@@ -11,11 +11,3 @@ spec:
   source:
     path: examples/my-service/overlay/staging
     repoURL: https://github.com/dag-andersen/argocd-diff-preview
-    kustomize:
-      patches:
-        - target:
-            kind: Deployment
-          patch: |-
-            - op: replace
-              path: /spec/template/spec/containers/0/ports/0/containerPort
-              value: 443
