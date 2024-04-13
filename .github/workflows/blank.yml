@@ -5,8 +5,6 @@ name: CI
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -22,18 +20,30 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - uses: actions/checkout@v4
+        with:
+          path: pull-request
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
 
       # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      - name: gh 
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          docker run \
+            --network=host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$(PWD)/main:/main" \
+            -v "$(PWD)/pull-request:/${{ github.head_ref }}" \
+            -v "$(PWD)/output:/output" \
+            -e RUST_LOG=info \
+            -e TARGET_BRANCH=${{ github.head_ref }} \
+            -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
+            dagandersen/argocd-diff-preview:latest
+          cat output/diff.md
 
       # Runs a set of commands using the runners shell
       - name: gh 
