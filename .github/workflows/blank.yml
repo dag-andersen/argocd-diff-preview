@@ -36,13 +36,13 @@ jobs:
           docker run \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$(PWD)/main:/main" \
-            -v "$(PWD)/pull-request:/${{ github.head_ref }}" \
-            -v "$(PWD)/output:/output" \
+            -v $(pwd)/main:/main \
+            -v $(pwd)/pull-request:/${{ github.head_ref }} \
+            -v $(pwd)/output:/output \
             -e RUST_LOG=info \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
-            dagandersen/argocd-diff-preview:latest
+            dagandersen/argocd-diff-preview:latest-amd64
           cat output/diff.md
 
       # Runs a set of commands using the runners shell
