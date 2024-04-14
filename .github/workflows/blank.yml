@@ -41,8 +41,8 @@ jobs:
           docker run \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $(pwd)/main:/main \
-            -v $(pwd)/pull-request:/${{ github.head_ref }} \
+            -v $(pwd)/main:/base-branch \
+            -v $(pwd)/pull-request:/target-branch\
             -v $(pwd)/output:/output \
             -e RUST_LOG=info \
             -e TARGET_BRANCH=${{ github.head_ref }} \
