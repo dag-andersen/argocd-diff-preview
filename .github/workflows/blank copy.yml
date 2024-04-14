@@ -34,9 +34,8 @@ jobs:
       - name: gh 
         run: |
           curl -sSL -o argocd-diff-preview https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.1/argocd-diff-preview
-          install -m 555 argocd-diff-preview /usr/local/bin/argocd-diff-preview
-          rm argocd-diff-preview
-          argocd-diff-preview --help
+          chmod +x argocd-diff-preview
+          ./argocd-diff-preview --help
 
       # Runs a set of commands using the runners shell
       - name: gh 
