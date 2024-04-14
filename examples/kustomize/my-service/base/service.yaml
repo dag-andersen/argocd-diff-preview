@@ -4,4 +4,4 @@ metadata:
   name: myapp
 spec:
   ports:
-  - port: 80
+    - port: 80

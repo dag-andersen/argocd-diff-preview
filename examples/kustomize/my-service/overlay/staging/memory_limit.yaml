@@ -6,9 +6,9 @@ spec:
   template:
     spec:
       containers:
-      - name: myapp
-        resources:
-          limits:
-            memory: "256Mi"
-          requests:
-            memory: "128Mi"
+        - name: myapp
+          resources:
+            limits:
+              memory: "256Mi"
+            requests:
+              memory: "128Mi"
