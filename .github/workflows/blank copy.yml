@@ -33,7 +33,7 @@ jobs:
       # Runs a set of commands using the runners shell
       - name: gh 
         run: |
-          curl -sSL -o argocd-diff-preview https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.1/argocd-diff-preview
+          curl -sSL -o argocd-diff-preview https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.2/argocd-diff-preview
           chmod +x argocd-diff-preview
           ./argocd-diff-preview --help
 
