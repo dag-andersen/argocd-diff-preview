@@ -9,5 +9,5 @@ spec:
     name: in-cluster
     namespace: default
   source:
-    path: examples/my-service/overlay/staging
+    path: examples/kustomize/my-service/overlay/staging
     repoURL: https://github.com/dag-andersen/argocd-diff-preview
