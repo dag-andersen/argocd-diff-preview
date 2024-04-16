@@ -81,23 +81,20 @@ docker run \
     path: main
 
 - name: Diff
-  run: |
-    docker run \
-      --network=host \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      -v $(pwd)/main:/base-branch \
-      -v $(pwd)/pull-request:/target-branch\
-      -v $(pwd)/output:/output \
-      -e RUST_LOG=info \
-      -e TARGET_BRANCH=${{ github.head_ref }} \
-      -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
-      dagandersen/argocd-diff-preview:latest-amd64
-    cat output/diff.md
+  run: >
+    docker run
+    --network=host
+    -v /var/run/docker.sock:/var/run/docker.sock
+    -v $(pwd)/main:/base-branch
+    -v $(pwd)/pull-request:/target-branch
+    -v $(pwd)/output:/output
+    -e TARGET_BRANCH=${{ github.head_ref }}
+    -e GIT_REPO=<your-repo>
+    dagandersen/argocd-diff-preview:latest-amd64
 
 - name: post comment 
   run: |
-    gh pr comment ${{ github.event.number }} --edit-last --body-file output/diff.md \
-      || gh pr comment ${{ github.event.number }} --body-file output/diff.md
+    gh pr comment ${{ github.event.number }} --body-file output/diff.md
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
