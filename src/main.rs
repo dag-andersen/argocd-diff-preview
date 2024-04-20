@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "example", about = "An example of StructOpt usage.")]
+#[structopt(name = "argocd-diff-preview", about = "A tool that generates the diff between two branches")]
 struct Opt {
     /// Activate debug mode
     // short and long flags (-d, --debug) will be deduced from the field's name
@@ -27,45 +27,35 @@ struct Opt {
     debug: bool,
 
     /// Set timeout
-    // we don't want to name it "speed", need to look smart
-    #[structopt(long = "timeout", default_value = "180", env = "TIMEOUT")]
+    #[structopt(long, default_value = "180", env)]
     timeout: u64,
 
-    /// Where to write the output: to `stdout` or `file`
-    #[structopt(short = "r", long = "file-regex", env = "FILE_REGEX")]
+    /// Regex to filter files. Example: "/apps_.*\.yaml"
+    #[structopt(short = "r", long, env)]
     file_regex: Option<String>,
 
-    #[structopt(short = "i", long = "diff-ignore", env = "DIFF_IGNORE")]
+    /// Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver
+    #[structopt(short = "i", long, env)]
     diff_ignore: Option<String>,
 
-    #[structopt(
-        short = "b",
-        long = "base-branch",
-        default_value = "main",
-        env = "BASE_BRANCH"
-    )]
+    /// Base branch name
+    #[structopt(short, long, default_value = "main", env)]
     base_branch: String,
 
-    #[structopt(short = "t", long = "target-branch", env = "TARGET_BRANCH")]
+    /// Target branch name
+    #[structopt(short, long, env)]
     target_branch: String,
 
+    /// Git repository URL
     #[structopt(short = "g", long = "git-repo", env = "GIT_REPO")]
     git_repository: String,
 
-    #[structopt(
-        short = "o",
-        long = "output-folder",
-        default_value = "./output",
-        env = "OUTPUT_FOLDER"
-    )]
+    /// Output folder where the diff will be saved
+    #[structopt(short, long, default_value = "./output", env)]
     output_folder: String,
 
-    #[structopt(
-        short = "s",
-        long = "secret-folder",
-        default_value = "./secrets",
-        env = "SECRET_FOLDER"
-    )]
+    /// Secrets folder where the secrets are read from
+    #[structopt(short, long, default_value = "./secrets", env)]
     secrets_folder: String,
 }
 
