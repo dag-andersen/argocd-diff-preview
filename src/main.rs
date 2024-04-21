@@ -19,7 +19,10 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "argocd-diff-preview", about = "A tool that generates the diff between two branches")]
+#[structopt(
+    name = "argocd-diff-preview",
+    about = "A tool that generates the diff between two branches"
+)]
 struct Opt {
     /// Activate debug mode
     // short and long flags (-d, --debug) will be deduced from the field's name
@@ -61,6 +64,13 @@ struct Opt {
 
 static BASE_BRANCH: &str = "base-branch";
 static TARGET_BRANCH: &str = "target-branch";
+static ERROR_MESSAGES: [&str; 5] = [
+    "helm template .",
+    "authentication required",
+    "path does not exist",
+    "error converting YAML to JSON",
+    "Unknown desc = `helm template .",
+];
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -202,7 +212,7 @@ async fn generate_diff(
     let diff_as_string = parse_diff_output(
         run_command(
             &format!(
-                "git --no-pager diff --no-index {} {} {}",
+                "git --no-pager diff -U10 --no-index {} {} {}",
                 list_of_patterns_to_ignore, BASE_BRANCH, TARGET_BRANCH
             ),
             Some(output_folder),
@@ -281,13 +291,7 @@ async fn get_resources(
                         for condition in conditions {
                             if let Some("ComparisonError") = condition["type"].as_str() {
                                 match condition["message"].as_str() {
-                                    Some(msg)
-                                        if msg.contains("helm template .")
-                                            || msg.contains("authentication required")
-                                            || msg.contains("path does not exist")
-                                            || msg.contains("error converting YAML to JSON")
-                                            || msg.contains("Unknown desc = `helm template .") =>
-                                    {
+                                    Some(msg) if ERROR_MESSAGES.iter().any(|e| msg.contains(e)) => {
                                         set_of_failed_apps
                                             .insert(name.to_string().clone(), msg.to_string());
                                         continue;
@@ -548,7 +552,7 @@ async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Output,
         .args(&args[1..])
         .current_dir(current_dir.unwrap_or("."))
         .output()
-        .expect(format!("Failed to execute command {}", command).as_str());
+        .expect(format!("Failed to execute command: {}", command).as_str());
 
     if !output.status.success() {
         return Err(output);
