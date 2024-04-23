@@ -64,9 +64,10 @@ struct Opt {
 
 static BASE_BRANCH: &str = "base-branch";
 static TARGET_BRANCH: &str = "target-branch";
-static ERROR_MESSAGES: [&str; 5] = [
+static ERROR_MESSAGES: [&str; 6] = [
     "helm template .",
     "authentication required",
+    "authentication failed",
     "path does not exist",
     "error converting YAML to JSON",
     "Unknown desc = `helm template .",
@@ -75,6 +76,9 @@ static ERROR_MESSAGES: [&str; 5] = [
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
+
+    // Start timer
+    let start = std::time::Instant::now();
 
     if opt.debug {
         std::env::set_var("RUST_LOG", "debug");
@@ -170,6 +174,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         diff_ignore,
     )
     .await?;
+
+    info!("🎉 Done in {} seconds", start.elapsed().as_secs());
 
     Ok(())
 }
@@ -663,7 +669,7 @@ async fn patch_argocd_applications(
             let resource: serde_yaml::Value = match serde_yaml::from_str(r) {
                 Ok(r) => r,
                 Err(e) => {
-                    error!("⚠️ failed to parse resource with error: {}", e);
+                    debug!("⚠️ failed to parse resource with error: {}", e);
                     serde_yaml::Value::Null
                 }
             };

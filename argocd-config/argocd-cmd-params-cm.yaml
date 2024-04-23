@@ -8,4 +8,4 @@ metadata:
   namespace: argocd
 data:
   reposerver.git.request.timeout: "150s"
-  reposerver.parallelism.limit: "100"
+  reposerver.parallelism.limit: "300"
