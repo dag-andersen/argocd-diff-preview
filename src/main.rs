@@ -45,9 +45,17 @@ struct Opt {
     #[structopt(short, long, default_value = "main", env)]
     base_branch: String,
 
+    /// Base branch folder
+    #[structopt(long, env, default_value = "base-branch")]
+    base_branch_folder: String,
+
     /// Target branch name
     #[structopt(short, long, env)]
     target_branch: String,
+
+    /// Target branch folder
+    #[structopt(long, env, default_value = "target-branch")]
+    target_branch_folder: String,
 
     /// Git repository URL
     #[structopt(short = "g", long = "git-repo", env = "GIT_REPO")]
@@ -62,8 +70,20 @@ struct Opt {
     secrets_folder: String,
 }
 
-static BASE_BRANCH: &str = "base-branch";
-static TARGET_BRANCH: &str = "target-branch";
+enum Branch {
+    Base,
+    Target,
+}
+
+impl std::fmt::Display for Branch {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Branch::Base => write!(f, "base"),
+            Branch::Target => write!(f, "target"),
+        }
+    }
+}
+
 static ERROR_MESSAGES: [&str; 6] = [
     "helm template .",
     "authentication required",
@@ -98,7 +118,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|f| Regex::new(&f).unwrap());
 
     let base_branch_name = opt.base_branch;
+    let base_branch_folder = opt.base_branch_folder;
     let target_branch_name = opt.target_branch;
+    let target_branch_folder = opt.target_branch_folder;
     let repo = opt.git_repository;
     let diff_ignore = opt.diff_ignore;
     let timeout = opt.timeout;
@@ -108,6 +130,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("✨ Running with:");
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
+    info!("✨ - base-branch-folder: {}", base_branch_folder);
+    info!("✨ - target-branch-folder: {}", target_branch_folder);
+    info!("✨ - secrets-folder: {}", secrets_folder);
+    info!("✨ - output-folder: {}", output_folder);
     info!("✨ - git-repo: {}", repo);
     info!("✨ - timeout: {}", timeout);
     if let Some(a) = file_regex.clone() {
@@ -117,21 +143,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("✨ - diff-ignore: {}", a);
     }
 
+    if !check_if_folder_exists(&base_branch_folder) {
+        error!("❌ Base branch folder does not exist: {}", base_branch_folder);
+        panic!("Base branch folder does not exist");
+    }
+
+    if !check_if_folder_exists(&target_branch_folder) {
+        error!("❌ Target branch folder does not exist: {}", target_branch_folder);
+        panic!("Target branch folder does not exist");
+    }
+
     create_cluster("argocd-test").await?;
-    let client = Client::try_default().await?;
-    // use k8s_openapi::api::core::v1::Pod;
-    // let pods: Api<Pod> = Api::namespaced(client.clone(), "kube-system");
-
-    // // list all pods
-    // for p in pods.list(&Default::default()).await? {
-    //     info!(
-    //         "Found pod {} in namespace {}",
-    //         p.metadata.name.unwrap(),
-    //         p.metadata.namespace.unwrap()
-    //     );
-    // }
-
-    install_argo_cd(client.clone()).await?;
+    install_argo_cd().await?;
 
     create_folder_if_not_exists(secrets_folder);
     match apply_folder(secrets_folder) {
@@ -143,29 +166,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let file_name = |branch: &str| format!("apps_{}.yaml", branch);
-
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
-    let base_apps =
-        parse_argocd_application(&BASE_BRANCH, &base_branch_name, &file_regex, &repo).await?;
-    write_to_file(&base_apps, &file_name(&BASE_BRANCH));
-    let target_apps =
-        parse_argocd_application(&TARGET_BRANCH, &target_branch_name, &file_regex, &repo).await?;
-    write_to_file(&target_apps, &file_name(&TARGET_BRANCH));
+    let base_apps = parse_argocd_application(&base_branch_folder, &base_branch_name, &file_regex, &repo).await?;
+    write_to_file(&base_apps, apps_file(&Branch::Base));
+    let target_apps = parse_argocd_application(&target_branch_folder, &target_branch_name, &file_regex, &repo).await?;
+    write_to_file(&target_apps, apps_file(&Branch::Target));
 
     // Cleanup
-    create_folder_if_not_exists(output_folder);
-    fs::remove_dir_all(format!("{}/{}", output_folder, BASE_BRANCH)).unwrap_or_default();
-    fs::remove_dir_all(format!("{}/{}", output_folder, TARGET_BRANCH)).unwrap_or_default();
-    fs::create_dir(format!("{}/{}", output_folder, BASE_BRANCH))
-        .expect("Unable to create directory");
-    fs::create_dir(format!("{}/{}", output_folder, TARGET_BRANCH))
-        .expect("Unable to create directory");
+    clean_output_folder(output_folder);
 
-    get_resources(BASE_BRANCH, timeout, output_folder).await?;
+    get_resources(&Branch::Base, timeout, output_folder).await?;
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
-    get_resources(TARGET_BRANCH, timeout, output_folder).await?;
+    get_resources(&Branch::Target, timeout, output_folder).await?;
 
     generate_diff(
         output_folder,
@@ -180,13 +193,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn clean_output_folder(output_folder: &str) {
+    create_folder_if_not_exists(output_folder);
+    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Base)).unwrap_or_default();
+    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Target)).unwrap_or_default();
+    fs::create_dir(format!("{}/{}", output_folder, Branch::Base))
+        .expect("Unable to create directory");
+    fs::create_dir(format!("{}/{}", output_folder, Branch::Target))
+        .expect("Unable to create directory");
+}
+
+fn apps_file(branch: &Branch) -> &'static str {
+    match branch {
+        Branch::Base => "apps_base_branch.yaml",
+        Branch::Target => "apps_target_branch.yaml",
+    }
+}
+
 async fn generate_diff(
     output_folder: &str,
-    base: &str,
-    target: &str,
+    base_branch_name: &str,
+    target_branch_name: &str,
     diff_ignore: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    info!("🔮 Generating diff between {} and {}", base, target);
+    info!("🔮 Generating diff between {} and {}", base_branch_name, target_branch_name);
 
     let list_of_patterns_to_ignore = match diff_ignore {
         Some(s) => s
@@ -208,7 +238,7 @@ async fn generate_diff(
         run_command(
             &format!(
                 "git --no-pager diff --compact-summary --no-index {} {} {}",
-                list_of_patterns_to_ignore, BASE_BRANCH, TARGET_BRANCH
+                list_of_patterns_to_ignore, Branch::Base, Branch::Target
             ),
             Some(output_folder),
         )
@@ -219,7 +249,7 @@ async fn generate_diff(
         run_command(
             &format!(
                 "git --no-pager diff -U10 --no-index {} {} {}",
-                list_of_patterns_to_ignore, BASE_BRANCH, TARGET_BRANCH
+                list_of_patterns_to_ignore, Branch::Base, Branch::Target
             ),
             Some(output_folder),
         )
@@ -237,15 +267,13 @@ async fn generate_diff(
 }
 
 async fn get_resources(
-    branch_type: &str,
+    branch_type: &Branch,
     timeout: u64,
     output_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
     info!("🌚 Getting resources for {}", branch_type);
 
-    let applications_file = format!("apps_{}.yaml", branch_type);
-
-    match apply_manifest(&applications_file) {
+    match apply_manifest(&apps_file(branch_type)) {
         Ok(_) => (),
         Err(e) => panic!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
@@ -378,31 +406,24 @@ async fn get_resources(
         branch_type
     );
 
-    match delete_manifest(&applications_file) {
+    match run_command("kubectl delete applications.argoproj.io -n argocd --all", None).await {
         Ok(_) => (),
         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
     Ok(())
 }
 
-async fn install_argo_cd(client: Client) -> Result<(), Box<dyn Error>> {
+async fn install_argo_cd() -> Result<(), Box<dyn Error>> {
     info!("🦑 Installing Argo CD...");
 
-    // Create namespace
-    let ns = k8s_openapi::api::core::v1::Namespace {
-        metadata: kube::api::ObjectMeta {
-            name: Some("argocd".to_string()),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    let ns_api: Api<Namespace> = Api::all(client.clone());
-    ns_api.create(&Default::default(), &ns).await?;
 
-    // // list namespaces
-    // for ns in ns_api.list(&Default::default()).await? {
-    //     info!("Found namespace {}", ns.metadata.name.unwrap());
-    // }
+    match run_command("kubectl create ns argocd", None).await {
+        Ok(_) => (),
+        Err(e) => {
+            error!("❌ Failed to create namespace argocd");
+            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
+        }
+    }
 
     // Install Argo CD
     match run_command("kubectl -n argocd apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml", None).await {
@@ -413,8 +434,36 @@ async fn install_argo_cd(client: Client) -> Result<(), Box<dyn Error>> {
         }
     }
     info!("🦑 Waiting for Argo CD to start...");
-    apply_manifest("argocd-config/argocd-cmd-params-cm.yaml")
-        .expect("failed to apply argocd-cmd-params-cm");
+
+    static ARGOCD_CMD_PARAMS_CM : &str = r#"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  reposerver.git.request.timeout: "150s"
+  reposerver.parallelism.limit: "300"
+"#;
+    // apply argocd-cmd-params-cm
+    let mut child = Command::new("kubectl")
+        .arg("apply")
+        .arg("-f")
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to execute process");
+
+    let child_stdin = child.stdin.as_mut().expect("Failed to open stdin");
+    child_stdin.write_all(ARGOCD_CMD_PARAMS_CM.as_bytes()).expect("Failed to write to stdin");
+
+    let output = child.wait_with_output().expect("Failed to read stdout");
+
     run_command(
         "kubectl -n argocd rollout restart deploy argocd-repo-server",
         None,
@@ -444,8 +493,9 @@ async fn install_argo_cd(client: Client) -> Result<(), Box<dyn Error>> {
         .spawn()
         .expect("failed to execute process");
 
+    let client = Client::try_default().await?;
     debug!("password:");
-    let secret: Api<Secret> = Api::namespaced(client.clone(), "argocd");
+    let secret: Api<Secret> = Api::namespaced(client, "argocd");
     let secret_name = "argocd-initial-admin-secret";
     let secret = secret.get(secret_name).await?.clone();
     let data = secret.data.unwrap();
@@ -786,6 +836,10 @@ fn create_folder_if_not_exists(folder_name: &str) {
     if !PathBuf::from(folder_name).is_dir() {
         fs::create_dir(folder_name).expect("Unable to create directory");
     }
+}
+
+fn check_if_folder_exists(folder_name: &str) -> bool {
+    PathBuf::from(folder_name).is_dir()
 }
 
 fn print_diff(summary: &str, diff: &str) -> String {
