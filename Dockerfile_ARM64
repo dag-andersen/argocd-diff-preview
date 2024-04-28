@@ -45,7 +45,5 @@ COPY --from=build /argocd-diff-preview/target/release/argocd-diff-preview .
 
 RUN apt-get update && apt-get install -y git
 
-COPY ./argocd-config ./argocd-config
-
 # set the startup command to run your binary
 CMD ["./argocd-diff-preview"]

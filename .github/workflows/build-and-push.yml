@@ -1,9 +1,9 @@
-name: Build and push
+name: Build and Push on tag
 
-on: workflow_dispatch
-
-env:
-  APP-VERSION: ${{ github.run_id }}
+on:
+  push:
+    tags:
+      - "v*.*.*"
 
 jobs:
   build-amd64:
@@ -20,14 +20,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile_AMD64
-          platforms: linux/amd64
-          push: true
-          tags: dagandersen/argocd-diff-preview:latest-amd64
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      - name: Build and push # tag with git tag
+        run: |
+          docker buildx build --platform=linux/amd64 -f ./Dockerfile_AMD64 . -t dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 --push
 
   build-arm64:
     runs-on: ubuntu-latest
@@ -43,16 +40,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile_ARM64
-          platforms: linux/arm64
-          push: true
-          tags: dagandersen/argocd-diff-preview:latest-arm64
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      - name: Build and push # tag with git tag
+        run: |
+          docker buildx build --platform=linux/arm64 -f ./Dockerfile_ARM64 . -t dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64 --push
 
-  docker-manifest:
+  create-manifest:
     runs-on: ubuntu-latest
     needs: [build-amd64, build-arm64]
     steps:
@@ -67,10 +61,15 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: create manifest
         run: |
-          docker manifest create dagandersen/argocd-diff-preview:latest \
-            dagandersen/argocd-diff-preview-amd64:latest \
-            dagandersen/argocd-diff-preview-arm64:latest
-          docker manifest push dagandersen/argocd-diff-preview:latest
-
+          docker buildx imagetools create -t \
+            dagandersen/argocd-diff-preview:${RELEASE_VERSION} \
+            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 \
+            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64
+          docker buildx imagetools create -t \
+            dagandersen/argocd-diff-preview:latest \
+            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 \
+            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64

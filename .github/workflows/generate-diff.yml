@@ -1,4 +1,4 @@
-name: Calculate diff
+name: Generate Diff
 
 on:
   pull_request:
@@ -26,18 +26,17 @@ jobs:
           ref: main
           path: main
 
-      - name: Calculate diff
-        run: >
-          docker run
-          --network=host
-          -v /var/run/docker.sock:/var/run/docker.sock
-          -v $(pwd)/main:/base-branch
-          -v $(pwd)/pull-request:/target-branch
-          -v $(pwd)/output:/output
-          -e RUST_LOG=info
-          -e TARGET_BRANCH=${{ github.head_ref }}
-          -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git"
-          dagandersen/argocd-diff-preview:latest-amd64
+      - name: Diff
+        run: |
+          docker run \
+            --network=host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $(pwd)/main:/base-branch \
+            -v $(pwd)/pull-request:/target-branch \
+            -v $(pwd)/output:/output \
+            -e TARGET_BRANCH=${{ github.head_ref }} \
+            -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
+            dagandersen/argocd-diff-preview:latest
 
       - name: Post diff as comment
         run: |

@@ -1,7 +1,9 @@
 name: Tests and release
 
-on: workflow_dispatch
-
+on:
+  push:
+    tags:
+      - "v*.*.*"
 env:
   CRATE_NAME: argocd-diff-preview
   GITHUB_TOKEN: ${{ github.token }}
@@ -11,6 +13,8 @@ jobs:
   test:
     name: ${{ matrix.platform.os_name }} with rust
     runs-on: ${{ matrix.platform.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -66,3 +70,9 @@ jobs:
         with:
           name: argocd-diff-preview-${{ matrix.platform.os_name }}
           path: "argocd-diff-preview-*"
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: "argocd-diff-preview-*"
+        if: startsWith( github.ref, 'refs/tags/v' )
