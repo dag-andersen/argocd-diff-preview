@@ -6,8 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kube = { version = "0.90.0", features = ["runtime", "derive"] }
-k8s-openapi = { version = "0.21.1", features = ["latest"] }
 tokio = {version="1.4.0",features = ["full"]}
 base64 = "0.22.0"
 serde = "1.0"
