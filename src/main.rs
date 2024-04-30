@@ -1,18 +1,23 @@
 use regex::Regex;
-use base64::prelude::*;
 use serde_yaml::Mapping;
 use std::collections::HashSet;
+use std::fs;
 use std::{
     collections::BTreeMap,
     error::Error,
-    fs::{self, File},
     io::{BufRead, Write},
-    process::{Command, Output, Stdio},
+    process::{Command, Output},
 };
 
 use log::{debug, error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_output_to_file, write_to_file};
+mod kind;
+mod argocd;
+mod utils;
+mod diff;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -69,6 +74,13 @@ struct Opt {
 enum Branch {
     Base,
     Target,
+}
+
+fn apps_file(branch: &Branch) -> &'static str {
+    match branch {
+        Branch::Base => "apps_base_branch.yaml",
+        Branch::Target => "apps_target_branch.yaml",
+    }
 }
 
 impl std::fmt::Display for Branch {
@@ -151,8 +163,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cluster_name = "argocd-diff-preview";
 
-    create_cluster(&cluster_name).await?;
-    install_argo_cd().await?;
+    kind::create_cluster(&cluster_name).await?;
+    argocd::install_argo_cd().await?;
 
     create_folder_if_not_exists(secrets_folder);
     match apply_folder(secrets_folder) {
@@ -178,9 +190,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     get_resources(&Branch::Target, timeout, output_folder).await?;
 
-    delete_cluster(&cluster_name);
+    kind::delete_cluster(&cluster_name);
 
-    generate_diff(
+    diff::generate_diff(
         output_folder,
         &base_branch_name,
         &target_branch_name,
@@ -201,69 +213,6 @@ fn clean_output_folder(output_folder: &str) {
         .expect("Unable to create directory");
     fs::create_dir(format!("{}/{}", output_folder, Branch::Target))
         .expect("Unable to create directory");
-}
-
-fn apps_file(branch: &Branch) -> &'static str {
-    match branch {
-        Branch::Base => "apps_base_branch.yaml",
-        Branch::Target => "apps_target_branch.yaml",
-    }
-}
-
-async fn generate_diff(
-    output_folder: &str,
-    base_branch_name: &str,
-    target_branch_name: &str,
-    diff_ignore: Option<String>,
-) -> Result<(), Box<dyn Error>> {
-    info!("🔮 Generating diff between {} and {}", base_branch_name, target_branch_name);
-
-    let list_of_patterns_to_ignore = match diff_ignore {
-        Some(s) => s
-            .split(",")
-            .map(|s| format!("--ignore-matching-lines={}", s))
-            .collect::<Vec<String>>()
-            .join(" "),
-        None => "".to_string(),
-    };
-
-    let parse_diff_output = |output: Result<Output, Output>| -> String {
-        match output {
-            Ok(_) => "No changes found".to_string(),
-            Err(e) => String::from_utf8_lossy(&e.stdout).to_string(),
-        }
-    };
-
-    let summary_as_string = parse_diff_output(
-        run_command(
-            &format!(
-                "git --no-pager diff --compact-summary --no-index {} {} {}",
-                list_of_patterns_to_ignore, Branch::Base, Branch::Target
-            ),
-            Some(output_folder),
-        )
-        .await,
-    );
-
-    let diff_as_string = parse_diff_output(
-        run_command(
-            &format!(
-                "git --no-pager diff -U10 --no-index {} {} {}",
-                list_of_patterns_to_ignore, Branch::Base, Branch::Target
-            ),
-            Some(output_folder),
-        )
-        .await,
-    );
-
-    let markdown = print_diff(&summary_as_string, &diff_as_string);
-
-    let markdown_path = format!("{}/diff.md", output_folder);
-    write_to_file(&markdown, &markdown_path);
-
-    info!("🙏 Please check the {} file for differences", markdown_path);
-
-    Ok(())
 }
 
 async fn get_resources(
@@ -413,236 +362,6 @@ async fn get_resources(
         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
     Ok(())
-}
-
-async fn install_argo_cd() -> Result<(), Box<dyn Error>> {
-    info!("🦑 Installing Argo CD...");
-
-
-    match run_command("kubectl create ns argocd", None).await {
-        Ok(_) => (),
-        Err(e) => {
-            error!("❌ Failed to create namespace argocd");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
-
-    // Install Argo CD
-    match run_command("kubectl -n argocd apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml", None).await {
-        Ok(_) => (),
-        Err(e) => {
-            error!("❌ Failed to install Argo CD");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
-    info!("🦑 Waiting for Argo CD to start...");
-
-    static ARGOCD_CMD_PARAMS_CM : &str = r#"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    app.kubernetes.io/name: argocd-cmd-params-cm
-    app.kubernetes.io/part-of: argocd
-  name: argocd-cmd-params-cm
-  namespace: argocd
-data:
-  reposerver.git.request.timeout: "150s"
-  reposerver.parallelism.limit: "300"
-"#;
-    // apply argocd-cmd-params-cm
-    let mut child = Command::new("kubectl")
-        .arg("apply")
-        .arg("-f")
-        .arg("-")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("failed to execute process");
-
-    let child_stdin = child.stdin.as_mut().expect("Failed to open stdin");
-    child_stdin.write_all(ARGOCD_CMD_PARAMS_CM.as_bytes()).expect("Failed to write to stdin");
-    child.wait_with_output().expect("Failed to read stdout");
-
-    run_command(
-        "kubectl -n argocd rollout restart deploy argocd-repo-server",
-        None,
-    )
-    .await
-    .expect("failed to restart argocd-repo-server");
-    run_command(
-        "kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=60s",
-        None,
-    )
-    .await
-    .expect("failed to wait for argocd-repo-server");
-
-    info!("🦑 Logging in to Argo CD through CLI...");
-    debug!("Port-forwarding Argo CD server...");
-
-    // port-forward Argo CD server
-    Command::new("kubectl")
-        .arg("-n")
-        .arg("argocd")
-        .arg("port-forward")
-        .arg("service/argocd-server")
-        .arg("8080:443")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("failed to execute process");
-
-    debug!("Getting initial admin password...");
-    let secret_name = "argocd-initial-admin-secret";
-    let command = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password}";
-    debug!("Running command: {}", command);
-    let password_encoded = match run_command(
-        &command,
-        None,
-    ).await {
-        Ok(a) => a,
-        Err(e) => {
-            error!("❌ Failed to get secret {}", secret_name);
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    };
-
-    let password_decoded_vec = BASE64_STANDARD.decode(password_encoded.stdout).expect("failed to decode password");
-    let password = String::from_utf8(password_decoded_vec).expect("failed to convert password to string");
-    
-    // sleep for 5 seconds
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await; 
-    
-    // log into Argo CD
-    
-    let username = "admin";
-    debug!("Logging in to Argo CD with username, {} and password, {}", username, password);
-
-    run_command(
-        &format!(
-            "argocd login localhost:8080 --insecure --username {} --password {}",
-            username,
-            password
-        ),
-        None,
-    )
-    .await
-    .expect("failed to login to argocd");
-
-    run_command("argocd app list", None)
-        .await
-        .expect("Failed to run: argocd app list");
-
-    info!("🦑 Argo CD installed successfully");
-    Ok(())
-}
-
-async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
-    // check if docker is running
-    match run_command("docker ps", None).await {
-        Ok(_) => (),
-        Err(e) => {
-            error!("❌ Docker is not running");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
-
-    info!("🚀 Creating cluster...");
-    match Command::new("kind")
-        .arg("delete")
-        .arg("cluster")
-        .arg("--name")
-        .arg(cluster_name)
-        .output()
-    {
-        Ok(o) => o,
-        Err(e) => {
-            panic!("error: {}", e)
-        }
-    };
-
-    match run_command(
-        &format!("kind create cluster --name {}", cluster_name),
-        None,
-    )
-    .await
-    {
-        Ok(_) => {
-            info!("🚀 Cluster created successfully");
-            Ok(())
-        }
-        Err(e) => {
-            error!("❌ Failed to Create cluster");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
-}
-
-fn delete_cluster(cluster_name: &str) {
-    info!("💥 Deleting cluster...");
-    spawn_command(
-        &format!("kind delete cluster --name {}", cluster_name),
-        None,
-    );
-}
-
-async fn run_command_output_to_file(
-    command: &str,
-    file_name: &str,
-    create_folder: bool,
-) -> Result<Output, Output> {
-    let output = run_command(command, None).await?;
-    save_to_file(&output.stdout, file_name, create_folder)
-        .await
-        .expect("failed to save output to file");
-    Ok(output)
-}
-
-async fn save_to_file(
-    s: &Vec<u8>,
-    file_name: &str,
-    create_folder: bool,
-) -> Result<(), Box<dyn Error>> {
-    if create_folder {
-        let path = PathBuf::from(file_name);
-        let parent = path.parent().unwrap();
-        if !parent.is_dir() {
-            fs::create_dir_all(parent).expect("Unable to create directory");
-        }
-    }
-    fs::remove_file(file_name).unwrap_or_default();
-    let mut f = File::create_new(file_name).expect("Unable to create file");
-    f.write_all(s).expect("Unable to write file");
-
-    Ok(())
-}
-
-async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Output, Output> {
-    let args = command.split_whitespace().collect::<Vec<&str>>();
-    let output = Command::new(args[0])
-        .args(&args[1..])
-        .current_dir(current_dir.unwrap_or("."))
-        .output()
-        .expect(format!("Failed to execute command: {}", command).as_str());
-
-    if !output.status.success() {
-        return Err(output);
-    }
-
-    Ok(output)
-}
-
-fn spawn_command(command: &str, current_dir: Option<&str>) {
-    let args = command.split_whitespace().collect::<Vec<&str>>();
-    Command::new(args[0])
-        .args(&args[1..])
-        .current_dir(current_dir.unwrap_or("."))
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect(format!("Failed to execute command: {}", command).as_str());
 }
 
 async fn parse_argocd_application(
@@ -805,12 +524,6 @@ async fn patch_argocd_applications(
     Ok(output)
 }
 
-fn write_to_file(s: &str, file_name: &str) {
-    fs::remove_file(file_name).unwrap_or_default();
-    let mut f = File::create_new(file_name).expect("Unable to create file");
-    f.write_all(s.as_bytes()).expect("Unable to write file");
-}
-
 fn apply_manifest(file_name: &str) -> Result<Output, Output> {
     let output = Command::new("kubectl")
         .arg("apply")
@@ -846,37 +559,3 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
     Ok(count)
 }
 
-fn create_folder_if_not_exists(folder_name: &str) {
-    if !PathBuf::from(folder_name).is_dir() {
-        fs::create_dir(folder_name).expect("Unable to create directory");
-    }
-}
-
-fn check_if_folder_exists(folder_name: &str) -> bool {
-    PathBuf::from(folder_name).is_dir()
-}
-
-fn print_diff(summary: &str, diff: &str) -> String {
-    let markdown = r#"
-## Argo CD Diff Preview
-
-Summary:
-```bash
-%summary%
-```
-
-<details>
-<summary>Diff:</summary>
-<br>
-
-```diff
-%diff%
-```
-
-</details>
-"#;
-
-    markdown
-        .replace("%summary%", summary)
-        .replace("%diff%", diff)
-}
