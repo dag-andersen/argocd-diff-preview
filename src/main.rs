@@ -153,7 +153,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         panic!("Target branch folder does not exist");
     }
 
-    create_cluster("argocd-test").await?;
+    let cluster_name = "argocd-diff-preview";
+
+    create_cluster(&cluster_name).await?;
     install_argo_cd().await?;
 
     create_folder_if_not_exists(secrets_folder);
@@ -179,6 +181,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     get_resources(&Branch::Base, timeout, output_folder).await?;
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     get_resources(&Branch::Target, timeout, output_folder).await?;
+
+    delete_cluster(&cluster_name);
 
     generate_diff(
         output_folder,
@@ -571,6 +575,14 @@ async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     }
 }
 
+fn delete_cluster(cluster_name: &str) {
+    info!("💥 Deleting cluster...");
+    spawn_command(
+        &format!("kind delete cluster --name {}", cluster_name),
+        None,
+    );
+}
+
 async fn run_command_output_to_file(
     command: &str,
     file_name: &str,
@@ -615,6 +627,17 @@ async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Output,
     }
 
     Ok(output)
+}
+
+fn spawn_command(command: &str, current_dir: Option<&str>) {
+    let args = command.split_whitespace().collect::<Vec<&str>>();
+    Command::new(args[0])
+        .args(&args[1..])
+        .current_dir(current_dir.unwrap_or("."))
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect(format!("Failed to execute command: {}", command).as_str());
 }
 
 async fn parse_argocd_application(
