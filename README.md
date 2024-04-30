@@ -194,7 +194,7 @@ stringData:
 </details>
 
 <details>
-  <summary>Credentials example  - GitHub App </summary>
+  <summary>Credentials example - GitHub App </summary>
 
 ```yaml
 apiVersion: v1

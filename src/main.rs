@@ -306,7 +306,7 @@ async fn get_resources(
             }
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
-                    debug!("processing application: {}", name);
+                    debug!("Processing application: {}", name);
                     match run_command_output_to_file(
                         &format!("argocd app manifests {}", name),
                         &format!("{}/{}/{}", output_folder, branch_type, name),
@@ -314,7 +314,7 @@ async fn get_resources(
                     )
                     .await
                     {
-                        Ok(_) => debug!("processed application: {}", name),
+                        Ok(_) => debug!("Processed application: {}", name),
                         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
                     }
                     set_of_processed_apps.insert(name.to_string().clone());
@@ -649,7 +649,7 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String
 
     let k8s_resources: Vec<String> = yaml_files
         .flat_map(|f| {
-            debug!("file: {}", f);
+            debug!("Found file: {}", f);
             let file = std::fs::File::open(f).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
@@ -719,7 +719,7 @@ async fn patch_argocd_applications(
             let resource: serde_yaml::Value = match serde_yaml::from_str(r) {
                 Ok(r) => r,
                 Err(e) => {
-                    debug!("⚠️ failed to parse resource with error: {}", e);
+                    debug!("⚠️ Failed to parse resource with error: {}", e);
                     serde_yaml::Value::Null
                 }
             };
@@ -753,7 +753,7 @@ async fn patch_argocd_applications(
                 }
             });
             debug!(
-                "#### done with: {:?}",
+                "Collected resources from application: {:?}",
                 r["metadata"]["name"].as_str().unwrap()
             );
             r
