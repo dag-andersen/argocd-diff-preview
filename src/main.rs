@@ -1,9 +1,5 @@
-#![allow(unused_imports)]
-#![allow(dead_code)]
-#![allow(unused_variables)]
-use k8s_openapi::api::core::v1::{Namespace, Secret};
-use kube::{Api, Client, Resource};
 use regex::Regex;
+use base64::prelude::*;
 use serde_yaml::Mapping;
 use std::collections::HashSet;
 use std::{
@@ -14,7 +10,7 @@ use std::{
     process::{Command, Output, Stdio},
 };
 
-use log::{debug, error, info, log_enabled, warn, Level, LevelFilter};
+use log::{debug, error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -233,7 +229,7 @@ async fn generate_diff(
 
     let parse_diff_output = |output: Result<Output, Output>| -> String {
         match output {
-            Ok(o) => "No changes found".to_string(),
+            Ok(_) => "No changes found".to_string(),
             Err(e) => String::from_utf8_lossy(&e.stdout).to_string(),
         }
     };
@@ -277,9 +273,11 @@ async fn get_resources(
 ) -> Result<(), Box<dyn Error>> {
     info!("🌚 Getting resources for {}", branch_type);
 
-    match apply_manifest(&apps_file(branch_type)) {
-        Ok(_) => (),
-        Err(e) => panic!("error: {}", String::from_utf8_lossy(&e.stderr)),
+    if fs::metadata(apps_file(branch_type)).unwrap().len() != 0 {
+        match apply_manifest(&apps_file(branch_type)) {
+            Ok(_) => (),
+            Err(e) => panic!("error: {}", String::from_utf8_lossy(&e.stderr)),
+        }
     }
 
     let mut set_of_processed_apps = HashSet::new();
@@ -384,7 +382,7 @@ async fn get_resources(
             );
             for app in &list_of_timed_out_apps {
                 match run_command(&format!("argocd app get {} --refresh", app), None).await {
-                    Ok(e) => info!("🔄 Refreshing application: {}", app),
+                    Ok(_) => info!("🔄 Refreshing application: {}", app),
                     Err(e) => error!(
                         "⚠️ Failed to refresh application: {} with {}",
                         app,
@@ -465,8 +463,7 @@ data:
 
     let child_stdin = child.stdin.as_mut().expect("Failed to open stdin");
     child_stdin.write_all(ARGOCD_CMD_PARAMS_CM.as_bytes()).expect("Failed to write to stdin");
-
-    let output = child.wait_with_output().expect("Failed to read stdout");
+    child.wait_with_output().expect("Failed to read stdout");
 
     run_command(
         "kubectl -n argocd rollout restart deploy argocd-repo-server",
@@ -485,7 +482,7 @@ data:
     debug!("Port-forwarding Argo CD server...");
 
     // port-forward Argo CD server
-    let child = Command::new("kubectl")
+    Command::new("kubectl")
         .arg("-n")
         .arg("argocd")
         .arg("port-forward")
@@ -497,38 +494,46 @@ data:
         .spawn()
         .expect("failed to execute process");
 
-    let client = Client::try_default().await?;
-    debug!("password:");
-    let secret: Api<Secret> = Api::namespaced(client, "argocd");
+    debug!("Getting initial admin password...");
     let secret_name = "argocd-initial-admin-secret";
-    let secret = secret.get(secret_name).await?.clone();
-    let data = secret.data.unwrap();
-    let password_encoded = data.get("password").unwrap();
-    let password_decoded = String::from_utf8_lossy(&password_encoded.0);
-    debug!("- {}", password_decoded);
+    let command = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password}";
+    debug!("Running command: {}", command);
+    let password_encoded = match run_command(
+        &command,
+        None,
+    ).await {
+        Ok(a) => a,
+        Err(e) => {
+            error!("❌ Failed to get secret {}", secret_name);
+            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
+        }
+    };
 
+    let password_decoded_vec = BASE64_STANDARD.decode(password_encoded.stdout).expect("failed to decode password");
+    let password = String::from_utf8(password_decoded_vec).expect("failed to convert password to string");
+    
     // sleep for 5 seconds
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await; 
+    
     // log into Argo CD
+    
+    let username = "admin";
+    debug!("Logging in to Argo CD with username, {} and password, {}", username, password);
 
     run_command(
         &format!(
-            "argocd login localhost:8080 --insecure --username admin --password {}",
-            password_decoded
+            "argocd login localhost:8080 --insecure --username {} --password {}",
+            username,
+            password
         ),
         None,
     )
     .await
     .expect("failed to login to argocd");
 
-    let output = run_command("argocd app list", None)
+    run_command("argocd app list", None)
         .await
-        .expect("failed to list argocd apps");
-    debug!(
-        "argocd app list output: \n{}",
-        String::from_utf8_lossy(&output.stdout)
-    );
+        .expect("Failed to run: argocd app list");
 
     info!("🦑 Argo CD installed successfully");
     Ok(())
@@ -545,7 +550,7 @@ async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     }
 
     info!("🚀 Creating cluster...");
-    let output = match Command::new("kind")
+    match Command::new("kind")
         .arg("delete")
         .arg("cluster")
         .arg("--name")
@@ -839,20 +844,6 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
         }
     }
     Ok(count)
-}
-
-// TODO: delete using "delete applications --all"
-fn delete_manifest(file_name: &str) -> Result<Output, Output> {
-    let output = Command::new("kubectl")
-        .arg("delete")
-        .arg("-f")
-        .arg(file_name)
-        .output()
-        .expect(format!("failed to delete manifest: {}", file_name).as_str());
-    match output.status.success() {
-        true => Ok(output),
-        false => Err(output),
-    }
 }
 
 fn create_folder_if_not_exists(folder_name: &str) {
