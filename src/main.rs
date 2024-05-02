@@ -13,11 +13,15 @@ use log::{debug, error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_output_to_file, write_to_file};
-mod kind;
+use crate::utils::{
+    check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_output_to_file,
+    write_to_file,
+};
 mod argocd;
-mod utils;
 mod diff;
+mod kind;
+mod minikube;
+mod utils;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -111,6 +115,8 @@ static ERROR_MESSAGES: [&str; 6] = [
     "Unknown desc = `helm template .",
 ];
 
+static TIMEOUT_MESSAGES: [&str; 2] = ["Client.Timeout", "failed to get git client for repo"];
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
@@ -175,12 +181,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if !check_if_folder_exists(&base_branch_folder) {
-        error!("❌ Base branch folder does not exist: {}", base_branch_folder);
+        error!(
+            "❌ Base branch folder does not exist: {}",
+            base_branch_folder
+        );
         panic!("Base branch folder does not exist");
     }
 
     if !check_if_folder_exists(&target_branch_folder) {
-        error!("❌ Target branch folder does not exist: {}", target_branch_folder);
+        error!(
+            "❌ Target branch folder does not exist: {}",
+            target_branch_folder
+        );
         panic!("Target branch folder does not exist");
     }
 
@@ -204,9 +216,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
-    let base_apps = parse_argocd_application(&base_branch_folder, &base_branch_name, &file_regex, &repo).await?;
+    let base_apps =
+        parse_argocd_application(&base_branch_folder, &base_branch_name, &file_regex, &repo)
+            .await?;
     write_to_file(&base_apps, apps_file(&Branch::Base));
-    let target_apps = parse_argocd_application(&target_branch_folder, &target_branch_name, &file_regex, &repo).await?;
+    let target_apps = parse_argocd_application(
+        &target_branch_folder,
+        &target_branch_name,
+        &file_regex,
+        &repo,
+    )
+    .await?;
     write_to_file(&target_apps, apps_file(&Branch::Target));
 
     // Cleanup
@@ -311,9 +331,7 @@ async fn get_resources(
                                         continue;
                                     }
                                     Some(msg)
-                                        if msg.contains("Client.Timeout")
-                                            || msg
-                                                .contains("failed to get git client for repo") =>
+                                        if TIMEOUT_MESSAGES.iter().any(|e| msg.contains(e)) =>
                                     {
                                         list_of_timed_out_apps.push(name.to_string().clone());
                                     }
@@ -386,7 +404,12 @@ async fn get_resources(
         branch_type
     );
 
-    match run_command("kubectl delete applications.argoproj.io -n argocd --all", None).await {
+    match run_command(
+        "kubectl delete applications.argoproj.io -n argocd --all",
+        None,
+    )
+    .await
+    {
         Ok(_) => (),
         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
@@ -587,4 +610,3 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
     }
     Ok(count)
 }
-
