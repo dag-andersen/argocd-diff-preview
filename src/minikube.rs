@@ -4,13 +4,13 @@ use std::error::Error;
 use crate::{run_command, utils::spawn_command};
 
 pub async fn is_installed() -> bool {
-    match run_command("kind version", None).await {
+    match run_command("minikube status", None).await {
         Ok(_) => true,
         Err(_) => false,
     }
 }
 
-pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
+pub async fn create_cluster() -> Result<(), Box<dyn Error>> {
     // check if docker is running
     match run_command("docker ps", None).await {
         Ok(_) => (),
@@ -21,24 +21,14 @@ pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     }
 
     info!("🚀 Creating cluster...");
-    match run_command(
-        &format!("kind delete cluster --name {}", cluster_name),
-        None,
-    )
-    .await
-    {
+    match run_command(&format!("minikube delete"), None).await {
         Ok(o) => o,
         Err(e) => {
             panic!("error: {}", String::from_utf8_lossy(&e.stderr))
         }
     };
 
-    match run_command(
-        &format!("kind create cluster --name {}", cluster_name),
-        None,
-    )
-    .await
-    {
+    match run_command(&format!("minikube start"), None).await {
         Ok(_) => {
             info!("🚀 Cluster created successfully");
             Ok(())
@@ -50,10 +40,7 @@ pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     }
 }
 
-pub fn delete_cluster(cluster_name: &str) {
+pub fn delete_cluster() {
     info!("💥 Deleting cluster...");
-    spawn_command(
-        &format!("kind delete cluster --name {}", cluster_name),
-        None,
-    );
+    spawn_command(&format!("minikube delete"), None);
 }

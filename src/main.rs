@@ -69,18 +69,21 @@ struct Opt {
     /// Secrets folder where the secrets are read from
     #[structopt(short, long, default_value = "./secrets", env)]
     secrets_folder: String,
+
+    /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
+    #[structopt(long, env)]
+    local_cluster_tool: Option<String>,
+}
+
+#[derive(Debug)]
+enum ClusterTool {
+    Kind,
+    Minikube,
 }
 
 enum Branch {
     Base,
     Target,
-}
-
-fn apps_file(branch: &Branch) -> &'static str {
-    match branch {
-        Branch::Base => "apps_base_branch.yaml",
-        Branch::Target => "apps_target_branch.yaml",
-    }
 }
 
 impl std::fmt::Display for Branch {
@@ -89,6 +92,13 @@ impl std::fmt::Display for Branch {
             Branch::Base => write!(f, "base"),
             Branch::Target => write!(f, "target"),
         }
+    }
+}
+
+fn apps_file(branch: &Branch) -> &'static str {
+    match branch {
+        Branch::Base => "apps_base_branch.yaml",
+        Branch::Target => "apps_target_branch.yaml",
     }
 }
 
@@ -135,7 +145,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
 
+    // select local cluster tool
+    let tool = match opt.local_cluster_tool {
+        Some(t) if t == "kind" => ClusterTool::Kind,
+        Some(t) if t == "minikube" => ClusterTool::Minikube,
+        _ if kind::is_installed().await => ClusterTool::Kind,
+        _ if minikube::is_installed().await => ClusterTool::Minikube,
+        _ => {
+            error!("❌ No local cluster tool found. Please install kind or minikube");
+            panic!("No local cluster tool found")
+        }
+    };
+
     info!("✨ Running with:");
+    info!("✨ - local-cluster-tool: {:?}", tool);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
     info!("✨ - base-branch-folder: {}", base_branch_folder);
@@ -163,7 +186,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cluster_name = "argocd-diff-preview";
 
-    kind::create_cluster(&cluster_name).await?;
+    match tool {
+        ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
+        ClusterTool::Minikube => minikube::create_cluster().await?,
+    }
     argocd::install_argo_cd().await?;
 
     create_folder_if_not_exists(secrets_folder);
@@ -190,7 +216,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     get_resources(&Branch::Target, timeout, output_folder).await?;
 
-    kind::delete_cluster(&cluster_name);
+    match tool {
+        ClusterTool::Kind => kind::delete_cluster(&cluster_name),
+        ClusterTool::Minikube => minikube::delete_cluster(),
+    }
 
     diff::generate_diff(
         output_folder,

@@ -9,6 +9,20 @@ use log::{debug, error, info};
 
 use crate::run_command;
 
+static ARGOCD_CMD_PARAMS_CM: &str = r#"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  reposerver.git.request.timeout: "150s"
+  reposerver.parallelism.limit: "300"
+"#;
+
 pub async fn install_argo_cd() -> Result<(), Box<dyn Error>> {
     info!("🦑 Installing Argo CD...");
 
@@ -30,19 +44,6 @@ pub async fn install_argo_cd() -> Result<(), Box<dyn Error>> {
     }
     info!("🦑 Waiting for Argo CD to start...");
 
-    static ARGOCD_CMD_PARAMS_CM: &str = r#"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  labels:
-    app.kubernetes.io/name: argocd-cmd-params-cm
-    app.kubernetes.io/part-of: argocd
-  name: argocd-cmd-params-cm
-  namespace: argocd
-data:
-  reposerver.git.request.timeout: "150s"
-  reposerver.parallelism.limit: "300"
-"#;
     // apply argocd-cmd-params-cm
     let mut child = Command::new("kubectl")
         .arg("apply")
