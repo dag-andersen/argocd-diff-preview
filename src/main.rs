@@ -13,11 +13,15 @@ use log::{debug, error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_output_to_file, write_to_file};
-mod kind;
+use crate::utils::{
+    check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_output_to_file,
+    write_to_file,
+};
 mod argocd;
-mod utils;
 mod diff;
+mod kind;
+mod minikube;
+mod utils;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -69,18 +73,21 @@ struct Opt {
     /// Secrets folder where the secrets are read from
     #[structopt(short, long, default_value = "./secrets", env)]
     secrets_folder: String,
+
+    /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
+    #[structopt(long, env)]
+    local_cluster_tool: Option<String>,
+}
+
+#[derive(Debug)]
+enum ClusterTool {
+    Kind,
+    Minikube,
 }
 
 enum Branch {
     Base,
     Target,
-}
-
-fn apps_file(branch: &Branch) -> &'static str {
-    match branch {
-        Branch::Base => "apps_base_branch.yaml",
-        Branch::Target => "apps_target_branch.yaml",
-    }
 }
 
 impl std::fmt::Display for Branch {
@@ -92,6 +99,13 @@ impl std::fmt::Display for Branch {
     }
 }
 
+fn apps_file(branch: &Branch) -> &'static str {
+    match branch {
+        Branch::Base => "apps_base_branch.yaml",
+        Branch::Target => "apps_target_branch.yaml",
+    }
+}
+
 static ERROR_MESSAGES: [&str; 6] = [
     "helm template .",
     "authentication required",
@@ -100,6 +114,8 @@ static ERROR_MESSAGES: [&str; 6] = [
     "error converting YAML to JSON",
     "Unknown desc = `helm template .",
 ];
+
+static TIMEOUT_MESSAGES: [&str; 2] = ["Client.Timeout", "failed to get git client for repo"];
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -135,7 +151,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
 
+    // select local cluster tool
+    let tool = match opt.local_cluster_tool {
+        Some(t) if t == "kind" => ClusterTool::Kind,
+        Some(t) if t == "minikube" => ClusterTool::Minikube,
+        _ if kind::is_installed().await => ClusterTool::Kind,
+        _ if minikube::is_installed().await => ClusterTool::Minikube,
+        _ => {
+            error!("❌ No local cluster tool found. Please install kind or minikube");
+            panic!("No local cluster tool found")
+        }
+    };
+
     info!("✨ Running with:");
+    info!("✨ - local-cluster-tool: {:?}", tool);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
     info!("✨ - base-branch-folder: {}", base_branch_folder);
@@ -152,18 +181,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     if !check_if_folder_exists(&base_branch_folder) {
-        error!("❌ Base branch folder does not exist: {}", base_branch_folder);
+        error!(
+            "❌ Base branch folder does not exist: {}",
+            base_branch_folder
+        );
         panic!("Base branch folder does not exist");
     }
 
     if !check_if_folder_exists(&target_branch_folder) {
-        error!("❌ Target branch folder does not exist: {}", target_branch_folder);
+        error!(
+            "❌ Target branch folder does not exist: {}",
+            target_branch_folder
+        );
         panic!("Target branch folder does not exist");
     }
 
     let cluster_name = "argocd-diff-preview";
 
-    kind::create_cluster(&cluster_name).await?;
+    match tool {
+        ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
+        ClusterTool::Minikube => minikube::create_cluster().await?,
+    }
     argocd::install_argo_cd().await?;
 
     create_folder_if_not_exists(secrets_folder);
@@ -178,9 +216,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
-    let base_apps = parse_argocd_application(&base_branch_folder, &base_branch_name, &file_regex, &repo).await?;
+    let base_apps =
+        parse_argocd_application(&base_branch_folder, &base_branch_name, &file_regex, &repo)
+            .await?;
     write_to_file(&base_apps, apps_file(&Branch::Base));
-    let target_apps = parse_argocd_application(&target_branch_folder, &target_branch_name, &file_regex, &repo).await?;
+    let target_apps = parse_argocd_application(
+        &target_branch_folder,
+        &target_branch_name,
+        &file_regex,
+        &repo,
+    )
+    .await?;
     write_to_file(&target_apps, apps_file(&Branch::Target));
 
     // Cleanup
@@ -190,7 +236,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
     get_resources(&Branch::Target, timeout, output_folder).await?;
 
-    kind::delete_cluster(&cluster_name);
+    match tool {
+        ClusterTool::Kind => kind::delete_cluster(&cluster_name),
+        ClusterTool::Minikube => minikube::delete_cluster(),
+    }
 
     diff::generate_diff(
         output_folder,
@@ -282,9 +331,7 @@ async fn get_resources(
                                         continue;
                                     }
                                     Some(msg)
-                                        if msg.contains("Client.Timeout")
-                                            || msg
-                                                .contains("failed to get git client for repo") =>
+                                        if TIMEOUT_MESSAGES.iter().any(|e| msg.contains(e)) =>
                                     {
                                         list_of_timed_out_apps.push(name.to_string().clone());
                                     }
@@ -357,7 +404,12 @@ async fn get_resources(
         branch_type
     );
 
-    match run_command("kubectl delete applications.argoproj.io -n argocd --all", None).await {
+    match run_command(
+        "kubectl delete applications.argoproj.io -n argocd --all",
+        None,
+    )
+    .await
+    {
         Ok(_) => (),
         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
@@ -429,11 +481,12 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String
 }
 
 async fn patch_argocd_applications(
-    mut applications: Vec<String>,
+    mut yaml_chunks: Vec<String>,
     branch: &str,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
     info!("🤖 Patching applications for branch: {}", branch);
+
     let clean_spec = |spec: &mut Mapping| {
         spec.remove("syncPolicy");
         spec["project"] = serde_yaml::Value::String("default".to_string());
@@ -460,7 +513,7 @@ async fn patch_argocd_applications(
         }
     };
 
-    let filtered_resources = applications
+    let applications = yaml_chunks
         .iter_mut()
         .map(|r| {
             let resource: serde_yaml::Value = match serde_yaml::from_str(r) {
@@ -482,6 +535,7 @@ async fn patch_argocd_applications(
             })
         })
         .map(|(kind, mut r)| {
+            // Clean up the spec
             clean_spec({
                 if kind == "Application" {
                     r["spec"].as_mapping_mut().unwrap()
@@ -492,6 +546,7 @@ async fn patch_argocd_applications(
             (kind, r)
         })
         .map(|(kind, mut r)| {
+            // Redirect all applications to the branch
             redirect_sources({
                 if kind == "Application" {
                     r["spec"].as_mapping_mut().unwrap()
@@ -509,13 +564,13 @@ async fn patch_argocd_applications(
 
     info!(
         "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
-        filtered_resources.len(),
+        applications.len(),
         branch
     );
 
     // convert back to string
     let mut output = String::new();
-    for r in filtered_resources {
+    for r in applications {
         let r = serde_yaml::to_string(&r).unwrap();
         output.push_str(&r);
         output.push_str("---\n");
@@ -558,4 +613,3 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
     }
     Ok(count)
 }
-

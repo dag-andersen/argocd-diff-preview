@@ -53,11 +53,11 @@ The implementation is actually quite simple. It just follows the steps below:
 - Does not support ArgoCD CMP plugins
 - Does not work [Cluster Generators](https://argocd-applicationset.readthedocs.io/en/stable/Generators-Cluster/) in your ApplicationSets
 
-## Try now locally!
+## Try demo locally with 3 simple commands!
 
 Steps:
 1. Make sure Docker is running. E.g., run `docker ps` to see if it's running.
-2. Run the following command:
+2. Run the following 3 commands:
 
 ```bash
 git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
@@ -147,7 +147,7 @@ docker run \
 ### Run as binary
 
 Pre-requisites:
-- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
+- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
 
 Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/releases) and find the correct binary for your operating system.
 
@@ -162,7 +162,7 @@ tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
 ### Run from source
 
 Pre-requisites:
-- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/), [Rust](https://www.rust-lang.org/tools/install)
+- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/), [Rust](https://www.rust-lang.org/tools/install)
 
 ```bash
 git clone https://github.com/dag-andersen/argocd-diff-preview
@@ -235,14 +235,17 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -b, --base-branch <base-branch>          Base branch name [env: BASE_BRANCH=]  [default: main]
-    -i, --diff-ignore <diff-ignore>          Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
-    -r, --file-regex <file-regex>            Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
-    -g, --git-repo <git-repository>          Git repository URL [env: GIT_REPO=]
-    -o, --output-folder <output-folder>      Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
-    -s, --secrets-folder <secrets-folder>    Secrets folder where the secrets are read from [env: SECRETS_FOLDER=]  [default: ./secrets]
-    -t, --target-branch <target-branch>      Target branch name [env: TARGET_BRANCH=]
-        --timeout <timeout>                  Set timeout [env: TIMEOUT=]  [default: 180]
+    -b, --base-branch <base-branch>         Base branch name [env: BASE_BRANCH=]  [default: main]
+        --base-branch-folder <folder>       Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
+    -i, --diff-ignore <diff-ignore>         Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
+    -r, --file-regex <file-regex>           Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
+    -g, --git-repo <git-repository>         Git repository URL [env: GIT_REPO=]
+        --local-cluster-tool <tool>         Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
+    -o, --output-folder <output-folder>     Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
+    -s, --secrets-folder <secrets-folder>   Secrets folder where the secrets are read from [env: SECRETS_FOLDER=]  [default: ./secrets]
+    -t, --target-branch <target-branch>     Target branch name [env: TARGET_BRANCH=]
+        --target-branch-folder <folder>     Target branch folder [env: TARGET_BRANCH_FOLDER=]  [default: target-branch]
+        --timeout <timeout>                 Set timeout [env: TIMEOUT=]  [default: 180]
 ```
 
 ## Roadmap
