@@ -481,11 +481,12 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String
 }
 
 async fn patch_argocd_applications(
-    mut applications: Vec<String>,
+    mut yaml_chunks: Vec<String>,
     branch: &str,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
     info!("🤖 Patching applications for branch: {}", branch);
+
     let clean_spec = |spec: &mut Mapping| {
         spec.remove("syncPolicy");
         spec["project"] = serde_yaml::Value::String("default".to_string());
@@ -512,7 +513,7 @@ async fn patch_argocd_applications(
         }
     };
 
-    let filtered_resources = applications
+    let applications = yaml_chunks
         .iter_mut()
         .map(|r| {
             let resource: serde_yaml::Value = match serde_yaml::from_str(r) {
@@ -534,6 +535,7 @@ async fn patch_argocd_applications(
             })
         })
         .map(|(kind, mut r)| {
+            // Clean up the spec
             clean_spec({
                 if kind == "Application" {
                     r["spec"].as_mapping_mut().unwrap()
@@ -544,6 +546,7 @@ async fn patch_argocd_applications(
             (kind, r)
         })
         .map(|(kind, mut r)| {
+            // Redirect all applications to the branch
             redirect_sources({
                 if kind == "Application" {
                     r["spec"].as_mapping_mut().unwrap()
@@ -561,13 +564,13 @@ async fn patch_argocd_applications(
 
     info!(
         "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
-        filtered_resources.len(),
+        applications.len(),
         branch
     );
 
     // convert back to string
     let mut output = String::new();
-    for r in filtered_resources {
+    for r in applications {
         let r = serde_yaml::to_string(&r).unwrap();
         output.push_str(&r);
         output.push_str("---\n");
