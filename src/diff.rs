@@ -48,7 +48,7 @@ pub async fn generate_diff(
     let diff_as_string = parse_diff_output(
         run_command(
             &format!(
-                "git --no-pager diff -U10 --no-index {} {} {}",
+                "git --no-pager diff --no-prefix -U10 --no-index {} {} {}",
                 list_of_patterns_to_ignore,
                 Branch::Base,
                 Branch::Target

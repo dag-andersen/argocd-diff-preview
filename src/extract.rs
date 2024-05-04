@@ -19,7 +19,7 @@ static ERROR_MESSAGES: [&str; 6] = [
 static TIMEOUT_MESSAGES: [&str; 3] = [
     "Client.Timeout",
     "failed to get git client for repo",
-    "rpc error: code = Unknown desc = Get \"https"
+    "rpc error: code = Unknown desc = Get \"https",
 ];
 
 pub async fn get_resources(
@@ -30,6 +30,8 @@ pub async fn get_resources(
     info!("🌚 Getting resources for {}", branch_type);
 
     let app_file = apps_file(branch_type);
+
+    delete_applications().await;
 
     if fs::metadata(app_file).unwrap().len() != 0 {
         match apply_manifest(app_file) {
@@ -52,6 +54,10 @@ pub async fn get_resources(
 
         let items = applications["items"].as_sequence().unwrap();
         if items.is_empty() {
+            break;
+        }
+
+        if items.len() == set_of_processed_apps.len() {
             break;
         }
 
@@ -106,10 +112,6 @@ pub async fn get_resources(
             apps_left += 1
         }
 
-        if apps_left == 0 {
-            break;
-        }
-
         // TIMEOUT
         let time_elapsed = start_time.elapsed().as_secs();
         if time_elapsed > timeout as u64 {
@@ -151,12 +153,14 @@ pub async fn get_resources(
             }
         }
 
-        info!(
-            "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
-            apps_left,
-            items.len(),
-            timeout - time_elapsed
-        );
+        if apps_left > 0 {
+            info!(
+                "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
+                apps_left,
+                items.len(),
+                timeout - time_elapsed
+            );
+        }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
@@ -167,14 +171,17 @@ pub async fn get_resources(
         branch_type
     );
 
+    Ok(())
+}
+
+async fn delete_applications() {
     match run_command(
-        "kubectl delete applications.argoproj.io -n argocd --all",
+        "kubectl delete applicationsets.argoproj.io,applications.argoproj.io --all -n argocd",
         None,
     )
     .await
     {
-        Ok(_) => (),
+        Ok(_) => debug!("Deleted applications"),
         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
-    Ok(())
 }
