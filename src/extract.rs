@@ -31,8 +31,6 @@ pub async fn get_resources(
 
     let app_file = apps_file(branch_type);
 
-    delete_applications().await;
-
     if fs::metadata(app_file).unwrap().len() != 0 {
         match apply_manifest(app_file) {
             Ok(_) => (),
@@ -174,7 +172,7 @@ pub async fn get_resources(
     Ok(())
 }
 
-async fn delete_applications() {
+pub async fn delete_applications() {
     match run_command(
         "kubectl delete applicationsets.argoproj.io,applications.argoproj.io --all -n argocd",
         None,

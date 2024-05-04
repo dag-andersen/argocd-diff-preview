@@ -221,6 +221,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     clean_output_folder(output_folder);
 
     extract::get_resources(&Branch::Base, timeout, output_folder).await?;
+    extract::delete_applications().await;
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     extract::get_resources(&Branch::Target, timeout, output_folder).await?;
 
