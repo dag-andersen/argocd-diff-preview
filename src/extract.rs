@@ -16,7 +16,11 @@ static ERROR_MESSAGES: [&str; 6] = [
     "Unknown desc = `helm template .",
 ];
 
-static TIMEOUT_MESSAGES: [&str; 2] = ["Client.Timeout", "failed to get git client for repo"];
+static TIMEOUT_MESSAGES: [&str; 3] = [
+    "Client.Timeout",
+    "failed to get git client for repo",
+    "rpc error: code = Unknown desc = Get \"https"
+];
 
 pub async fn get_resources(
     branch_type: &Branch,
@@ -106,6 +110,7 @@ pub async fn get_resources(
             break;
         }
 
+        // TIMEOUT
         let time_elapsed = start_time.elapsed().as_secs();
         if time_elapsed > timeout as u64 {
             error!("❌ Timed out after {} seconds", timeout);
@@ -117,6 +122,7 @@ pub async fn get_resources(
             return Err("Timed out".into());
         }
 
+        // ERRORS
         if !set_of_failed_apps.is_empty() {
             for (name, msg) in &set_of_failed_apps {
                 error!(
@@ -127,6 +133,7 @@ pub async fn get_resources(
             return Err("Failed to process applications".into());
         }
 
+        // TIMED OUT APPS
         if !list_of_timed_out_apps.is_empty() {
             info!(
                 "💤 {} Applications timed out.",
