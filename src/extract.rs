@@ -44,7 +44,15 @@ pub async fn get_resources(
 
     let multi_progress = indicatif::MultiProgress::new();
     let progress_bar =  multi_progress.add(indicatif::ProgressBar::new(100));
-    let timeout_bar = multi_progress.add(indicatif::ProgressBar::new(timeout));
+    let spinner_with_status = multi_progress.add(indicatif::ProgressBar::new_spinner());
+
+    // style including, emoji, progress bar, x out of y, and time left
+    progress_bar.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            .expect("Failed to set style")
+            .progress_chars("##-"),
+    );
 
     let mut set_of_processed_apps = HashSet::new();
     let mut set_of_failed_apps = BTreeMap::new();
@@ -77,10 +85,10 @@ pub async fn get_resources(
 
         for item in items {
             let name = item["metadata"]["name"].as_str().unwrap();
+            spinner_with_status.set_message(format!("Timeout in {} seconds, Processing application: {}", timeout - start_time.elapsed().as_secs(), name));
             if set_of_processed_apps.contains(name) {
                 continue;
             }
-            timeout_bar.set_position(start_time.elapsed().as_secs());
 
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
@@ -180,6 +188,8 @@ pub async fn get_resources(
                 }
             }
         }
+
+        spinner_with_status.set_message(format!("Timeout in {} seconds, Waiting for applications to sync...", timeout - start_time.elapsed().as_secs()));
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
