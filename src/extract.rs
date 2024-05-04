@@ -42,6 +42,10 @@ pub async fn get_resources(
         }
     }
 
+    let multi_progress = indicatif::MultiProgress::new();
+    let progress_bar =  multi_progress.add(indicatif::ProgressBar::new(100));
+    let timeout_bar = multi_progress.add(indicatif::ProgressBar::new(timeout));
+
     let mut set_of_processed_apps = HashSet::new();
     let mut set_of_failed_apps = BTreeMap::new();
 
@@ -59,6 +63,9 @@ pub async fn get_resources(
             break;
         }
 
+        progress_bar.set_length(items.len() as u64);
+        progress_bar.set_position(set_of_processed_apps.len() as u64);
+
         if items.len() == set_of_processed_apps.len() {
             break;
         }
@@ -73,6 +80,8 @@ pub async fn get_resources(
             if set_of_processed_apps.contains(name) {
                 continue;
             }
+            timeout_bar.set_position(start_time.elapsed().as_secs());
+
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
                     debug!("Getting manifests for application: {}", name);
@@ -87,6 +96,7 @@ pub async fn get_resources(
                         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
                     }
                     set_of_processed_apps.insert(name.to_string().clone());
+                    progress_bar.set_position(set_of_processed_apps.len() as u64);
                     continue;
                 }
                 Some("Unknown") => {
@@ -169,15 +179,6 @@ pub async fn get_resources(
                     ),
                 }
             }
-        }
-
-        if apps_left > 0 {
-            info!(
-                "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
-                apps_left,
-                items.len(),
-                timeout - time_elapsed
-            );
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
