@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, error::Error};
 
 use log::{debug, error, info};
 
-use crate::utils::{run_command, run_command_output_to_file};
+use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
 
 static ERROR_MESSAGES: [&str; 6] = [
@@ -66,15 +66,15 @@ pub async fn get_resources(
             }
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
-                    debug!("Processing application: {}", name);
-                    match run_command_output_to_file(
-                        &format!("argocd app manifests {}", name),
-                        &format!("{}/{}/{}", output_folder, branch_type, name),
-                        false,
-                    )
-                    .await
-                    {
-                        Ok(_) => debug!("Processed application: {}", name),
+                    debug!("Getting manifests for application: {}", name);
+                    match run_command(&format!("argocd app manifests {}", name), None).await {
+                        Ok(o) => {
+                            fs::write(
+                                &format!("{}/{}/{}", output_folder, branch_type, name),
+                                &o.stdout,
+                            )?;
+                            debug!("Got manifests for application: {}", name)
+                        }
                         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
                     }
                     set_of_processed_apps.insert(name.to_string().clone());

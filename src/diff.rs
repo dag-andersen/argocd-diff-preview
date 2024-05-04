@@ -1,7 +1,8 @@
 use log::info;
+use std::fs;
 use std::{error::Error, process::Output};
 
-use crate::utils::{run_command, write_to_file};
+use crate::utils::run_command;
 use crate::Branch;
 
 pub async fn generate_diff(
@@ -60,7 +61,7 @@ pub async fn generate_diff(
     let markdown = print_diff(&summary_as_string, &diff_as_string);
 
     let markdown_path = format!("{}/diff.md", output_folder);
-    write_to_file(&markdown, &markdown_path);
+    fs::write(&markdown_path, &markdown)?;
 
     info!("🙏 Please check the {} file for differences", markdown_path);
 
