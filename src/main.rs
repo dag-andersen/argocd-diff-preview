@@ -159,7 +159,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
     info!("✨ - git-repo: {}", repo);
-    info!("✨ - timeout: {}", timeout);
+    info!("✨ - timeout: {} seconds", timeout);
     if let Some(a) = file_regex.clone() {
         info!("✨ - file-regex: {}", a.as_str());
     }

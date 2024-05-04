@@ -4,6 +4,8 @@ use std::{error::Error, io::BufRead};
 
 use log::{debug, info};
 
+type K8sResource = serde_yaml::Value;
+
 pub async fn get_applications(
     directory: &str,
     branch: &str,
@@ -15,7 +17,10 @@ pub async fn get_applications(
     Ok(output)
 }
 
-async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String>, Box<dyn Error>> {
+async fn parse_yaml(
+    directory: &str,
+    regex: &Option<Regex>,
+) -> Result<Vec<K8sResource>, Box<dyn Error>> {
     use walkdir::WalkDir;
 
     info!("🤖 Fetching all files in dir: {}", directory);
@@ -34,15 +39,14 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String
         .map(|e| format!("{}", e.path().display()))
         .filter(|f| regex.is_none() || regex.as_ref().unwrap().is_match(&f));
 
-    let k8s_resources: Vec<String> = yaml_files
+    let k8s_resources: Vec<K8sResource> = yaml_files
         .flat_map(|f| {
             debug!("Found file: {}", f);
-            let file = std::fs::File::open(f).unwrap();
+            let file = std::fs::File::open(&f).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
 
-            // split list of strings by "---"
-            let string_lists: Vec<String> = lines.fold(vec!["".to_string()], |mut acc, s| {
+            let mut raw_yaml_chunks: Vec<String> = lines.fold(vec!["".to_string()], |mut acc, s| {
                 if s == "---" {
                     acc.push("".to_string());
                 } else {
@@ -52,9 +56,19 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String
                 }
                 acc
             });
-            string_lists
+            let yaml_vec: Vec<serde_yaml::Value> = raw_yaml_chunks.iter_mut().enumerate().map(|(i,r)| {
+                let yaml = match serde_yaml::from_str(r) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        debug!("⚠️ Failed to parse element number {}, in file '{}', with error: '{}'", i, f, e);
+                        serde_yaml::Value::Null
+                    }
+                };
+                yaml
+            }).collect();
+            yaml_vec
         })
-        .collect::<Vec<String>>();
+        .collect();
 
     match regex {
         Some(r) => info!(
@@ -69,7 +83,7 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<Vec<String
 }
 
 async fn patch_argocd_applications(
-    mut yaml_chunks: Vec<String>,
+    yaml_chunks: Vec<K8sResource>,
     branch: &str,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
@@ -100,18 +114,8 @@ async fn patch_argocd_applications(
         }
     };
 
-    let applications = yaml_chunks
-        .iter_mut()
-        .map(|r| {
-            let resource: serde_yaml::Value = match serde_yaml::from_str(r) {
-                Ok(r) => r,
-                Err(e) => {
-                    debug!("⚠️ Failed to parse resource with error: {}", e);
-                    serde_yaml::Value::Null
-                }
-            };
-            resource
-        })
+    let applications: Vec<K8sResource> = yaml_chunks
+        .into_iter()
         .map(|mut r| {
             r["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
             r
@@ -151,7 +155,7 @@ async fn patch_argocd_applications(
             );
             r
         })
-        .collect::<Vec<serde_yaml::Value>>();
+        .collect();
 
     info!(
         "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
