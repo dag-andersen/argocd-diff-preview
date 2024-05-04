@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use crate::utils::{
-    check_if_folder_exists, create_folder_if_not_exists, run_command, write_to_file,
+    check_if_folder_exists, create_folder_if_not_exists, run_command,
 };
 mod argocd;
 mod diff;
@@ -214,14 +214,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )
     .await?;
 
-    write_to_file(&base_apps, apps_file(&Branch::Base));
-    write_to_file(&target_apps, apps_file(&Branch::Target));
+    fs::write(apps_file(&Branch::Base), base_apps)?;
+    fs::write(apps_file(&Branch::Target), &target_apps)?;
 
     // Cleanup
     clean_output_folder(output_folder);
 
     extract::get_resources(&Branch::Base, timeout, output_folder).await?;
-    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+    extract::delete_applications().await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     extract::get_resources(&Branch::Target, timeout, output_folder).await?;
 
     match tool {

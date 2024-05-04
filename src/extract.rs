@@ -4,7 +4,7 @@ use std::{collections::BTreeMap, error::Error};
 
 use log::{debug, error, info};
 
-use crate::utils::{run_command, run_command_output_to_file};
+use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
 
 static ERROR_MESSAGES: [&str; 6] = [
@@ -19,7 +19,7 @@ static ERROR_MESSAGES: [&str; 6] = [
 static TIMEOUT_MESSAGES: [&str; 3] = [
     "Client.Timeout",
     "failed to get git client for repo",
-    "rpc error: code = Unknown desc = Get \"https"
+    "rpc error: code = Unknown desc = Get \"https",
 ];
 
 pub async fn get_resources(
@@ -55,6 +55,10 @@ pub async fn get_resources(
             break;
         }
 
+        if items.len() == set_of_processed_apps.len() {
+            break;
+        }
+
         let mut list_of_timed_out_apps = vec![];
 
         let mut apps_left = 0;
@@ -66,15 +70,15 @@ pub async fn get_resources(
             }
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
-                    debug!("Processing application: {}", name);
-                    match run_command_output_to_file(
-                        &format!("argocd app manifests {}", name),
-                        &format!("{}/{}/{}", output_folder, branch_type, name),
-                        false,
-                    )
-                    .await
-                    {
-                        Ok(_) => debug!("Processed application: {}", name),
+                    debug!("Getting manifests for application: {}", name);
+                    match run_command(&format!("argocd app manifests {}", name), None).await {
+                        Ok(o) => {
+                            fs::write(
+                                &format!("{}/{}/{}", output_folder, branch_type, name),
+                                &o.stdout,
+                            )?;
+                            debug!("Got manifests for application: {}", name)
+                        }
                         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
                     }
                     set_of_processed_apps.insert(name.to_string().clone());
@@ -104,10 +108,6 @@ pub async fn get_resources(
                 _ => (),
             }
             apps_left += 1
-        }
-
-        if apps_left == 0 {
-            break;
         }
 
         // TIMEOUT
@@ -151,12 +151,14 @@ pub async fn get_resources(
             }
         }
 
-        info!(
-            "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
-            apps_left,
-            items.len(),
-            timeout - time_elapsed
-        );
+        if apps_left > 0 {
+            info!(
+                "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
+                apps_left,
+                items.len(),
+                timeout - time_elapsed
+            );
+        }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
@@ -167,14 +169,17 @@ pub async fn get_resources(
         branch_type
     );
 
+    Ok(())
+}
+
+pub async fn delete_applications() {
     match run_command(
-        "kubectl delete applications.argoproj.io -n argocd --all",
+        "kubectl delete applicationsets.argoproj.io,applications.argoproj.io --all -n argocd",
         None,
     )
     .await
     {
-        Ok(_) => (),
+        Ok(_) => debug!("Deleted applications"),
         Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
     }
-    Ok(())
 }
