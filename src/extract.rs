@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
+use std::process::{Command, Stdio};
 use std::{collections::BTreeMap, error::Error};
 
 use log::{debug, error, info};
@@ -173,13 +174,61 @@ pub async fn get_resources(
 }
 
 pub async fn delete_applications() {
-    match run_command(
-        "kubectl delete applicationsets.argoproj.io,applications.argoproj.io --all -n argocd",
-        None,
-    )
-    .await
-    {
-        Ok(_) => debug!("Deleted applications"),
-        Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
+    info!("🧼 Removing applications");
+    loop {
+        debug!("🗑 Deleting ApplicationSets");
+
+        match run_command(
+            "kubectl delete applicationsets.argoproj.io --all -n argocd",
+            None,
+        )
+        .await
+        {
+            Ok(_) => debug!("🗑 Deleted ApplicationSets"),
+            Err(e) => {
+                error!(
+                    "❌ Failed to delete applicationsets: {}",
+                    String::from_utf8_lossy(&e.stderr)
+                )
+            }
+        };
+
+        debug!("🗑 Deleting Applications");
+
+        let args = "kubectl delete applications.argoproj.io --all -n argocd"
+            .split_whitespace()
+            .collect::<Vec<&str>>();
+        let mut child = Command::new(args[0])
+            .args(&args[1..])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("failed to execute process");
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        if run_command("kubectl get applications -A --no-headers", None)
+            .await
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+            .map(|e| e.trim().is_empty())
+            .unwrap_or_default() {
+            let _ = child.kill();
+            break;
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        if run_command("kubectl get applications -A --no-headers", None)
+            .await
+            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+            .map(|e| e.trim().is_empty())
+            .unwrap_or_default() {
+            let _ = child.kill();
+            break;
+        }
+
+        match child.kill() {
+            Ok(_) => debug!("Timed out. Retrying..."),
+            Err(e) => error!("❌ Failed to delete applications: {}", e),
+        };
     }
+    info!("🧼 Removed applications successfully")
 }
