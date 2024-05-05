@@ -29,6 +29,7 @@ jobs:
         run: |
           docker build . -f Dockerfile_AMD64 -t image
           docker run \
+            -t \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $(pwd)/main:/base-branch \
