@@ -21,10 +21,12 @@ local-test-docker:
 	docker build . -f Dockerfile_ARM64 -t image-arm64
 	docker run \
 		--network=host \
+		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(PWD)/$(base_branch):/base-branch \
 		-v $(PWD)/$(target_branch):/target-branch \
 		-v $(PWD)/output:/output \
+		-v $(PWD)/secrets:/secrets \
 		-e BASE_BRANCH=$(base_branch) \
 		-e TARGET_BRANCH=$(target_branch) \
 		-e GIT_REPO="https://github.com/$(github_org)/$(gitops_repo).git" \
