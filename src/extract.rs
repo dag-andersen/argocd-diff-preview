@@ -8,13 +8,14 @@ use log::{debug, error, info};
 use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
 
-static ERROR_MESSAGES: [&str; 6] = [
+static ERROR_MESSAGES: [&str; 7] = [
     "helm template .",
     "authentication required",
     "authentication failed",
     "path does not exist",
     "error converting YAML to JSON",
     "Unknown desc = `helm template .",
+    "Unknown desc = Unable to resolve"
 ];
 
 static TIMEOUT_MESSAGES: [&str; 3] = [
