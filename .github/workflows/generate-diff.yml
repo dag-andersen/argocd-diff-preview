@@ -2,9 +2,11 @@ name: Generate Diff
 
 on:
   pull_request:
-    branches: ["main"]
-
-  workflow_dispatch:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/generate-diff.yml"
+      - "examples/**"
 
 jobs:
   build:
