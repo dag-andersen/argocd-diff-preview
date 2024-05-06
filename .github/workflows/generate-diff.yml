@@ -37,7 +37,7 @@ jobs:
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
-            -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
+            -e GIT_REPO="$(git config --get remote.origin.url)" \
             dagandersen/argocd-diff-preview:latest
 
       - name: Post diff as comment
