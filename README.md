@@ -23,8 +23,6 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 
 The safest way to render your Helm Charts and Kustomize Overlays is to let ArgoCD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines.
 
-The safest way to render your Helm Charts and Kustomize Overlays is to let ArgoCD render them for you. This can be done by spinning up an ephemeral cluster inside testing pipeline. 
-
 The implementation is actually quite simple. It just follows the steps below:
 
 #### 10 steps
