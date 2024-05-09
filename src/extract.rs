@@ -62,6 +62,7 @@ pub async fn get_resources(
         }
 
         let mut list_of_timed_out_apps = vec![];
+        let mut other_errors = vec![];
 
         let mut apps_left = 0;
 
@@ -100,6 +101,10 @@ pub async fn get_resources(
                                         if TIMEOUT_MESSAGES.iter().any(|e| msg.contains(e)) =>
                                     {
                                         list_of_timed_out_apps.push(name.to_string().clone());
+                                        other_errors.push((name.to_string(), msg.to_string()));
+                                    }
+                                    Some(msg) => {
+                                        other_errors.push((name.to_string(), msg.to_string()));
                                     }
                                     _ => (),
                                 }
@@ -121,6 +126,15 @@ pub async fn get_resources(
                 set_of_processed_apps.len(),
                 apps_left
             );
+            if !other_errors.is_empty() {
+                error!("❌ Applications with 'ComparisonError' errors:");
+                for (name, msg) in &other_errors {
+                    error!(
+                        "❌ {}, {}",
+                        name, msg
+                    );
+                }
+            }
             return Err("Timed out".into());
         }
 
