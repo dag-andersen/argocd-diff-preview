@@ -27,7 +27,7 @@ pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     )
     .await
     {
-        Ok(o) => o,
+        Ok(_) => (),
         Err(e) => {
             panic!("error: {}", String::from_utf8_lossy(&e.stderr))
         }
