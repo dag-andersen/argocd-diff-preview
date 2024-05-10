@@ -113,32 +113,48 @@ docker run \
   <summary>Example in GitHub Actions workflow</summary>
 
 ```yaml
-- uses: actions/checkout@v4
-  with:
-    path: pull-request
+name: Argo CD Diff Preview
 
-- uses: actions/checkout@v4
-  with:
-    ref: main
-    path: main
+on:
+  pull_request:
+    branches:
+      - "main"
 
-- name: Diff
-  run: |
-    docker run \
-      --network=host \
-      -v /var/run/docker.sock:/var/run/docker.sock \
-      -v $(pwd)/main:/base-branch \
-      -v $(pwd)/pull-request:/target-branch\
-      -v $(pwd)/output:/output \
-      -e TARGET_BRANCH=${{ github.head_ref }} \
-      -e GIT_REPO=<your-repo> \
-      dagandersen/argocd-diff-preview:latest
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
 
-- name: post comment 
-  run: |
-    gh pr comment ${{ github.event.number }} --body-file output/diff.md
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: pull-request
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Diff
+        run: |
+          docker run \
+            --network=host \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v $(pwd)/main:/base-branch \
+            -v $(pwd)/pull-request:/target-branch \
+            -v $(pwd)/output:/output \
+            -e TARGET_BRANCH=${{ github.head_ref }} \
+            -e GIT_REPO="$(git config --get remote.origin.url)" \
+            dagandersen/argocd-diff-preview:latest
+
+      - name: Post diff as comment
+        run: |
+          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md --edit-last || \
+          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 </details>
