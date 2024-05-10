@@ -60,9 +60,9 @@ struct Opt {
     #[structopt(long, env, default_value = "target-branch")]
     target_branch_folder: String,
 
-    /// Git repository URL
-    #[structopt(short = "g", long = "git-repo", env = "GIT_REPO")]
-    git_repository: String,
+    /// Git Repository. Format: OWNER/REPO
+    #[structopt(long = "repo", env)]
+    repo: String,
 
     /// Output folder where the diff will be saved
     #[structopt(short, long, default_value = "./output", env)]
@@ -132,7 +132,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let base_branch_folder = opt.base_branch_folder;
     let target_branch_name = opt.target_branch;
     let target_branch_folder = opt.target_branch_folder;
-    let repo = opt.git_repository;
+    let repo = opt.repo;
     let diff_ignore = opt.diff_ignore;
     let timeout = opt.timeout;
     let output_folder = opt.output_folder.as_str();
@@ -150,6 +150,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
+    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
+    if !repo_regex.is_match(&repo) {
+        error!("❌ Invalid repository format. Please use OWNER/REPO");
+        panic!("Invalid repository format");
+    }
+
     info!("✨ Running with:");
     info!("✨ - local-cluster-tool: {:?}", tool);
     info!("✨ - base-branch: {}", base_branch_name);
@@ -158,7 +164,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("✨ - target-branch-folder: {}", target_branch_folder);
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
-    info!("✨ - git-repo: {}", repo);
+    info!("✨ - repo: {}", repo);
     info!("✨ - timeout: {} seconds", timeout);
     if let Some(a) = file_regex.clone() {
         info!("✨ - file-regex: {}", a.as_str());

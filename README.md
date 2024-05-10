@@ -146,7 +146,7 @@ jobs:
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
-            -e GIT_REPO="$(git config --get remote.origin.url)" \
+            -e REPO=${{ github.repository }} \
             dagandersen/argocd-diff-preview:latest
 
       - name: Post diff as comment
@@ -254,9 +254,9 @@ OPTIONS:
         --base-branch-folder <folder>       Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
     -i, --diff-ignore <diff-ignore>         Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
     -r, --file-regex <file-regex>           Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
-    -g, --git-repo <git-repository>         Git repository URL [env: GIT_REPO=]
         --local-cluster-tool <tool>         Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
     -o, --output-folder <output-folder>     Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
+        --repo <repo>                       Git Repository. Format: OWNER/REPO [env: REPO=]
     -s, --secrets-folder <secrets-folder>   Secrets folder where the secrets are read from [env: SECRETS_FOLDER=]  [default: ./secrets]
     -t, --target-branch <target-branch>     Target branch name [env: TARGET_BRANCH=]
         --target-branch-folder <folder>     Target branch folder [env: TARGET_BRANCH_FOLDER=]  [default: target-branch]

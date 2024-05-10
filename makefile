@@ -9,7 +9,7 @@ local-test-cargo:
 	cd base-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(base_branch)" && cp -r $(gitops_repo)/. base-branch && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. target-branch && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
-	cargo run -- -b "$(base_branch)" -t "$(target_branch)" -g "https://github.com/$(github_org)/$(gitops_repo).git" -r "$(regex)" --debug
+	cargo run -- -b "$(base_branch)" -t "$(target_branch)" --repo $(github_org)/$(gitops_repo) -r "$(regex)" --debug
 
 local-test-docker:
 	# Pull repos
@@ -29,6 +29,6 @@ local-test-docker:
 		-v $(PWD)/secrets:/secrets \
 		-e BASE_BRANCH=$(base_branch) \
 		-e TARGET_BRANCH=$(target_branch) \
-		-e GIT_REPO="https://github.com/$(github_org)/$(gitops_repo).git" \
+		-e REPO=$(github_org)/$(gitops_repo) \
 		-e FILE_REGEX=$(regex) \
 		image-arm64
