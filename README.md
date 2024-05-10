@@ -67,7 +67,7 @@ docker run \
    -v $(pwd)/base-branch:/base-branch \
    -v $(pwd)/target-branch:/target-branch \
    -e TARGET_BRANCH=helm-example-3 \
-   -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
+   -e REPO=dag-andersen/argocd-diff-preview \
    dagandersen/argocd-diff-preview:latest
 ```
 
@@ -105,7 +105,7 @@ docker run \
    -v $(pwd)/output:/output \
    -e BASE_BRANCH=main \
    -e TARGET_BRANCH=<name-of-the-target-branch> \
-   -e GIT_REPO="https://github.com/dag-andersen/argocd-diff-preview.git" \
+   -e REPO=<owner/repo-name> \
    dagandersen/argocd-diff-preview:latest
 ```
 
@@ -242,7 +242,7 @@ For example, if someone in your organization from *Team A* changes to one of the
 ## Options
 ```
 USAGE:
-    argocd-diff-preview [FLAGS] [OPTIONS] --git-repo <git-repository> --target-branch <target-branch>
+    argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-branch>
 
 FLAGS:
     -d, --debug      Activate debug mode
