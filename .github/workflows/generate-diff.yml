@@ -11,14 +11,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: write-all
+    permissions:
+      contents: read
+      pull-requests: write
 
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - uses: actions/checkout@v4
         with:
           path: pull-request
@@ -42,7 +39,7 @@ jobs:
 
       - name: Post diff as comment
         run: |
-          gh pr comment ${{ github.event.number }} --edit-last --body-file output/diff.md \
-            || gh pr comment ${{ github.event.number }} --body-file output/diff.md
+          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md --edit-last || \
+          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
