@@ -100,14 +100,13 @@ async fn patch_argocd_applications(
             if spec["source"]["repoURL"]
                 .as_str()
                 .unwrap()
-                .trim_end_matches(".git")
-                == repo
+                .contains(repo)
             {
                 spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string());
             }
         } else if spec.contains_key("sources") {
             for source in spec["sources"].as_sequence_mut().unwrap() {
-                if source["repoURL"].as_str().unwrap().trim_end_matches(".git") == repo {
+                if source["repoURL"].as_str().unwrap().contains(repo) {
                     source["targetRevision"] = serde_yaml::Value::String(branch.to_string());
                 }
             }
