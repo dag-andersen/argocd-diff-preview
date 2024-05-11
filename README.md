@@ -13,7 +13,7 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 
 In the Kubernetes world, we often use templating tools like Kustomize and Helm to generate our Kubernetes manifests. These tools make maintaining and streamlining configuration easier across applications and environments. However, they also make it harder to visualize the application's actual configuration in the cluster.
 
-Mentally parsing Helm templates and kustomize patches is hard without rendering the actual output. Thus, making mistakes while modifying an application's configuration is relatively easy.
+Mentally parsing Helm templates and Kustomize patches is hard without rendering the actual output. Thus, making mistakes while modifying an application's configuration is relatively easy.
 
 In the field of GitOps and infrastructure as code, all configurations are checked into Git and modified through PRs. The code changes in the PR are reviewed by a human, who needs to understand the changes made to the configuration. This is hard when the configuration is generated through templating tools like Kustomize and Helm.
 
@@ -21,22 +21,22 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 
 ![](./images/flow_dark.png)
 
-The safest way to render your Helm Charts and Kustomize Overlays is to let ArgoCD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines.
+The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let ArgoCD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
 The implementation is actually quite simple. It just follows the steps below:
 
-#### 10 steps
+#### 10 Steps
 1. Start a local cluster
 2. Install ArgoCD
 3. Add the required credentials (git credentials, image pull secrets, etc.)
 4. Fetch all ArgoCD application files on your PR branch
-   - Point their `targetRevision` to the Pull Request branch.
+   - Point their `targetRevision` to the Pull Request branch
    - Remove the `syncPolicy` from the application (to avoid the application to sync locally)
 1. Apply the modified applications to the cluster
 2. Let ArgoCD do its magic
-3. Extract the rendered manifests from the ArgoCD server.
+3. Extract the rendered manifests from the ArgoCD server
 4. Repeat steps 4–7 for the base branch (main branch)
-5. Create a diff between the manifests rendered from each branch.
+5. Create a diff between the manifests rendered from each branch
 6. Display the diff in the PR
 
 ## Features
@@ -48,14 +48,14 @@ The implementation is actually quite simple. It just follows the steps below:
 - Render resources from external sources (e.g., Helm charts). For example, when you update the chart version of Nginx, you can get a render of the new output. For example, this is useful to spot changes in default values. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15). 
 
 #### Not supported
-- Does not support ArgoCD CMP plugins
-- Does not work [Cluster Generators](https://argocd-applicationset.readthedocs.io/en/stable/Generators-Cluster/) in your ApplicationSets
+- Does not support Argo CD CMP plugins
+- Does not work with [Cluster Generators](https://argocd-applicationset.readthedocs.io/en/stable/Generators-Cluster/) in your ApplicationSets
 
 ## Try demo locally with 3 simple commands!
 
-Steps:
-1. Make sure Docker is running. E.g., run `docker ps` to see if it's running.
-2. Run the following 3 commands:
+First, make sure Docker is running. E.g., run `docker ps` to see if it's running.
+
+Second, run the following 3 commands:
 
 ```bash
 git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
@@ -86,8 +86,13 @@ and the output would be something like this:
 🙏 Please check the ./output/diff.md file for differences
 ```
 
-and the `./output/diff.md` would be something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
+Finally, you can view the diff by running:
 
+```bash
+cat ./output/diff.md
+```
+
+The result should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
 
 ## Installation and Usage
 
@@ -109,8 +114,33 @@ docker run \
    dagandersen/argocd-diff-preview:latest
 ```
 
-<details>
-  <summary>Example in GitHub Actions workflow</summary>
+### Run as binary
+
+Pre-requisites:
+- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
+
+Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/releases) and find the correct binary for your operating system.
+
+Example for downloading and running on macOS:
+
+```bash
+curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.7/argocd-diff-preview-Darwin-x86_64.tar.gz
+tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
+./argocd-diff-preview --help
+```
+
+### Run from source
+
+Pre-requisites:
+- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/), [Rust](https://www.rust-lang.org/tools/install)
+
+```bash
+git clone https://github.com/dag-andersen/argocd-diff-preview
+cd argocd-diff-preview
+cargo run -- --help
+```
+
+### Usage in a GitHub Actions Workflow
 
 ```yaml
 name: Argo CD Diff Preview
@@ -118,7 +148,7 @@ name: Argo CD Diff Preview
 on:
   pull_request:
     branches:
-      - "main"
+      - main
 
 jobs:
   build:
@@ -137,7 +167,7 @@ jobs:
           ref: main
           path: main
 
-      - name: Diff
+      - name: Generate Diff
         run: |
           docker run \
             --network=host \
@@ -147,7 +177,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:latest
+            dagandersen/argocd-diff-preview:v0.0.7
 
       - name: Post diff as comment
         run: |
@@ -157,40 +187,41 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-</details>
 
-### Run as binary
+### Handling Credentials
 
-Pre-requisites:
-- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
+In the simple code examples above, we do not provide the cluster with any credentials, which only works if the image/Helm Chart registry and the Git repository are public. Since your repository might not be public you need to provide the tool with the necessary read-access credentials for the repository. This can be done by placing the Argo CD repo secrets in folder mounted at `/secrets`. When the tool starts, it will simply run `kubectl apply -f /secrets` to apply every resource to the cluster, before starting the rendering process.
 
-Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/releases) and find the correct binary for your operating system.
+Example: 
 
-Example for downloading and running on macOS:
+```yaml
+steps:
+  ...
+# Lets assume your repository credentials are
+# stored in a file called my-repo-secrets.yaml
+- name: Prepare secrets
+  run: |
+    mkdir secrets
+    cp my-repo-secrets.yaml ./secrets
 
-```bash
-curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.4/argocd-diff-preview-Darwin-x86_64.tar.gz
-tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
-./argocd-diff-preview --help
+- name: Generate Diff
+  run: |
+    docker run \
+      --network=host \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v $(pwd)/main:/base-branch \
+      -v $(pwd)/pull-request:/target-branch \
+      -v $(pwd)/output:/output \
+      -v $(pwd)/secrets:/secrets \         ⬅️ Mount the secrets folder
+      -e TARGET_BRANCH=${{ github.head_ref }} \
+      -e REPO=${{ github.repository }} \
+      dagandersen/argocd-diff-preview:v0.0.7
 ```
 
-### Run from source
-
-Pre-requisites:
-- Install: [Git](https://git-scm.com/downloads), [Docker](https://docs.docker.com/get-docker/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/), [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/), [Rust](https://www.rust-lang.org/tools/install)
-
-```bash
-git clone https://github.com/dag-andersen/argocd-diff-preview
-cd argocd-diff-preview
-cargo run -- --help
-```
-
-### Handling credentials
-
-In the simple code examples above, we do not provide the cluster with any credentials, which only works if the image registry and the git repository are public. Since your Git repository might not be public you need to provide the tool with the necessary read-access credentials for the repository. This can be done by placing the Argo CD repo secrets in folder mounted at `/secrets`. When the tool starts, it will simply run `kubectl apply -f /secrets` to apply every resource to the cluster, before starting the rendering process.
+Examples of how repository credentials are specified:
 
 <details>
-  <summary>Credentials example - Username + Password </summary>
+  <summary>Username + Password </summary>
 
 ```yaml
 apiVersion: v1
@@ -209,7 +240,7 @@ stringData:
 </details>
 
 <details>
-  <summary>Credentials example - GitHub App </summary>
+  <summary>GitHub App </summary>
 
 ```yaml
 apiVersion: v1
@@ -266,14 +297,12 @@ OPTIONS:
 ## Roadmap
 - Make a dedicated GitHub Action that wraps the Docker container, so the tool becomes more user-friendly.  
 - Let the user specify Argo CD version. Currently it always uses the newest version available.
-- Let the user specify how many lines above and below the diff they want to see. This is useful when the diff is too big to be displayed in a PR comment.
-- Delete Argo CD Applications, when they have been parsed by the tool, so Argo CD can focus on the remaining applications, which hopefully speeds up the process. 
-
-## Do you experience any issues?
-
-If you experience any issues, please open an issue in this repository. We will do our best to address it as soon as possible. I only have limited codebases available to me, so I can't test it on all possible codebases. 
+- Let the user specify how many lines above and below the code change they want to see. This is useful when the diff is too big to be displayed in a PR comment.
+- Let the user specify max characters in the diff. This is useful when the diff is too big to be displayed in a PR comment.
+- Delete Argo CD Applications, when they have been parsed by the tool, so Argo CD can focus on the remaining applications, which hopefully speeds up the rendering process.
 
 ## Questions, issues, or suggestions
 
-If you have any questions, issues, or suggestions, please open an issue in this repository.
+If you have any questions, issues, or suggestions, please open an issue in this repository. We will do our best to address it as soon as possible.
+
 Any contributions are **greatly appreciated**. 

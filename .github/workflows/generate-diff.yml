@@ -25,7 +25,7 @@ jobs:
           ref: main
           path: main
 
-      - name: Diff
+      - name: Generate Diff
         run: |
           docker run \
             --network=host \
@@ -35,7 +35,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:latest
+            dagandersen/argocd-diff-preview:v0.0.7
 
       - name: Post diff as comment
         run: |
