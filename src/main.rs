@@ -83,6 +83,10 @@ struct Opt {
     /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
     #[structopt(long, env)]
     local_cluster_tool: Option<String>,
+
+    /// Max diff message character count. Default: 65536 (GitHub comment limit)
+    #[structopt(long, env)]
+    max_diff_length: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -147,6 +151,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let secrets_folder = opt.secrets_folder.as_str();
     let line_count = opt.line_count;
     let argocd_version = opt.argocd_version.as_deref();
+    let max_diff_length = opt.max_diff_length;
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -187,6 +192,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     if let Some(a) = argocd_version {
         info!("✨ - argocd-version: {}", a);
+    }
+    if let Some(a) = max_diff_length {
+        info!("✨ - max-diff-length: {}", a);
     }
 
     if !check_if_folder_exists(&base_branch_folder) {
@@ -258,6 +266,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &target_branch_name,
         diff_ignore,
         line_count,
+        max_diff_length,
     )
     .await?;
 
