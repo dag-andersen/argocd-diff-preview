@@ -44,6 +44,10 @@ struct Opt {
     #[structopt(short = "i", long, env)]
     diff_ignore: Option<String>,
 
+    /// Argo CD version. Default: stable
+    #[structopt(long, env)]
+    argocd_version: Option<String>,
+
     /// Base branch name
     #[structopt(short, long, default_value = "main", env)]
     base_branch: String,
@@ -137,6 +141,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let timeout = opt.timeout;
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
+    let argocd_version = opt.argocd_version.as_deref();
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -172,6 +177,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(a) = diff_ignore.clone() {
         info!("✨ - diff-ignore: {}", a);
     }
+    if let Some(a) = argocd_version {
+        info!("✨ - argocd-version: {}", a);
+    }
 
     if !check_if_folder_exists(&base_branch_folder) {
         error!(
@@ -195,12 +203,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
-    argocd::install_argo_cd().await?;
+    argocd::install_argo_cd(argocd_version).await?;
 
     create_folder_if_not_exists(secrets_folder);
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
-        Ok(_) => info!("🤷‍♂️ No secrets found in {}", secrets_folder),
+        Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
             panic!("error: {}", e)

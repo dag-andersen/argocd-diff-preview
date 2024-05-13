@@ -281,6 +281,7 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
+        --argocd-version <argocd-version>   Argo CD version [env: ARGOCD_VERSION=]  [default: stable]
     -b, --base-branch <base-branch>         Base branch name [env: BASE_BRANCH=]  [default: main]
         --base-branch-folder <folder>       Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
     -i, --diff-ignore <diff-ignore>         Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
