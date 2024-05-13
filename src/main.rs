@@ -44,6 +44,10 @@ struct Opt {
     #[structopt(short = "i", long, env)]
     diff_ignore: Option<String>,
 
+    /// Generate diffs with <n> lines above and below the highlighted changes in the diff. Default: 10
+    #[structopt(short, long, env)] 
+    line_count: Option<usize>,
+
     /// Argo CD version. Default: stable
     #[structopt(long, env)]
     argocd_version: Option<String>,
@@ -141,6 +145,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let timeout = opt.timeout;
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
+    let line_count = opt.line_count;
     let argocd_version = opt.argocd_version.as_deref();
 
     // select local cluster tool
@@ -176,6 +181,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     if let Some(a) = diff_ignore.clone() {
         info!("✨ - diff-ignore: {}", a);
+    }
+    if let Some(a) = line_count {
+        info!("✨ - line-count: {}", a);
     }
     if let Some(a) = argocd_version {
         info!("✨ - argocd-version: {}", a);
@@ -249,6 +257,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &base_branch_name,
         &target_branch_name,
         diff_ignore,
+        line_count,
     )
     .await?;
 

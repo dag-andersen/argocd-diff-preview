@@ -286,6 +286,7 @@ OPTIONS:
         --base-branch-folder <folder>       Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
     -i, --diff-ignore <diff-ignore>         Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
     -r, --file-regex <file-regex>           Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
+    -l, --line-count <line-count>           Generate diffs with <n> lines above and below the highlighted changes in the diff. Default: 10 [env: LINE_COUNT=]
         --local-cluster-tool <tool>         Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
     -o, --output-folder <output-folder>     Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
         --repo <repo>                       Git Repository. Format: OWNER/REPO [env: REPO=]

@@ -10,6 +10,7 @@ pub async fn generate_diff(
     base_branch_name: &str,
     target_branch_name: &str,
     diff_ignore: Option<String>,
+    line_count: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
     info!(
         "🔮 Generating diff between {} and {}",
@@ -48,7 +49,8 @@ pub async fn generate_diff(
     let diff_as_string = parse_diff_output(
         run_command(
             &format!(
-                "git --no-pager diff --no-prefix -U10 --no-index {} {} {}",
+                "git --no-pager diff --no-prefix -U{} --no-index {} {} {}",
+                line_count.unwrap_or(10),
                 list_of_patterns_to_ignore,
                 Branch::Base,
                 Branch::Target
