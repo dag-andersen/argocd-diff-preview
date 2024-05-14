@@ -56,17 +56,9 @@ struct Opt {
     #[structopt(short, long, default_value = "main", env)]
     base_branch: String,
 
-    /// Base branch folder
-    #[structopt(long, env, default_value = "base-branch")]
-    base_branch_folder: String,
-
     /// Target branch name
     #[structopt(short, long, env)]
     target_branch: String,
-
-    /// Target branch folder
-    #[structopt(long, env, default_value = "target-branch")]
-    target_branch_folder: String,
 
     /// Git Repository. Format: OWNER/REPO
     #[structopt(long = "repo", env)]
@@ -116,6 +108,9 @@ fn apps_file(branch: &Branch) -> &'static str {
     }
 }
 
+const BASE_BRANCH_FOLDER: &str = "base-branch";
+const TARGET_BRANCH_FOLDER: &str = "target-branch";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
@@ -141,9 +136,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|f| Regex::new(&f).unwrap());
 
     let base_branch_name = opt.base_branch;
-    let base_branch_folder = opt.base_branch_folder;
     let target_branch_name = opt.target_branch;
-    let target_branch_folder = opt.target_branch_folder;
     let repo = opt.repo;
     let diff_ignore = opt.diff_ignore;
     let timeout = opt.timeout;
@@ -175,8 +168,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("✨ - local-cluster-tool: {:?}", tool);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
-    info!("✨ - base-branch-folder: {}", base_branch_folder);
-    info!("✨ - target-branch-folder: {}", target_branch_folder);
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
     info!("✨ - repo: {}", repo);
@@ -197,18 +188,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("✨ - max-diff-length: {}", a);
     }
 
-    if !check_if_folder_exists(&base_branch_folder) {
+    if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
         error!(
             "❌ Base branch folder does not exist: {}",
-            base_branch_folder
+            BASE_BRANCH_FOLDER
         );
         panic!("Base branch folder does not exist");
     }
 
-    if !check_if_folder_exists(&target_branch_folder) {
+    if !check_if_folder_exists(&TARGET_BRANCH_FOLDER) {
         error!(
             "❌ Target branch folder does not exist: {}",
-            target_branch_folder
+            TARGET_BRANCH_FOLDER
         );
         panic!("Target branch folder does not exist");
     }
@@ -234,10 +225,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
     let base_apps =
-        parsing::get_applications(&base_branch_folder, &base_branch_name, &file_regex, &repo)
+        parsing::get_applications(&BASE_BRANCH_FOLDER, &base_branch_name, &file_regex, &repo)
             .await?;
     let target_apps = parsing::get_applications(
-        &target_branch_folder,
+        &TARGET_BRANCH_FOLDER,
         &target_branch_name,
         &file_regex,
         &repo,

@@ -18,10 +18,11 @@ static ERROR_MESSAGES: [&str; 7] = [
     "Unknown desc = Unable to resolve"
 ];
 
-static TIMEOUT_MESSAGES: [&str; 3] = [
+static TIMEOUT_MESSAGES: [&str; 4] = [
     "Client.Timeout",
     "failed to get git client for repo",
     "rpc error: code = Unknown desc = Get \"https",
+    "i/o timeout",
 ];
 
 pub async fn get_resources(
@@ -117,6 +118,22 @@ pub async fn get_resources(
             apps_left += 1
         }
 
+        // ERRORS
+        if !set_of_failed_apps.is_empty() {
+            for (name, msg) in &set_of_failed_apps {
+                error!(
+                    "❌ Failed to process application: {} with error: \n{}",
+                    name, msg
+                );
+            }
+            return Err("Failed to process applications".into());
+        }
+
+        if items.len() == set_of_processed_apps.len() {
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            continue;
+        }
+
         // TIMEOUT
         let time_elapsed = start_time.elapsed().as_secs();
         if time_elapsed > timeout as u64 {
@@ -136,17 +153,6 @@ pub async fn get_resources(
                 }
             }
             return Err("Timed out".into());
-        }
-
-        // ERRORS
-        if !set_of_failed_apps.is_empty() {
-            for (name, msg) in &set_of_failed_apps {
-                error!(
-                    "❌ Failed to process application: {} with error: \n{}",
-                    name, msg
-                );
-            }
-            return Err("Failed to process applications".into());
         }
 
         // TIMED OUT APPS

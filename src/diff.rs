@@ -21,11 +21,7 @@ pub async fn generate_diff(
     );
 
     let list_of_patterns_to_ignore = match diff_ignore {
-        Some(s) => s
-            .split(",")
-            .map(|s| format!("--ignore-matching-lines={}", s))
-            .collect::<Vec<String>>()
-            .join(" "),
+        Some(s) => format!("--ignore-matching-lines='{}'", s),
         None => "".to_string(),
     };
 
@@ -119,7 +115,6 @@ fn markdown_template_length() -> usize {
     MARKDOWN_TEMPLATE
         .replace("%summary%", "")
         .replace("%diff%", "")
-        .replace("%extra_message%", "")
         .len()
 }
 
