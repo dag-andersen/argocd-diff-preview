@@ -15,7 +15,7 @@ static ERROR_MESSAGES: [&str; 7] = [
     "path does not exist",
     "error converting YAML to JSON",
     "Unknown desc = `helm template .",
-    "Unknown desc = Unable to resolve"
+    "Unknown desc = Unable to resolve",
 ];
 
 static TIMEOUT_MESSAGES: [&str; 4] = [
@@ -146,10 +146,7 @@ pub async fn get_resources(
             if !other_errors.is_empty() {
                 error!("❌ Applications with 'ComparisonError' errors:");
                 for (name, msg) in &other_errors {
-                    error!(
-                        "❌ {}, {}",
-                        name, msg
-                    );
+                    error!("❌ {}, {}", name, msg);
                 }
             }
             return Err("Timed out".into());
@@ -231,7 +228,8 @@ pub async fn delete_applications() {
             .await
             .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
             .map(|e| e.trim().is_empty())
-            .unwrap_or_default() {
+            .unwrap_or_default()
+        {
             let _ = child.kill();
             break;
         }
@@ -241,7 +239,8 @@ pub async fn delete_applications() {
             .await
             .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
             .map(|e| e.trim().is_empty())
-            .unwrap_or_default() {
+            .unwrap_or_default()
+        {
             let _ = child.kill();
             break;
         }

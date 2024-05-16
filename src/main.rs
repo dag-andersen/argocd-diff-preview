@@ -10,9 +10,7 @@ use log::{debug, error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use crate::utils::{
-    check_if_folder_exists, create_folder_if_not_exists, run_command,
-};
+use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
 mod argocd;
 mod diff;
 mod extract;
@@ -45,7 +43,7 @@ struct Opt {
     diff_ignore: Option<String>,
 
     /// Generate diffs with <n> lines above and below the highlighted changes in the diff. Default: 10
-    #[structopt(short, long, env)] 
+    #[structopt(short, long, env)]
     line_count: Option<usize>,
 
     /// Argo CD version. Default: stable
@@ -138,12 +136,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let base_branch_name = opt.base_branch;
     let target_branch_name = opt.target_branch;
     let repo = opt.repo;
-    let diff_ignore = opt.diff_ignore;
+    let diff_ignore = opt.diff_ignore.filter(|f| !f.trim().is_empty());
     let timeout = opt.timeout;
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
     let line_count = opt.line_count;
-    let argocd_version = opt.argocd_version.as_deref();
+    let argocd_version = opt
+        .argocd_version
+        .as_deref()
+        .filter(|f| !f.trim().is_empty());
     let max_diff_length = opt.max_diff_length;
 
     // select local cluster tool

@@ -3,3 +3,4 @@ target/
 argocd/
 secrets/
 output/
+.vscode/
