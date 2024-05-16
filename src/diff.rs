@@ -9,7 +9,6 @@ pub async fn generate_diff(
     output_folder: &str,
     base_branch_name: &str,
     target_branch_name: &str,
-    diff_ignore: Option<String>,
     line_count: Option<usize>,
     max_char_count: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
@@ -20,30 +19,19 @@ pub async fn generate_diff(
         base_branch_name, target_branch_name
     );
 
-    let patterns_to_ignore = match diff_ignore {
-        Some(s) => format!("--ignore-matching-lines {}", s),
-        None => "".to_string(),
-    };
-
     let parse_diff_output = |output: Result<Output, Output>| -> String {
-        let o = match output {
+        match output {
+            Ok(_) => "No changes found".to_string(),
             Err(e) if !e.stderr.is_empty() => panic!(
                 "Error running diff command with error: {}",
                 String::from_utf8_lossy(&e.stderr)
             ),
-            Ok(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
             Err(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
-        };
-        if o.trim().is_empty() {
-            return "No changes found".to_string();
-        } else {
-            o
         }
     };
 
     let summary_diff_command = format!(
-        "git --no-pager diff --compact-summary --no-index {} {} {}",
-        patterns_to_ignore,
+        "git --no-pager diff --compact-summary --no-index {} {}",
         Branch::Base,
         Branch::Target
     );
@@ -57,9 +45,8 @@ pub async fn generate_diff(
         parse_diff_output(run_command(&summary_diff_command, Some(output_folder)).await);
 
     let diff_command = &format!(
-        "git --no-pager diff --no-prefix -U{} --no-index {} {} {}",
+        "git --no-pager diff --no-prefix -U{} --no-index {} {}",
         line_count.unwrap_or(10),
-        patterns_to_ignore,
         Branch::Base,
         Branch::Target
     );

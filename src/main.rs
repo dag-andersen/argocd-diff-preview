@@ -141,10 +141,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
     let line_count = opt.line_count;
-    let argocd_version = opt
-        .argocd_version
-        .as_deref()
-        .filter(|f| !f.trim().is_empty());
+    let argocd_version = opt.argocd_version.as_deref().filter(|f| !f.trim().is_empty());
     let max_diff_length = opt.max_diff_length;
 
     // select local cluster tool
@@ -164,6 +161,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
         panic!("Invalid repository format");
     }
+    let ignore_regex = diff_ignore.map(|f| Regex::new(&f).unwrap());
 
     info!("✨ Running with:");
     info!("✨ - local-cluster-tool: {:?}", tool);
@@ -176,7 +174,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(a) = file_regex.clone() {
         info!("✨ - file-regex: {}", a.as_str());
     }
-    if let Some(a) = diff_ignore.clone() {
+    if let Some(a) = ignore_regex.clone() {
         info!("✨ - diff-ignore: {}", a);
     }
     if let Some(a) = line_count {
@@ -242,10 +240,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Cleanup
     clean_output_folder(output_folder);
 
-    extract::get_resources(&Branch::Base, timeout, output_folder).await?;
+    extract::get_resources(&Branch::Base, timeout, &ignore_regex, output_folder).await?;
     extract::delete_applications().await;
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+    extract::get_resources(&Branch::Target, timeout, &ignore_regex, output_folder).await?;
 
     match tool {
         ClusterTool::Kind => kind::delete_cluster(&cluster_name),
@@ -256,7 +254,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         output_folder,
         &base_branch_name,
         &target_branch_name,
-        diff_ignore,
         line_count,
         max_diff_length,
     )

@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 use std::{collections::BTreeMap, error::Error};
 
 use log::{debug, error, info};
+use regex::Regex;
 
 use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
@@ -28,6 +29,7 @@ static TIMEOUT_MESSAGES: [&str; 4] = [
 pub async fn get_resources(
     branch_type: &Branch,
     timeout: u64,
+    ignore: &Option<Regex>,
     output_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
     info!("🌚 Getting resources for {}", branch_type);
@@ -77,9 +79,16 @@ pub async fn get_resources(
                     debug!("Getting manifests for application: {}", name);
                     match run_command(&format!("argocd app manifests {}", name), None).await {
                         Ok(o) => {
+                            let s = String::from_utf8_lossy(&o.stdout).to_string();
+                            let output = match &ignore {
+                                Some(i) => {
+                                    replace_text(&s, i)
+                                }
+                                None => s,
+                            };
                             fs::write(
                                 &format!("{}/{}/{}", output_folder, branch_type, name),
-                                &o.stdout,
+                                output.as_bytes(),
                             )?;
                             debug!("Got manifests for application: {}", name)
                         }
@@ -251,4 +260,12 @@ pub async fn delete_applications() {
         };
     }
     info!("🧼 Removed applications successfully")
+}
+
+fn replace_text(input: &str, regex: &Regex) -> String {
+    let mut s = input.to_string();
+    regex.find_iter(&input).for_each(|m| {
+        s = s.replace(m.as_str(), &"X".repeat(m.as_str().len()))
+    });
+    s
 }
