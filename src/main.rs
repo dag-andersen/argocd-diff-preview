@@ -10,9 +10,7 @@ use log::{debug, error, info};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-use crate::utils::{
-    check_if_folder_exists, create_folder_if_not_exists, run_command,
-};
+use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
 mod argocd;
 mod diff;
 mod extract;
@@ -44,21 +42,21 @@ struct Opt {
     #[structopt(short = "i", long, env)]
     diff_ignore: Option<String>,
 
+    /// Generate diffs with <n> lines above and below the highlighted changes in the diff. Default: 10
+    #[structopt(short, long, env)]
+    line_count: Option<usize>,
+
+    /// Argo CD version. Default: stable
+    #[structopt(long, env)]
+    argocd_version: Option<String>,
+
     /// Base branch name
     #[structopt(short, long, default_value = "main", env)]
     base_branch: String,
 
-    /// Base branch folder
-    #[structopt(long, env, default_value = "base-branch")]
-    base_branch_folder: String,
-
     /// Target branch name
     #[structopt(short, long, env)]
     target_branch: String,
-
-    /// Target branch folder
-    #[structopt(long, env, default_value = "target-branch")]
-    target_branch_folder: String,
 
     /// Git Repository. Format: OWNER/REPO
     #[structopt(long = "repo", env)]
@@ -75,6 +73,10 @@ struct Opt {
     /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
     #[structopt(long, env)]
     local_cluster_tool: Option<String>,
+
+    /// Max diff message character count. Default: 65536 (GitHub comment limit)
+    #[structopt(long, env)]
+    max_diff_length: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -104,6 +106,9 @@ fn apps_file(branch: &Branch) -> &'static str {
     }
 }
 
+const BASE_BRANCH_FOLDER: &str = "base-branch";
+const TARGET_BRANCH_FOLDER: &str = "target-branch";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
@@ -129,14 +134,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .map(|f| Regex::new(&f).unwrap());
 
     let base_branch_name = opt.base_branch;
-    let base_branch_folder = opt.base_branch_folder;
     let target_branch_name = opt.target_branch;
-    let target_branch_folder = opt.target_branch_folder;
     let repo = opt.repo;
-    let diff_ignore = opt.diff_ignore;
+    let diff_ignore = opt.diff_ignore.filter(|f| !f.trim().is_empty());
     let timeout = opt.timeout;
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
+    let line_count = opt.line_count;
+    let argocd_version = opt
+        .argocd_version
+        .as_deref()
+        .filter(|f| !f.trim().is_empty());
+    let max_diff_length = opt.max_diff_length;
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -160,8 +169,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     info!("✨ - local-cluster-tool: {:?}", tool);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
-    info!("✨ - base-branch-folder: {}", base_branch_folder);
-    info!("✨ - target-branch-folder: {}", target_branch_folder);
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
     info!("✨ - repo: {}", repo);
@@ -172,19 +179,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(a) = diff_ignore.clone() {
         info!("✨ - diff-ignore: {}", a);
     }
+    if let Some(a) = line_count {
+        info!("✨ - line-count: {}", a);
+    }
+    if let Some(a) = argocd_version {
+        info!("✨ - argocd-version: {}", a);
+    }
+    if let Some(a) = max_diff_length {
+        info!("✨ - max-diff-length: {}", a);
+    }
 
-    if !check_if_folder_exists(&base_branch_folder) {
+    if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
         error!(
             "❌ Base branch folder does not exist: {}",
-            base_branch_folder
+            BASE_BRANCH_FOLDER
         );
         panic!("Base branch folder does not exist");
     }
 
-    if !check_if_folder_exists(&target_branch_folder) {
+    if !check_if_folder_exists(&TARGET_BRANCH_FOLDER) {
         error!(
             "❌ Target branch folder does not exist: {}",
-            target_branch_folder
+            TARGET_BRANCH_FOLDER
         );
         panic!("Target branch folder does not exist");
     }
@@ -195,12 +211,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
-    argocd::install_argo_cd().await?;
+    argocd::install_argo_cd(argocd_version).await?;
 
     create_folder_if_not_exists(secrets_folder);
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
-        Ok(_) => info!("🤷‍♂️ No secrets found in {}", secrets_folder),
+        Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
             panic!("error: {}", e)
@@ -210,10 +226,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
     let base_apps =
-        parsing::get_applications(&base_branch_folder, &base_branch_name, &file_regex, &repo)
+        parsing::get_applications(&BASE_BRANCH_FOLDER, &base_branch_name, &file_regex, &repo)
             .await?;
     let target_apps = parsing::get_applications(
-        &target_branch_folder,
+        &TARGET_BRANCH_FOLDER,
         &target_branch_name,
         &file_regex,
         &repo,
@@ -241,6 +257,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &base_branch_name,
         &target_branch_name,
         diff_ignore,
+        line_count,
+        max_diff_length,
     )
     .await?;
 

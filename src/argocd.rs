@@ -23,7 +23,7 @@ data:
   reposerver.parallelism.limit: "300"
 "#;
 
-pub async fn install_argo_cd() -> Result<(), Box<dyn Error>> {
+pub async fn install_argo_cd(version: Option<&str>) -> Result<(), Box<dyn Error>> {
     info!("🦑 Installing Argo CD...");
 
     match run_command("kubectl create ns argocd", None).await {
@@ -35,7 +35,11 @@ pub async fn install_argo_cd() -> Result<(), Box<dyn Error>> {
     }
 
     // Install Argo CD
-    match run_command("kubectl -n argocd apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml", None).await {
+    let install_url = format!(
+        "https://raw.githubusercontent.com/argoproj/argo-cd/{}/manifests/install.yaml",
+        version.unwrap_or("stable")
+    );
+    match run_command(&format!("kubectl -n argocd apply -f {}", install_url), None).await {
         Ok(_) => (),
         Err(e) => {
             error!("❌ Failed to install Argo CD");

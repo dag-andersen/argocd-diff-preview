@@ -34,7 +34,7 @@ RUN rm ./target/release/deps/argocd_diff_preview-*
 RUN cargo build --release
 
 # our final base
-FROM rust:1-slim-buster
+FROM rust:1-slim-bookworm
 
 COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 

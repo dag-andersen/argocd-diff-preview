@@ -281,11 +281,14 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
+        --argocd-version <argocd-version>   Argo CD version [env: ARGOCD_VERSION=]  [default: stable]
     -b, --base-branch <base-branch>         Base branch name [env: BASE_BRANCH=]  [default: main]
         --base-branch-folder <folder>       Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
     -i, --diff-ignore <diff-ignore>         Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
     -r, --file-regex <file-regex>           Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
+    -l, --line-count <line-count>           Generate diffs with <n> lines above and below the highlighted changes in the diff. [env: LINE_COUNT=]  [Default: 10] 
         --local-cluster-tool <tool>         Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
+        --max-diff-length <length>          Max diff message character count. [env: MAX_DIFF_LENGTH=]  [Default: 65536] (GitHub comment limit)
     -o, --output-folder <output-folder>     Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
         --repo <repo>                       Git Repository. Format: OWNER/REPO [env: REPO=]
     -s, --secrets-folder <secrets-folder>   Secrets folder where the secrets are read from [env: SECRETS_FOLDER=]  [default: ./secrets]
@@ -296,9 +299,6 @@ OPTIONS:
 
 ## Roadmap
 - Make a dedicated GitHub Action that wraps the Docker container, so the tool becomes more user-friendly.  
-- Let the user specify Argo CD version. Currently it always uses the newest version available.
-- Let the user specify how many lines above and below the code change they want to see. This is useful when the diff is too big to be displayed in a PR comment.
-- Let the user specify max characters in the diff. This is useful when the diff is too big to be displayed in a PR comment.
 - Delete Argo CD Applications, when they have been parsed by the tool, so Argo CD can focus on the remaining applications, which hopefully speeds up the rendering process.
 
 ## Questions, issues, or suggestions
