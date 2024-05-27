@@ -7,7 +7,7 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 - [Helm example | External Chart: Nginx](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
 - [Kustomize Example](https://github.com/dag-andersen/argocd-diff-preview/pull/12)
 
-![](./images/example.png)
+![](./images/example-1.png)
 
 ## Why do we need this?
 
@@ -128,7 +128,8 @@ Example for downloading and running on macOS:
 ```bash
 curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.8/argocd-diff-preview-Darwin-x86_64.tar.gz
 tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
-./argocd-diff-preview --help
+sudo mv argocd-diff-preview /usr/local/bin
+argocd-diff-preview --help
 ```
 
 <details>
@@ -146,7 +147,7 @@ git clone https://github.com/<owner>/<repo-name> target-branch --depth 1 -q -b <
 And now you are ready to run the tool:
   
 ```bash
-./argocd-diff-preview \
+argocd-diff-preview \
    --repo <owner>/<repo-name> \
    --base-branch main \
    --target-branch <your-branch>
