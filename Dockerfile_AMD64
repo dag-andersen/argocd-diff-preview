@@ -45,5 +45,7 @@ COPY --from=build /argocd-diff-preview/target/release/argocd-diff-preview .
 
 RUN apt-get update && apt-get install -y git
 
-# set the startup command to run your binary
+RUN git config --global --add safe.directory /base-branch
+RUN git config --global --add safe.directory /target-branch
+
 ENTRYPOINT ["./argocd-diff-preview"]

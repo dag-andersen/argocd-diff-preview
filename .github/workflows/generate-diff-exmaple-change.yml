@@ -1,11 +1,11 @@
-name: Generate Diff
+name: Generate Diff Example Change
 
 on:
   pull_request:
     branches:
       - "main"
     paths:
-      - ".github/workflows/generate-diff.yml"
+      - ".github/workflows/generate-diff-exmaple-change.yml"
       - "examples/**"
 
 jobs:

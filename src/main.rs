@@ -6,7 +6,7 @@ use std::{
     process::{Command, Output},
 };
 
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -50,17 +50,17 @@ struct Opt {
     #[structopt(long, env)]
     argocd_version: Option<String>,
 
-    /// Base branch name
-    #[structopt(short, long, default_value = "main", env)]
-    base_branch: String,
-
-    /// Target branch name
+    /// Base branch name. If not provided, it will be auto-detected from .git folder in base-branch folder
     #[structopt(short, long, env)]
-    target_branch: String,
+    base_branch: Option<String>,
 
-    /// Git Repository. Format: OWNER/REPO
-    #[structopt(long = "repo", env)]
-    repo: String,
+    /// Target branch name. If not provided, it will be auto-detected from .git folder in target-branch folder
+    #[structopt(short, long, env)]
+    target_branch: Option<String>,
+
+    /// Git Repository. Format: OWNER/REPO. If not provided, it will be auto-detected from .git folder in base-branch folder
+    #[structopt(long, env)]
+    repo: Option<String>,
 
     /// Output folder where the diff will be saved
     #[structopt(short, long, default_value = "./output", env)]
@@ -90,6 +90,15 @@ enum Branch {
     Target,
 }
 
+impl Branch {
+    fn folder(&self) -> &str {
+        match self {
+            Branch::Base => "base-branch",
+            Branch::Target => "target-branch",
+        }
+    }
+}
+
 impl std::fmt::Display for Branch {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -105,9 +114,6 @@ fn apps_file(branch: &Branch) -> &'static str {
         Branch::Target => "apps_target_branch.yaml",
     }
 }
-
-const BASE_BRANCH_FOLDER: &str = "base-branch";
-const TARGET_BRANCH_FOLDER: &str = "target-branch";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -133,19 +139,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter(|f| !f.trim().is_empty())
         .map(|f| Regex::new(&f).unwrap());
 
-    let base_branch_name = opt.base_branch;
-    let target_branch_name = opt.target_branch;
-    let repo = opt.repo;
-    let diff_ignore = opt.diff_ignore.filter(|f| !f.trim().is_empty());
-    let timeout = opt.timeout;
-    let output_folder = opt.output_folder.as_str();
-    let secrets_folder = opt.secrets_folder.as_str();
-    let line_count = opt.line_count;
-    let argocd_version = opt
-        .argocd_version
-        .as_deref()
-        .filter(|f| !f.trim().is_empty());
-    let max_diff_length = opt.max_diff_length;
+    info!("✨ Running with:");
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -159,19 +153,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
-    if !repo_regex.is_match(&repo) {
-        error!("❌ Invalid repository format. Please use OWNER/REPO");
-        panic!("Invalid repository format");
-    }
-
-    info!("✨ Running with:");
     info!("✨ - local-cluster-tool: {:?}", tool);
-    info!("✨ - base-branch: {}", base_branch_name);
-    info!("✨ - target-branch: {}", target_branch_name);
+
+    let (repo_name, base_branch_name, target_branch_name) =
+        repo_and_branch_config(opt.repo, opt.base_branch, opt.target_branch).await;
+
+    let diff_ignore = opt.diff_ignore.filter(|f| !f.trim().is_empty());
+    let timeout = opt.timeout;
+    let output_folder = opt.output_folder.as_str();
+    let secrets_folder = opt.secrets_folder.as_str();
+    let line_count = opt.line_count;
+    let argocd_version = opt
+        .argocd_version
+        .as_deref()
+        .filter(|f| !f.trim().is_empty());
+    let max_diff_length = opt.max_diff_length;
+
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
-    info!("✨ - repo: {}", repo);
     info!("✨ - timeout: {} seconds", timeout);
     if let Some(a) = file_regex.clone() {
         info!("✨ - file-regex: {}", a.as_str());
@@ -189,18 +188,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("✨ - max-diff-length: {}", a);
     }
 
-    if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
+    if !check_if_folder_exists(&Branch::Base.folder()) {
         error!(
             "❌ Base branch folder does not exist: {}",
-            BASE_BRANCH_FOLDER
+            Branch::Base.folder()
         );
         panic!("Base branch folder does not exist");
     }
 
-    if !check_if_folder_exists(&TARGET_BRANCH_FOLDER) {
+    if !check_if_folder_exists(&Branch::Target.folder()) {
         error!(
             "❌ Target branch folder does not exist: {}",
-            TARGET_BRANCH_FOLDER
+            Branch::Target.folder()
         );
         panic!("Target branch folder does not exist");
     }
@@ -224,15 +223,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // remove .git from repo
-    let repo = repo.trim_end_matches(".git");
-    let base_apps =
-        parsing::get_applications(&BASE_BRANCH_FOLDER, &base_branch_name, &file_regex, &repo)
-            .await?;
+    let base_apps = parsing::get_applications(
+        &Branch::Base.folder(),
+        &base_branch_name,
+        &file_regex,
+        &repo_name,
+    )
+    .await?;
     let target_apps = parsing::get_applications(
-        &TARGET_BRANCH_FOLDER,
+        &Branch::Target.folder(),
         &target_branch_name,
         &file_regex,
-        &repo,
+        &repo_name,
     )
     .await?;
 
@@ -310,4 +312,71 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
         }
     }
     Ok(count)
+}
+
+async fn repo_and_branch_config(
+    base_repo_option: Option<String>,
+    base_branch_name_option: Option<String>,
+    target_branch_name_option: Option<String>,
+) -> (String, String, String) {
+    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
+
+    let repo_name = match (base_repo_option, diff::get_repo_name(Branch::Base).await) {
+        (Some(r), _) if repo_regex.is_match(&r) => {
+            info!("✨ - repo: {}", r);
+            r
+        }
+        (Some(_), _) => {
+            error!("❌ Invalid repository format. Please use OWNER/REPO");
+            panic!("Invalid repository format");
+        }
+        (None, Some(r)) => {
+            info!("✨ - repo: {} (Auto Detected)", r);
+            r
+        }
+        _ => {
+            warn!("🚨 Failed to autodetect repository from .git folder");
+            error!("❌ Please provide the repository with --repo in the format OWNER/REPO");
+            panic!("Repository not provided and not autodetected in in .git folder")
+        }
+    };
+
+    let base_branch_name = match (
+        base_branch_name_option,
+        diff::get_branch_name(Branch::Base).await,
+    ) {
+        (Some(b), _) => {
+            info!("✨ - base-branch: {}", b);
+            b
+        }
+        (None, Some(b)) => {
+            info!("✨ - base-branch: {} (Auto Detected)", b);
+            b
+        }
+        _ => {
+            warn!("🚨 Failed to autodetect base-branch name from .git folder");
+            error!("❌ Please provide the base branch name with --base-branch");
+            panic!("Base branch name not provided and not found in git remotes")
+        }
+    };
+
+    let target_branch_name = match (
+        target_branch_name_option,
+        diff::get_branch_name(Branch::Target).await,
+    ) {
+        (Some(b), _) => {
+            info!("✨ - target-branch: {}", b);
+            b
+        }
+        (None, Some(b)) => {
+            info!("✨ - base-branch: {} (Auto Detected)", b);
+            b
+        }
+        _ => {
+            warn!("🚨 Failed to autodetect target-branch name from .git folder");
+            error!("❌ Please provide the target branch name with --target-branch");
+            panic!("Target branch name not provided and not found in git remotes")
+        }
+    };
+    (repo_name, base_branch_name, target_branch_name)
 }
