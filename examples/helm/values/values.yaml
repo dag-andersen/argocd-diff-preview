@@ -1,1 +1,5 @@
-fullnameOverride: super-app-name
+fullnameOverride: suuuuuuuper-app-name
+
+podLabels:
+  app: super-app-name
+  system: argocd
