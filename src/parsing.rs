@@ -97,17 +97,22 @@ async fn patch_argocd_applications(
 
     let redirect_sources = |spec: &mut Mapping| {
         if spec.contains_key("source") {
-            if spec["source"]["repoURL"]
-                .as_str()
-                .unwrap()
-                .contains(repo)
-            {
-                spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string());
+            match spec["source"]["repoURL"].as_str() {
+                Some(url) if url.contains(repo) => {
+                    spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string());
+                }
+                _ => {}
             }
         } else if spec.contains_key("sources") {
-            for source in spec["sources"].as_sequence_mut().unwrap() {
-                if source["repoURL"].as_str().unwrap().contains(repo) {
-                    source["targetRevision"] = serde_yaml::Value::String(branch.to_string());
+            let sources = spec["sources"].as_sequence_mut();
+            if sources.is_some() {
+                for source in sources.unwrap() {
+                    match source["repoURL"].as_str() {
+                        Some(url) if url.contains(repo) => {
+                            source["targetRevision"] = serde_yaml::Value::String(branch.to_string());
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
@@ -128,31 +133,31 @@ async fn patch_argocd_applications(
                 }
             })
         })
-        .map(|(kind, mut r)| {
+        .filter_map(|(kind, mut r)| {
             // Clean up the spec
             clean_spec({
                 if kind == "Application" {
-                    r["spec"].as_mapping_mut().unwrap()
+                    r["spec"].as_mapping_mut()?
                 } else {
-                    r["spec"]["template"]["spec"].as_mapping_mut().unwrap()
+                    r["spec"]["template"]["spec"].as_mapping_mut()?
                 }
             });
-            (kind, r)
+            Some((kind, r))
         })
-        .map(|(kind, mut r)| {
+        .filter_map(|(kind, mut r)| {
             // Redirect all applications to the branch
             redirect_sources({
                 if kind == "Application" {
-                    r["spec"].as_mapping_mut().unwrap()
+                    r["spec"].as_mapping_mut()?
                 } else {
-                    r["spec"]["template"]["spec"].as_mapping_mut().unwrap()
+                    r["spec"]["template"]["spec"].as_mapping_mut()?
                 }
             });
             debug!(
                 "Collected resources from application: {:?}",
-                r["metadata"]["name"].as_str().unwrap()
+                r["metadata"]["name"].as_str().unwrap_or("unknown")
             );
-            r
+            Some(r)
         })
         .collect();
 
@@ -165,7 +170,7 @@ async fn patch_argocd_applications(
     // convert back to string
     let mut output = String::new();
     for r in &applications {
-        let r = serde_yaml::to_string(r).unwrap();
+        let r = serde_yaml::to_string(r)?;
         output.push_str(&r);
         output.push_str("---\n");
     }
