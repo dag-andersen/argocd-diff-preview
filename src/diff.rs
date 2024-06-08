@@ -86,9 +86,7 @@ pub async fn generate_diff(
             let last_diff_char = remaining - warning_message.len();
             diff_as_string[..last_diff_char].to_string() + warning_message
         }
-        _ => 
-            return Err("Diff is too long and cannot be truncated. Increase the max length with `--max-diff-length`".into())
-        
+        _ => return Err("Diff is too long and cannot be truncated. Increase the max length with `--max-diff-length`".into())
     };
 
     let markdown = print_diff(&summary_as_string, &diff_truncated);

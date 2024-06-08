@@ -37,6 +37,7 @@ pub async fn get_resources(
 
     if fs::metadata(app_file).unwrap().len() != 0 {
         if let Err(e) = apply_manifest(app_file) {
+            error!("❌ Failed to apply applications for branch: {}", branch_type);
             panic!("error: {}", String::from_utf8_lossy(&e.stderr))
         }
     }
