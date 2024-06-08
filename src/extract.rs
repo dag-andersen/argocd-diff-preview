@@ -8,7 +8,7 @@ use log::{debug, error, info};
 use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
 
-static ERROR_MESSAGES: [&str; 7] = [
+static ERROR_MESSAGES: [&str; 8] = [
     "helm template .",
     "authentication required",
     "authentication failed",
@@ -16,6 +16,7 @@ static ERROR_MESSAGES: [&str; 7] = [
     "error converting YAML to JSON",
     "Unknown desc = `helm template .",
     "Unknown desc = Unable to resolve",
+    "is not a valid chart repository or cannot be reached",
 ];
 
 static TIMEOUT_MESSAGES: [&str; 4] = [
@@ -35,9 +36,9 @@ pub async fn get_resources(
     let app_file = apps_file(branch_type);
 
     if fs::metadata(app_file).unwrap().len() != 0 {
-        match apply_manifest(app_file) {
-            Ok(_) => (),
-            Err(e) => panic!("error: {}", String::from_utf8_lossy(&e.stderr)),
+        if let Err(e) = apply_manifest(app_file) {
+            error!("❌ Failed to apply applications for branch: {}", branch_type);
+            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
         }
     }
 
