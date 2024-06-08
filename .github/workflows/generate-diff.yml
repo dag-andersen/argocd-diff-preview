@@ -27,7 +27,9 @@ jobs:
 
       - name: Generate Diff
         run: |
+          docker build . -f Dockerfile_AMD64 -t image
           docker run \
+            -t \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $(pwd)/main:/base-branch \
@@ -35,7 +37,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.9
+            image
 
       - name: Post diff as comment
         run: |
