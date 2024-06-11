@@ -47,8 +47,10 @@ The implementation is actually quite simple. It just follows the steps below:
 - Provides a clear and concise view of the changes
 - Render resources from external sources (e.g., Helm charts). For example, when you update the chart version of Nginx, you can get a render of the new output. For example, this is useful to spot changes in default values. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15). 
 
-#### Not supported
-- Does not support Argo CD CMP plugins
+
+> [!IMPORTANT] Not tested:
+> - Does not support Argo CD CMP plugins
+> - Does not work with [Cluster Generators](https://argocd-applicationset.readthedocs.io/en/stable/Generators-Cluster/) in your ApplicationSets
 
 ## Try demo locally with 3 simple commands!
 
@@ -312,6 +314,25 @@ stringData:
 </details>
 
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
+
+> [!TIP]
+>
+> If your workflow pipeline have access to the live cluster where the real ArgoCD instance runs, then you can simply run 
+>
+> ```yaml
+> steps:
+>   ...
+> - name: Get credentials from live cluster
+>   run: |
+>     mkdir secrets
+>     kubectl get secrets <your-git-repo-access-secrets> -n argocd -o yaml     >> secrets/credentials.yaml
+>     kubectl get secrets <your-helm-chart-access-secrets> -n argocd -o yaml   >> secrets/credentials.yaml
+> 
+> - name: Generate Diff
+>   run: |
+>     docker run \
+>       ...
+> ```
 
 ### Scalability and performance
 
