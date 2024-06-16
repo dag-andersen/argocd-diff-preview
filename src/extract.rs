@@ -8,13 +8,14 @@ use log::{debug, error, info};
 use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
 
-static ERROR_MESSAGES: [&str; 8] = [
+static ERROR_MESSAGES: [&str; 9] = [
     "helm template .",
     "authentication required",
     "authentication failed",
     "path does not exist",
     "error converting YAML to JSON",
     "Unknown desc = `helm template .",
+    "Unknown desc = `kustomize build",
     "Unknown desc = Unable to resolve",
     "is not a valid chart repository or cannot be reached",
 ];
@@ -37,7 +38,10 @@ pub async fn get_resources(
 
     if fs::metadata(app_file).unwrap().len() != 0 {
         if let Err(e) = apply_manifest(app_file) {
-            error!("❌ Failed to apply applications for branch: {}", branch_type);
+            error!(
+                "❌ Failed to apply applications for branch: {}",
+                branch_type
+            );
             panic!("error: {}", String::from_utf8_lossy(&e.stderr))
         }
     }
@@ -92,23 +96,27 @@ pub async fn get_resources(
                 Some("Unknown") => {
                     if let Some(conditions) = item["status"]["conditions"].as_sequence() {
                         for condition in conditions {
-                            if let Some("ComparisonError") = condition["type"].as_str() {
-                                match condition["message"].as_str() {
-                                    Some(msg) if ERROR_MESSAGES.iter().any(|e| msg.contains(e)) => {
-                                        set_of_failed_apps
-                                            .insert(name.to_string().clone(), msg.to_string());
-                                        continue;
+                            if let Some(t) = condition["type"].as_str() {
+                                if t.to_lowercase().contains("error") {
+                                    match condition["message"].as_str() {
+                                        Some(msg)
+                                            if ERROR_MESSAGES.iter().any(|e| msg.contains(e)) =>
+                                        {
+                                            set_of_failed_apps
+                                                .insert(name.to_string().clone(), msg.to_string());
+                                            continue;
+                                        }
+                                        Some(msg)
+                                            if TIMEOUT_MESSAGES.iter().any(|e| msg.contains(e)) =>
+                                        {
+                                            list_of_timed_out_apps.push(name.to_string().clone());
+                                            other_errors.push((name.to_string(), msg.to_string()));
+                                        }
+                                        Some(msg) => {
+                                            other_errors.push((name.to_string(), msg.to_string()));
+                                        }
+                                        _ => (),
                                     }
-                                    Some(msg)
-                                        if TIMEOUT_MESSAGES.iter().any(|e| msg.contains(e)) =>
-                                    {
-                                        list_of_timed_out_apps.push(name.to_string().clone());
-                                        other_errors.push((name.to_string(), msg.to_string()));
-                                    }
-                                    Some(msg) => {
-                                        other_errors.push((name.to_string(), msg.to_string()));
-                                    }
-                                    _ => (),
                                 }
                             }
                         }

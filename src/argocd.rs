@@ -9,21 +9,37 @@ use log::{debug, error, info};
 
 use crate::run_command;
 
-static ARGOCD_CMD_PARAMS_CM: &str = r#"
+static ARGOCD_CONFIGMAPS: &str = r#"
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  kustomize.buildOptions: "%kube_build_options%"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
   labels:
     app.kubernetes.io/name: argocd-cmd-params-cm
     app.kubernetes.io/part-of: argocd
-  name: argocd-cmd-params-cm
-  namespace: argocd
 data:
   reposerver.git.request.timeout: "150s"
   reposerver.parallelism.limit: "300"
 "#;
 
-pub async fn install_argo_cd(version: Option<&str>) -> Result<(), Box<dyn Error>> {
+pub struct ArgoCDOptions<'a> {
+    pub version: Option<&'a str>,
+    pub kube_build_options: Option<&'a str>,
+}
+
+pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn Error>> {
     info!("🦑 Installing Argo CD...");
 
     match run_command("kubectl create ns argocd", None).await {
@@ -37,7 +53,7 @@ pub async fn install_argo_cd(version: Option<&str>) -> Result<(), Box<dyn Error>
     // Install Argo CD
     let install_url = format!(
         "https://raw.githubusercontent.com/argoproj/argo-cd/{}/manifests/install.yaml",
-        version.unwrap_or("stable")
+        options.version.unwrap_or("stable")
     );
     match run_command(&format!("kubectl -n argocd apply -f {}", install_url), None).await {
         Ok(_) => (),
@@ -59,9 +75,11 @@ pub async fn install_argo_cd(version: Option<&str>) -> Result<(), Box<dyn Error>
         .spawn()
         .expect("failed to execute process");
 
+    let config_map = ARGOCD_CONFIGMAPS.replace("%kube_build_options%", &options.kube_build_options.unwrap_or(""));
+
     let child_stdin = child.stdin.as_mut().expect("Failed to open stdin");
     child_stdin
-        .write_all(ARGOCD_CMD_PARAMS_CM.as_bytes())
+        .write_all(config_map.as_bytes())
         .expect("Failed to write to stdin");
     child.wait_with_output().expect("Failed to read stdout");
 
