@@ -18,10 +18,7 @@ pub async fn get_applications(
     Ok(output)
 }
 
-async fn parse_yaml(
-    directory: &str,
-    regex: &Option<Regex>,
-) -> Result<K8sFiles, Box<dyn Error>> {
+async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<K8sFiles, Box<dyn Error>> {
     use walkdir::WalkDir;
 
     info!("🤖 Fetching all files in dir: {}", directory);
@@ -94,15 +91,19 @@ async fn patch_argocd_applications(
         spec["project"] = serde_yaml::Value::String("default".to_string());
         if spec.contains_key("destination") {
             spec["destination"]["name"] = serde_yaml::Value::String("in-cluster".to_string());
+            spec["destination"]
+                .as_mapping_mut()
+                .map(|a| a.remove("server"));
         }
         spec.remove("syncPolicy");
     };
 
-    let redirect_sources = | file: &str, spec: &mut Mapping| {
+    let redirect_sources = |file: &str, spec: &mut Mapping| {
         if spec.contains_key("source") {
             match spec["source"]["repoURL"].as_str() {
-                Some(url) if url.contains(repo) => 
-                    spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string()),
+                Some(url) if url.contains(repo) => {
+                    spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string())
+                }
                 _ => debug!("Found no 'repoURL' under spec.sources[] in file: {}", file),
             }
         } else if spec.contains_key("sources") {
@@ -110,7 +111,8 @@ async fn patch_argocd_applications(
                 for source in sources {
                     match source["repoURL"].as_str() {
                         Some(url) if url.contains(repo) => {
-                            source["targetRevision"] = serde_yaml::Value::String(branch.to_string());
+                            source["targetRevision"] =
+                                serde_yaml::Value::String(branch.to_string());
                         }
                         _ => debug!("Found no 'repoURL' under spec.sources[] in file: {}", file),
                     }
@@ -121,9 +123,9 @@ async fn patch_argocd_applications(
 
     let applications: Vec<K8sResource> = yaml_chunks
         .into_iter()
-        .map(|( f, mut r)| {
+        .map(|(f, mut r)| {
             r["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
-            (f,r)
+            (f, r)
         })
         .filter_map(|(f, r)| {
             r["kind"].as_str().map(|s| s.to_string()).and_then(|kind| {
