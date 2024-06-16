@@ -77,6 +77,10 @@ struct Opt {
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
+
+    // kustomize.buildOptions for argocd-cm ConfigMap
+    #[structopt(long, env)]
+    kustomize_build_options: Option<String>,
 }
 
 #[derive(Debug)]
@@ -145,6 +149,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .argocd_version
         .as_deref()
         .filter(|f| !f.trim().is_empty());
+    let kube_build_options = opt
+        .kustomize_build_options
+        .as_deref()
+        .filter(|f| !f.trim().is_empty());
     let max_diff_length = opt.max_diff_length;
 
     // select local cluster tool
@@ -188,6 +196,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(a) = max_diff_length {
         info!("✨ - max-diff-length: {}", a);
     }
+    if let Some(a) = kube_build_options {
+        info!("✨ - kube-build-options: {}", a);
+    }
 
     if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
         error!(
@@ -211,7 +222,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
-    argocd::install_argo_cd(argocd_version).await?;
+    argocd::install_argo_cd(argocd::ArgoCDOptions {
+        version: argocd_version,
+        kube_build_options,
+    })
+    .await?;
 
     create_folder_if_not_exists(secrets_folder);
     match apply_folder(secrets_folder) {

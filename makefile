@@ -11,7 +11,7 @@ pull-repostory:
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
 local-test-cargo: pull-repostory
-	cargo run -- -b "$(base_branch)" -t "$(target_branch)" --repo $(github_org)/$(gitops_repo) -r "$(regex)" --debug --diff-ignore "$(diff-ignore)" --timeout $(timeout)
+	cargo run -- -b "$(base_branch)" -t "$(target_branch)" --repo $(github_org)/$(gitops_repo) -r "$(regex)" --debug --diff-ignore "$(diff-ignore)" --timeout $(timeout) --kustomize-build-options="$(kustomize-build-options)"
 
 local-test-docker: pull-repostory
 	docker build . -f $(docker_file) -t image
@@ -29,4 +29,5 @@ local-test-docker: pull-repostory
 		-e FILE_REGEX="$(regex)" \
 		-e DIFF_IGNORE="$(diff-ignore)" \
 		-e TIMEOUT=$(timeout) \
+		-e KUSTOMIZE_BUILD_OPTIONS="$(kustomize-build-options)" \
 		image
