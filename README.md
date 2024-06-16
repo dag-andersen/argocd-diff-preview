@@ -21,20 +21,20 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 
 ![](./images/flow_dark.png)
 
-The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let ArgoCD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
+The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
 The implementation is actually quite simple. It just follows the steps below:
 
 #### 10 Steps
 1. Start a local cluster
-2. Install ArgoCD
+2. Install Argo CD
 3. Add the required credentials (git credentials, image pull secrets, etc.)
-4. Fetch all ArgoCD application files on your PR branch
+4. Fetch all Argo CD application files on your PR branch
    - Point their `targetRevision` to the Pull Request branch
    - Remove the `syncPolicy` from the application (to avoid the application to sync locally)
 1. Apply the modified applications to the cluster
-2. Let ArgoCD do its magic
-3. Extract the rendered manifests from the ArgoCD server
+2. Let Argo CD do its magic
+3. Extract the rendered manifests from the Argo CD server
 4. Repeat steps 4–7 for the base branch (main branch)
 5. Create a diff between the manifests rendered from each branch
 6. Display the diff in the PR
@@ -49,7 +49,6 @@ The implementation is actually quite simple. It just follows the steps below:
 
 #### Not supported
 - Does not support Argo CD CMP plugins
-- Does not work with [Cluster Generators](https://argocd-applicationset.readthedocs.io/en/stable/Generators-Cluster/) in your ApplicationSets
 
 ## Try demo locally with 3 simple commands!
 
@@ -68,7 +67,7 @@ docker run \
    -v $(pwd)/target-branch:/target-branch \
    -e TARGET_BRANCH=helm-example-3 \
    -e REPO=dag-andersen/argocd-diff-preview \
-   dagandersen/argocd-diff-preview:v0.0.9
+   dagandersen/argocd-diff-preview:v0.0.10
 ```
 
 and the output would be something like this:
@@ -111,7 +110,7 @@ docker run \
    -e BASE_BRANCH=main \
    -e TARGET_BRANCH=<name-of-the-target-branch> \
    -e REPO=<owner/repo-name> \
-   dagandersen/argocd-diff-preview:v0.0.9
+   dagandersen/argocd-diff-preview:v0.0.10
 ```
 
 Example on how to use it: ["Try demo locally with 3 simple commands!"](./README.md#try-demo-locally-with-3-simple-commands)
@@ -126,7 +125,7 @@ Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/release
 Example for downloading and running on macOS:
 
 ```bash
-curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.9/argocd-diff-preview-Darwin-x86_64.tar.gz
+curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.10/argocd-diff-preview-Darwin-x86_64.tar.gz
 tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
 sudo mv argocd-diff-preview /usr/local/bin
 argocd-diff-preview --help
@@ -227,7 +226,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.9
+            dagandersen/argocd-diff-preview:v0.0.10
 
       - name: Post diff as comment
         run: |
@@ -265,7 +264,7 @@ steps:
       -v $(pwd)/secrets:/secrets \         ⬅️ Mount the secrets folder
       -e TARGET_BRANCH=${{ github.head_ref }} \
       -e REPO=${{ github.repository }} \
-      dagandersen/argocd-diff-preview:v0.0.9
+      dagandersen/argocd-diff-preview:v0.0.10
 ```
 
 Examples of how repository credentials are specified:
@@ -331,20 +330,21 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-        --argocd-version <argocd-version>   Argo CD version [env: ARGOCD_VERSION=]  [default: stable]
-    -b, --base-branch <base-branch>         Base branch name [env: BASE_BRANCH=]  [default: main]
-        --base-branch-folder <folder>       Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
-    -i, --diff-ignore <diff-ignore>         Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
-    -r, --file-regex <file-regex>           Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
-    -l, --line-count <line-count>           Generate diffs with <n> lines above and below the highlighted changes in the diff. [env: LINE_COUNT=]  [Default: 10] 
-        --local-cluster-tool <tool>         Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
-        --max-diff-length <length>          Max diff message character count. [env: MAX_DIFF_LENGTH=]  [Default: 65536] (GitHub comment limit)
-    -o, --output-folder <output-folder>     Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
-        --repo <repo>                       Git Repository. Format: OWNER/REPO [env: REPO=]
-    -s, --secrets-folder <secrets-folder>   Secrets folder where the secrets are read from [env: SECRETS_FOLDER=]  [default: ./secrets]
-    -t, --target-branch <target-branch>     Target branch name [env: TARGET_BRANCH=]
-        --target-branch-folder <folder>     Target branch folder [env: TARGET_BRANCH_FOLDER=]  [default: target-branch]
-        --timeout <timeout>                 Set timeout [env: TIMEOUT=]  [default: 180]
+        --argocd-version <argocd-version>     Argo CD version [env: ARGOCD_VERSION=]  [default: stable]
+    -b, --base-branch <base-branch>           Base branch name [env: BASE_BRANCH=]  [default: main]
+        --base-branch-folder <folder>         Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
+    -i, --diff-ignore <diff-ignore>           Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
+    -r, --file-regex <file-regex>             Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
+        --kustomize-build-options <options>   kustomize.buildOptions for argocd-cm ConfigMap [env: KUSTOMIZE_BUILD_OPTIONS=]
+    -l, --line-count <line-count>             Generate diffs with <n> lines above and below the highlighted changes in the diff. [env: LINE_COUNT=]  [Default: 10] 
+        --local-cluster-tool <tool>           Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
+        --max-diff-length <length>            Max diff message character count. [env: MAX_DIFF_LENGTH=]  [Default: 65536] (GitHub comment limit)
+    -o, --output-folder <output-folder>       Output folder where the diff will be saved [env: OUTPUT_FOLDER=]  [default: ./output]
+        --repo <repo>                         Git Repository. Format: OWNER/REPO [env: REPO=]
+    -s, --secrets-folder <secrets-folder>     Secrets folder where the secrets are read from [env: SECRETS_FOLDER=]  [default: ./secrets]
+    -t, --target-branch <target-branch>       Target branch name [env: TARGET_BRANCH=]
+        --target-branch-folder <folder>       Target branch folder [env: TARGET_BRANCH_FOLDER=]  [default: target-branch]
+        --timeout <timeout>                   Set timeout [env: TIMEOUT=]  [default: 180]
 ```
 
 ## Roadmap

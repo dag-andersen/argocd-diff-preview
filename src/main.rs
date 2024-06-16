@@ -78,7 +78,7 @@ struct Opt {
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
 
-    // kustomize.buildOptions for argocd-cm ConfigMap
+    /// kustomize.buildOptions for argocd-cm ConfigMap
     #[structopt(long, env)]
     kustomize_build_options: Option<String>,
 }
