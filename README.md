@@ -47,53 +47,53 @@ The implementation is actually quite simple. It just follows the steps below:
 - Can be run locally before you open the pull request
 - Render resources from external sources (e.g., Helm charts). For example, when you update the chart version of Nginx, you can get a render of the new output. For example, this is useful to spot changes in default values. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15). 
 
+Not tested:
+- Does not support Argo CD CMP plugins
 
-> [!IMPORTANT] Not tested:
-> - Does not support Argo CD CMP plugins
-> - Does not work with [Cluster Generators](https://argocd-applicationset.readthedocs.io/en/stable/Generators-Cluster/) in your ApplicationSets
-
-## Try demo locally with 3 simple commands!
-
-First, make sure Docker is running. E.g., run `docker ps` to see if it's running.
-
-Second, run the following 3 commands:
-
-```bash
-git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
-git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --depth 1 -q -b helm-example-3
-docker run \
-   --network host \
-   -v /var/run/docker.sock:/var/run/docker.sock \
-   -v $(pwd)/output:/output \
-   -v $(pwd)/base-branch:/base-branch \
-   -v $(pwd)/target-branch:/target-branch \
-   -e TARGET_BRANCH=helm-example-3 \
-   -e REPO=dag-andersen/argocd-diff-preview \
-   dagandersen/argocd-diff-preview:v0.0.10
-```
-
-and the output would be something like this:
-
-```
-...
-🚀 Creating cluster...
-🚀 Cluster created successfully
-🦑 Installing Argo CD...
-...
-🌚 Getting resources for base-branch
-🌚 Getting resources for target-branch
-...
-🔮 Generating diff between main and helm-example-3
-🙏 Please check the ./output/diff.md file for differences
-```
-
-Finally, you can view the diff by running:
-
-```bash
-cat ./output/diff.md
-```
-
-The result should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
+> [!TIP]
+> 
+> ## Try demo locally with 3 simple commands!
+> 
+> First, make sure Docker is running. E.g., run `docker ps` to see if it's running.
+> 
+> Second, run the following 3 commands:
+> 
+> ```bash
+> git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
+> git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --depth 1 -q -b helm-example-3
+> docker run \
+>    --network host \
+>    -v /var/run/docker.sock:/var/run/docker.sock \
+>    -v $(pwd)/output:/output \
+>    -v $(pwd)/base-branch:/base-branch \
+>    -v $(pwd)/target-branch:/target-branch \
+>    -e TARGET_BRANCH=helm-example-3 \
+>    -e REPO=dag-andersen/argocd-diff-preview \
+>    dagandersen/argocd-diff-preview:v0.0.10
+> ```
+> 
+> and the output would be something like this:
+> 
+> ```
+> ...
+> 🚀 Creating cluster...
+> 🚀 Cluster created successfully
+> 🦑 Installing Argo CD...
+> ...
+> 🌚 Getting resources for base-branch
+> 🌚 Getting resources for target-branch
+> ...
+> 🔮 Generating diff between main and helm-example-3
+> 🙏 Please check the ./output/diff.md file for differences
+> ```
+> 
+> Finally, you can view the diff by running:
+> 
+> ```bash
+> cat ./output/diff.md
+> ```
+> 
+> The result should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
 
 ## Installation and Usage
 
@@ -375,7 +375,7 @@ OPTIONS:
 - Make a dedicated GitHub Action that wraps the Docker container, so the tool becomes more user-friendly.  
 - Delete Argo CD Applications, when they have been parsed by the tool, so Argo CD can focus on the remaining applications, which hopefully speeds up the rendering process.
 
-## Questions, issues, or suggestions
 
 > [!IMPORTANT]
-> If you have any questions, issues, or suggestions, please open an issue in this repository. We will do our best to address it as soon as possible.
+> ## Questions, issues, or suggestions
+> If you experience issues or have any questions or suggestions, please open an issue in this repository. We will do our best to address it as soon as possible!
