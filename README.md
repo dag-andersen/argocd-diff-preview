@@ -77,7 +77,6 @@ Not tested:
 > ```
 > ...
 > 🚀 Creating cluster...
-> 🚀 Cluster created successfully
 > 🦑 Installing Argo CD...
 > ...
 > 🌚 Getting resources for base-branch
@@ -87,13 +86,11 @@ Not tested:
 > 🙏 Please check the ./output/diff.md file for differences
 > ```
 > 
-> Finally, you can view the diff by running:
+> Finally, you can view the diff by running :arrow_down: The diff should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
 > 
 > ```bash
 > cat ./output/diff.md
 > ```
-> 
-> The result should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
 
 ## Installation and Usage
 
@@ -317,7 +314,7 @@ For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/o
 
 > [!TIP]
 >
-> If your workflow pipeline has access to the live cluster where the real ArgoCD instance runs, then you can simply run :arrow_down: and store the secrets in a folder mounted at `/secrets`. 
+> If your pipeline has access to the live cluster where the real Argo CD instance runs, then you can simply run `kubectl get secrets ...` to extract the necessary secrets before running the tool and then store them in a folder mounted at `/secrets`. This way, the ephemeral cluster always has access to the same repositories as the real Argo CD instance.
 >
 > ```yaml
 > steps:
@@ -325,8 +322,8 @@ For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/o
 > - name: Get credentials from live cluster
 >   run: |
 >     mkdir secrets
->     kubectl get secrets <your-git-repo-access-secrets> -n argocd -o yaml     >> secrets/credentials.yaml
->     kubectl get secrets <your-helm-chart-access-secrets> -n argocd -o yaml   >> secrets/credentials.yaml
+>     kubectl get secrets <git-repo-access> -n argocd -o yaml     >> secrets/credentials.yaml
+>     kubectl get secrets <helm-chart-access> -n argocd -o yaml   >> secrets/credentials.yaml
 > 
 > - name: Generate Diff
 >   run: |
@@ -378,4 +375,4 @@ OPTIONS:
 
 > [!IMPORTANT]
 > ## Questions, issues, or suggestions
-> If you experience issues or have any questions or suggestions, please open an issue in this repository. We will do our best to address it as soon as possible!
+> If you experience issues or have any questions or suggestions, please open an issue in this repository! :) 
