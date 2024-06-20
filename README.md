@@ -350,8 +350,7 @@ OPTIONS:
 - Make a dedicated GitHub Action that wraps the Docker container, so the tool becomes more user-friendly.  
 - Delete Argo CD Applications, when they have been parsed by the tool, so Argo CD can focus on the remaining applications, which hopefully speeds up the rendering process.
 
-## Questions, issues, or suggestions
+> [!IMPORTANT]
+> ## Questions, issues, or suggestions
+> If you experience issues or have any questions or suggestions, please open an issue in this repository! 🚀
 
-If you have any questions, issues, or suggestions, please open an issue in this repository. We will do our best to address it as soon as possible.
-
-Any contributions are **greatly appreciated**. 
