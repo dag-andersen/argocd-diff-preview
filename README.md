@@ -48,50 +48,49 @@ The implementation is actually quite simple. It just follows the steps below:
 - Render resources from external sources (e.g., Helm charts). For example, when you update the chart version of Nginx, you can get a render of the new output. For example, this is useful to spot changes in default values. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15). 
 
 #### Not supported
-- Does not support Argo CD CMP plugins
+- [Argo CD Config Management Plugins](https://argo-cd.readthedocs.io/en/stable/operator-manual/config-management-plugins/)
 
-## Try demo locally with 3 simple commands!
-
-First, make sure Docker is running. E.g., run `docker ps` to see if it's running.
-
-Second, run the following 3 commands:
-
-```bash
-git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
-git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --depth 1 -q -b helm-example-3
-docker run \
-   --network host \
-   -v /var/run/docker.sock:/var/run/docker.sock \
-   -v $(pwd)/output:/output \
-   -v $(pwd)/base-branch:/base-branch \
-   -v $(pwd)/target-branch:/target-branch \
-   -e TARGET_BRANCH=helm-example-3 \
-   -e REPO=dag-andersen/argocd-diff-preview \
-   dagandersen/argocd-diff-preview:v0.0.10
-```
-
-and the output would be something like this:
-
-```
-...
-🚀 Creating cluster...
-🚀 Cluster created successfully
-🦑 Installing Argo CD...
-...
-🌚 Getting resources for base-branch
-🌚 Getting resources for target-branch
-...
-🔮 Generating diff between main and helm-example-3
-🙏 Please check the ./output/diff.md file for differences
-```
-
-Finally, you can view the diff by running:
-
-```bash
-cat ./output/diff.md
-```
-
-The result should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
+> [!TIP]
+> 
+> ## Try demo locally with 3 simple commands!
+> 
+> First, make sure Docker is running. E.g., run `docker ps` to see if it's running.
+> 
+> Second, run the following 3 commands:
+> 
+> ```bash
+> git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
+> git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --depth 1 -q -b helm-example-3
+> docker run \
+>    --network host \
+>    -v /var/run/docker.sock:/var/run/docker.sock \
+>    -v $(pwd)/output:/output \
+>    -v $(pwd)/base-branch:/base-branch \
+>    -v $(pwd)/target-branch:/target-branch \
+>    -e TARGET_BRANCH=helm-example-3 \
+>    -e REPO=dag-andersen/argocd-diff-preview \
+>    dagandersen/argocd-diff-preview:v0.0.10
+> ```
+> 
+> and the output would be something like this:
+> 
+> ```
+> ...
+> 🚀 Creating cluster...
+> 🦑 Installing Argo CD...
+> ...
+> 🌚 Getting resources for base-branch
+> 🌚 Getting resources for target-branch
+> ...
+> 🔮 Generating diff between main and helm-example-3
+> 🙏 Please check the ./output/diff.md file for differences
+> ```
+> 
+> Finally, you can view the diff by running the following command :arrow_down: The diff should look something like [this](https://github.com/dag-andersen/argocd-diff-preview/pull/16)
+> 
+> ```bash
+> cat ./output/diff.md
+> ```
 
 ## Installation and Usage
 
