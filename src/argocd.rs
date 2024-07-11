@@ -74,7 +74,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("failed to execute process");
+        .expect("Failed to apply argocd-cmd-params-cm");
 
     let config_map = ARGOCD_CONFIGMAPS.replace("%kube_build_options%", &options.kube_build_options.unwrap_or(""));
 
@@ -89,13 +89,13 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         None,
     )
     .await
-    .expect("failed to restart argocd-repo-server");
+    .expect("Failed to restart argocd-repo-server");
     run_command(
         "kubectl -n argocd rollout status deployment/argocd-repo-server --timeout=60s",
         None,
     )
     .await
-    .expect("failed to wait for argocd-repo-server");
+    .expect("Failed to wait for argocd-repo-server");
 
     info!("🦑 Logging in to Argo CD through CLI...");
     debug!("Port-forwarding Argo CD server...");
