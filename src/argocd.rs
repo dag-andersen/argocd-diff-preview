@@ -2,7 +2,7 @@ use base64::prelude::*;
 use std::{
     error::Error,
     io::Write,
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
 };
 
 use log::{debug, error, info};
@@ -20,6 +20,7 @@ metadata:
     app.kubernetes.io/part-of: argocd
 data:
   kustomize.buildOptions: "%kube_build_options%"
+  admin.enabled: "true"
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -116,17 +117,29 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     let secret_name = "argocd-initial-admin-secret";
     let command =
         "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password}";
-    debug!("Running command: {}", command);
-    let password_encoded = match run_command(&command, None).await {
-        Ok(a) => a,
-        Err(e) => {
-            error!("❌ Failed to get secret {}", secret_name);
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
+
+    let mut password_encoded: Option<Output> = None;
+    let mut counter = 0;
+    while password_encoded.is_none() {
+        password_encoded = match run_command(&command, None).await {
+            Ok(a) => Some(a),
+            Err(e) => {
+                if counter == 10 {
+                    error!("❌ Failed to get secret {}", secret_name);
+                    panic!("error: {}", String::from_utf8_lossy(&e.stderr))
+                }
+                counter += 1;
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                debug!("⏳ Retrying to get secret {}", secret_name);
+                None
+            }
         }
-    };
+    }
+
+    let password_encoded_unwrapped = password_encoded.unwrap();
 
     let password_decoded_vec = BASE64_STANDARD
-        .decode(password_encoded.stdout)
+        .decode(password_encoded_unwrapped.stdout)
         .expect("failed to decode password");
     let password =
         String::from_utf8(password_decoded_vec).expect("failed to convert password to string");
