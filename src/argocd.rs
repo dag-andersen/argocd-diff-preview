@@ -124,12 +124,12 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         password_encoded = match run_command(&command, None).await {
             Ok(a) => Some(a),
             Err(e) => {
-                if counter == 10 {
+                if counter == 5 {
                     error!("❌ Failed to get secret {}", secret_name);
                     panic!("error: {}", String::from_utf8_lossy(&e.stderr))
                 }
                 counter += 1;
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                 debug!("⏳ Retrying to get secret {}", secret_name);
                 None
             }
