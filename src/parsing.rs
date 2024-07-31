@@ -100,6 +100,9 @@ async fn patch_argocd_applications(
 
     let redirect_sources = |file: &str, spec: &mut Mapping| {
         if spec.contains_key("source") {
+            if spec["source"]["chart"].as_str().is_some() {
+                return;
+            }
             match spec["source"]["repoURL"].as_str() {
                 Some(url) if url.contains(repo) => {
                     spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string())
@@ -109,6 +112,9 @@ async fn patch_argocd_applications(
         } else if spec.contains_key("sources") {
             if let Some(sources) = spec["sources"].as_sequence_mut() {
                 for source in sources {
+                    if source["chart"].as_str().is_some() {
+                        continue;
+                    }
                     match source["repoURL"].as_str() {
                         Some(url) if url.contains(repo) => {
                             source["targetRevision"] =
