@@ -135,7 +135,7 @@ async fn patch_argocd_applications(
         })
         .filter_map(|(f, r)| {
             r["kind"].as_str().map(|s| s.to_string()).and_then(|kind| {
-                (kind == "Application" || kind == "ApplicationSet").then(|| (f, kind, r))
+                (kind == "Application" || kind == "ApplicationSet").then_some((f, kind, r))
             })
         })
         .filter_map(|(f, kind, mut r)| {

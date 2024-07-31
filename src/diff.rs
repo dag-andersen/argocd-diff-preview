@@ -35,7 +35,7 @@ pub async fn generate_diff(
             Err(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
         };
         if o.trim().is_empty() {
-            return "No changes found".to_string();
+            "No changes found".to_string()
         } else {
             o
         }

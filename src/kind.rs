@@ -4,10 +4,7 @@ use std::error::Error;
 use crate::{run_command, utils::spawn_command};
 
 pub async fn is_installed() -> bool {
-    match run_command("which kind", None).await {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+    run_command("which kind", None).await.is_ok()
 }
 
 pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {

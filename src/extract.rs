@@ -146,7 +146,7 @@ pub async fn get_resources(
 
         // TIMEOUT
         let time_elapsed = start_time.elapsed().as_secs();
-        if time_elapsed > timeout as u64 {
+        if time_elapsed > timeout {
             error!("❌ Timed out after {} seconds", timeout);
             error!(
                 "❌ Processed {} applications, but {} applications still remain",
