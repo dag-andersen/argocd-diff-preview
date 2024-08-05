@@ -135,6 +135,18 @@ async fn patch_argocd_applications(
                 (kind == "Application" || kind == "ApplicationSet").then_some((f, kind, r))
             })
         })
+        .filter(|(f, _, r)| {
+            if r["metadata"]["annotations"]["argocd-diff-preview/ignore"].as_str() == Some("true") {
+                debug!(
+                    "Ignoring application {:?} due to 'argocd-diff-preview/ignore' in file: {}",
+                    r["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    f
+                );
+                false
+            } else {
+                true
+            }
+        })
         .map(|(f, kind, mut r)| {
             r["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
             (f, kind, r)
