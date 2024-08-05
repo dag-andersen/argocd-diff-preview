@@ -345,6 +345,14 @@ OPTIONS:
         --timeout <timeout>                   Set timeout [env: TIMEOUT=]  [default: 180]
 ```
 
+## All contributors
+
+Contributions are welcome!
+
+<a href="https://github.com/dag-andersen/argocd-diff-preview/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=dag-andersen/argocd-diff-preview" />
+</a>
+
 ## Roadmap
 - Make a dedicated GitHub Action that wraps the Docker container, so the tool becomes more user-friendly.  
 - Delete Argo CD Applications, when they have been parsed by the tool, so Argo CD can focus on the remaining applications, which hopefully speeds up the rendering process.

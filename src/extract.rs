@@ -8,7 +8,7 @@ use log::{debug, error, info};
 use crate::utils::run_command;
 use crate::{apply_manifest, apps_file, Branch};
 
-static ERROR_MESSAGES: [&str; 9] = [
+static ERROR_MESSAGES: [&str; 10] = [
     "helm template .",
     "authentication required",
     "authentication failed",
@@ -18,6 +18,7 @@ static ERROR_MESSAGES: [&str; 9] = [
     "Unknown desc = `kustomize build",
     "Unknown desc = Unable to resolve",
     "is not a valid chart repository or cannot be reached",
+    "Unknown desc = repository not found",
 ];
 
 static TIMEOUT_MESSAGES: [&str; 4] = [
@@ -145,7 +146,7 @@ pub async fn get_resources(
 
         // TIMEOUT
         let time_elapsed = start_time.elapsed().as_secs();
-        if time_elapsed > timeout as u64 {
+        if time_elapsed > timeout {
             error!("❌ Timed out after {} seconds", timeout);
             error!(
                 "❌ Processed {} applications, but {} applications still remain",
