@@ -129,14 +129,15 @@ async fn patch_argocd_applications(
 
     let applications: Vec<K8sResource> = yaml_chunks
         .into_iter()
-        .map(|(f, mut r)| {
-            r["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
-            (f, r)
-        })
         .filter_map(|(f, r)| {
+            debug!("Processing file: {}", f);
             r["kind"].as_str().map(|s| s.to_string()).and_then(|kind| {
                 (kind == "Application" || kind == "ApplicationSet").then_some((f, kind, r))
             })
+        })
+        .map(|(f, kind, mut r)| {
+            r["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
+            (f, kind, r)
         })
         .filter_map(|(f, kind, mut r)| {
             // Clean up the spec
