@@ -1,16 +1,14 @@
+use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
+use log::{debug, error, info};
 use regex::Regex;
 use std::fs;
+use std::path::PathBuf;
 use std::{
     error::Error,
     io::Write,
     process::{Command, Output},
 };
-
-use log::{debug, error, info};
-use std::path::PathBuf;
 use structopt::StructOpt;
-
-use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
 mod argocd;
 mod diff;
 mod extract;
@@ -240,14 +238,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
-    let base_apps =
-        parsing::get_applications(&BASE_BRANCH_FOLDER, &base_branch_name, &file_regex, &repo)
-            .await?;
-    let target_apps = parsing::get_applications(
-        &TARGET_BRANCH_FOLDER,
+    let base_apps = parsing::get_applications_as_string(
+        BASE_BRANCH_FOLDER,
+        &base_branch_name,
+        &file_regex,
+        repo,
+    )
+    .await?;
+    let target_apps = parsing::get_applications_as_string(
+        TARGET_BRANCH_FOLDER,
         &target_branch_name,
         &file_regex,
-        &repo,
+        repo,
     )
     .await?;
 
@@ -311,15 +313,13 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
     }
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(folder_name) {
-        for entry in entries {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                let file_name = path.to_str().unwrap();
-                if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
-                    match apply_manifest(file_name) {
-                        Ok(_) => count += 1,
-                        Err(e) => return Err(String::from_utf8_lossy(&e.stderr).to_string()),
-                    }
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let file_name = path.to_str().unwrap();
+            if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
+                match apply_manifest(file_name) {
+                    Ok(_) => count += 1,
+                    Err(e) => return Err(String::from_utf8_lossy(&e.stderr).to_string()),
                 }
             }
         }

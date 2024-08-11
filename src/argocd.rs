@@ -1,13 +1,11 @@
+use crate::run_command;
 use base64::prelude::*;
+use log::{debug, error, info};
 use std::{
     error::Error,
     io::Write,
     process::{Command, Output, Stdio},
 };
-
-use log::{debug, error, info};
-
-use crate::run_command;
 
 static ARGOCD_CONFIGMAPS: &str = r#"
 apiVersion: v1

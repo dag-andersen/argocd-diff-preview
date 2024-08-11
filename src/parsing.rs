@@ -1,29 +1,43 @@
+use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Mapping;
 use std::{error::Error, io::BufRead};
 
-use log::{debug, info};
+struct K8sResource {
+    file_name: String,
+    yaml: serde_yaml::Value,
+}
 
-type K8sResource = serde_yaml::Value;
-type K8sFiles = Vec<(String, K8sResource)>;
+struct Application {
+    file_name: String,
+    yaml: serde_yaml::Value,
+    kind: ApplicationKind,
+}
 
-pub async fn get_applications(
+enum ApplicationKind {
+    Application,
+    ApplicationSet,
+}
+
+pub async fn get_applications_as_string(
     directory: &str,
     branch: &str,
     regex: &Option<Regex>,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
-    let applications = parse_yaml(directory, regex).await?;
-    let output = patch_argocd_applications(applications, branch, repo).await?;
+    let yaml_files = get_yaml_files(directory, regex).await;
+    let k8s_resources = parse_yaml(yaml_files).await;
+    let applications = get_applications(k8s_resources);
+    let output = patch_applications(applications, branch, repo).await?;
     Ok(output)
 }
 
-async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<K8sFiles, Box<dyn Error>> {
+async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
     use walkdir::WalkDir;
 
     info!("🤖 Fetching all files in dir: {}", directory);
 
-    let yaml_files = WalkDir::new(directory)
+    let yaml_files: Vec<String> = WalkDir::new(directory)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file())
@@ -35,12 +49,26 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<K8sFiles, 
                 .unwrap_or(false)
         })
         .map(|e| format!("{}", e.path().display()))
-        .filter(|f| regex.is_none() || regex.as_ref().unwrap().is_match(&f));
+        .filter(|f| regex.is_none() || regex.as_ref().unwrap().is_match(f))
+        .collect();
 
-    let k8s_resources: K8sFiles = yaml_files
+    match regex {
+        Some(r) => debug!(
+            "🤖 Found {} yaml files matching regex: {}",
+            yaml_files.len(),
+            r.as_str()
+        ),
+        None => debug!("🤖 Found {} yaml files", yaml_files.len()),
+    }
+
+    yaml_files
+}
+
+async fn parse_yaml(files: Vec<String>) -> Vec<K8sResource> {
+    files.iter()
         .flat_map(|f| {
             debug!("Found file: {}", f);
-            let file = std::fs::File::open(&f).unwrap();
+            let file = std::fs::File::open(f).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
 
@@ -49,12 +77,12 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<K8sFiles, 
                     acc.push("".to_string());
                 } else {
                     let last = acc.len() - 1;
-                    acc[last].push_str("\n");
+                    acc[last].push('\n');
                     acc[last].push_str(&s);
                 }
                 acc
             });
-            let yaml_vec: K8sFiles = raw_yaml_chunks.iter_mut().enumerate().map(|(i,r)| {
+            let yaml_vec: Vec<K8sResource> = raw_yaml_chunks.iter_mut().enumerate().map(|(i,r)| {
                 let yaml = match serde_yaml::from_str(r) {
                     Ok(r) => r,
                     Err(e) => {
@@ -62,43 +90,38 @@ async fn parse_yaml(directory: &str, regex: &Option<Regex>) -> Result<K8sFiles, 
                         serde_yaml::Value::Null
                     }
                 };
-                (f.clone(),yaml)
+                K8sResource {
+                    file_name: f.clone(),
+                    yaml,
+                }
             }).collect();
             yaml_vec
         })
-        .collect();
-
-    match regex {
-        Some(r) => info!(
-            "🤖 Found {} k8s resources in files matching regex: {}",
-            k8s_resources.len(),
-            r.as_str()
-        ),
-        None => info!("🤖 Found {} k8s resources", k8s_resources.len()),
-    }
-
-    Ok(k8s_resources)
+        .collect()
 }
 
-async fn patch_argocd_applications(
-    yaml_chunks: K8sFiles,
+async fn patch_applications(
+    applications: Vec<Application>,
     branch: &str,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
     info!("🤖 Patching applications for branch: {}", branch);
 
-    let clean_spec = |spec: &mut Mapping| {
-        spec["project"] = serde_yaml::Value::String("default".to_string());
+    let point_destination_to_in_cluster = |spec: &mut Mapping| {
         if spec.contains_key("destination") {
             spec["destination"]["name"] = serde_yaml::Value::String("in-cluster".to_string());
             spec["destination"]
                 .as_mapping_mut()
                 .map(|a| a.remove("server"));
         }
-        spec.remove("syncPolicy");
     };
 
-    let redirect_sources = |file: &str, spec: &mut Mapping| {
+    let set_project_to_default =
+        |spec: &mut Mapping| spec["project"] = serde_yaml::Value::String("default".to_string());
+
+    let remove_sync_policy = |spec: &mut Mapping| spec.remove("syncPolicy");
+
+    let redirect_sources = |spec: &mut Mapping, file: &str| {
         if spec.contains_key("source") {
             if spec["source"]["chart"].as_str().is_some() {
                 return;
@@ -127,56 +150,31 @@ async fn patch_argocd_applications(
         }
     };
 
-    let applications: Vec<K8sResource> = yaml_chunks
+    let applications: Vec<Application> = applications
         .into_iter()
-        .filter_map(|(f, r)| {
-            debug!("Processing file: {}", f);
-            r["kind"].as_str().map(|s| s.to_string()).and_then(|kind| {
-                (kind == "Application" || kind == "ApplicationSet").then_some((f, kind, r))
-            })
+        .map(|mut a| {
+            // Update namesapce
+            a.yaml["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
+            a
         })
-        .filter(|(f, _, r)| {
-            if r["metadata"]["annotations"]["argocd-diff-preview/ignore"].as_str() == Some("true") {
-                debug!(
-                    "Ignoring application {:?} due to 'argocd-diff-preview/ignore' in file: {}",
-                    r["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    f
-                );
-                false
-            } else {
-                true
-            }
-        })
-        .map(|(f, kind, mut r)| {
-            r["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
-            (f, kind, r)
-        })
-        .filter_map(|(f, kind, mut r)| {
+        .filter_map(|mut a| {
             // Clean up the spec
-            clean_spec({
-                if kind == "Application" {
-                    r["spec"].as_mapping_mut()?
-                } else {
-                    r["spec"]["template"]["spec"].as_mapping_mut()?
+            let spec = match a.kind {
+                ApplicationKind::Application => a.yaml["spec"].as_mapping_mut()?,
+                ApplicationKind::ApplicationSet => {
+                    a.yaml["spec"]["template"]["spec"].as_mapping_mut()?
                 }
-            });
-            Some((f, kind, r))
-        })
-        .filter_map(|(f, kind, mut r)| {
-            // Redirect all applications to the branch
-            redirect_sources(&f, {
-                if kind == "Application" {
-                    r["spec"].as_mapping_mut()?
-                } else {
-                    r["spec"]["template"]["spec"].as_mapping_mut()?
-                }
-            });
+            };
+            remove_sync_policy(spec);
+            set_project_to_default(spec);
+            point_destination_to_in_cluster(spec);
+            redirect_sources(spec, &a.file_name);
             debug!(
                 "Collected resources from application: {:?} in file: {}",
-                r["metadata"]["name"].as_str().unwrap_or("unknown"),
-                f
+                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                a.file_name
             );
-            Some(r)
+            Some(a)
         })
         .collect();
 
@@ -186,13 +184,47 @@ async fn patch_argocd_applications(
         branch
     );
 
-    // convert back to string
+    // convert back to yaml string
     let mut output = String::new();
-    for r in &applications {
-        let r = serde_yaml::to_string(r)?;
-        output.push_str(&r);
+    for r in applications {
+        output.push_str(&serde_yaml::to_string(&r.yaml)?);
         output.push_str("---\n");
     }
 
     Ok(output)
+}
+
+fn get_applications(k8s_resources: Vec<K8sResource>) -> Vec<Application> {
+    k8s_resources
+        .into_iter()
+        .filter_map(|r| {
+            debug!("Processing file: {}", r.file_name);
+            let kind =
+                r.yaml["kind"]
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .and_then(|kind| match kind.as_str() {
+                        "Application" => Some(ApplicationKind::Application),
+                        "ApplicationSet" => Some(ApplicationKind::ApplicationSet),
+                        _ => None,
+                    })?;
+
+            if r.yaml["metadata"]["annotations"]["argocd-diff-preview/ignore"].as_str()
+                == Some("true")
+            {
+                debug!(
+                    "Ignoring application {:?} due to 'argocd-diff-preview/ignore=true' in file: {}",
+                    r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    r.file_name
+                );
+                return None;
+            }
+
+            Some(Application {
+                kind,
+                file_name: r.file_name,
+                yaml: r.yaml,
+            })
+        })
+        .collect()
 }
