@@ -41,7 +41,7 @@ struct Opt {
     diff_ignore: Option<String>,
 
     /// Generate diffs with <n> lines above and below the highlighted changes in the diff. Default: 10
-    #[structopt(short, long, env)]
+    #[structopt(short = "c", long, env)]
     line_count: Option<usize>,
 
     /// Argo CD version. Default: stable
@@ -79,6 +79,10 @@ struct Opt {
     /// kustomize.buildOptions for argocd-cm ConfigMap
     #[structopt(long, env)]
     kustomize_build_options: Option<String>,
+
+    /// label selector for applications
+    #[structopt(long, short = "l", env)]
+    selector: Option<String>,
 }
 
 #[derive(Debug)]
@@ -99,6 +103,17 @@ impl std::fmt::Display for Branch {
             Branch::Target => write!(f, "target"),
         }
     }
+}
+
+enum Operator {
+    Eq,
+    Ne,
+}
+
+struct Selector {
+    key: String,
+    value: String,
+    operator: Operator,
 }
 
 fn apps_file(branch: &Branch) -> &'static str {
@@ -214,6 +229,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
         panic!("Target branch folder does not exist");
     }
 
+    // labels are in the following format: key1=value1,key2=value2,key3!=value3
+    let selector = opt.selector.map(|s| {
+        let labels: Vec<Selector> = s
+            .split(",")
+            .map(|a| {
+                let not_equal = a.split("!=").collect::<Vec<&str>>();
+                let equal = a.split("=").collect::<Vec<&str>>();
+                match (not_equal.len(), equal.len()) {
+                    (2, _) => Selector {
+                        key: not_equal[0].to_string(),
+                        value: not_equal[1].to_string(),
+                        operator: Operator::Ne,
+                    },
+                    (_, 2) => Selector {
+                        key: equal[0].to_string(),
+                        value: equal[1].to_string(),
+                        operator: Operator::Eq,
+                    },
+                    _ => {
+                        error!("❌ Invalid label selector format: {}", a);
+                        panic!("Invalid label selector format");
+                    }
+                }
+            })
+            .collect();
+        labels
+    });
+
     let cluster_name = "argocd-diff-preview";
 
     match tool {
@@ -242,6 +285,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         BASE_BRANCH_FOLDER,
         &base_branch_name,
         &file_regex,
+        &selector,
         repo,
     )
     .await?;
@@ -249,6 +293,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         TARGET_BRANCH_FOLDER,
         &target_branch_name,
         &file_regex,
+        &selector,
         repo,
     )
     .await?;
