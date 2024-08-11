@@ -1,7 +1,6 @@
+use crate::{run_command, utils::spawn_command};
 use log::{error, info};
 use std::error::Error;
-
-use crate::{run_command, utils::spawn_command};
 
 pub async fn is_installed() -> bool {
     run_command("which minikube", None).await.is_ok()

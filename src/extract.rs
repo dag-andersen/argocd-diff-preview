@@ -1,12 +1,10 @@
+use crate::utils::run_command;
+use crate::{apply_manifest, apps_file, Branch};
+use log::{debug, error, info};
 use std::collections::HashSet;
 use std::fs;
 use std::process::{Command, Stdio};
 use std::{collections::BTreeMap, error::Error};
-
-use log::{debug, error, info};
-
-use crate::utils::run_command;
-use crate::{apply_manifest, apps_file, Branch};
 
 static ERROR_MESSAGES: [&str; 10] = [
     "helm template .",
