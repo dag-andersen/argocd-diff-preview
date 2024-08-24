@@ -52,6 +52,8 @@ pub async fn get_resources(
     let mut set_of_processed_apps = HashSet::new();
     let mut set_of_failed_apps = BTreeMap::new();
 
+    let mut k8s_resources = vec![];
+
     let start_time = std::time::Instant::now();
 
     loop {
@@ -211,6 +213,8 @@ pub async fn get_resources(
         set_of_processed_apps.len(),
         branch.name
     );
+
+    store_resources(branch_type, output_folder, k8s_resources)?;
 
     Ok(())
 }

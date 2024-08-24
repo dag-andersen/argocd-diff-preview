@@ -14,6 +14,7 @@ mod argo_resource;
 mod argocd;
 mod branch;
 mod diff;
+mod dyff;
 mod error;
 mod extract;
 mod kind;
@@ -339,7 +340,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         ClusterTool::Minikube => minikube::delete_cluster(false),
     }
 
-    diff::generate_diff(
+    dyff::generate_diff(
         output_folder,
         &base_branch,
         &target_branch,
