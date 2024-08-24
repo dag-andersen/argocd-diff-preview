@@ -219,6 +219,105 @@ pub async fn get_resources(
     Ok(())
 }
 
+struct K8sResource {
+    metadata_name: Option<String>,
+    namespace: Option<String>,
+    kind: String,
+    api_version: String,
+    from_app: String,
+    yaml: serde_yaml::Value,
+}
+
+fn parse_yaml_string(yaml: String, app: String) -> Vec<K8sResource> {
+    let lines = yaml.lines();
+
+    let mut raw_yaml_chunks: Vec<String> = lines.fold(vec!["".to_string()], |mut acc, s| {
+        if s == "---" {
+            acc.push("".to_string());
+        } else {
+            let last = acc.len() - 1;
+            acc[last].push('\n');
+            acc[last].push_str(&s);
+        }
+        acc
+    });
+    let yaml_vec: Vec<K8sResource> = raw_yaml_chunks
+        .iter_mut()
+        .enumerate()
+        .map(|(i, r)| {
+            let yaml = match serde_yaml::from_str(r) {
+                Ok(r) => r,
+                Err(e) => {
+                    debug!(
+                        "⚠️ Failed to parse element number {}, with error: '{}'",
+                        i + 1,
+                        e
+                    );
+                    serde_yaml::Value::Null
+                }
+            };
+            let kind = yaml["kind"].as_str().unwrap_or("unknown");
+            let api_version = yaml["apiVersion"].as_str().unwrap_or("unknown");
+            K8sResource {
+                metadata_name: yaml["metadata"]["name"].as_str().map(|s| s.to_string()),
+                namespace: yaml["metadata"]["namespace"]
+                    .as_str()
+                    .map(|s| s.to_string()),
+                kind: kind.to_string(),
+                api_version: api_version.to_string(),
+                from_app: app.clone(),
+                yaml,
+            }
+        })
+        .collect();
+    yaml_vec
+}
+
+// for each resource, split the resources into separate files in the output folder. Follow pattern: app/api_version/kind/namespace/name.yaml
+fn store_resources(
+    branch_type: &Branch,
+    output_folder: &str,
+    k8s_resources: Vec<K8sResource>,
+) -> Result<(), Box<dyn Error>> {
+    debug!("Storing resources in output folder: {}", output_folder);
+
+    for resource in k8s_resources {
+        let app = format!("hej-{}", resource.from_app.clone());
+        let api_version = resource.api_version.clone().replace("/", "&");
+        let kind = resource.kind.clone();
+        let namespace = resource
+            .namespace
+            .clone()
+            .unwrap_or("ClusterScope".to_string());
+        let name = resource
+            .metadata_name
+            .clone()
+            .unwrap_or("unknown".to_string());
+
+        let folder_path = format!("{}/{}", output_folder, app);
+        
+        let file_path = format!(
+            "{}/{}/{}&{}&{}&{}",
+            folder_path, branch_type, api_version, kind, namespace, name
+        );
+
+        debug!("Creating folder: {}", folder_path);
+        debug!("Creating file: {}", file_path);
+
+        debug!(
+            "app: {}, api_version: {}, kind: {}, namespace: {}, name: {}",
+            app, api_version, kind, namespace, name
+        );
+
+        create_folder_if_not_exists(format!("{}/{}", folder_path, Branch::Base).as_str());
+        create_folder_if_not_exists(format!("{}/{}", folder_path, Branch::Target).as_str());
+        debug!("Writing file: {}", file_path);
+        fs::write(file_path, serde_yaml::to_string(&resource.yaml)?)?;
+    }
+
+    Ok(())
+}
+
 pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     info!("🧼 Removing applications");
     loop {

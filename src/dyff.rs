@@ -1,7 +1,7 @@
 use crate::utils::run_command;
 use crate::Branch;
 use log::{debug, info};
-use std::fs;
+use std::{fs, vec};
 use std::{error::Error, process::Output};
 
 pub async fn generate_diff(
@@ -9,7 +9,6 @@ pub async fn generate_diff(
     base_branch_name: &str,
     target_branch_name: &str,
     diff_ignore: Option<String>,
-    line_count: Option<usize>,
     max_char_count: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
     let max_diff_message_char_count = max_char_count.unwrap_or(65536);
@@ -24,54 +23,64 @@ pub async fn generate_diff(
         None => "".to_string(),
     };
 
-    let parse_diff_output = |output: Result<Output, Output>| -> String {
-        let o = match output {
-            Err(e) if !e.stderr.is_empty() => panic!(
-                "Error running diff command with error: {}",
-                String::from_utf8_lossy(&e.stderr)
-            ),
-            Ok(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
-            Err(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
-        };
-        if o.trim().is_empty() {
-            "No changes found".to_string()
-        } else {
-            o
-        }
+    // let summary_diff_command = format!(
+    //     "git --no-pager diff --compact-summary --no-index {} {} {}",
+    //     patterns_to_ignore,
+    //     Branch::Base,
+    //     Branch::Target
+    // );
+
+    // debug!(
+    //     "Getting summary diff with command: {}",
+    //     summary_diff_command
+    // );
+
+    // let summary_as_string =
+    //     parse_diff_output(run_command(&summary_diff_command, Some(output_folder)).await);
+
+    let header = |header: &str| -> String {
+        format!("### Argo CD Application: {}\n", header)
     };
 
-    let summary_diff_command = format!(
-        "git --no-pager diff --compact-summary --no-index {} {} {}",
-        patterns_to_ignore,
-        Branch::Base,
-        Branch::Target
-    );
-
-    debug!(
-        "Getting summary diff with command: {}",
-        summary_diff_command
-    );
-
-    let summary_as_string =
-        parse_diff_output(run_command(&summary_diff_command, Some(output_folder)).await);
-
     let diff_command = &format!(
-        "dyff between --color=false --detect-kubernetes=false {} {}",
+        "dyff between --color=false --omit-header --detect-kubernetes=false {} {}",
         Branch::Base,
         Branch::Target
     );
 
     debug!("Getting diff with command: {}", diff_command);
 
-    let diff_as_string = parse_diff_output(run_command(diff_command, Some(output_folder)).await);
+    // loop over all folders in the output folder and run the diff command
+
+    let mut outputs: Vec<String> = vec![];
+
+    let search_folder = output_folder;
+    debug!("Searching for folders in {}", output_folder);
+    for entry in fs::read_dir(search_folder)? {
+        let entry = entry?;
+        let path = entry.path();
+        debug!("Found entry: {:?}", path);
+        if path.is_dir() {
+            let folder_name = path.to_str().unwrap();
+            let output_string: String = match run_command(diff_command, Some(folder_name)).await {
+                Ok(s) if !s.stdout.trim_ascii_end().is_empty() => String::from_utf8_lossy(&s.stdout).to_string(),
+                _ => continue,
+            };
+            outputs.push(header(folder_name));
+            outputs.push(output_string);
+        }
+        debug!("Finished processing entry: {:?}", path);
+    }
 
     let remaining_max_chars =
-        max_diff_message_char_count - markdown_template_length() - summary_as_string.len();
+        max_diff_message_char_count - markdown_template_length();
 
     let warning_message = &format!(
         "\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to {} characters. This can be adjusted with the `--max-diff-length` flag",
         max_diff_message_char_count
     );
+
+    let diff_as_string = outputs.join("\n\n");
 
     let diff_truncated = match remaining_max_chars {
         remaining if remaining > diff_as_string.len() => diff_as_string, // No need to truncate
@@ -86,7 +95,7 @@ pub async fn generate_diff(
         _ => return Err("Diff is too long and cannot be truncated. Increase the max length with `--max-diff-length`".into())
     };
 
-    let markdown = print_diff(&summary_as_string, &diff_truncated);
+    let markdown = print_diff(&"", &diff_truncated);
 
     let markdown_path = format!("{}/diff.md", output_folder);
     fs::write(&markdown_path, markdown)?;

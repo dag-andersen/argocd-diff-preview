@@ -345,7 +345,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &base_branch,
         &target_branch,
         diff_ignore,
-        line_count,
         max_diff_length,
     )?;
 
@@ -355,23 +354,13 @@ async fn run() -> Result<(), Box<dyn Error>> {
 }
 
 fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
-    create_folder_if_not_exists(output_folder)?;
-    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Base)).unwrap_or_default();
-    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Target)).unwrap_or_default();
-    {
-        let dir = format!("{}/{}", output_folder, BranchType::Base);
-        match fs::create_dir(&dir) {
-            Ok(_) => (),
-            Err(_) => return Err(format!("❌ Failed to create directory: {}", dir).into()),
-        }
-    }
-    {
-        let dir = format!("{}/{}", output_folder, BranchType::Target);
-        match fs::create_dir(&dir) {
-            Ok(_) => (),
-            Err(_) => return Err(format!("❌ Failed to create directory: {}", dir).into()),
-        }
-    }
+    create_folder_if_not_exists(output_folder);
+    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Base)).unwrap_or_default();
+    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Target)).unwrap_or_default();
+    // fs::create_dir(format!("{}/{}", output_folder, Branch::Base))
+    //     .expect("Unable to create directory");
+    // fs::create_dir(format!("{}/{}", output_folder, Branch::Target))
+    //     .expect("Unable to create directory");
     Ok(())
 }
 

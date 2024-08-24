@@ -7,7 +7,7 @@ use crate::error::CommandOutput;
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
     if !PathBuf::from(folder_name).is_dir() {
-        fs::create_dir(folder_name)?;
+        fs::create_dir_all(folder_name)?;
     }
     Ok(())
 }
