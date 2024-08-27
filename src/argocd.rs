@@ -39,7 +39,8 @@ pub struct ArgoCDOptions<'a> {
 }
 
 pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn Error>> {
-    info!("🦑 Installing Argo CD...");
+    let version = options.version.unwrap_or("stable");
+    info!("🦑 Installing Argo CD version: '{}'", version);
 
     match run_command("kubectl create ns argocd", None).await {
         Ok(_) => (),
@@ -52,7 +53,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     // Install Argo CD
     let install_url = format!(
         "https://raw.githubusercontent.com/argoproj/argo-cd/{}/manifests/install.yaml",
-        options.version.unwrap_or("stable")
+        version
     );
     match run_command(&format!("kubectl -n argocd apply -f {}", install_url), None).await {
         Ok(_) => (),
@@ -95,21 +96,17 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     .await
     .expect("Failed to wait for argocd-repo-server");
 
-    info!("🦑 Logging in to Argo CD through CLI...");
-    debug!("Port-forwarding Argo CD server...");
+    // wait for argocd-server to be ready
+    run_command(
+        "kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s",
+        None,
+    )
+    .await
+    .expect("failed to wait for argocd-server");
 
-    // port-forward Argo CD server
-    Command::new("kubectl")
-        .arg("-n")
-        .arg("argocd")
-        .arg("port-forward")
-        .arg("service/argocd-server")
-        .arg("8080:443")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("failed to execute process");
+    info!("🦑 Argo CD is now available");
+
+    info!("🦑 Logging in to Argo CD through CLI...");
 
     debug!("Getting initial admin password...");
     let secret_name = "argocd-initial-admin-secret";

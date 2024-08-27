@@ -19,6 +19,10 @@ pub async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Out
     let args = command.split_whitespace().collect::<Vec<&str>>();
     let output = Command::new(args[0])
         .args(&args[1..])
+        .env(
+            "ARGOCD_OPTS",
+            "--port-forward --port-forward-namespace=argocd",
+        )
         .current_dir(current_dir.unwrap_or("."))
         .output()
         .expect(format!("Failed to execute command: {}", command).as_str());
