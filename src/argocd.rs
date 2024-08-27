@@ -100,7 +100,9 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     run_command(
         "kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s",
         None,
-    ).await.expect("failed to wait for argocd-server");
+    )
+    .await
+    .expect("failed to wait for argocd-server");
 
     info!("🦑 Argo CD is now available");
 
