@@ -9,6 +9,14 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 
 ![](./images/example-1.png)
 
+## ArgoCon 2024 Talk
+
+<img align="right" src="./images/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` will be presented at ArgoCon 2024 in Utah, US. The talk will cover the current tools and methods for visualizing code changes in GitOps workflows and introduce this new approach, which uses ephemeral clusters to render accurate diffs directly on your pull requests.
+
+- [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](
+https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
+
+
 ## Why do we need this?
 
 In the Kubernetes world, we often use templating tools like Kustomize and Helm to generate our Kubernetes manifests. These tools make maintaining and streamlining configuration easier across applications and environments. However, they also make it harder to visualize the application's actual configuration in the cluster.
