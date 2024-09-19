@@ -1,8 +1,8 @@
+use crate::{Operator, Selector};
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Mapping;
 use std::{error::Error, io::BufRead};
-use crate::{Operator, Selector};
 
 struct K8sResource {
     file_name: String,
@@ -227,11 +227,14 @@ fn get_applications(
 
             // loop over labels and check if the selector matches
             if let Some(selector) = selector {
-                let labels: Vec<(&str, &str)> = r.yaml["metadata"]["labels"]
-                    .as_mapping()?
-                    .iter()
-                    .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
-                    .collect();
+                let labels: Vec<(&str, &str)> = {
+                    match r.yaml["metadata"]["labels"].as_mapping() {
+                        Some(m) => m.iter()
+                            .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
+                            .collect(),
+                        None => Vec::new(),
+                    }
+                };
                 let selected = selector.iter().all(|l| match l.operator {
                     Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
                     Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
@@ -243,6 +246,12 @@ fn get_applications(
                         r.file_name
                     );
                     return None;
+                } else {
+                    debug!(
+                        "Selected application {:?} due to selector match in file: {}",
+                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        r.file_name
+                    );
                 }
             }
 
