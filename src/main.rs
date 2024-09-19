@@ -76,11 +76,11 @@ struct Opt {
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
 
-    /// kustomize.buildOptions for argocd-cm ConfigMap
+    /// Kustomize.buildOptions for argocd-cm ConfigMap
     #[structopt(long, env)]
     kustomize_build_options: Option<String>,
 
-    /// label selector for applications
+    /// Label selector to filter on, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2).
     #[structopt(long, short = "l", env)]
     selector: Option<String>,
 }
