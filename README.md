@@ -80,7 +80,7 @@ The implementation is actually quite simple. It just follows the steps below:
 >    -v $(pwd)/target-branch:/target-branch \
 >    -e TARGET_BRANCH=helm-example-3 \
 >    -e REPO=dag-andersen/argocd-diff-preview \
->    dagandersen/argocd-diff-preview:v0.0.15
+>    dagandersen/argocd-diff-preview:v0.0.16
 > ```
 > 
 > and the output would be something like this:
@@ -116,7 +116,7 @@ docker run \
    -e BASE_BRANCH=main \
    -e TARGET_BRANCH=<name-of-the-target-branch> \
    -e REPO=<owner/repo-name> \
-   dagandersen/argocd-diff-preview:v0.0.15
+   dagandersen/argocd-diff-preview:v0.0.16
 ```
 
 Example on how to use it: ["Try demo locally with 3 simple commands!"](./README.md#try-demo-locally-with-3-simple-commands)
@@ -131,7 +131,7 @@ Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/release
 Example for downloading and running on macOS:
 
 ```bash
-curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.15/argocd-diff-preview-Darwin-x86_64.tar.gz
+curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.16/argocd-diff-preview-Darwin-x86_64.tar.gz
 tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
 sudo mv argocd-diff-preview /usr/local/bin
 argocd-diff-preview --help
@@ -232,7 +232,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.15
+            dagandersen/argocd-diff-preview:v0.0.16
 
       - name: Post diff as comment
         run: |
@@ -282,7 +282,7 @@ jobs:
           -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
           -e TARGET_BRANCH=${{ github.head_ref }} \
           -e REPO=${{ github.repository }} \
-          dagandersen/argocd-diff-preview:v0.0.15
+          dagandersen/argocd-diff-preview:v0.0.16
 ```
 
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
