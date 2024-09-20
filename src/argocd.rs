@@ -116,7 +116,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     let mut password_encoded: Option<Output> = None;
     let mut counter = 0;
     while password_encoded.is_none() {
-        password_encoded = match run_command(&command, None).await {
+        password_encoded = match run_command(command, None).await {
             Ok(a) => Some(a),
             Err(e) => {
                 if counter == 5 {
