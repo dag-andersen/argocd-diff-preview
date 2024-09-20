@@ -56,9 +56,6 @@ The implementation is actually quite simple. It just follows the steps below:
 - Provides a clear and concise view of the changes
 - Render resources from external sources (e.g., Helm charts). For example, when you update the chart version of Nginx, you can get a render of the new output. For example, this is useful to spot changes in default values. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15). 
 
-#### Not supported
-- [Argo CD Config Management Plugins](https://argo-cd.readthedocs.io/en/stable/operator-manual/config-management-plugins/)
-
 ---
 
 > [!TIP]
@@ -327,7 +324,7 @@ Here are three ways to limit which applications are rendered:
 
 #### Label Selectors
 
-Run the tool with the `--selector` argument to filter applications based on labels. The argument supports `=`, `==`, and `!=`.
+Run the tool with the `--selector` option to filter applications based on labels. The option supports `=`, `==`, and `!=`.
 
 *Example:*
 ```bash
@@ -364,7 +361,7 @@ spec:
 
 #### File Regex
 
-Alternatively, use the `--file-regex` argument to limit rendering to manifests whose file paths match a regular expression. This is helpful when rendering changes from specific teams or directories.
+Alternatively, use the `--file-regex` option to limit rendering to manifests whose file paths match a regular expression. This is helpful when rendering changes from specific teams or directories.
 
 *Example:*
 
@@ -373,6 +370,46 @@ If someone in your organization from *Team A* changes to one of their applicatio
 argocd-diff-preview --file-regex="/Team-A/"
 ```
 This ensures only applications in folders matching `*/Team-A/*` are rendered.
+
+### Custom Argo CD Installation
+
+Argo CD is installed using a [Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd). You can specify the Chart version with the `--argocd-chart-version` option. It defaults to the latest version.
+
+You can modify the Argo CD Helm Chart installation by providing the tool with a `values.yaml` file and mounting it in the `argocd-config` folder within the container. Check out all the available values in the [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd).
+
+*Example:*
+
+Here we set `configs.cm."kustomize.buildOptions"` in the Chart.
+
+```yaml
+jobs:
+  build:
+    ...
+    steps:
+      ...
+    - name: Set ArgoCD Custom Values
+      run: |
+        cat > values.yaml << "EOF"
+        # set whatever helm values you want
+        configs:
+          cm:
+            kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm
+        EOF
+
+    - name: Generate Diff
+      run: |
+        docker run \
+          --network=host \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -v $(pwd)/main:/base-branch \
+          -v $(pwd)/pull-request:/target-branch \
+          -v $(PWD)/values.yaml:/argocd-config/values.yaml \   ⬅️ Mount values.yaml
+          ...
+```
+
+#### Argo CD Config Management Plugins (CMP)
+
+You can install any [Argo CD Config Management Plugin](https://argo-cd.readthedocs.io/en/stable/operator-manual/config-management-plugins/) that is supported through the [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd). However, there is no guarantee that the plugin will work with the tool, as this depends on the plugin and its specific implementation
 
 ## Options
 ```
@@ -385,12 +422,11 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-        --argocd-version <argocd-version>     Argo CD version [env: ARGOCD_VERSION=]  [default: stable]
+        --argocd-chart-version <version>      Argo CD Helm Chart version [env: ARGOCD_CHART_VERSION=]
     -b, --base-branch <base-branch>           Base branch name [env: BASE_BRANCH=]  [default: main]
         --base-branch-folder <folder>         Base branch folder [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
     -i, --diff-ignore <diff-ignore>           Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+' for ignoring changes caused by version changes following semver [env: DIFF_IGNORE=]
     -r, --file-regex <file-regex>             Regex to filter files. Example: "/apps_.*\.yaml" [env: FILE_REGEX=]
-        --kustomize-build-options <options>   kustomize.buildOptions for argocd-cm ConfigMap [env: KUSTOMIZE_BUILD_OPTIONS=]
     -c, --line-count <line-count>             Generate diffs with <n> lines above and below the highlighted changes in the diff. [env: LINE_COUNT=]  [Default: 10] 
         --local-cluster-tool <tool>           Local cluster tool. Options: kind, minikube [env: LOCAL_CLUSTER_TOOL=] [default: auto]
         --max-diff-length <length>            Max diff message character count. [env: MAX_DIFF_LENGTH=]  [Default: 65536] (GitHub comment limit)
