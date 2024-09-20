@@ -4,3 +4,5 @@ argocd/
 secrets/
 output/
 .vscode/
+/apps_target_branch.yaml
+/apps_base_branch.yaml

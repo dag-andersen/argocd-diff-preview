@@ -1,3 +1,4 @@
+use crate::{Operator, Selector};
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Mapping;
@@ -23,11 +24,12 @@ pub async fn get_applications_as_string(
     directory: &str,
     branch: &str,
     regex: &Option<Regex>,
+    selector: &Option<Vec<Selector>>,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
     let k8s_resources = parse_yaml(yaml_files).await;
-    let applications = get_applications(k8s_resources);
+    let applications = get_applications(k8s_resources, selector);
     let output = patch_applications(applications, branch, repo).await?;
     Ok(output)
 }
@@ -194,7 +196,10 @@ async fn patch_applications(
     Ok(output)
 }
 
-fn get_applications(k8s_resources: Vec<K8sResource>) -> Vec<Application> {
+fn get_applications(
+    k8s_resources: Vec<K8sResource>,
+    selector: &Option<Vec<Selector>>,
+) -> Vec<Application> {
     k8s_resources
         .into_iter()
         .filter_map(|r| {
@@ -218,6 +223,36 @@ fn get_applications(k8s_resources: Vec<K8sResource>) -> Vec<Application> {
                     r.file_name
                 );
                 return None;
+            }
+
+            // loop over labels and check if the selector matches
+            if let Some(selector) = selector {
+                let labels: Vec<(&str, &str)> = {
+                    match r.yaml["metadata"]["labels"].as_mapping() {
+                        Some(m) => m.iter()
+                            .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
+                            .collect(),
+                        None => Vec::new(),
+                    }
+                };
+                let selected = selector.iter().all(|l| match l.operator {
+                    Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
+                    Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
+                });
+                if !selected {
+                    debug!(
+                        "Ignoring application {:?} due to selector mismatch in file: {}",
+                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        r.file_name
+                    );
+                    return None;
+                } else {
+                    debug!(
+                        "Selected application {:?} due to selector match in file: {}",
+                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        r.file_name
+                    );
+                }
             }
 
             Some(Application {

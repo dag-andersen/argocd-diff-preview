@@ -41,7 +41,7 @@ struct Opt {
     diff_ignore: Option<String>,
 
     /// Generate diffs with <n> lines above and below the highlighted changes in the diff. Default: 10
-    #[structopt(short, long, env)]
+    #[structopt(short = "c", long, env)]
     line_count: Option<usize>,
 
     /// Argo CD version. Default: stable
@@ -79,6 +79,10 @@ struct Opt {
     /// kustomize.buildOptions for argocd-cm ConfigMap
     #[structopt(long, env)]
     kustomize_build_options: Option<String>,
+
+    /// Label selector to filter on, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2).
+    #[structopt(long, short = "l", env)]
+    selector: Option<String>,
 }
 
 #[derive(Debug)]
@@ -101,6 +105,32 @@ impl std::fmt::Display for Branch {
     }
 }
 
+enum Operator {
+    Eq,
+    Ne,
+}
+
+struct Selector {
+    key: String,
+    value: String,
+    operator: Operator,
+}
+
+impl std::fmt::Display for Selector {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Selector {
+                key,
+                value,
+                operator,
+            } => match operator {
+                Operator::Eq => write!(f, "{}={}", key, value),
+                Operator::Ne => write!(f, "{}!={}", key, value),
+            },
+        }
+    }
+}
+
 fn apps_file(branch: &Branch) -> &'static str {
     match branch {
         Branch::Base => "apps_base_branch.yaml",
@@ -110,6 +140,7 @@ fn apps_file(branch: &Branch) -> &'static str {
 
 const BASE_BRANCH_FOLDER: &str = "base-branch";
 const TARGET_BRANCH_FOLDER: &str = "target-branch";
+const CLUSTER_NAME: &str = "argocd-diff-preview";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -198,6 +229,62 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("✨ - kube-build-options: {}", a);
     }
 
+    // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
+    let selector = opt.selector.map(|s| {
+        let labels: Vec<Selector> = s
+            .split(",")
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| {
+                let not_equal = l.split("!=").collect::<Vec<&str>>();
+                let equal_double = l.split("==").collect::<Vec<&str>>();
+                let equal_single = l.split("=").collect::<Vec<&str>>();
+                let selector = match (not_equal.len(), equal_double.len(), equal_single.len()) {
+                    (2, _, _) => Selector {
+                        key: not_equal[0].trim().to_string(),
+                        value: not_equal[1].trim().to_string(),
+                        operator: Operator::Ne,
+                    },
+                    (_, 2, _) => Selector {
+                        key: equal_double[0].trim().to_string(),
+                        value: equal_double[1].trim().to_string(),
+                        operator: Operator::Eq,
+                    },
+                    (_, _, 2) => Selector {
+                        key: equal_single[0].trim().to_string(),
+                        value: equal_single[1].trim().to_string(),
+                        operator: Operator::Eq,
+                    },
+                    _ => {
+                        error!("❌ Invalid label selector format: {}", l);
+                        panic!("Invalid label selector format");
+                    }
+                };
+                if selector.key.is_empty()
+                    || selector.key.contains("!")
+                    || selector.key.contains("=")
+                    || selector.value.is_empty()
+                    || selector.value.contains("!")
+                    || selector.value.contains("=")
+                {
+                    error!("❌ Invalid label selector format: {}", l);
+                    panic!("Invalid label selector format");
+                }
+                selector
+            })
+            .collect();
+        labels
+    });
+
+    if let Some(list) = &selector {
+        info!(
+            "✨ - selector: {}",
+            list.iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        );
+    }
+
     if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
         error!(
             "❌ Base branch folder does not exist: {}",
@@ -214,7 +301,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         panic!("Target branch folder does not exist");
     }
 
-    let cluster_name = "argocd-diff-preview";
+    let cluster_name = CLUSTER_NAME;
 
     match tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
@@ -242,6 +329,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         BASE_BRANCH_FOLDER,
         &base_branch_name,
         &file_regex,
+        &selector,
         repo,
     )
     .await?;
@@ -249,6 +337,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         TARGET_BRANCH_FOLDER,
         &target_branch_name,
         &file_regex,
+        &selector,
         repo,
     )
     .await?;
