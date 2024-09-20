@@ -76,7 +76,7 @@ struct Opt {
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
 
-    /// Kustomize.buildOptions for argocd-cm ConfigMap
+    /// kustomize.buildOptions for argocd-cm ConfigMap
     #[structopt(long, env)]
     kustomize_build_options: Option<String>,
 
@@ -233,10 +233,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let selector = opt.selector.map(|s| {
         let labels: Vec<Selector> = s
             .split(",")
-            .map(|a| {
-                let not_equal = a.split("!=").collect::<Vec<&str>>();
-                let equal_double = a.split("==").collect::<Vec<&str>>();
-                let equal_single = a.split("=").collect::<Vec<&str>>();
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| {
+                let not_equal = l.split("!=").collect::<Vec<&str>>();
+                let equal_double = l.split("==").collect::<Vec<&str>>();
+                let equal_single = l.split("=").collect::<Vec<&str>>();
                 let selector = match (not_equal.len(), equal_double.len(), equal_single.len()) {
                     (2, _, _) => Selector {
                         key: not_equal[0].trim().to_string(),
@@ -254,12 +255,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         operator: Operator::Eq,
                     },
                     _ => {
-                        error!("❌ Invalid label selector format: {}", a);
+                        error!("❌ Invalid label selector format: {}", l);
                         panic!("Invalid label selector format");
                     }
                 };
-                if selector.key.is_empty() || selector.value.is_empty() {
-                    error!("❌ Invalid label selector format: {}", a);
+                if selector.key.is_empty()
+                    || selector.key.contains("!")
+                    || selector.key.contains("=")
+                    || selector.value.is_empty()
+                    || selector.value.contains("!")
+                    || selector.value.contains("=")
+                {
+                    error!("❌ Invalid label selector format: {}", l);
                     panic!("Invalid label selector format");
                 }
                 selector
