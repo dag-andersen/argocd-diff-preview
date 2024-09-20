@@ -19,12 +19,13 @@ static ERROR_MESSAGES: [&str; 10] = [
     "Unknown desc = repository not found",
 ];
 
-static TIMEOUT_MESSAGES: [&str; 5] = [
+static TIMEOUT_MESSAGES: [&str; 6] = [
     "Client.Timeout",
     "failed to get git client for repo",
     "rpc error: code = Unknown desc = Get \"https",
     "i/o timeout",
-    "Could not resolve host: github.com", // Attempt at fixing: https://github.com/dag-andersen/argocd-diff-preview/issues/44
+    "Could not resolve host: github.com",
+    "Temporary failure in name resolution", // Attempt at fixing: https://github.com/dag-andersen/argocd-diff-preview/issues/44
 ];
 
 pub async fn get_resources(
@@ -83,7 +84,7 @@ pub async fn get_resources(
                     match run_command(&format!("argocd app manifests {}", name), None).await {
                         Ok(o) => {
                             fs::write(
-                                &format!("{}/{}/{}", output_folder, branch_type, name),
+                                format!("{}/{}/{}", output_folder, branch_type, name),
                                 &o.stdout,
                             )?;
                             debug!("Got manifests for application: {}", name)
