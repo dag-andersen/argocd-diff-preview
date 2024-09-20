@@ -402,8 +402,6 @@ OPTIONS:
 
 ## All contributors
 
-Contributions are welcome!
-
 <a href="https://github.com/dag-andersen/argocd-diff-preview/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=dag-andersen/argocd-diff-preview" />
 </a>
