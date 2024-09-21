@@ -44,9 +44,9 @@ struct Opt {
     #[structopt(short = "c", long, env)]
     line_count: Option<usize>,
 
-    /// Argo CD version. Default: stable
+    /// Argo CD Helm Chart version.
     #[structopt(long, env)]
-    argocd_version: Option<String>,
+    argocd_chart_version: Option<String>,
 
     /// Base branch name
     #[structopt(short, long, default_value = "main", env)]
@@ -75,11 +75,6 @@ struct Opt {
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
-
-    /// kustomize.buildOptions for argocd-cm ConfigMap
-    #[structopt(long, env)]
-    kustomize_build_options: Option<String>,
-
     /// Label selector to filter on, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2).
     #[structopt(long, short = "l", env)]
     selector: Option<String>,
@@ -175,11 +170,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let secrets_folder = opt.secrets_folder.as_str();
     let line_count = opt.line_count;
     let argocd_version = opt
-        .argocd_version
-        .as_deref()
-        .filter(|f| !f.trim().is_empty());
-    let kube_build_options = opt
-        .kustomize_build_options
+        .argocd_chart_version
         .as_deref()
         .filter(|f| !f.trim().is_empty());
     let max_diff_length = opt.max_diff_length;
@@ -224,9 +215,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     if let Some(a) = max_diff_length {
         info!("✨ - max-diff-length: {}", a);
-    }
-    if let Some(a) = kube_build_options {
-        info!("✨ - kube-build-options: {}", a);
     }
 
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
@@ -307,9 +295,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
+    
     argocd::install_argo_cd(argocd::ArgoCDOptions {
         version: argocd_version,
-        kube_build_options,
+        debug: opt.debug,
     })
     .await?;
 
