@@ -19,12 +19,13 @@ static ERROR_MESSAGES: [&str; 10] = [
     "Unknown desc = repository not found",
 ];
 
-static TIMEOUT_MESSAGES: [&str; 6] = [
+static TIMEOUT_MESSAGES: [&str; 7] = [
     "Client.Timeout",
     "failed to get git client for repo",
     "rpc error: code = Unknown desc = Get \"https",
     "i/o timeout",
     "Could not resolve host: github.com",
+    ":8081: connect: connection refused",
     "Temporary failure in name resolution", // Attempt at fixing: https://github.com/dag-andersen/argocd-diff-preview/issues/44
 ];
 
@@ -33,7 +34,7 @@ pub async fn get_resources(
     timeout: u64,
     output_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
-    info!("🌚 Getting resources for {}", branch_type);
+    info!("🌚 Getting resources from {}", branch_type);
 
     let app_file = apps_file(branch_type);
 

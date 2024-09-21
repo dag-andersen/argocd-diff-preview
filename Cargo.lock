@@ -85,7 +85,7 @@ dependencies = [
 
 [[package]]
 name = "argocd-diff-preview"
-version = "0.0.17"
+version = "0.0.18"
 dependencies = [
  "base64",
  "env_logger",

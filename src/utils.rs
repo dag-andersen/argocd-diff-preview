@@ -17,15 +17,19 @@ pub fn check_if_folder_exists(folder_name: &str) -> bool {
 
 pub async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Output, Output> {
     let args = command.split_whitespace().collect::<Vec<&str>>();
-    let output = Command::new(args[0])
-        .args(&args[1..])
+    run_command_from_list(args, current_dir).await
+}
+
+pub async fn run_command_from_list(command: Vec<&str>, current_dir: Option<&str>) -> Result<Output, Output> {
+    let output = Command::new(command[0])
+        .args(&command[1..])
         .env(
             "ARGOCD_OPTS",
             "--port-forward --port-forward-namespace=argocd",
         )
         .current_dir(current_dir.unwrap_or("."))
         .output()
-        .expect(format!("Failed to execute command: {}", command).as_str());
+        .expect(format!("Failed to execute command: {}", command.join(" ")).as_str());
 
     if !output.status.success() {
         return Err(output);
