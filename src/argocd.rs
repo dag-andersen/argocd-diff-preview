@@ -24,11 +24,11 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
             }
             let values_exist = std::fs::metadata(format!("{}/values.yaml", CONFIG_PATH))
                 .is_ok()
-                .then_some("-f argocd-config/values.yaml");
+                .then_some(format!("-f {}/values.yaml", CONFIG_PATH));
             let values_override_exist =
                 std::fs::metadata(format!("{}/values-override.yaml", CONFIG_PATH))
                     .is_ok()
-                    .then_some("-f argocd-config/values-override.yaml");
+                    .then_some(format!("-f {}/values-override.yaml", CONFIG_PATH));
             (values_exist, values_override_exist)
         }
         Err(_e) => {
