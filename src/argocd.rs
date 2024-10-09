@@ -8,24 +8,34 @@ pub struct ArgoCDOptions<'a> {
     pub debug: bool,
 }
 
+const CONFIG_PATH: &str = "argocd-config";
+
 pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn Error>> {
     info!(
         "🦑 Installing Argo CD Helm Chart version: '{}'",
         options.version.unwrap_or("latest")
     );
 
-    match std::fs::read_dir("argocd-config") {
+    let (values, values_override) = match std::fs::read_dir(CONFIG_PATH) {
         Ok(dir) => {
             debug!("📂 Files in folder 'argocd-config':");
             for file in dir {
-                debug!("📄 {:?}", file.unwrap().file_name());
+                debug!("- 📄 {:?}", file.unwrap().file_name());
             }
+            let values_exist = std::fs::metadata(format!("{}/values.yaml", CONFIG_PATH))
+                .is_ok()
+                .then_some("-f argocd-config/values.yaml");
+            let values_override_exist =
+                std::fs::metadata(format!("{}/values-override.yaml", CONFIG_PATH))
+                    .is_ok()
+                    .then_some("-f argocd-config/values-override.yaml");
+            (values_exist, values_override_exist)
         }
-        Err(e) => {
-            error!("❌ Failed to read folder 'argocd-config'");
-            panic!("error: {}", e)
+        Err(_e) => {
+            info!("📂 Folder '{}' doesn't exist. Installing Argo CD Helm Chart with default configuration", CONFIG_PATH);
+            (None, None)
         }
-    }
+    };
 
     // create namespace argocd
     match run_command("kubectl create ns argocd", None).await {
@@ -53,9 +63,9 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     info!("🦑 Installing Argo CD Helm Chart");
 
     let helm_install_command = format!(
-        "helm install argocd argo/argo-cd -n argocd -f {} -f {} {}",
-        "argocd-config/values.yaml",
-        "argocd-config/values-override.yaml",
+        "helm install argocd argo/argo-cd -n argocd {} {} {}",
+        values.unwrap_or_default(),
+        values_override.unwrap_or_default(),
         options
             .version
             .map(|a| format!("--version {}", a))
