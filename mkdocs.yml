@@ -1,0 +1,50 @@
+site_name: Argo CD Diff Preview
+repo_url: https://github.com/dag-andersen/argocd-diff-preview
+edit_uri: edit/main/docs/
+theme:
+  icon:
+    repo: fontawesome/brands/github
+  name: material
+  logo: assets/logo-transparent.png
+  favicon: assets/favicon.png
+  features:
+    - content.action.edit
+  palette: 
+    # Dark Mode
+    scheme: slate
+    primary: black
+    accent: grey
+
+nav:
+- Overview: index.md
+- Demo: demo.md
+- Getting started:
+  - github-actions-workflow.md
+  - Local Installation: installation.md
+  - custom-argo-cd-installation.md
+- Developer Guide: 
+  - generated-applications.md
+  - Ignore Lines: ignoring-lines.md
+  - application-selection.md
+- All Options: options.md
+- Troubleshooting: troubleshooting.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dag-andersen/argocd-diff-preview
+
+copyright: Copyright &copy; 2024 Dag Bjerre Andersen
