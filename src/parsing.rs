@@ -25,6 +25,7 @@ pub async fn get_applications_as_string(
     branch: &str,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
@@ -199,6 +200,7 @@ async fn patch_applications(
 fn get_applications(
     k8s_resources: Vec<K8sResource>,
     selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
 ) -> Vec<Application> {
     k8s_resources
         .into_iter()
@@ -253,6 +255,30 @@ fn get_applications(
                         r.file_name
                     );
                 }
+            }
+
+            match (files_changed, r.yaml["metadata"]["annotations"]["argocd-diff-preview/watch-pattern"].as_str()) {
+                (Some(files_changed), Some(pattern)) => {
+                    if let Ok(re) = Regex::new(pattern.trim()) {
+                        if !files_changed.iter().any(|f| re.is_match(f)) {
+                            debug!(
+                                "Ignoring application {:?} due to file not being in changed files in file: {}",
+                                r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                                r.file_name
+                            );
+                            return None;
+                        }
+                    }
+                }
+                (Some(_), None) => {
+                    debug!(
+                        "Ignoring application {:?} due to missing 'argocd-diff-preview/watch-pattern' in file: {}",
+                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        r.file_name
+                    );
+                    return None;
+                }
+                _ => {}
             }
 
             Some(Application {
