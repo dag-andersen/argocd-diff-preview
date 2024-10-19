@@ -13,7 +13,6 @@ use structopt::StructOpt;
 mod argocd;
 mod diff;
 mod extract;
-mod kind;
 mod minikube;
 mod no_apps_found;
 mod parsing;
@@ -70,10 +69,6 @@ struct Opt {
     #[structopt(short, long, default_value = "./secrets", env)]
     secrets_folder: String,
 
-    /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
-    #[structopt(long, env)]
-    local_cluster_tool: Option<String>,
-
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
@@ -89,12 +84,6 @@ struct Opt {
     /// Ignore invalid watch pattern Regex on Applications. If flag is unset and an invalid Regex is found, the tool will exit with an error.
     #[structopt(long)]
     ignore_invalid_watch_pattern: bool,
-}
-
-#[derive(Debug)]
-enum ClusterTool {
-    Kind,
-    Minikube,
 }
 
 enum Branch {
@@ -199,18 +188,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .collect()
         });
 
-    // select local cluster tool
-    let tool = match opt.local_cluster_tool {
-        Some(t) if t == "kind" => ClusterTool::Kind,
-        Some(t) if t == "minikube" => ClusterTool::Minikube,
-        _ if kind::is_installed().await => ClusterTool::Kind,
-        _ if minikube::is_installed().await => ClusterTool::Minikube,
-        _ => {
-            error!("❌ No local cluster tool found. Please install kind or minikube");
-            panic!("No local cluster tool found")
-        }
-    };
-
     let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
     if !repo_regex.is_match(&repo) {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
@@ -218,7 +195,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     info!("✨ Running with:");
-    info!("✨ - local-cluster-tool: {:?}", tool);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
     info!("✨ - secrets-folder: {}", secrets_folder);
@@ -351,11 +327,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    match tool {
-        ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
-        ClusterTool::Minikube => minikube::create_cluster().await?,
-    }
-
     argocd::create_namespace().await?;
 
     create_folder_if_not_exists(secrets_folder);
@@ -395,11 +366,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
         extract::get_resources(&Branch::Target, timeout, output_folder).await?;
     }
 
-    // Delete cluster
-    match tool {
-        ClusterTool::Kind => kind::delete_cluster(&cluster_name),
-        ClusterTool::Minikube => minikube::delete_cluster(),
-    }
 
     diff::generate_diff(
         output_folder,

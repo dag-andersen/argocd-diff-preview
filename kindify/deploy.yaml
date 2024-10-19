@@ -1,0 +1,80 @@
+# service account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: diff-preview
+---
+# role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: diff-preview
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+# role binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: diff-preview
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: diff-preview
+subjects:
+- kind: ServiceAccount
+  name: diff-preview
+  namespace: default
+---
+# As Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: diff-preview
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      name: diff-preview
+      labels:
+        app: diff-preview
+    spec:
+      serviceAccountName: diff-preview
+      restartPolicy: Never  
+      volumes:
+        - name: base-branch
+          hostPath:
+            path: /base-branch
+            type: Directory
+        - name: target-branch
+          hostPath:
+            path: /target-branch
+            type: Directory
+        - name: output
+          hostPath:
+            path: /output
+            type: Directory
+        - name: secrets
+          hostPath:
+            path: /secrets
+            type: Directory
+      containers:
+        - name: diff-preview
+          image: diff-image
+          imagePullPolicy: Never
+          env:
+            - name: TARGET_BRANCH
+              value: replace-me
+            - name: REPO
+              value: dag-andersen/argocd-diff-preview
+          volumeMounts:
+            - name: base-branch
+              mountPath: /base-branch
+            - name: target-branch
+              mountPath: /target-branch
+            - name: output
+              mountPath: /output
+            - name: secrets
+              mountPath: /secrets

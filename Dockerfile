@@ -17,11 +17,7 @@ RUN rm src/*.rs
 
 # copy your source tree
 COPY ./src ./src
-
-# install kind
 RUN apt-get update && apt-get install -y curl
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-${TARGETARCH}
-RUN chmod +x ./kind
 
 # install helm
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -44,7 +40,6 @@ FROM debian:bookworm-slim
 
 COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 
-COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
 COPY --from=build /argocd-diff-preview/kubectl /usr/local/bin/kubectl
 COPY --from=build /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
