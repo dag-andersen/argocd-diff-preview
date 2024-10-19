@@ -1,5 +1,4 @@
 use crate::{Operator, Selector};
-use glob_match::glob_match;
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Mapping;
@@ -229,80 +228,98 @@ fn get_applications(
 
     let number_of_apps_before_filtering = apps.len();
 
-    let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|r| { 
-            if r.yaml["metadata"]["annotations"][ANNOTATION_IGNORE].as_str()
-                == Some("true")
-            {
+    let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|a| {
+
+        // check if the application should be ignored
+        if a.yaml["metadata"]["annotations"][ANNOTATION_IGNORE].as_str()
+            == Some("true")
+        {
+            debug!(
+                "Ignoring application {:?} due to '{}=true' in file: {}",
+                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                ANNOTATION_IGNORE,
+                a.file_name
+            );
+            return None;
+        }
+
+        // loop over labels and check if the selector matches
+        if let Some(selector) = selector {
+            let labels: Vec<(&str, &str)> = {
+                match a.yaml["metadata"]["labels"].as_mapping() {
+                    Some(m) => m.iter()
+                        .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
+                        .collect(),
+                    None => Vec::new(),
+                }
+            };
+            let selected = selector.iter().all(|l| match l.operator {
+                Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
+                Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
+            });
+            if !selected {
                 debug!(
-                    "Ignoring application {:?} due to '{}=true' in file: {}",
-                    r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    ANNOTATION_IGNORE,
-                    r.file_name
+                    "Ignoring application {:?} due to selector mismatch in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+                return None;
+            } else {
+                debug!(
+                    "Selected application {:?} due to selector match in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+            }
+        }
+
+        // 
+        let pattern: Option<Result<Regex, regex::Error>> = a.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str().map(Regex::new);
+        match (files_changed, pattern) {
+            (None, _) => {}
+            (Some(files_changed), _) if files_changed.contains(&a.file_name) => {
+                debug!(
+                    "Selected application {:?} due to file change in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+            }
+            (Some(files_changed), Some(Ok(pattern))) if !files_changed.iter().any(|f| pattern.is_match(f)) => {
+                debug!(
+                    "Ignoring application {:?} due to regex pattern '{}' not matching changed files",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern
+                );
+                return None;
+            },
+            (_, Some(Ok(pattern))) => {
+                debug!(
+                    "Selected application {:?} due to regex pattern '{}' matching changed files",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern
+                );
+            }
+            (_, Some(Err(e))) => {
+                debug!(
+                    "Ignoring application {:?} due to invalid regex pattern in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+                debug!("Error: {}", e);
+                return None;
+            }
+            (_, None) => {
+                debug!(
+                    "Ignoring application {:?} due to missing 'argocd-diff-preview/watch-pattern' in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
                 );
                 return None;
             }
+        }
 
-            // loop over labels and check if the selector matches
-            if let Some(selector) = selector {
-                let labels: Vec<(&str, &str)> = {
-                    match r.yaml["metadata"]["labels"].as_mapping() {
-                        Some(m) => m.iter()
-                            .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
-                            .collect(),
-                        None => Vec::new(),
-                    }
-                };
-                let selected = selector.iter().all(|l| match l.operator {
-                    Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
-                    Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
-                });
-                if !selected {
-                    debug!(
-                        "Ignoring application {:?} due to selector mismatch in file: {}",
-                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                        r.file_name
-                    );
-                    return None;
-                } else {
-                    debug!(
-                        "Selected application {:?} due to selector match in file: {}",
-                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                        r.file_name
-                    );
-                }
-            }
-
-            match (files_changed, r.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str()) {
-                (Some(files_changed), Some(pattern)) => {
-                    if !files_changed.iter().any(|f| glob_match(pattern, f)) {
-                        debug!(
-                            "Ignoring application {:?} due to glob pattern '{}' not matching changed files",
-                            r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                            pattern
-                        );
-                        return None;
-                    } else {
-                        debug!(
-                            "Selected application {:?} due to glob pattern '{}' matching changed files",
-                            r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                            pattern
-                        );
-                    }
-                }
-                (Some(_), None) => {
-                    debug!(
-                        "Ignoring application {:?} due to missing 'argocd-diff-preview/watch-pattern' in file: {}",
-                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                        r.file_name
-                    );
-                    return None;
-                }
-                _ => (),
-            }
-
-            Some(r)
-        })
-        .collect();
+        Some(a)
+    }).collect();
 
     if number_of_apps_before_filtering != filtered_apps.len() {
         info!(
