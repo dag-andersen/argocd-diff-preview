@@ -1,6 +1,8 @@
+use crate::utils::check_if_folder_exists;
 use crate::utils::run_command;
 use crate::Branch;
 use log::{debug, info};
+use regex::Regex;
 use std::fs;
 use std::{error::Error, process::Output};
 
@@ -130,4 +132,65 @@ fn print_diff(summary: &str, diff: &str) -> String {
         .replace("%diff%", diff)
         .trim_start()
         .to_string()
+}
+
+fn folder_is_git_repo(branch: &Branch) -> bool {
+    check_if_folder_exists(&format!("{}/.git", branch.folder()))
+}
+
+pub async fn get_repo_name(branch: Branch) -> Option<String> {
+    if !folder_is_git_repo(&branch) {
+        debug!("Folder {} does not contain a .git folder", branch.folder());
+        return None;
+    }
+
+    let repo_name = match run_command("git remote get-url origin", Some(branch.folder())).await {
+        Ok(o) => o.stdout,
+        Err(e) => {
+            debug!(
+                "Error getting repo name for {}: {}",
+                branch,
+                String::from_utf8_lossy(&e.stderr)
+            );
+            return None;
+        }
+    };
+
+    let repo_name = String::from_utf8_lossy(&repo_name);
+
+    debug!("Repo name: {} for branch: {}", repo_name, branch);
+
+    let repo_url_regex: Regex = Regex::new(r"[:/](?P<repo>[^/]+/[^/]+)(\.git)?$").unwrap();
+
+    match repo_url_regex.captures(repo_name.as_ref()) {
+        Some(capture) => {
+            let repo_name = capture.name("repo").unwrap().as_str();
+            Some(repo_name.trim().to_string())
+        }
+        None => {
+            debug!("Failed to capture repo name from: {}", repo_name);
+            None
+        }
+    }
+}
+
+pub async fn get_branch_name(branch: Branch) -> Option<String> {
+    if !folder_is_git_repo(&branch) {
+        return None;
+    }
+
+    let branch_name =
+        match run_command("git rev-parse --abbrev-ref HEAD", Some(branch.folder())).await {
+            Ok(o) => o.stdout,
+            Err(e) => {
+                debug!(
+                    "Error getting branch name for {}: {}",
+                    branch,
+                    String::from_utf8_lossy(&e.stderr)
+                );
+                return None;
+            }
+        };
+
+    Some(String::from_utf8_lossy(&branch_name).trim().to_string())
 }

@@ -1,12 +1,12 @@
-name: Generate Diff
+name: Generate Diff Tool Change
 
 on:
   pull_request:
     branches:
       - "main"
     paths:
-      - ".github/workflows/generate-diff.yml"
-      - "examples/**"
+      - "src/**"
+      - Cargo.toml
 
 jobs:
   build:
@@ -25,17 +25,21 @@ jobs:
           ref: main
           path: main
 
+      - name: Print Dirs
+        run: |
+          ls -la pull-request
+          ls -la main
+
       - name: Generate Diff
         run: |
+          docker build pull-request -f pull-request/Dockerfile_AMD64 -t image
           docker run \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            -e TARGET_BRANCH=${{ github.head_ref }} \
-            -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.19
+            image --debug
 
       - name: Post diff as comment
         run: |
