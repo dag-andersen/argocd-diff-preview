@@ -103,7 +103,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         let mut password_encoded: Option<Output> = None;
         let mut counter = 0;
         while password_encoded.is_none() {
-            password_encoded = match run_command(&command, None).await {
+            password_encoded = match run_command(command, None).await {
                 Ok(a) => Some(a),
                 Err(e) => {
                     if counter == 5 {
@@ -121,10 +121,8 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         let password_decoded = BASE64_STANDARD
             .decode(password_encoded)
             .expect("failed to decode password");
-        let password =
-            String::from_utf8(password_decoded).expect("failed to convert password to string");
 
-        password
+        String::from_utf8(password_decoded).expect("failed to convert password to string")
     };
 
     // sleep for 5 seconds

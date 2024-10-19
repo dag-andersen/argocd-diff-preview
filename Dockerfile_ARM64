@@ -52,5 +52,8 @@ RUN apt-get update && apt-get install -y git
 # copy argocd helm chart values
 COPY ./argocd-config ./argocd-config
 
+RUN git config --global --add safe.directory /base-branch
+RUN git config --global --add safe.directory /target-branch
+
 # set the startup command to run your binary
 ENTRYPOINT ["./argocd-diff-preview"]
