@@ -392,7 +392,7 @@ fn apply_manifest(file_name: &str) -> Result<Output, Output> {
         .arg("-f")
         .arg(file_name)
         .output()
-        .expect(format!("failed to apply manifest: {}", file_name).as_str());
+        .unwrap_or_else(|_| panic!("failed to apply manifest: {}", file_name));
     match output.status.success() {
         true => Ok(output),
         false => Err(output),

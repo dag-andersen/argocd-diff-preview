@@ -32,7 +32,7 @@ pub async fn run_command_from_list(
         )
         .current_dir(current_dir.unwrap_or("."))
         .output()
-        .expect(format!("Failed to execute command: {}", command.join(" ")).as_str());
+        .unwrap_or_else(|_| panic!("Failed to execute command: {}", command.join(" ")));
 
     if !output.status.success() {
         return Err(output);
@@ -49,5 +49,5 @@ pub fn spawn_command(command: &str, current_dir: Option<&str>) {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .expect(format!("Failed to execute command: {}", command).as_str());
+        .unwrap_or_else(|_| panic!("Failed to execute command: {}", command));
 }

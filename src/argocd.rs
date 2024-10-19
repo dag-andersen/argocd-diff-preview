@@ -119,10 +119,8 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         let password_decoded = BASE64_STANDARD
             .decode(password_encoded)
             .expect("failed to decode password");
-        let password =
-            String::from_utf8(password_decoded).expect("failed to convert password to string");
 
-        password
+        String::from_utf8(password_decoded).expect("failed to convert password to string")
     };
 
     // sleep for 5 seconds
