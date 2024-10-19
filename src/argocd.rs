@@ -60,8 +60,6 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         }
     }
 
-    info!("🦑 Installing Argo CD Helm Chart");
-
     let helm_install_command = format!(
         "helm install argocd argo/argo-cd -n argocd {} {} {}",
         values.unwrap_or_default(),

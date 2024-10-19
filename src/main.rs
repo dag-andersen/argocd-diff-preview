@@ -181,7 +181,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let max_diff_length = opt.max_diff_length;
     let files_changed: Option<Vec<String>> = opt
         .files_changed
-        .map(|a| a.split(' ').map(|s| s.to_string()).collect());
+        .filter(|f| !f.trim().is_empty())
+        .map(|a| a.trim().split(' ').map(|s| s.to_string()).collect());
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {

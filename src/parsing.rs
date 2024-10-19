@@ -1,4 +1,5 @@
 use crate::{Operator, Selector};
+use glob_match::glob_match;
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Mapping;
@@ -30,7 +31,7 @@ pub async fn get_applications_as_string(
 ) -> Result<String, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
     let k8s_resources = parse_yaml(yaml_files).await;
-    let applications = get_applications(k8s_resources, selector);
+    let applications = get_applications(k8s_resources, selector, files_changed);
     let output = patch_applications(applications, branch, repo).await?;
     Ok(output)
 }
@@ -70,7 +71,7 @@ async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
 async fn parse_yaml(files: Vec<String>) -> Vec<K8sResource> {
     files.iter()
         .flat_map(|f| {
-            debug!("Found file: {}", f);
+            debug!("Found yaml file: {}", f);
             let file = std::fs::File::open(f).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
@@ -202,10 +203,9 @@ fn get_applications(
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
 ) -> Vec<Application> {
-    k8s_resources
+    let apps: Vec<Application> = k8s_resources
         .into_iter()
         .filter_map(|r| {
-            debug!("Processing file: {}", r.file_name);
             let kind =
                 r.yaml["kind"]
                     .as_str()
@@ -216,6 +216,17 @@ fn get_applications(
                         _ => None,
                     })?;
 
+            Some(Application {
+                kind,
+                file_name: r.file_name,
+                yaml: r.yaml,
+            })
+        })
+        .collect();
+
+    let number_of_apps_before_filtering = apps.len();
+
+    let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|r| { 
             if r.yaml["metadata"]["annotations"]["argocd-diff-preview/ignore"].as_str()
                 == Some("true")
             {
@@ -259,15 +270,19 @@ fn get_applications(
 
             match (files_changed, r.yaml["metadata"]["annotations"]["argocd-diff-preview/watch-pattern"].as_str()) {
                 (Some(files_changed), Some(pattern)) => {
-                    if let Ok(re) = Regex::new(pattern.trim()) {
-                        if !files_changed.iter().any(|f| re.is_match(f)) {
-                            debug!(
-                                "Ignoring application {:?} due to file not being in changed files in file: {}",
-                                r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                                r.file_name
-                            );
-                            return None;
-                        }
+                    if !files_changed.iter().any(|f| glob_match(pattern, f)) {
+                        debug!(
+                            "Ignoring application {:?} due to glob pattern '{}' not matching changed files",
+                            r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                            pattern
+                        );
+                        return None;
+                    } else {
+                        debug!(
+                            "Selected application {:?} due to glob pattern '{}' matching changed files",
+                            r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                            pattern
+                        );
                     }
                 }
                 (Some(_), None) => {
@@ -278,14 +293,25 @@ fn get_applications(
                     );
                     return None;
                 }
-                _ => {}
+                _ => (),
             }
 
-            Some(Application {
-                kind,
-                file_name: r.file_name,
-                yaml: r.yaml,
-            })
+            Some(r)
         })
-        .collect()
+        .collect();
+
+    if number_of_apps_before_filtering != filtered_apps.len() {
+        info!(
+            "🤖 Found {} applications before filtering",
+            number_of_apps_before_filtering
+        );
+        info!(
+            "🤖 Found {} applications after filtering",
+            filtered_apps.len()
+        );
+    } else {
+        info!("🤖 Found {} applications", number_of_apps_before_filtering);
+    }
+
+    filtered_apps
 }
