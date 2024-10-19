@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: my-app
   namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/**"
 spec:
   project: default
   destination:
