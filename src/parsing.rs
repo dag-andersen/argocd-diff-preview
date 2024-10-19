@@ -1,4 +1,5 @@
 use crate::{Operator, Selector};
+use glob_match::glob_match;
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Mapping;
@@ -20,16 +21,20 @@ enum ApplicationKind {
     ApplicationSet,
 }
 
+const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
+const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
+
 pub async fn get_applications_as_string(
     directory: &str,
     branch: &str,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
     repo: &str,
 ) -> Result<String, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
     let k8s_resources = parse_yaml(yaml_files).await;
-    let applications = get_applications(k8s_resources, selector);
+    let applications = get_applications(k8s_resources, selector, files_changed);
     let output = patch_applications(applications, branch, repo).await?;
     Ok(output)
 }
@@ -69,7 +74,7 @@ async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
 async fn parse_yaml(files: Vec<String>) -> Vec<K8sResource> {
     files.iter()
         .flat_map(|f| {
-            debug!("Found file: {}", f);
+            debug!("Found yaml file: {}", f);
             let file = std::fs::File::open(f).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
@@ -199,11 +204,11 @@ async fn patch_applications(
 fn get_applications(
     k8s_resources: Vec<K8sResource>,
     selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
 ) -> Vec<Application> {
-    k8s_resources
+    let apps: Vec<Application> = k8s_resources
         .into_iter()
         .filter_map(|r| {
-            debug!("Processing file: {}", r.file_name);
             let kind =
                 r.yaml["kind"]
                     .as_str()
@@ -214,12 +219,24 @@ fn get_applications(
                         _ => None,
                     })?;
 
-            if r.yaml["metadata"]["annotations"]["argocd-diff-preview/ignore"].as_str()
+            Some(Application {
+                kind,
+                file_name: r.file_name,
+                yaml: r.yaml,
+            })
+        })
+        .collect();
+
+    let number_of_apps_before_filtering = apps.len();
+
+    let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|r| { 
+            if r.yaml["metadata"]["annotations"][ANNOTATION_IGNORE].as_str()
                 == Some("true")
             {
                 debug!(
-                    "Ignoring application {:?} due to 'argocd-diff-preview/ignore=true' in file: {}",
+                    "Ignoring application {:?} due to '{}=true' in file: {}",
                     r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    ANNOTATION_IGNORE,
                     r.file_name
                 );
                 return None;
@@ -255,11 +272,50 @@ fn get_applications(
                 }
             }
 
-            Some(Application {
-                kind,
-                file_name: r.file_name,
-                yaml: r.yaml,
-            })
+            match (files_changed, r.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str()) {
+                (Some(files_changed), Some(pattern)) => {
+                    if !files_changed.iter().any(|f| glob_match(pattern, f)) {
+                        debug!(
+                            "Ignoring application {:?} due to glob pattern '{}' not matching changed files",
+                            r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                            pattern
+                        );
+                        return None;
+                    } else {
+                        debug!(
+                            "Selected application {:?} due to glob pattern '{}' matching changed files",
+                            r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                            pattern
+                        );
+                    }
+                }
+                (Some(_), None) => {
+                    debug!(
+                        "Ignoring application {:?} due to missing 'argocd-diff-preview/watch-pattern' in file: {}",
+                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        r.file_name
+                    );
+                    return None;
+                }
+                _ => (),
+            }
+
+            Some(r)
         })
-        .collect()
+        .collect();
+
+    if number_of_apps_before_filtering != filtered_apps.len() {
+        info!(
+            "🤖 Found {} applications before filtering",
+            number_of_apps_before_filtering
+        );
+        info!(
+            "🤖 Found {} applications after filtering",
+            filtered_apps.len()
+        );
+    } else {
+        info!("🤖 Found {} applications", number_of_apps_before_filtering);
+    }
+
+    filtered_apps
 }

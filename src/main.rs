@@ -75,9 +75,14 @@ struct Opt {
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
+
     /// Label selector to filter on, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2).
     #[structopt(long, short = "l", env)]
     selector: Option<String>,
+
+    /// List of files changed between the two branches
+    #[structopt(long, env)]
+    files_changed: Option<String>,
 }
 
 #[derive(Debug)]
@@ -174,6 +179,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .as_deref()
         .filter(|f| !f.trim().is_empty());
     let max_diff_length = opt.max_diff_length;
+    let files_changed: Option<Vec<String>> = opt
+        .files_changed
+        .filter(|f| !f.trim().is_empty())
+        .map(|a| a.trim().split(' ').map(|s| s.to_string()).collect());
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -215,6 +224,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     if let Some(a) = max_diff_length {
         info!("✨ - max-diff-length: {}", a);
+    }
+    if let Some(a) = files_changed.clone() {
+        info!("✨ - files-changed: {:?}", a);
     }
 
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
@@ -295,7 +307,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
-    
+
     argocd::install_argo_cd(argocd::ArgoCDOptions {
         version: argocd_version,
         debug: opt.debug,
@@ -319,6 +331,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &base_branch_name,
         &file_regex,
         &selector,
+        &files_changed,
         repo,
     )
     .await?;
@@ -327,6 +340,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &target_branch_name,
         &file_regex,
         &selector,
+        &files_changed,
         repo,
     )
     .await?;
@@ -378,7 +392,7 @@ fn apply_manifest(file_name: &str) -> Result<Output, Output> {
         .arg("-f")
         .arg(file_name)
         .output()
-        .expect(format!("failed to apply manifest: {}", file_name).as_str());
+        .unwrap_or_else(|_| panic!("failed to apply manifest: {}", file_name));
     match output.status.success() {
         true => Ok(output),
         false => Err(output),
