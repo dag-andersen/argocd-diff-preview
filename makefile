@@ -16,10 +16,10 @@ local-test-cargo: pull-repostory
 		--repo $(github_org)/$(gitops_repo) \
 		--debug  \
 		-r "$(regex)" \
-		--diff-ignore "$(diff-ignore)" \
+		--diff-ignore "$(diff_ignore)" \
 		--timeout $(timeout) \
 		-l "$(selector)" \
-		--files-changed="$(files-changed)"
+		--files-changed="$(files_changed)"
 
 local-test-docker: pull-repostory
 	docker build . -f $(docker_file) -t image
@@ -35,6 +35,8 @@ local-test-docker: pull-repostory
 		-e TARGET_BRANCH=$(target_branch) \
 		-e REPO=$(github_org)/$(gitops_repo) \
 		-e FILE_REGEX="$(regex)" \
-		-e DIFF_IGNORE="$(diff-ignore)" \
+		-e DIFF_IGNORE="$(diff_ignore)" \
 		-e TIMEOUT=$(timeout) \
+		-e SELECTOR="$(selector)" \
+		-e FILES_CHANGED="$(files_changed)" \
 		image

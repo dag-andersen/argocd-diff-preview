@@ -9,10 +9,17 @@ struct K8sResource {
     yaml: serde_yaml::Value,
 }
 
-struct Application {
+pub struct Application {
     file_name: String,
     yaml: serde_yaml::Value,
     kind: ApplicationKind,
+}
+
+// display trait application 
+impl std::fmt::Display for Application {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
+    }
 }
 
 enum ApplicationKind {
@@ -23,19 +30,21 @@ enum ApplicationKind {
 const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
 const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
 
-pub async fn get_applications_as_string(
+pub async fn get_applications(
     directory: &str,
     branch: &str,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
     repo: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Vec<Application>, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
     let k8s_resources = parse_yaml(yaml_files).await;
-    let applications = get_applications(k8s_resources, selector, files_changed);
-    let output = patch_applications(applications, branch, repo).await?;
-    Ok(output)
+    let applications = from_resource_to_application(k8s_resources, selector, files_changed);
+    if !applications.is_empty() {
+        return Ok(patch_applications(applications, branch, repo).await?);
+    }
+    Ok(applications)
 }
 
 async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
@@ -110,7 +119,7 @@ async fn patch_applications(
     applications: Vec<Application>,
     branch: &str,
     repo: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Vec<Application>, Box<dyn Error>> {
     info!("🤖 Patching applications for branch: {}", branch);
 
     let point_destination_to_in_cluster = |spec: &mut Mapping| {
@@ -190,17 +199,10 @@ async fn patch_applications(
         branch
     );
 
-    // convert back to yaml string
-    let mut output = String::new();
-    for r in applications {
-        output.push_str(&serde_yaml::to_string(&r.yaml)?);
-        output.push_str("---\n");
-    }
-
-    Ok(output)
+    Ok(applications)
 }
 
-fn get_applications(
+fn from_resource_to_application(
     k8s_resources: Vec<K8sResource>,
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
@@ -335,4 +337,8 @@ fn get_applications(
     }
 
     filtered_apps
+}
+
+pub fn applications_to_string(applications: Vec<Application>) -> String {
+    applications.iter().map(|a| a.to_string()).collect::<Vec<String>>().join("---\n")
 }

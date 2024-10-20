@@ -1,5 +1,6 @@
 use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
 use log::{debug, error, info};
+use parsing::applications_to_string;
 use regex::Regex;
 use std::fs;
 use std::path::PathBuf;
@@ -11,6 +12,7 @@ use std::{
 use structopt::StructOpt;
 mod argocd;
 mod diff;
+mod no_apps_found;
 mod extract;
 mod kind;
 mod minikube;
@@ -80,7 +82,7 @@ struct Opt {
     #[structopt(long, short = "l", env)]
     selector: Option<String>,
 
-    /// List of files changed between the two branches
+    /// List of files changed between the two branches. Input must be a comma or space separated string. When provided, only Applications watching these files will be rendered.
     #[structopt(long, env)]
     files_changed: Option<String>,
 }
@@ -181,8 +183,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let max_diff_length = opt.max_diff_length;
     let files_changed: Option<Vec<String>> = opt
         .files_changed
-        .filter(|f| !f.trim().is_empty())
-        .map(|a| a.trim().split(' ').map(|s| s.to_string()).collect());
+        .map(|f| f.trim().to_string())
+        .filter(|f| !f.is_empty())
+        .map(|f| {
+            (if f.contains(',') {
+                f.split(',')
+            } else {
+                f.split(' ')
+            })
+            .map(|s| s.trim().to_string())
+            .collect()
+        });
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -303,6 +314,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cluster_name = CLUSTER_NAME;
 
+    // remove .git from repo
+    let repo = repo.trim_end_matches(".git");
+    let base_apps = parsing::get_applications(
+        BASE_BRANCH_FOLDER,
+        &base_branch_name,
+        &file_regex,
+        &selector,
+        &files_changed,
+        repo,
+    )
+    .await?;
+
+    let target_apps = parsing::get_applications(
+        TARGET_BRANCH_FOLDER,
+        &target_branch_name,
+        &file_regex,
+        &selector,
+        &files_changed,
+        repo,
+    )
+    .await?;
+
+    let found_base_apps = !base_apps.is_empty();
+    let found_target_apps = !target_apps.is_empty();
+
+    if !found_base_apps && !found_target_apps {
+        info!("👀 Nothing to compare");
+        info!("👀 If this doesn't seem right, try running the tool with '--debug' to get more details about what is happening");
+        no_apps_found::write_message(output_folder, &selector, &files_changed).await?;
+        info!("🎉 Done in {} seconds", start.elapsed().as_secs());
+        return Ok(());
+    }
+
     match tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
@@ -324,38 +368,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // remove .git from repo
-    let repo = repo.trim_end_matches(".git");
-    let base_apps = parsing::get_applications_as_string(
-        BASE_BRANCH_FOLDER,
-        &base_branch_name,
-        &file_regex,
-        &selector,
-        &files_changed,
-        repo,
-    )
-    .await?;
-    let target_apps = parsing::get_applications_as_string(
-        TARGET_BRANCH_FOLDER,
-        &target_branch_name,
-        &file_regex,
-        &selector,
-        &files_changed,
-        repo,
-    )
-    .await?;
+    fs::write(apps_file(&Branch::Base), applications_to_string(base_apps))?;
+    fs::write(apps_file(&Branch::Target), applications_to_string(target_apps))?;
 
-    fs::write(apps_file(&Branch::Base), base_apps)?;
-    fs::write(apps_file(&Branch::Target), &target_apps)?;
-
-    // Cleanup
+    // Cleanup output folder
     clean_output_folder(output_folder);
 
-    extract::get_resources(&Branch::Base, timeout, output_folder).await?;
-    extract::delete_applications().await;
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+    // Extract resources from Argo CD
+    if found_base_apps {
+        extract::get_resources(&Branch::Base, timeout, output_folder).await?;
+        if found_target_apps {
+            extract::delete_applications().await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
+    }
+    if found_target_apps {
+        extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+    }
 
+    // Delete cluster
     match tool {
         ClusterTool::Kind => kind::delete_cluster(&cluster_name),
         ClusterTool::Minikube => minikube::delete_cluster(),
