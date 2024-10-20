@@ -259,21 +259,21 @@ fn get_applications(
             });
             if !selected {
                 debug!(
-                    "Ignoring application {:?} due to selector mismatch in file: {}",
+                    "Ignoring application {:?} due to label selector mismatch in file: {}",
                     a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
                     a.file_name
                 );
                 return None;
             } else {
                 debug!(
-                    "Selected application {:?} due to selector match in file: {}",
+                    "Selected application {:?} due to label selector match in file: {}",
                     a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
                     a.file_name
                 );
             }
         }
 
-        // 
+        // Check watch pattern annotation
         let pattern: Option<Result<Regex, regex::Error>> = a.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str().map(Regex::new);
         match (files_changed, pattern) {
             (None, _) => {}

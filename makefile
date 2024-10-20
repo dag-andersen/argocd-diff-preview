@@ -11,7 +11,15 @@ pull-repostory:
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
 local-test-cargo: pull-repostory
-	cargo run -- -b "$(base_branch)" -t "$(target_branch)" --repo $(github_org)/$(gitops_repo) -r "$(regex)" --debug --diff-ignore "$(diff-ignore)" --timeout $(timeout) -l "$(selector)"
+	cargo run -- -b "$(base_branch)" \
+		-t "$(target_branch)" \
+		--repo $(github_org)/$(gitops_repo) \
+		--debug  \
+		-r "$(regex)" \
+		--diff-ignore "$(diff-ignore)" \
+		--timeout $(timeout) \
+		-l "$(selector)" \
+		--files-changed="$(files-changed)"
 
 local-test-docker: pull-repostory
 	docker build . -f $(docker_file) -t image

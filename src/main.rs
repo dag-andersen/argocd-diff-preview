@@ -230,7 +230,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
-    let selector = opt.selector.map(|s| {
+    let selector = opt.selector.filter(|s| !s.trim().is_empty()).map(|s| {
         let labels: Vec<Selector> = s
             .split(",")
             .filter(|l| !l.trim().is_empty())
