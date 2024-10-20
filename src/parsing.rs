@@ -15,7 +15,7 @@ pub struct Application {
     kind: ApplicationKind,
 }
 
-// display trait application 
+// display trait application
 impl std::fmt::Display for Application {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
@@ -30,6 +30,41 @@ enum ApplicationKind {
 const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
 const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
 
+pub struct GetApplicationOptions<'a> {
+    pub directory: &'a str,
+    pub branch: &'a str,
+}
+
+pub async fn get_applications_for_both_branches<'a>(
+    base_branch: GetApplicationOptions<'a>,
+    target_branch: GetApplicationOptions<'a>,
+    regex: &Option<Regex>,
+    selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
+    repo: &str,
+) -> Result<(Vec<Application>, Vec<Application>), Box<dyn Error>> {
+    let base_apps = get_applications(
+        base_branch.directory,
+        base_branch.branch,
+        regex,
+        selector,
+        files_changed,
+        repo,
+    )
+    .await?;
+    let target_apps = get_applications(
+        target_branch.directory,
+        target_branch.branch,
+        regex,
+        selector,
+        files_changed,
+        repo,
+    )
+    .await?;
+
+    Ok((base_apps, target_apps))
+}
+
 pub async fn get_applications(
     directory: &str,
     branch: &str,
@@ -42,7 +77,7 @@ pub async fn get_applications(
     let k8s_resources = parse_yaml(yaml_files).await;
     let applications = from_resource_to_application(k8s_resources, selector, files_changed);
     if !applications.is_empty() {
-        return Ok(patch_applications(applications, branch, repo).await?);
+        return patch_applications(applications, branch, repo).await;
     }
     Ok(applications)
 }
@@ -340,5 +375,9 @@ fn from_resource_to_application(
 }
 
 pub fn applications_to_string(applications: Vec<Application>) -> String {
-    applications.iter().map(|a| a.to_string()).collect::<Vec<String>>().join("---\n")
+    applications
+        .iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<String>>()
+        .join("---\n")
 }

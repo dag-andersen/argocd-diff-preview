@@ -1,6 +1,6 @@
 use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
 use log::{debug, error, info};
-use parsing::applications_to_string;
+use parsing::{applications_to_string, GetApplicationOptions};
 use regex::Regex;
 use std::fs;
 use std::path::PathBuf;
@@ -12,10 +12,10 @@ use std::{
 use structopt::StructOpt;
 mod argocd;
 mod diff;
-mod no_apps_found;
 mod extract;
 mod kind;
 mod minikube;
+mod no_apps_found;
 mod parsing;
 mod utils;
 
@@ -316,19 +316,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
-    let base_apps = parsing::get_applications(
-        BASE_BRANCH_FOLDER,
-        &base_branch_name,
-        &file_regex,
-        &selector,
-        &files_changed,
-        repo,
-    )
-    .await?;
-
-    let target_apps = parsing::get_applications(
-        TARGET_BRANCH_FOLDER,
-        &target_branch_name,
+    let (base_apps, target_apps) = parsing::get_applications_for_both_branches(
+        GetApplicationOptions {
+            directory: BASE_BRANCH_FOLDER,
+            branch: &base_branch_name,
+        },
+        GetApplicationOptions {
+            directory: TARGET_BRANCH_FOLDER,
+            branch: &target_branch_name,
+        },
         &file_regex,
         &selector,
         &files_changed,

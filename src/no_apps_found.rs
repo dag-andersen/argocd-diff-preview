@@ -23,7 +23,9 @@ pub async fn write_message(
         (Some(s), Some(f)) => {
             let message = format!(
                 "🔍 Found 0 Applications that matches '{}' and watches these files: '{}'",
-                selector_string(s), f.join(", "));
+                selector_string(s),
+                f.join(", ")
+            );
             print_diff(&message)
         }
         (Some(s), None) => {
