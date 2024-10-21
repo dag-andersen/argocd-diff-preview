@@ -1,5 +1,5 @@
 use crate::{Operator, Selector};
-use log::{debug, info};
+use log::{debug, info, warn};
 use regex::Regex;
 use serde_yaml::Mapping;
 use std::{error::Error, io::BufRead};
@@ -15,7 +15,6 @@ pub struct Application {
     kind: ApplicationKind,
 }
 
-// display trait application
 impl std::fmt::Display for Application {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
@@ -311,7 +310,8 @@ fn from_resource_to_application(
         }
 
         // Check watch pattern annotation
-        let pattern: Option<Result<Regex, regex::Error>> = a.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str().map(Regex::new);
+        let pattern_annotation = a.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str();
+        let pattern: Option<Result<Regex, regex::Error>> = pattern_annotation.map(Regex::new);
         match (files_changed, pattern) {
             (None, _) => {}
             (Some(files_changed), _) if files_changed.contains(&a.file_name) => {
@@ -321,7 +321,14 @@ fn from_resource_to_application(
                     a.file_name
                 );
             }
-            (Some(files_changed), Some(Ok(pattern))) if !files_changed.iter().any(|f| pattern.is_match(f)) => {
+            (Some(files_changed), Some(Ok(pattern))) if files_changed.iter().any(|f| pattern.is_match(f)) => {
+                debug!(
+                    "Selected application {:?} due to regex pattern '{}' matching changed files",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern
+                );
+            }
+            (_, Some(Ok(pattern))) => {
                 debug!(
                     "Ignoring application {:?} due to regex pattern '{}' not matching changed files",
                     a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
@@ -329,17 +336,11 @@ fn from_resource_to_application(
                 );
                 return None;
             },
-            (_, Some(Ok(pattern))) => {
-                debug!(
-                    "Selected application {:?} due to regex pattern '{}' matching changed files",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    pattern
-                );
-            }
             (_, Some(Err(e))) => {
-                debug!(
-                    "Ignoring application {:?} due to invalid regex pattern in file: {}",
+                warn!(
+                    "🚨 Ignoring application {:?} due to invalid regex pattern '{}' ({})",
                     a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern_annotation.unwrap(),
                     a.file_name
                 );
                 debug!("Error: {}", e);
@@ -347,8 +348,9 @@ fn from_resource_to_application(
             }
             (_, None) => {
                 debug!(
-                    "Ignoring application {:?} due to missing 'argocd-diff-preview/watch-pattern' in file: {}",
+                    "Ignoring application {:?} due to missing '{}' annotation ({})",
                     a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    &ANNOTATION_WATCH_PATTERN,
                     a.file_name
                 );
                 return None;

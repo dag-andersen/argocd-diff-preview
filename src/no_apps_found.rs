@@ -1,4 +1,3 @@
-use log::info;
 use std::error::Error;
 use std::fs;
 
@@ -11,47 +10,11 @@ pub async fn write_message(
     selector: &Option<Vec<Selector>>,
     changed_files: &Option<Vec<String>>,
 ) -> Result<(), Box<dyn Error>> {
+    let message = get_message(selector, changed_files);
 
-    let selector_string = |s: &Vec<Selector>| {
-        s.iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
-    };
-
-    let markdown = match (selector, changed_files) {
-        (Some(s), Some(f)) => {
-            let message = format!(
-                "🔍 Found 0 Applications that matches '{}' and watches these files: '{}'",
-                selector_string(s),
-                f.join(", ")
-            );
-            print_diff(&message)
-        }
-        (Some(s), None) => {
-            let message = format!(
-                "🔍 Found 0 Applications after selecting applications matching '{}'",
-                selector_string(s)
-            );
-            print_diff(&message)
-        }
-        (None, Some(f)) => {
-            let message = format!(
-                "🔍 Found 0 Applications that watched these files: '{}'",
-                f.join(", ")
-            );
-            print_diff(&message)
-        }
-        (None, None) => {
-            let message = "🔍 Found 0 Applications".to_string();
-            print_diff(&message)
-        }
-    };
-
+    let markdown = generate_markdown(&message);
     let markdown_path = format!("{}/diff.md", output_folder);
     fs::write(&markdown_path, markdown)?;
-
-    info!("🙏 Please check the {} file for differences", markdown_path);
 
     Ok(())
 }
@@ -62,9 +25,38 @@ const MARKDOWN_TEMPLATE: &str = r#"
 %message%
 "#;
 
-fn print_diff(message: &str) -> String {
+fn generate_markdown(message: &str) -> String {
     MARKDOWN_TEMPLATE
         .replace("%message%", message)
         .trim_start()
         .to_string()
+}
+
+pub fn get_message(
+    selector: &Option<Vec<Selector>>,
+    changed_files: &Option<Vec<String>>,
+) -> String {
+    let selector_string = |s: &Vec<Selector>| {
+        s.iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>()
+            .join(",")
+    };
+
+    match (selector, changed_files) {
+        (Some(s), Some(f)) => format!(
+            "Found no changed Applications that matched '{}' and watched these files: '{}'",
+            selector_string(s),
+            f.join("`, `")
+        ),
+        (Some(s), None) => format!(
+            "Found no changed Applications that matched '{}'",
+            selector_string(s)
+        ),
+        (None, Some(f)) => format!(
+            "Found no changed Applications that watched these files: '{}'",
+            f.join("`, `")
+        ),
+        (None, None) => "Found no Applications".to_string(),
+    }
 }
