@@ -1,5 +1,6 @@
 use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
 use log::{debug, error, info};
+use parsing::{applications_to_string, GetApplicationOptions};
 use regex::Regex;
 use std::fs;
 use std::path::PathBuf;
@@ -14,6 +15,7 @@ mod diff;
 mod extract;
 mod kind;
 mod minikube;
+mod no_apps_found;
 mod parsing;
 mod utils;
 
@@ -75,9 +77,14 @@ struct Opt {
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
     max_diff_length: Option<usize>,
+
     /// Label selector to filter on, supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2).
     #[structopt(long, short = "l", env)]
     selector: Option<String>,
+
+    /// List of files changed between the two branches. Input must be a comma or space separated string. When provided, only Applications watching these files will be rendered.
+    #[structopt(long, env)]
+    files_changed: Option<String>,
 }
 
 #[derive(Debug)]
@@ -174,6 +181,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .as_deref()
         .filter(|f| !f.trim().is_empty());
     let max_diff_length = opt.max_diff_length;
+    let files_changed: Option<Vec<String>> = opt
+        .files_changed
+        .map(|f| f.trim().to_string())
+        .filter(|f| !f.is_empty())
+        .map(|f| {
+            (if f.contains(',') {
+                f.split(',')
+            } else {
+                f.split(' ')
+            })
+            .map(|s| s.trim().to_string())
+            .collect()
+        });
 
     // select local cluster tool
     let tool = match opt.local_cluster_tool {
@@ -216,9 +236,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(a) = max_diff_length {
         info!("✨ - max-diff-length: {}", a);
     }
+    if let Some(a) = files_changed.clone() {
+        info!("✨ - files-changed: {:?}", a);
+    }
 
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
-    let selector = opt.selector.map(|s| {
+    let selector = opt.selector.filter(|s| !s.trim().is_empty()).map(|s| {
         let labels: Vec<Selector> = s
             .split(",")
             .filter(|l| !l.trim().is_empty())
@@ -291,11 +314,40 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cluster_name = CLUSTER_NAME;
 
+    // remove .git from repo
+    let repo = repo.trim_end_matches(".git");
+    let (base_apps, target_apps) = parsing::get_applications_for_both_branches(
+        GetApplicationOptions {
+            directory: BASE_BRANCH_FOLDER,
+            branch: &base_branch_name,
+        },
+        GetApplicationOptions {
+            directory: TARGET_BRANCH_FOLDER,
+            branch: &target_branch_name,
+        },
+        &file_regex,
+        &selector,
+        &files_changed,
+        repo,
+    )
+    .await?;
+
+    let found_base_apps = !base_apps.is_empty();
+    let found_target_apps = !target_apps.is_empty();
+
+    if !found_base_apps && !found_target_apps {
+        info!("👀 Nothing to compare");
+        info!("👀 If this doesn't seem right, try running the tool with '--debug' to get more details about what is happening");
+        no_apps_found::write_message(output_folder, &selector, &files_changed).await?;
+        info!("🎉 Done in {} seconds", start.elapsed().as_secs());
+        return Ok(());
+    }
+
     match tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
-    
+
     argocd::install_argo_cd(argocd::ArgoCDOptions {
         version: argocd_version,
         debug: opt.debug,
@@ -312,36 +364,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // remove .git from repo
-    let repo = repo.trim_end_matches(".git");
-    let base_apps = parsing::get_applications_as_string(
-        BASE_BRANCH_FOLDER,
-        &base_branch_name,
-        &file_regex,
-        &selector,
-        repo,
-    )
-    .await?;
-    let target_apps = parsing::get_applications_as_string(
-        TARGET_BRANCH_FOLDER,
-        &target_branch_name,
-        &file_regex,
-        &selector,
-        repo,
-    )
-    .await?;
+    fs::write(apps_file(&Branch::Base), applications_to_string(base_apps))?;
+    fs::write(apps_file(&Branch::Target), applications_to_string(target_apps))?;
 
-    fs::write(apps_file(&Branch::Base), base_apps)?;
-    fs::write(apps_file(&Branch::Target), &target_apps)?;
-
-    // Cleanup
+    // Cleanup output folder
     clean_output_folder(output_folder);
 
-    extract::get_resources(&Branch::Base, timeout, output_folder).await?;
-    extract::delete_applications().await;
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+    // Extract resources from Argo CD
+    if found_base_apps {
+        extract::get_resources(&Branch::Base, timeout, output_folder).await?;
+        if found_target_apps {
+            extract::delete_applications().await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
+    }
+    if found_target_apps {
+        extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+    }
 
+    // Delete cluster
     match tool {
         ClusterTool::Kind => kind::delete_cluster(&cluster_name),
         ClusterTool::Minikube => minikube::delete_cluster(),
@@ -378,7 +419,7 @@ fn apply_manifest(file_name: &str) -> Result<Output, Output> {
         .arg("-f")
         .arg(file_name)
         .output()
-        .expect(format!("failed to apply manifest: {}", file_name).as_str());
+        .unwrap_or_else(|_| panic!("failed to apply manifest: {}", file_name));
     match output.status.success() {
         true => Ok(output),
         false => Err(output),

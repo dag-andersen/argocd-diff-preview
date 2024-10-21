@@ -20,7 +20,10 @@ pub async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Out
     run_command_from_list(args, current_dir).await
 }
 
-pub async fn run_command_from_list(command: Vec<&str>, current_dir: Option<&str>) -> Result<Output, Output> {
+pub async fn run_command_from_list(
+    command: Vec<&str>,
+    current_dir: Option<&str>,
+) -> Result<Output, Output> {
     let output = Command::new(command[0])
         .args(&command[1..])
         .env(
@@ -29,7 +32,7 @@ pub async fn run_command_from_list(command: Vec<&str>, current_dir: Option<&str>
         )
         .current_dir(current_dir.unwrap_or("."))
         .output()
-        .expect(format!("Failed to execute command: {}", command.join(" ")).as_str());
+        .unwrap_or_else(|_| panic!("Failed to execute command: {}", command.join(" ")));
 
     if !output.status.success() {
         return Err(output);
@@ -46,5 +49,5 @@ pub fn spawn_command(command: &str, current_dir: Option<&str>) {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .expect(format!("Failed to execute command: {}", command).as_str());
+        .unwrap_or_else(|_| panic!("Failed to execute command: {}", command));
 }

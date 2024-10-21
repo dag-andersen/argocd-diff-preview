@@ -9,7 +9,7 @@ on:
       - "examples/**"
 
 jobs:
-  build:
+  render-diff:
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -34,7 +34,7 @@ pub async fn get_resources(
     timeout: u64,
     output_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
-    info!("🌚 Getting resources from {}", branch_type);
+    info!("🌚 Getting resources from {}-branch", branch_type);
 
     let app_file = apps_file(branch_type);
 
