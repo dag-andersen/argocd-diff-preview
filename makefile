@@ -10,7 +10,7 @@ pull-repostory:
 	cd base-branch   && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(base_branch)"   && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
-local-test-cargo: pull-repostory
+run-with-cargo: pull-repostory
 	cargo run -- -b "$(base_branch)" \
 		-t "$(target_branch)" \
 		--repo $(github_org)/$(gitops_repo) \
@@ -21,7 +21,7 @@ local-test-cargo: pull-repostory
 		-l "$(selector)" \
 		--files-changed="$(files_changed)"
 
-local-test-docker: pull-repostory
+run-with-docker: pull-repostory
 	docker build . -f $(docker_file) -t image
 	docker run \
 		--network=host \

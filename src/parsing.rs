@@ -6,11 +6,13 @@ use std::{error::Error, io::BufRead};
 
 struct K8sResource {
     file_name: String,
+    directory: String,
     yaml: serde_yaml::Value,
 }
 
 pub struct Application {
     file_name: String,
+    directory: String,
     yaml: serde_yaml::Value,
     kind: ApplicationKind,
 }
@@ -73,7 +75,7 @@ pub async fn get_applications(
     repo: &str,
 ) -> Result<Vec<Application>, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
-    let k8s_resources = parse_yaml(yaml_files).await;
+    let k8s_resources = parse_yaml(directory, yaml_files).await;
     let applications = from_resource_to_application(k8s_resources, selector, files_changed);
     if !applications.is_empty() {
         return patch_applications(applications, branch, repo).await;
@@ -97,27 +99,28 @@ async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
                 .map(|s| s == "yaml" || s == "yml")
                 .unwrap_or(false)
         })
-        .map(|e| format!("{}", e.path().display()))
+        .map(|e| format!("{}", e.path().iter().skip(1).collect::<std::path::PathBuf>().display()))
         .filter(|f| regex.is_none() || regex.as_ref().unwrap().is_match(f))
         .collect();
 
     match regex {
         Some(r) => debug!(
-            "🤖 Found {} yaml files matching regex: {}",
+            "🤖 Found {} yaml files in dir '{}' matching regex: {}",
             yaml_files.len(),
+            directory,
             r.as_str()
         ),
-        None => debug!("🤖 Found {} yaml files", yaml_files.len()),
+        None => debug!("🤖 Found {} yaml files in dir '{}'", yaml_files.len(), directory),
     }
 
     yaml_files
 }
 
-async fn parse_yaml(files: Vec<String>) -> Vec<K8sResource> {
+async fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
     files.iter()
         .flat_map(|f| {
-            debug!("Found yaml file: {}", f);
-            let file = std::fs::File::open(f).unwrap();
+            debug!("In {} found yaml file: {}", directory, f);
+            let file = std::fs::File::open(format!("{}/{}",directory,f)).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
 
@@ -140,6 +143,7 @@ async fn parse_yaml(files: Vec<String>) -> Vec<K8sResource> {
                     }
                 };
                 K8sResource {
+                    directory: directory.to_string(),
                     file_name: f.clone(),
                     yaml,
                 }
@@ -256,6 +260,7 @@ fn from_resource_to_application(
 
             Some(Application {
                 kind,
+                directory: r.directory,
                 file_name: r.file_name,
                 yaml: r.yaml,
             })
@@ -314,6 +319,7 @@ fn from_resource_to_application(
         let pattern: Option<Result<Regex, regex::Error>> = pattern_annotation.map(Regex::new);
         match (files_changed, pattern) {
             (None, _) => {}
+            // Check if the application changed.
             (Some(files_changed), _) if files_changed.contains(&a.file_name) => {
                 debug!(
                     "Selected application {:?} due to file change in file: {}",
@@ -321,6 +327,7 @@ fn from_resource_to_application(
                     a.file_name
                 );
             }
+            // Check if the application changed and the regex pattern matches.
             (Some(files_changed), Some(Ok(pattern))) if files_changed.iter().any(|f| pattern.is_match(f)) => {
                 debug!(
                     "Selected application {:?} due to regex pattern '{}' matching changed files",
