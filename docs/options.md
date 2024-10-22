@@ -30,6 +30,12 @@ OPTIONS:
                 Regex to filter files. Example: "/apps_.*\.yaml" 
                 [env: FILE_REGEX=]
 
+        --files-changed <files-changed>
+                List of files changed between the two branches.
+                Input must be a comma or space separated list of strings.
+                When provided, only Applications watching these files will be rendered
+                [env: FILES_CHANGED=]
+
     -c, --line-count <line-count>
                 Generate diffs with <n> lines above and below the highlighted 
                 changes in the diff. 

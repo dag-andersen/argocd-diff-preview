@@ -39,7 +39,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.19
+            dagandersen/argocd-diff-preview:v0.0.20
 
       - name: Post diff as comment
         run: |
@@ -53,7 +53,7 @@ jobs:
 
 In the simple code examples above, we do not provide the cluster with any credentials, which only works if the image/Helm Chart registry and the Git repository are public. Since your repository might not be public you need to provide the tool with the necessary read-access credentials for the repository. This can be done by placing the Argo CD repo secrets in folder mounted at `/secrets`. When the tool starts, it will simply run `kubectl apply -f /secrets` to apply every resource to the cluster, before starting the rendering process.
 
-```yaml title=".github/workflows/generate-diff.yml" linenums="19"
+```yaml title=".github/workflows/generate-diff.yml" linenums="19" hl_lines="7-22 32"
 ...
     - uses: actions/checkout@v4
       with:
@@ -88,7 +88,7 @@ In the simple code examples above, we do not provide the cluster with any creden
           -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
           -e TARGET_BRANCH=${{ github.head_ref }} \
           -e REPO=${{ github.repository }} \
-          dagandersen/argocd-diff-preview:v0.0.19
+          dagandersen/argocd-diff-preview:v0.0.20
 ```
 
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)

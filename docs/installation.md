@@ -2,7 +2,7 @@
 
 === "Docker"
 
-    ## Pre-requisites:
+    ## Pre-requisites
 
     - Install: [Docker](https://docs.docker.com/get-docker/)
 
@@ -28,14 +28,14 @@
       -e TARGET_BRANCH=<branch-a> \
       -e BASE_BRANCH=<branch-b> \
       -e REPO=<owner>/<repo>  \
-      dagandersen/argocd-diff-preview:v0.0.19
+      dagandersen/argocd-diff-preview:v0.0.20
     ```
 
     If base-branch(`BASE_BRANCH`) is not specified it will default to `main`.
 
 === "Binary"
 
-    ## Pre-requisites:
+    ## Pre-requisites
 
     Install:
 
@@ -52,7 +52,7 @@
     *Example for downloading and running on macOS:*
 
     ```bash
-    curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.19/argocd-diff-preview-Darwin-x86_64.tar.gz
+    curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.20/argocd-diff-preview-Darwin-x86_64.tar.gz
     tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
     sudo mv argocd-diff-preview /usr/local/bin
     argocd-diff-preview --help
@@ -81,7 +81,7 @@
 
 === "Source"
 
-    ## Pre-requisites:
+    ## Pre-requisites
 
     Install:
 

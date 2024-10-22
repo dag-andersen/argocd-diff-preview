@@ -40,3 +40,10 @@ run-with-docker: pull-repostory
 		-e SELECTOR="$(selector)" \
 		-e FILES_CHANGED="$(files_changed)" \
 		image
+
+mkdocs:
+	pip install mkdocs-material \
+	&& python3 -m venv venv \
+	&& source venv/bin/activate \
+	&& open http://localhost:8000 \
+	&& mkdocs serve
