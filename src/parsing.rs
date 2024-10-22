@@ -1,5 +1,5 @@
 use crate::{Operator, Selector};
-use log::{debug, info};
+use log::{debug, info, warn};
 use regex::Regex;
 use serde_yaml::Mapping;
 use std::{error::Error, io::BufRead};
@@ -9,10 +9,16 @@ struct K8sResource {
     yaml: serde_yaml::Value,
 }
 
-struct Application {
+pub struct Application {
     file_name: String,
     yaml: serde_yaml::Value,
     kind: ApplicationKind,
+}
+
+impl std::fmt::Display for Application {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
+    }
 }
 
 enum ApplicationKind {
@@ -20,18 +26,59 @@ enum ApplicationKind {
     ApplicationSet,
 }
 
-pub async fn get_applications_as_string(
+const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
+const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
+
+pub struct GetApplicationOptions<'a> {
+    pub directory: &'a str,
+    pub branch: &'a str,
+}
+
+pub async fn get_applications_for_both_branches<'a>(
+    base_branch: GetApplicationOptions<'a>,
+    target_branch: GetApplicationOptions<'a>,
+    regex: &Option<Regex>,
+    selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
+    repo: &str,
+) -> Result<(Vec<Application>, Vec<Application>), Box<dyn Error>> {
+    let base_apps = get_applications(
+        base_branch.directory,
+        base_branch.branch,
+        regex,
+        selector,
+        files_changed,
+        repo,
+    )
+    .await?;
+    let target_apps = get_applications(
+        target_branch.directory,
+        target_branch.branch,
+        regex,
+        selector,
+        files_changed,
+        repo,
+    )
+    .await?;
+
+    Ok((base_apps, target_apps))
+}
+
+pub async fn get_applications(
     directory: &str,
     branch: &str,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
     repo: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Vec<Application>, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
-    let k8s_resources = parse_yaml(yaml_files).await;
-    let applications = get_applications(k8s_resources, selector);
-    let output = patch_applications(applications, branch, repo).await?;
-    Ok(output)
+    let k8s_resources = parse_yaml(directory, yaml_files).await;
+    let applications = from_resource_to_application(k8s_resources, selector, files_changed);
+    if !applications.is_empty() {
+        return patch_applications(applications, branch, repo).await;
+    }
+    Ok(applications)
 }
 
 async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
@@ -50,27 +97,41 @@ async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
                 .map(|s| s == "yaml" || s == "yml")
                 .unwrap_or(false)
         })
-        .map(|e| format!("{}", e.path().display()))
+        .map(|e| {
+            format!(
+                "{}",
+                e.path()
+                    .iter()
+                    .skip(1)
+                    .collect::<std::path::PathBuf>()
+                    .display()
+            )
+        })
         .filter(|f| regex.is_none() || regex.as_ref().unwrap().is_match(f))
         .collect();
 
     match regex {
         Some(r) => debug!(
-            "🤖 Found {} yaml files matching regex: {}",
+            "🤖 Found {} yaml files in dir '{}' matching regex: {}",
             yaml_files.len(),
+            directory,
             r.as_str()
         ),
-        None => debug!("🤖 Found {} yaml files", yaml_files.len()),
+        None => debug!(
+            "🤖 Found {} yaml files in dir '{}'",
+            yaml_files.len(),
+            directory
+        ),
     }
 
     yaml_files
 }
 
-async fn parse_yaml(files: Vec<String>) -> Vec<K8sResource> {
+async fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
     files.iter()
         .flat_map(|f| {
-            debug!("Found file: {}", f);
-            let file = std::fs::File::open(f).unwrap();
+            debug!("In dir '{}' found yaml file: {}", directory, f);
+            let file = std::fs::File::open(format!("{}/{}",directory,f)).unwrap();
             let reader = std::io::BufReader::new(file);
             let lines = reader.lines().map(|l| l.unwrap());
 
@@ -106,7 +167,7 @@ async fn patch_applications(
     applications: Vec<Application>,
     branch: &str,
     repo: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Vec<Application>, Box<dyn Error>> {
     info!("🤖 Patching applications for branch: {}", branch);
 
     let point_destination_to_in_cluster = |spec: &mut Mapping| {
@@ -186,24 +247,17 @@ async fn patch_applications(
         branch
     );
 
-    // convert back to yaml string
-    let mut output = String::new();
-    for r in applications {
-        output.push_str(&serde_yaml::to_string(&r.yaml)?);
-        output.push_str("---\n");
-    }
-
-    Ok(output)
+    Ok(applications)
 }
 
-fn get_applications(
+fn from_resource_to_application(
     k8s_resources: Vec<K8sResource>,
     selector: &Option<Vec<Selector>>,
+    files_changed: &Option<Vec<String>>,
 ) -> Vec<Application> {
-    k8s_resources
+    let apps: Vec<Application> = k8s_resources
         .into_iter()
         .filter_map(|r| {
-            debug!("Processing file: {}", r.file_name);
             let kind =
                 r.yaml["kind"]
                     .as_str()
@@ -214,52 +268,157 @@ fn get_applications(
                         _ => None,
                     })?;
 
-            if r.yaml["metadata"]["annotations"]["argocd-diff-preview/ignore"].as_str()
-                == Some("true")
-            {
-                debug!(
-                    "Ignoring application {:?} due to 'argocd-diff-preview/ignore=true' in file: {}",
-                    r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    r.file_name
-                );
-                return None;
-            }
-
-            // loop over labels and check if the selector matches
-            if let Some(selector) = selector {
-                let labels: Vec<(&str, &str)> = {
-                    match r.yaml["metadata"]["labels"].as_mapping() {
-                        Some(m) => m.iter()
-                            .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
-                            .collect(),
-                        None => Vec::new(),
-                    }
-                };
-                let selected = selector.iter().all(|l| match l.operator {
-                    Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
-                    Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
-                });
-                if !selected {
-                    debug!(
-                        "Ignoring application {:?} due to selector mismatch in file: {}",
-                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                        r.file_name
-                    );
-                    return None;
-                } else {
-                    debug!(
-                        "Selected application {:?} due to selector match in file: {}",
-                        r.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                        r.file_name
-                    );
-                }
-            }
-
             Some(Application {
                 kind,
                 file_name: r.file_name,
                 yaml: r.yaml,
             })
         })
-        .collect()
+        .collect();
+
+    match (selector, files_changed) {
+        (Some(s), Some(f)) => info!(
+            "🤖 Will only run on Applications that match '{}' and watch these files: '{}'",
+            s.iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
+            f.join("`, `")
+        ),
+        (Some(s), None) => info!(
+            "🤖 Will only run on Applications that match '{}'",
+            s.iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        ),
+        (None, Some(f)) => info!(
+            "🤖 Will only run on Applications that watch these files: '{}'",
+            f.join("`, `")
+        ),
+        (None, None) => {},
+    }
+
+    let number_of_apps_before_filtering = apps.len();
+
+    let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|a| {
+
+        // check if the application should be ignored
+        if a.yaml["metadata"]["annotations"][ANNOTATION_IGNORE].as_str()
+            == Some("true")
+        {
+            debug!(
+                "Ignoring application {:?} due to '{}=true' in file: {}",
+                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                ANNOTATION_IGNORE,
+                a.file_name
+            );
+            return None;
+        }
+
+        // loop over labels and check if the selector matches
+        if let Some(selector) = selector {
+            let labels: Vec<(&str, &str)> = {
+                match a.yaml["metadata"]["labels"].as_mapping() {
+                    Some(m) => m.iter()
+                        .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
+                        .collect(),
+                    None => Vec::new(),
+                }
+            };
+            let selected = selector.iter().all(|l| match l.operator {
+                Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
+                Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
+            });
+            if !selected {
+                debug!(
+                    "Ignoring application {:?} due to label selector mismatch in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+                return None;
+            } else {
+                debug!(
+                    "Selected application {:?} due to label selector match in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+            }
+        }
+
+        // Check watch pattern annotation
+        let pattern_annotation = a.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str();
+        let pattern: Option<Result<Regex, regex::Error>> = pattern_annotation.map(Regex::new);
+        match (files_changed, pattern) {
+            (None, _) => {}
+            // Check if the application changed.
+            (Some(files_changed), _) if files_changed.contains(&a.file_name) => {
+                debug!(
+                    "Selected application {:?} due to file change in file: {}",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.file_name
+                );
+            }
+            // Check if the application changed and the regex pattern matches.
+            (Some(files_changed), Some(Ok(pattern))) if files_changed.iter().any(|f| pattern.is_match(f)) => {
+                debug!(
+                    "Selected application {:?} due to regex pattern '{}' matching changed files",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern
+                );
+            }
+            (_, Some(Ok(pattern))) => {
+                debug!(
+                    "Ignoring application {:?} due to regex pattern '{}' not matching changed files",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern
+                );
+                return None;
+            },
+            (_, Some(Err(e))) => {
+                warn!(
+                    "🚨 Ignoring application {:?} due to invalid regex pattern '{}' ({})",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    pattern_annotation.unwrap(),
+                    a.file_name
+                );
+                debug!("Error: {}", e);
+                return None;
+            }
+            (_, None) => {
+                debug!(
+                    "Ignoring application {:?} due to missing '{}' annotation ({})",
+                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    &ANNOTATION_WATCH_PATTERN,
+                    a.file_name
+                );
+                return None;
+            }
+        }
+
+        Some(a)
+    }).collect();
+
+    if number_of_apps_before_filtering != filtered_apps.len() {
+        info!(
+            "🤖 Found {} applications before filtering",
+            number_of_apps_before_filtering
+        );
+        info!(
+            "🤖 Found {} applications after filtering",
+            filtered_apps.len()
+        );
+    } else {
+        info!("🤖 Found {} applications", number_of_apps_before_filtering);
+    }
+
+    filtered_apps
+}
+
+pub fn applications_to_string(applications: Vec<Application>) -> String {
+    applications
+        .iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<String>>()
+        .join("---\n")
 }
