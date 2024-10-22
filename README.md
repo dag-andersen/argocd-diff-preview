@@ -102,7 +102,7 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: mainv
+          ref: main
           path: main
 
       - name: Generate Diff
