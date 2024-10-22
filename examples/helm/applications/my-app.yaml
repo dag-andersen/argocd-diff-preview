@@ -15,4 +15,4 @@ spec:
       repoURL: https://github.com/dag-andersen/argocd-diff-preview
       helm:
         valueFiles:
-          - $local-files/examples/helm/values/values.yaml
+          - $local-files/examples/helm/values/my-app.yaml
