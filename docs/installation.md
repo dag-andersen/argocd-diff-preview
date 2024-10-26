@@ -45,7 +45,7 @@
       - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/)
       - [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
 
-    ## Find the correct binary for your operating system
+    ## Download binary from GitHub releases
 
     Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/releases) and find the correct binary for your operating system.
 
@@ -55,6 +55,15 @@
     curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.20/argocd-diff-preview-Darwin-x86_64.tar.gz
     tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
     sudo mv argocd-diff-preview /usr/local/bin
+    argocd-diff-preview --help
+    ```
+
+    ## Install binary with [aquaproj/aqua](https://github.com/aquaproj/aqua)
+    `argocd-diff-preview` also supports installation by aqua. See [documentation](https://aquaproj.github.io/docs/install) for aqua setup instructions.
+
+    ```bash
+    aqua g -i dag-andersen/argocd-diff-preview
+    aqua i
     argocd-diff-preview --help
     ```
 
@@ -120,4 +129,3 @@
     ```
 
     If base-branch is not specified it will default to `main`.
-
