@@ -348,11 +348,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ClusterTool::Minikube => minikube::create_cluster().await?,
     }
 
-    argocd::install_argo_cd(argocd::ArgoCDOptions {
-        version: argocd_version,
-        debug: opt.debug,
-    })
-    .await?;
+    argocd::create_namespace().await?;
 
     create_folder_if_not_exists(secrets_folder);
     match apply_folder(secrets_folder) {
@@ -363,6 +359,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             panic!("error: {}", e)
         }
     }
+
+    argocd::install_argo_cd(argocd::ArgoCDOptions {
+        version: argocd_version,
+        debug: opt.debug,
+    })
+    .await?;
 
     fs::write(apps_file(&Branch::Base), applications_to_string(base_apps))?;
     fs::write(
