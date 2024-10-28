@@ -62,6 +62,7 @@
     `argocd-diff-preview` also supports installation by aqua. See [documentation](https://aquaproj.github.io/docs/install) for aqua setup instructions.
 
     ```bash
+    aqua init
     aqua g -i dag-andersen/argocd-diff-preview
     aqua i
     argocd-diff-preview --help
