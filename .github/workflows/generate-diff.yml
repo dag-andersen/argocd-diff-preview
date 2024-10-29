@@ -16,6 +16,10 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+      
       - uses: actions/checkout@v4
         with:
           path: pull-request
@@ -27,6 +31,7 @@ jobs:
 
       - name: Generate Diff
         run: |
+          docker build pull-request -f pull-request/Dockerfile_AMD64 -t image
           docker run \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
@@ -35,7 +40,8 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.25
+            -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}" \
+            image --debug
 
       - name: Post diff as comment
         run: |

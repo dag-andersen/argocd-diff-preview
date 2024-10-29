@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app-watch-pattern-broken-regex
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: 'examples/helm/values/filtered,\'
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  sources:
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      ref: local-files
+    - path: examples/helm/charts/myApp
+      repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      helm:
+        valueFiles:
+          - $local-files/examples/helm/values/filtered.yaml
+        valuesObject:
+          replicaCount: 5
