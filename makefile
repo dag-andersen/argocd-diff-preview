@@ -15,7 +15,6 @@ run-with-cargo: pull-repostory
 		-t "$(target_branch)" \
 		--repo $(github_org)/$(gitops_repo) \
 		--debug \
-		--ignore-invalid-watch-pattern \
 		-r "$(regex)" \
 		--diff-ignore "$(diff_ignore)" \
 		--timeout $(timeout) \
