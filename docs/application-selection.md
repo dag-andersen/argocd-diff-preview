@@ -21,8 +21,16 @@ metadata:
   name: my-app
   namespace: argocd
   annotations:
-    argocd-diff-preview/watch-pattern: "examples/.*" # Regex
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered"
 spec:
+  sources:
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      ref: local-files
+    - path: examples/helm/charts/myApp
+      repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      helm:
+        valueFiles:
+          - $local-files/examples/helm/values/filtered.yaml
   ...
 ```
 
@@ -70,7 +78,7 @@ jobs:
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
             -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
-            dagandersen/argocd-diff-preview:v0.0.21
+            dagandersen/argocd-diff-preview:v0.0.22
 ```
 
 ## Ignoring individual applications
