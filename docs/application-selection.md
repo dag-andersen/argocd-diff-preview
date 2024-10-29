@@ -21,7 +21,7 @@ metadata:
   name: my-app
   namespace: argocd
   annotations:
-    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered"
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered.yaml"
 spec:
   sources:
     - repoURL: https://github.com/dag-andersen/argocd-diff-preview
