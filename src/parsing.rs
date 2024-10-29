@@ -1,7 +1,7 @@
 use crate::{Operator, Selector};
 use log::{debug, error, info, warn};
 use regex::Regex;
-use serde_yaml::Mapping;
+use serde_yaml::{Mapping, Value};
 use std::{error::Error, io::BufRead};
 
 struct K8sResource {
@@ -13,11 +13,18 @@ pub struct Application {
     file_name: String,
     yaml: serde_yaml::Value,
     kind: ApplicationKind,
+    name: String,
 }
 
 impl std::fmt::Display for Application {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
+    }
+}
+
+impl PartialEq for Application {
+    fn eq(&self, other: &Self) -> bool {
+        self.yaml == other.yaml
     }
 }
 
@@ -64,7 +71,39 @@ pub async fn get_applications_for_both_branches<'a>(
     )
     .await?;
 
-    Ok((base_apps, target_apps))
+    let duplicate_yaml = base_apps
+        .iter()
+        .filter(|a| target_apps.iter().any(|b| a.name == b.name))
+        .filter(|a| {
+            target_apps.iter().any(|b| {
+                let equal = a.yaml == b.yaml;
+                if equal {
+                    debug!(
+                        "Skipping application '{}' because it has not changed",
+                        a.name
+                    )
+                }
+                equal
+            })
+        })
+        .map(|a| a.yaml.clone())
+        .collect::<Vec<Value>>();
+
+    if duplicate_yaml.is_empty() {
+        Ok((base_apps, target_apps))
+    } else {
+        // remove duplicates
+        let base_apps = base_apps
+            .into_iter()
+            .filter(|a| !duplicate_yaml.contains(&a.yaml))
+            .collect();
+        let target_apps = target_apps
+            .into_iter()
+            .filter(|a| !duplicate_yaml.contains(&a.yaml))
+            .collect();
+
+        Ok((base_apps, target_apps))
+    }
 }
 
 pub async fn get_applications(
@@ -243,8 +282,7 @@ async fn patch_applications(
             redirect_sources(spec, &a.file_name);
             debug!(
                 "Collected resources from application: {:?} in file: {}",
-                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                a.file_name
+                a.name, a.file_name
             );
             Some(a)
         })
@@ -278,9 +316,15 @@ fn from_resource_to_application(
                         _ => None,
                     })?;
 
+            let name = r.yaml["metadata"]["name"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string();
+
             Some(Application {
                 kind,
                 file_name: r.file_name,
+                name,
                 yaml: r.yaml,
             })
         })
@@ -319,7 +363,7 @@ fn from_resource_to_application(
         {
             debug!(
                 "Ignoring application {:?} due to '{}=true' in file: {}",
-                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                a.name,
                 ANNOTATION_IGNORE,
                 a.file_name
             );
@@ -343,14 +387,14 @@ fn from_resource_to_application(
             if !selected {
                 debug!(
                     "Ignoring application {:?} due to label selector mismatch in file: {}",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.name,
                     a.file_name
                 );
                 return None;
             } else {
                 debug!(
                     "Selected application {:?} due to label selector match in file: {}",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.name,
                     a.file_name
                 );
             }
@@ -365,13 +409,13 @@ fn from_resource_to_application(
             if let Some(p) = pattern_vec.iter().filter_map(|r| r.as_ref().err()).next() {
                 if ignore_invalid_watch_pattern {
                     warn!("🚨 Ignoring application {:?} due to invalid regex pattern in '{}' ({}) - Error: {}",
-                        a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        a.name,
                         pattern_annotation.unwrap_or("unknown"),
                         a.file_name,
                         p);
                 } else {
                     error!("🚨 Application {:?} has an invalid regex pattern in '{}' ({}) - Error: {}",
-                        a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                        a.name,
                         pattern_annotation.unwrap_or("unknown"),
                         a.file_name,
                         p);
@@ -388,7 +432,7 @@ fn from_resource_to_application(
             (Some(files_changed), _) if files_changed.contains(&a.file_name) => {
                 debug!(
                     "Selected application {:?} due to file change in file: {}",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.name,
                     a.file_name
                 );
             }
@@ -396,14 +440,14 @@ fn from_resource_to_application(
             (Some(files_changed), Some(pattern)) if files_changed.iter().any(|f| pattern.iter().any(|r| r.is_match(f))) => {
                 debug!(
                     "Selected application {:?} due to regex pattern '{}' matching changed files",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.name,
                     pattern.iter().map(|r| r.as_str()).collect::<Vec<&str>>().join(", "),
                 );
             }
             (_, Some(pattern)) => {
                 debug!(
                     "Ignoring application {:?} due to regex pattern '{}' not matching changed files",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.name,
                     pattern.iter().map(|r| r.as_str()).collect::<Vec<&str>>().join(", "),
                 );
                 return None;
@@ -411,7 +455,7 @@ fn from_resource_to_application(
             (_, None) => {
                 debug!(
                     "Ignoring application {:?} due to missing '{}' annotation ({})",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
+                    a.name,
                     &ANNOTATION_WATCH_PATTERN,
                     a.file_name
                 );
