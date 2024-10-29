@@ -85,6 +85,10 @@ struct Opt {
     /// List of files changed between the two branches. Input must be a comma or space separated string. When provided, only Applications watching these files will be rendered.
     #[structopt(long, env)]
     files_changed: Option<String>,
+
+    /// Ignore invalid watch pattern Regex on Applications. If flag is unset and an invalid Regex is found, the tool will exit with an error.
+    #[structopt(long)]
+    ignore_invalid_watch_pattern: bool,
 }
 
 #[derive(Debug)]
@@ -239,6 +243,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(a) = files_changed.clone() {
         info!("✨ - files-changed: {:?}", a);
     }
+    if opt.ignore_invalid_watch_pattern {
+        info!("✨ Ignoring invalid watch patterns Regex on Applications");
+    }
 
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
     let selector = opt.selector.filter(|s| !s.trim().is_empty()).map(|s| {
@@ -329,6 +336,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         &selector,
         &files_changed,
         repo,
+        opt.ignore_invalid_watch_pattern,
     )
     .await?;
 

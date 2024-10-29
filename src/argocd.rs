@@ -11,7 +11,6 @@ pub struct ArgoCDOptions<'a> {
 const CONFIG_PATH: &str = "argocd-config";
 
 pub async fn create_namespace() -> Result<(), Box<dyn Error>> {
-
     match run_command("kubectl create ns argocd", None).await {
         Ok(_) => (),
         Err(e) => {
