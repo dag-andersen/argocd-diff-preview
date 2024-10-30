@@ -6,10 +6,14 @@ USAGE:
 FLAGS:
     -d, --debug
                 Activate debug mode
+
         --ignore-invalid-watch-pattern
-                Ignore invalid watch pattern Regex on Applications. If flag is unset and an
+                Ignore invalid watch pattern Regex on Applications. If flag is unset
+                and an invalid Regex is found, the tool will exit with an error
+
     -h, --help
                 Prints help information
+
     -V, --version
                 Prints version information
 
