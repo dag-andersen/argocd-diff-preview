@@ -52,7 +52,6 @@ COPY --from=build /argocd-diff-preview/target/release/argocd-diff-preview .
 
 RUN apt-get update && \
     apt-get install -y git && \
-    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # copy argocd helm chart values
