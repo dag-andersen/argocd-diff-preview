@@ -29,6 +29,10 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-      - name: Build and push # tag with git tag
-        run: |
-          docker buildx build --platform=linux/amd64 -f ./Dockerfile_AMD64 .
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/${{ matrix.platform }}
+          tags: test-${{ matrix.platform }}
