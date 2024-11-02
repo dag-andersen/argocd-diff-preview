@@ -1,7 +1,7 @@
 gitops_repo ?= argocd-diff-preview
 github_org ?= dag-andersen
 base_branch := main
-docker_file := Dockerfile_ARM64
+docker_file := Dockerfile
 timeout := 120
 
 pull-repostory:
