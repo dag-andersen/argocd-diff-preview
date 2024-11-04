@@ -17,6 +17,7 @@ mod kind;
 mod minikube;
 mod no_apps_found;
 mod parsing;
+mod filter_apps;
 mod utils;
 
 #[derive(Debug, StructOpt)]
