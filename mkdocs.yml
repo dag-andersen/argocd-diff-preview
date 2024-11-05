@@ -6,7 +6,7 @@ theme:
     repo: fontawesome/brands/github
   name: material
   logo: assets/logo-head.png
-  favicon: assets/favicon.png
+  favicon: assets/logo-head.png
   features:
     - content.action.edit
   palette: 

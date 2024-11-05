@@ -32,9 +32,9 @@ The safest way to make changes to you Helm Charts and Kustomize Overlays in your
 - Provides a clear and concise view of the changes
 - Does not require access to your real cluster or Argo CD instance. The tool runs in complete isolation.
 - Can be run locally before you open the pull request
-- Works with private repositories and Helm charts
+- Supports private repositories and Helm charts
 - Supports multi-source applications
-- Render resources from external sources (e.g., Helm charts). For example, when you update the chart version of Nginx, you can get a render of the new output. For example, this is useful to spot changes in default values. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15). 
+- Render resources from external sources (e.g., Helm charts). For example, when you update the Helm Chart version of `nginx`, you can see what exactly changed. [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15) 
 
 ---
 
