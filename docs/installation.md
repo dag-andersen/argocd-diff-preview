@@ -58,16 +58,6 @@
     argocd-diff-preview --help
     ```
 
-    ## Install binary with [aquaproj/aqua](https://github.com/aquaproj/aqua)
-    `argocd-diff-preview` also supports installation by aqua. See [documentation](https://aquaproj.github.io/docs/install) for aqua setup instructions.
-
-    ```bash
-    aqua init
-    aqua g -i dag-andersen/argocd-diff-preview
-    aqua i
-    argocd-diff-preview --help
-    ```
-
     ## Usage
 
     You need to pull down the two branches you want to compare. The first branch will be cloned into the `base-branch` folder, and the other branch will be cloned into the `target-branch` folder.
