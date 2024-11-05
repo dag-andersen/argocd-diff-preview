@@ -4,7 +4,7 @@ metadata:
   name: my-app-watch-pattern-valid-regex
   namespace: argocd
   annotations:
-    argocd-diff-preview/watch-pattern: "examples/helm/values/filtered"
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered"
 spec:
   project: default
   destination:

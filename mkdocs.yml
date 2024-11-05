@@ -5,8 +5,8 @@ theme:
   icon:
     repo: fontawesome/brands/github
   name: material
-  logo: assets/logo-transparent.png
-  favicon: assets/favicon.png
+  logo: assets/logo-head.png
+  favicon: assets/logo-head.png
   features:
     - content.action.edit
   palette: 

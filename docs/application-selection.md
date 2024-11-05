@@ -8,11 +8,11 @@ Here are _4_ ways to limit which applications are rendered:
 
 You can configure the tool to render only the applications affected by changes in a pull request. This optimizes the rendering process by focusing on the applications directly impacted by the modified files.
 
-To achieve this, you need to add the annotation: `argocd-diff-preview/watch-pattern` to all your Applications/ApplicationSets, and provide the tool with a list of changed files. If no list is provided, the annotation will be ignored.
+To achieve this, you need to add the annotation: `argocd-diff-preview/watch-pattern` to all your Applications/ApplicationSets, and provide the tool with a list of changed files. If no list is provided, the annotation will be ignored. The `watch-pattern` annotation takes a comma-separated list of file paths or regex patterns. The tool will render the application if any of the patterns match the changed files.
 
 *Example:*
 
-By adding the annotation `argocd-diff-preview/watch-pattern: "examples/.*"` to the Application manifest, the `my-app` application will only be rendered if a file in the `examples/` folder is modified in the PR. However, the `my-app` application will also be rendered if its own `Application` manifest is changed, so there's no need to include the application's file path in the watch-pattern annotation.
+By adding the annotation `argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered.yaml"` to the Application manifest, the `my-app` application will only be rendered if the `filtered.yaml` file or a file in the `examples/helm/charts/myApp/` folder is modified in the PR. However, the `my-app` application will also be rendered if its own `Application` manifest is changed, so there's no need to include the application's file path in the watch-pattern annotation.
 
 ```yaml title="Application" hl_lines="7"
 apiVersion: argoproj.io/v1alpha1
@@ -21,8 +21,16 @@ metadata:
   name: my-app
   namespace: argocd
   annotations:
-    argocd-diff-preview/watch-pattern: "examples/.*" # Regex
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered.yaml"
 spec:
+  sources:
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      ref: local-files
+    - path: examples/helm/charts/myApp
+      repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      helm:
+        valueFiles:
+          - $local-files/examples/helm/values/filtered.yaml
   ...
 ```
 
@@ -70,7 +78,7 @@ jobs:
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
             -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
-            dagandersen/argocd-diff-preview:v0.0.20
+            dagandersen/argocd-diff-preview:v0.0.23
 ```
 
 ## Ignoring individual applications

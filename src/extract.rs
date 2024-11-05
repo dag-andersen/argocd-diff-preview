@@ -111,12 +111,18 @@ pub async fn get_resources(
                                         Some(msg)
                                             if TIMEOUT_MESSAGES.iter().any(|e| msg.contains(e)) =>
                                         {
-                                            debug!("Application: {} timed out with error: {}", name, msg);
+                                            debug!(
+                                                "Application: {} timed out with error: {}",
+                                                name, msg
+                                            );
                                             list_of_timed_out_apps.push(name.to_string().clone());
                                             other_errors.push((name.to_string(), msg.to_string()));
                                         }
                                         Some(msg) => {
-                                            debug!("Application: {} failed with error: {}", name, msg);
+                                            debug!(
+                                                "Application: {} failed with error: {}",
+                                                name, msg
+                                            );
                                             other_errors.push((name.to_string(), msg.to_string()));
                                         }
                                         _ => (),

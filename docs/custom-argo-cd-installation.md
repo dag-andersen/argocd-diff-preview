@@ -36,7 +36,7 @@ jobs:
 
 # Argo CD Config Management Plugins (CMP)
 
-You can install any [Argo CD Config Management Plugin](https://argo-cd.readthedocs.io/en/stable/operator-manual/config-management-plugins/) that is supported through the [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd). However, there is no guarantee that the plugin will work with the tool, as this depends on the plugin and its specific implementation
+You can install any [Argo CD Config Management Plugin](https://argo-cd.readthedocs.io/en/stable/operator-manual/config-management-plugins/) that is supported through the [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd).
 
 !!! important "Questions, issues, or suggestions"
     If you experience issues or have any questions, please open an issue in the repository! 🚀

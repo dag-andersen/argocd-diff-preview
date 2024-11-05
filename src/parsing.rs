@@ -1,7 +1,7 @@
-use crate::{Operator, Selector};
-use log::{debug, info, warn};
+use crate::{filter_apps::filter, Operator, Selector};
+use log::{debug, error, info, warn};
 use regex::Regex;
-use serde_yaml::Mapping;
+use serde_yaml::{Mapping, Value};
 use std::{error::Error, io::BufRead};
 
 struct K8sResource {
@@ -10,9 +10,10 @@ struct K8sResource {
 }
 
 pub struct Application {
-    file_name: String,
-    yaml: serde_yaml::Value,
-    kind: ApplicationKind,
+    pub file_name: String,
+    pub yaml: serde_yaml::Value,
+    pub kind: ApplicationKind,
+    pub name: String,
 }
 
 impl std::fmt::Display for Application {
@@ -21,13 +22,16 @@ impl std::fmt::Display for Application {
     }
 }
 
+impl PartialEq for Application {
+    fn eq(&self, other: &Self) -> bool {
+        self.yaml == other.yaml
+    }
+}
+
 enum ApplicationKind {
     Application,
     ApplicationSet,
 }
-
-const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
-const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
 
 pub struct GetApplicationOptions<'a> {
     pub directory: &'a str,
@@ -41,6 +45,7 @@ pub async fn get_applications_for_both_branches<'a>(
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
     repo: &str,
+    ignore_invalid_watch_pattern: bool,
 ) -> Result<(Vec<Application>, Vec<Application>), Box<dyn Error>> {
     let base_apps = get_applications(
         base_branch.directory,
@@ -49,6 +54,7 @@ pub async fn get_applications_for_both_branches<'a>(
         selector,
         files_changed,
         repo,
+        ignore_invalid_watch_pattern,
     )
     .await?;
     let target_apps = get_applications(
@@ -58,10 +64,43 @@ pub async fn get_applications_for_both_branches<'a>(
         selector,
         files_changed,
         repo,
+        ignore_invalid_watch_pattern,
     )
     .await?;
 
-    Ok((base_apps, target_apps))
+    let duplicate_yaml = base_apps
+        .iter()
+        .filter(|a| target_apps.iter().any(|b| a.name == b.name))
+        .filter(|a| {
+            target_apps.iter().any(|b| {
+                let equal = a.yaml == b.yaml;
+                if equal {
+                    debug!(
+                        "Skipping application '{}' because it has not changed",
+                        a.name
+                    )
+                }
+                equal
+            })
+        })
+        .map(|a| a.yaml.clone())
+        .collect::<Vec<Value>>();
+
+    if duplicate_yaml.is_empty() {
+        Ok((base_apps, target_apps))
+    } else {
+        // remove duplicates
+        let base_apps = base_apps
+            .into_iter()
+            .filter(|a| !duplicate_yaml.contains(&a.yaml))
+            .collect();
+        let target_apps = target_apps
+            .into_iter()
+            .filter(|a| !duplicate_yaml.contains(&a.yaml))
+            .collect();
+
+        Ok((base_apps, target_apps))
+    }
 }
 
 pub async fn get_applications(
@@ -71,10 +110,16 @@ pub async fn get_applications(
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
     repo: &str,
+    ignore_invalid_watch_pattern: bool,
 ) -> Result<Vec<Application>, Box<dyn Error>> {
     let yaml_files = get_yaml_files(directory, regex).await;
     let k8s_resources = parse_yaml(directory, yaml_files).await;
-    let applications = from_resource_to_application(k8s_resources, selector, files_changed);
+    let applications = from_resource_to_application(
+        k8s_resources,
+        selector,
+        files_changed,
+        ignore_invalid_watch_pattern,
+    );
     if !applications.is_empty() {
         return patch_applications(applications, branch, repo).await;
     }
@@ -234,8 +279,7 @@ async fn patch_applications(
             redirect_sources(spec, &a.file_name);
             debug!(
                 "Collected resources from application: {:?} in file: {}",
-                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                a.file_name
+                a.name, a.file_name
             );
             Some(a)
         })
@@ -254,6 +298,7 @@ fn from_resource_to_application(
     k8s_resources: Vec<K8sResource>,
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
+    ignore_invalid_watch_pattern: bool,
 ) -> Vec<Application> {
     let apps: Vec<Application> = k8s_resources
         .into_iter()
@@ -268,9 +313,15 @@ fn from_resource_to_application(
                         _ => None,
                     })?;
 
+            let name = r.yaml["metadata"]["name"]
+                .as_str()
+                .unwrap_or("unknown")
+                .to_string();
+
             Some(Application {
                 kind,
                 file_name: r.file_name,
+                name,
                 yaml: r.yaml,
             })
         })
@@ -296,108 +347,12 @@ fn from_resource_to_application(
             "🤖 Will only run on Applications that watch these files: '{}'",
             f.join("`, `")
         ),
-        (None, None) => {},
+        (None, None) => {}
     }
 
     let number_of_apps_before_filtering = apps.len();
 
-    let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|a| {
-
-        // check if the application should be ignored
-        if a.yaml["metadata"]["annotations"][ANNOTATION_IGNORE].as_str()
-            == Some("true")
-        {
-            debug!(
-                "Ignoring application {:?} due to '{}=true' in file: {}",
-                a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                ANNOTATION_IGNORE,
-                a.file_name
-            );
-            return None;
-        }
-
-        // loop over labels and check if the selector matches
-        if let Some(selector) = selector {
-            let labels: Vec<(&str, &str)> = {
-                match a.yaml["metadata"]["labels"].as_mapping() {
-                    Some(m) => m.iter()
-                        .flat_map(|(k, v)| Some((k.as_str()?, v.as_str()?)))
-                        .collect(),
-                    None => Vec::new(),
-                }
-            };
-            let selected = selector.iter().all(|l| match l.operator {
-                Operator::Eq => labels.iter().any(|(k, v)| k == &l.key && v == &l.value),
-                Operator::Ne => labels.iter().all(|(k, v)| k != &l.key || v != &l.value),
-            });
-            if !selected {
-                debug!(
-                    "Ignoring application {:?} due to label selector mismatch in file: {}",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    a.file_name
-                );
-                return None;
-            } else {
-                debug!(
-                    "Selected application {:?} due to label selector match in file: {}",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    a.file_name
-                );
-            }
-        }
-
-        // Check watch pattern annotation
-        let pattern_annotation = a.yaml["metadata"]["annotations"][ANNOTATION_WATCH_PATTERN].as_str();
-        let pattern: Option<Result<Regex, regex::Error>> = pattern_annotation.map(Regex::new);
-        match (files_changed, pattern) {
-            (None, _) => {}
-            // Check if the application changed.
-            (Some(files_changed), _) if files_changed.contains(&a.file_name) => {
-                debug!(
-                    "Selected application {:?} due to file change in file: {}",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    a.file_name
-                );
-            }
-            // Check if the application changed and the regex pattern matches.
-            (Some(files_changed), Some(Ok(pattern))) if files_changed.iter().any(|f| pattern.is_match(f)) => {
-                debug!(
-                    "Selected application {:?} due to regex pattern '{}' matching changed files",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    pattern
-                );
-            }
-            (_, Some(Ok(pattern))) => {
-                debug!(
-                    "Ignoring application {:?} due to regex pattern '{}' not matching changed files",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    pattern
-                );
-                return None;
-            },
-            (_, Some(Err(e))) => {
-                warn!(
-                    "🚨 Ignoring application {:?} due to invalid regex pattern '{}' ({})",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    pattern_annotation.unwrap(),
-                    a.file_name
-                );
-                debug!("Error: {}", e);
-                return None;
-            }
-            (_, None) => {
-                debug!(
-                    "Ignoring application {:?} due to missing '{}' annotation ({})",
-                    a.yaml["metadata"]["name"].as_str().unwrap_or("unknown"),
-                    &ANNOTATION_WATCH_PATTERN,
-                    a.file_name
-                );
-                return None;
-            }
-        }
-
-        Some(a)
-    }).collect();
+    let filtered_apps: Vec<Application> = filter(apps, selector, files_changed, ignore_invalid_watch_pattern);
 
     if number_of_apps_before_filtering != filtered_apps.len() {
         info!(

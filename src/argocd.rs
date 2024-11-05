@@ -10,6 +10,19 @@ pub struct ArgoCDOptions<'a> {
 
 const CONFIG_PATH: &str = "argocd-config";
 
+pub async fn create_namespace() -> Result<(), Box<dyn Error>> {
+    match run_command("kubectl create ns argocd", None).await {
+        Ok(_) => (),
+        Err(e) => {
+            error!("❌ Failed to create namespace argocd");
+            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
+        }
+    }
+
+    debug!("🦑 Namespace argocd created successfully");
+    Ok(())
+}
+
 pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn Error>> {
     info!(
         "🦑 Installing Argo CD Helm Chart version: '{}'",
@@ -36,15 +49,6 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
             (None, None)
         }
     };
-
-    // create namespace argocd
-    match run_command("kubectl create ns argocd", None).await {
-        Ok(_) => (),
-        Err(e) => {
-            error!("❌ Failed to create namespace argocd");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
 
     // add argo repo to helm
     match run_command(
