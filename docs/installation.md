@@ -120,7 +120,7 @@
     ```
 
     If base-branch is not specified it will default to `main`.
-    
+
 === "Aqua"
 
     ## Pre-requisites
@@ -155,7 +155,6 @@
 
     ## Run the binary
     ```bash
-
     argocd-diff-preview \
       --repo <owner>/<repo-name> \
       --base-branch <branch-a> \
@@ -163,4 +162,3 @@
     ```
 
     If base-branch is not specified it will default to `main`.
-
