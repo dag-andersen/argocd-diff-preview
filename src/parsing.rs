@@ -235,7 +235,7 @@ async fn patch_applications(
                 return;
             }
             match spec["source"]["repoURL"].as_str() {
-                Some(url) if url.contains(repo) => {
+                Some(url) if url.to_lowercase().contains(repo.to_lowercase()) => {
                     spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string())
                 }
                 _ => debug!("Found no 'repoURL' under spec.sources[] in file: {}", file),
@@ -247,7 +247,7 @@ async fn patch_applications(
                         continue;
                     }
                     match source["repoURL"].as_str() {
-                        Some(url) if url.contains(repo) => {
+                        Some(url) if url.to_lowercase().contains(repo.to_lowercase()) => {
                             source["targetRevision"] =
                                 serde_yaml::Value::String(branch.to_string());
                         }
