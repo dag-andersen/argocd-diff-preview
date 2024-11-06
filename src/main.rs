@@ -91,7 +91,7 @@ struct Opt {
     #[structopt(long)]
     ignore_invalid_watch_pattern: bool,
 
-    // cluster name (only applicable to kind). Default: argocd-diff-preview
+    /// Cluster name (only applicable to kind)
     #[structopt(long, default_value = "argocd-diff-preview", env)]
     cluster_name: String
 }
