@@ -151,7 +151,6 @@ fn apps_file(branch: &Branch) -> &'static str {
 
 const BASE_BRANCH_FOLDER: &str = "base-branch";
 const TARGET_BRANCH_FOLDER: &str = "target-branch";
-const CLUSTER_NAME: &str = "argocd-diff-preview";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
