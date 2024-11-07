@@ -235,10 +235,10 @@ async fn patch_applications(
                 return;
             }
             match spec["source"]["repoURL"].as_str() {
-                Some(url) if url.contains(repo) => {
+                Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
                     spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string())
                 }
-                _ => debug!("Found no 'repoURL' under spec.sources[] in file: {}", file),
+                _ => debug!("Found no 'repoURL' under spec.source in file: {}", file),
             }
         } else if spec.contains_key("sources") {
             if let Some(sources) = spec["sources"].as_sequence_mut() {
@@ -247,7 +247,7 @@ async fn patch_applications(
                         continue;
                     }
                     match source["repoURL"].as_str() {
-                        Some(url) if url.contains(repo) => {
+                        Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
                             source["targetRevision"] =
                                 serde_yaml::Value::String(branch.to_string());
                         }
