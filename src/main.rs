@@ -90,6 +90,10 @@ struct Opt {
     /// Ignore invalid watch pattern Regex on Applications. If flag is unset and an invalid Regex is found, the tool will exit with an error.
     #[structopt(long)]
     ignore_invalid_watch_pattern: bool,
+
+    /// Cluster name (only applicable to kind)
+    #[structopt(long, default_value = "argocd-diff-preview", env)]
+    cluster_name: String
 }
 
 #[derive(Debug)]
@@ -147,7 +151,6 @@ fn apps_file(branch: &Branch) -> &'static str {
 
 const BASE_BRANCH_FOLDER: &str = "base-branch";
 const TARGET_BRANCH_FOLDER: &str = "target-branch";
-const CLUSTER_NAME: &str = "argocd-diff-preview";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -320,7 +323,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         panic!("Target branch folder does not exist");
     }
 
-    let cluster_name = CLUSTER_NAME;
+    let cluster_name = opt.cluster_name;
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
