@@ -28,7 +28,7 @@
       -e TARGET_BRANCH=<branch-a> \
       -e BASE_BRANCH=<branch-b> \
       -e REPO=<owner>/<repo>  \
-      dagandersen/argocd-diff-preview:v0.0.23
+      dagandersen/argocd-diff-preview:v0.0.24
     ```
 
     If base-branch(`BASE_BRANCH`) is not specified it will default to `main`.
@@ -52,7 +52,7 @@
     *Example for downloading and running on macOS:*
 
     ```bash
-    curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.23/argocd-diff-preview-Darwin-x86_64.tar.gz
+    curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.0.24/argocd-diff-preview-Darwin-x86_64.tar.gz
     tar -xvf argocd-diff-preview-Darwin-x86_64.tar.gz
     sudo mv argocd-diff-preview /usr/local/bin
     argocd-diff-preview --help
