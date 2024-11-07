@@ -8,10 +8,9 @@ const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
 pub fn filter(
     apps: Vec<Application>,
     selector: &Option<Vec<Selector>>,
-    files_changed: &Option<Vec<String>>, 
+    files_changed: &Option<Vec<String>>,
     ignore_invalid_watch_pattern: bool,
 ) -> Vec<Application> {
-
     let filtered_apps: Vec<Application> = apps.into_iter().filter_map(|a| {
 
         // check if the application should be ignored
@@ -125,4 +124,3 @@ pub fn filter(
 
     filtered_apps
 }
-

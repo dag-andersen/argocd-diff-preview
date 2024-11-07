@@ -1,5 +1,5 @@
-use crate::{filter_apps::filter, Operator, Selector};
-use log::{debug, error, info, warn};
+use crate::{filter_apps::filter, Selector};
+use log::{debug, info};
 use regex::Regex;
 use serde_yaml::{Mapping, Value};
 use std::{error::Error, io::BufRead};
@@ -12,7 +12,7 @@ struct K8sResource {
 pub struct Application {
     pub file_name: String,
     pub yaml: serde_yaml::Value,
-    pub kind: ApplicationKind,
+    kind: ApplicationKind,
     pub name: String,
 }
 

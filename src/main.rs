@@ -13,11 +13,11 @@ use structopt::StructOpt;
 mod argocd;
 mod diff;
 mod extract;
+mod filter_apps;
 mod kind;
 mod minikube;
 mod no_apps_found;
 mod parsing;
-mod filter_apps;
 mod utils;
 
 #[derive(Debug, StructOpt)]
@@ -93,7 +93,7 @@ struct Opt {
 
     /// Cluster name (only applicable to kind)
     #[structopt(long, default_value = "argocd-diff-preview", env)]
-    cluster_name: String
+    cluster_name: String,
 }
 
 #[derive(Debug)]
@@ -176,9 +176,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .filter(|f| !f.trim().is_empty())
         .map(|f| Regex::new(&f).unwrap());
 
-    let base_branch_name = opt.base_branch;
-    let target_branch_name = opt.target_branch;
-    let repo = opt.repo;
+    let base_branch_name = opt.base_branch.trim();
+    let target_branch_name = opt.target_branch.trim();
+    let repo = opt.repo.trim();
     let diff_ignore = opt.diff_ignore.filter(|f| !f.trim().is_empty());
     let timeout = opt.timeout;
     let output_folder = opt.output_folder.as_str();
@@ -216,7 +216,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
-    if !repo_regex.is_match(&repo) {
+    if !repo_regex.is_match(repo) {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
         panic!("Invalid repository format");
     }
@@ -254,12 +254,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
     let selector = opt.selector.filter(|s| !s.trim().is_empty()).map(|s| {
         let labels: Vec<Selector> = s
-            .split(",")
+            .split(',')
             .filter(|l| !l.trim().is_empty())
             .map(|l| {
                 let not_equal = l.split("!=").collect::<Vec<&str>>();
                 let equal_double = l.split("==").collect::<Vec<&str>>();
-                let equal_single = l.split("=").collect::<Vec<&str>>();
+                let equal_single = l.split('=').collect::<Vec<&str>>();
                 let selector = match (not_equal.len(), equal_double.len(), equal_single.len()) {
                     (2, _, _) => Selector {
                         key: not_equal[0].trim().to_string(),
@@ -282,11 +282,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                 };
                 if selector.key.is_empty()
-                    || selector.key.contains("!")
-                    || selector.key.contains("=")
+                    || selector.key.contains('!')
+                    || selector.key.contains('=')
                     || selector.value.is_empty()
-                    || selector.value.contains("!")
-                    || selector.value.contains("=")
+                    || selector.value.contains('!')
+                    || selector.value.contains('=')
                 {
                     error!("❌ Invalid label selector format: {}", l);
                     panic!("Invalid label selector format");

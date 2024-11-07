@@ -14,7 +14,7 @@ pub async fn write_message(
 
     let markdown = generate_markdown(&message);
     let markdown_path = format!("{}/diff.md", output_folder);
-    fs::write(&markdown_path, markdown)?;
+    fs::write(markdown_path, markdown)?;
 
     Ok(())
 }
