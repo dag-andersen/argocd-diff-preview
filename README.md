@@ -137,10 +137,11 @@ jobs:
 
 ## ArgoCon 2024 Talk
 
-<img align="right" src="./docs/assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` will be presented at ArgoCon 2024 in Utah, US. The talk will cover the current tools and methods for visualizing code changes in GitOps workflows and introduce this new approach, which uses ephemeral clusters to render accurate diffs directly on your pull requests.
+<img align="right" src="./docs/assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` was presented at ArgoCon 2024 in Utah, US. The talk covered current tools and methods for visualizing code changes in GitOps workflows and introduced this new approach, which uses ephemeral clusters to render accurate diffs directly on your pull requests.
 
-- [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](
+- Talk description: [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](
 https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
+- Talk recording: [YouTube](https://youtu.be/3aeP__qPSms)
 
 ## All Contributors
 
