@@ -40,9 +40,10 @@ RUN rm ./target/release/deps/argocd_diff_preview-*
 RUN cargo build --release
 
 # our final base
-FROM debian:bookworm-slim
+FROM alpine:latest
 
-COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
+# Install runtime dependencies
+RUN apk add --no-cache --update git
 
 COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
 COPY --from=build /argocd-diff-preview/kubectl /usr/local/bin/kubectl
@@ -50,12 +51,8 @@ COPY --from=build /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
 COPY --from=build /argocd-diff-preview/target/release/argocd-diff-preview .
 
-RUN apt-get update && \
-    apt-get install -y git && \
-    rm -rf /var/lib/apt/lists/*
-
-# copy argocd helm chart values
+# Copy argocd helm chart values
 COPY ./argocd-config ./argocd-config
 
-# set the startup command to run your binary
+# Set the startup command to run your binary
 ENTRYPOINT ["./argocd-diff-preview"]
