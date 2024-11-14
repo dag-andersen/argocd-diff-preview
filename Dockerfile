@@ -42,6 +42,8 @@ RUN cargo build --release
 # our final base
 FROM alpine:latest
 
+COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
+
 # Install runtime dependencies
 RUN apk add --no-cache --update git
 
