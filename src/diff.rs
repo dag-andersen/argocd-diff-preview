@@ -6,8 +6,8 @@ use std::{error::Error, process::Output};
 
 pub async fn generate_diff(
     output_folder: &str,
-    base_branch_name: &str,
-    target_branch_name: &str,
+    base_branch: &Branch,
+    target_branch: &Branch,
     diff_ignore: Option<String>,
     line_count: Option<usize>,
     max_char_count: Option<usize>,
@@ -16,7 +16,7 @@ pub async fn generate_diff(
 
     info!(
         "🔮 Generating diff between {} and {}",
-        base_branch_name, target_branch_name
+        base_branch.name, target_branch.name
     );
 
     let patterns_to_ignore = match diff_ignore {
@@ -43,8 +43,8 @@ pub async fn generate_diff(
     let summary_diff_command = format!(
         "git --no-pager diff --compact-summary --no-index {} {} {}",
         patterns_to_ignore,
-        Branch::Base,
-        Branch::Target
+        base_branch.branch_type,
+        target_branch.branch_type
     );
 
     debug!(
@@ -59,8 +59,8 @@ pub async fn generate_diff(
         "git --no-pager diff --no-prefix -U{} --no-index {} {} {}",
         line_count.unwrap_or(10),
         patterns_to_ignore,
-        Branch::Base,
-        Branch::Target
+        base_branch.branch_type,
+        target_branch.branch_type,
     );
 
     debug!("Getting diff with command: {}", diff_command);

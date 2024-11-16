@@ -1,7 +1,9 @@
 use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
+use branch::{Branch, BranchType};
 use log::{debug, error, info};
-use parsing::{applications_to_string, GetApplicationOptions};
+use parsing::applications_to_string;
 use regex::Regex;
+use selector::Selector;
 use std::fs;
 use std::path::PathBuf;
 use std::{
@@ -13,12 +15,14 @@ use structopt::StructOpt;
 mod argocd;
 mod diff;
 mod extract;
-mod filter_apps;
 mod kind;
 mod minikube;
 mod no_apps_found;
 mod parsing;
 mod utils;
+mod selector;
+mod argo_resource;
+mod branch;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -101,56 +105,6 @@ enum ClusterTool {
     Kind,
     Minikube,
 }
-
-enum Branch {
-    Base,
-    Target,
-}
-
-impl std::fmt::Display for Branch {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Branch::Base => write!(f, "base"),
-            Branch::Target => write!(f, "target"),
-        }
-    }
-}
-
-enum Operator {
-    Eq,
-    Ne,
-}
-
-struct Selector {
-    key: String,
-    value: String,
-    operator: Operator,
-}
-
-impl std::fmt::Display for Selector {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Selector {
-                key,
-                value,
-                operator,
-            } => match operator {
-                Operator::Eq => write!(f, "{}={}", key, value),
-                Operator::Ne => write!(f, "{}!={}", key, value),
-            },
-        }
-    }
-}
-
-fn apps_file(branch: &Branch) -> &'static str {
-    match branch {
-        Branch::Base => "apps_base_branch.yaml",
-        Branch::Target => "apps_target_branch.yaml",
-    }
-}
-
-const BASE_BRANCH_FOLDER: &str = "base-branch";
-const TARGET_BRANCH_FOLDER: &str = "target-branch";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -251,47 +205,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("✨ Ignoring invalid watch patterns Regex on Applications");
     }
 
+    let base_branch = Branch {
+        name: base_branch_name.to_string(),
+        branch_type: BranchType::Base,
+    };
+
+    let target_branch = Branch {
+        name: target_branch_name.to_string(),
+        branch_type: BranchType::Target,
+    };
+
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
     let selector = opt.selector.filter(|s| !s.trim().is_empty()).map(|s| {
         let labels: Vec<Selector> = s
             .split(',')
             .filter(|l| !l.trim().is_empty())
             .map(|l| {
-                let not_equal = l.split("!=").collect::<Vec<&str>>();
-                let equal_double = l.split("==").collect::<Vec<&str>>();
-                let equal_single = l.split('=').collect::<Vec<&str>>();
-                let selector = match (not_equal.len(), equal_double.len(), equal_single.len()) {
-                    (2, _, _) => Selector {
-                        key: not_equal[0].trim().to_string(),
-                        value: not_equal[1].trim().to_string(),
-                        operator: Operator::Ne,
-                    },
-                    (_, 2, _) => Selector {
-                        key: equal_double[0].trim().to_string(),
-                        value: equal_double[1].trim().to_string(),
-                        operator: Operator::Eq,
-                    },
-                    (_, _, 2) => Selector {
-                        key: equal_single[0].trim().to_string(),
-                        value: equal_single[1].trim().to_string(),
-                        operator: Operator::Eq,
-                    },
-                    _ => {
-                        error!("❌ Invalid label selector format: {}", l);
-                        panic!("Invalid label selector format");
-                    }
-                };
-                if selector.key.is_empty()
-                    || selector.key.contains('!')
-                    || selector.key.contains('=')
-                    || selector.value.is_empty()
-                    || selector.value.contains('!')
-                    || selector.value.contains('=')
-                {
-                    error!("❌ Invalid label selector format: {}", l);
-                    panic!("Invalid label selector format");
-                }
-                selector
+                Selector::from(l)
             })
             .collect();
         labels
@@ -307,18 +237,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
+    if !check_if_folder_exists(base_branch.folder_name()) {
         error!(
             "❌ Base branch folder does not exist: {}",
-            BASE_BRANCH_FOLDER
+            base_branch.folder_name()
         );
         panic!("Base branch folder does not exist");
     }
 
-    if !check_if_folder_exists(&TARGET_BRANCH_FOLDER) {
+    if !check_if_folder_exists(target_branch.folder_name()) {
         error!(
             "❌ Target branch folder does not exist: {}",
-            TARGET_BRANCH_FOLDER
+            target_branch.folder_name()
         );
         panic!("Target branch folder does not exist");
     }
@@ -328,14 +258,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
     let (base_apps, target_apps) = parsing::get_applications_for_both_branches(
-        GetApplicationOptions {
-            directory: BASE_BRANCH_FOLDER,
-            branch: &base_branch_name,
-        },
-        GetApplicationOptions {
-            directory: TARGET_BRANCH_FOLDER,
-            branch: &target_branch_name,
-        },
+        &base_branch,
+        &target_branch,
         &file_regex,
         &selector,
         &files_changed,
@@ -354,6 +278,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("🎉 Done in {} seconds", start.elapsed().as_secs());
         return Ok(());
     }
+
+    fs::write(base_branch.app_file(), applications_to_string(base_apps))?;
+    fs::write(
+        target_branch.app_file(),
+        applications_to_string(target_apps),
+    )?;
 
     match tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
@@ -378,25 +308,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     })
     .await?;
 
-    fs::write(apps_file(&Branch::Base), applications_to_string(base_apps))?;
-    fs::write(
-        apps_file(&Branch::Target),
-        applications_to_string(target_apps),
-    )?;
-
     // Cleanup output folder
     clean_output_folder(output_folder);
 
     // Extract resources from Argo CD
     if found_base_apps {
-        extract::get_resources(&Branch::Base, timeout, output_folder).await?;
+        extract::get_resources(&base_branch, timeout, output_folder).await?;
         if found_target_apps {
             extract::delete_applications().await;
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
     }
     if found_target_apps {
-        extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+        extract::get_resources(&target_branch, timeout, output_folder).await?;
     }
 
     // Delete cluster
@@ -407,8 +331,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     diff::generate_diff(
         output_folder,
-        &base_branch_name,
-        &target_branch_name,
+        &base_branch,
+        &target_branch,
         diff_ignore,
         line_count,
         max_diff_length,
@@ -422,11 +346,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 fn clean_output_folder(output_folder: &str) {
     create_folder_if_not_exists(output_folder);
-    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Base)).unwrap_or_default();
-    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Target)).unwrap_or_default();
-    fs::create_dir(format!("{}/{}", output_folder, Branch::Base))
+    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Base)).unwrap_or_default();
+    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Target)).unwrap_or_default();
+    fs::create_dir(format!("{}/{}", output_folder, BranchType::Base))
         .expect("Unable to create directory");
-    fs::create_dir(format!("{}/{}", output_folder, Branch::Target))
+    fs::create_dir(format!("{}/{}", output_folder, BranchType::Target))
         .expect("Unable to create directory");
 }
 

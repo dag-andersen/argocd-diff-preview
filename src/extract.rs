@@ -1,5 +1,5 @@
 use crate::utils::run_command;
-use crate::{apply_manifest, apps_file, Branch};
+use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use std::collections::HashSet;
 use std::fs;
@@ -30,19 +30,19 @@ static TIMEOUT_MESSAGES: [&str; 7] = [
 ];
 
 pub async fn get_resources(
-    branch_type: &Branch,
+    branch: &Branch,
     timeout: u64,
     output_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
-    info!("🌚 Getting resources from {}-branch", branch_type);
+    info!("🌚 Getting resources from {}-branch", branch.branch_type);
 
-    let app_file = apps_file(branch_type);
+    let app_file = branch.app_file();
 
     if fs::metadata(app_file).unwrap().len() != 0 {
         if let Err(e) = apply_manifest(app_file) {
             error!(
                 "❌ Failed to apply applications for branch: {}",
-                branch_type
+                branch.name
             );
             panic!("error: {}", String::from_utf8_lossy(&e.stderr))
         }
@@ -85,7 +85,7 @@ pub async fn get_resources(
                     match run_command(&format!("argocd app manifests {}", name), None).await {
                         Ok(o) => {
                             fs::write(
-                                format!("{}/{}/{}", output_folder, branch_type, name),
+                                format!("{}/{}/{}", output_folder, branch.branch_type, name),
                                 &o.stdout,
                             )?;
                             debug!("Got manifests for application: {}", name)
@@ -204,7 +204,7 @@ pub async fn get_resources(
     info!(
         "🌚 Got all resources from {} applications for {}",
         set_of_processed_apps.len(),
-        branch_type
+        branch.name
     );
 
     Ok(())
