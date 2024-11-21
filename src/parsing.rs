@@ -258,10 +258,56 @@ async fn patch_applications(
         }
     };
 
+    let redirect_generators_inner = |v: &mut Mapping, file: &str| {
+        if v.contains_key("generators") {
+            if let Some(i) = v["generators"].as_sequence_mut() {
+                for generator in i {
+                    match generator["git"].as_mapping_mut() {
+                        Some(git) => {
+                            if git.contains_key("repoURL") {
+                                match git["repoURL"].as_str() {
+                                    Some(url)
+                                        if url.to_lowercase().contains(&repo.to_lowercase()) =>
+                                    {
+                                        git["revision"] =
+                                            serde_yaml::Value::String(branch.to_string());
+                                        debug!(
+                                            "Redirected 'repoURL' in git generator in file: {}",
+                                            file
+                                        );
+                                    }
+                                    _ => debug!(
+                                        "Found no 'repoURL' under spec.generators.git in file: {}",
+                                        file
+                                    ),
+                                }
+                            }
+                        }
+                        None => {}
+                    }
+                }
+            }
+        }
+    };
+
+    let redirect_generators = |spec: &mut Mapping, file: &str| {
+        redirect_generators_inner(spec, file);
+        if spec.contains_key("generators") {
+            if let Some(g) = spec["generators"].as_sequence_mut() {
+                for generator in g {
+                    if let Some(i) = generator["matrix"].as_mapping_mut() {
+                        debug!("Found matrix generators in file: {}", file);
+                        redirect_generators_inner(i, file);
+                    }
+                }
+            }
+        }
+    };
+
     let applications: Vec<Application> = applications
         .into_iter()
         .map(|mut a| {
-            // Update namesapce
+            // Update namespace
             a.yaml["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
             a
         })
@@ -270,6 +316,7 @@ async fn patch_applications(
             let spec = match a.kind {
                 ApplicationKind::Application => a.yaml["spec"].as_mapping_mut()?,
                 ApplicationKind::ApplicationSet => {
+                    redirect_generators(a.yaml["spec"].as_mapping_mut()?, &a.file_name);
                     a.yaml["spec"]["template"]["spec"].as_mapping_mut()?
                 }
             };
