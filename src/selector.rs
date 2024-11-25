@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use log::error;
 
 pub enum Operator {
@@ -27,7 +29,7 @@ impl std::fmt::Display for Selector {
 }
 
 impl Selector {
-    pub fn from(l: &str) -> Selector {
+    pub fn from(l: &str) -> Result<Selector, Box<dyn Error>> {
         let not_equal = l.split("!=").collect::<Vec<&str>>();
         let equal_double = l.split("==").collect::<Vec<&str>>();
         let equal_single = l.split('=').collect::<Vec<&str>>();
@@ -49,7 +51,7 @@ impl Selector {
             },
             _ => {
                 error!("❌ Invalid label selector format: {}", l);
-                panic!("Invalid label selector format");
+                return Err("Invalid label selector format".into());
             }
         };
         if selector.key.is_empty()
@@ -60,9 +62,8 @@ impl Selector {
             || selector.value.contains('=')
         {
             error!("❌ Invalid label selector format: {}", l);
-            panic!("Invalid label selector format");
+            return Err("Invalid label selector format".into());
         }
-        selector
+        Ok(selector)
     }
-    
 }

@@ -1,11 +1,12 @@
 use log::{debug, error, warn};
 use regex::Regex;
 
-use crate::{parsing::K8sResource, selector::Operator, utils::run_command, Selector};
+use crate::{parsing::K8sResource, selector::Operator, Selector};
 
 const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
 const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
 
+#[derive(PartialEq)]
 pub enum ApplicationKind {
     Application,
     ApplicationSet,
@@ -259,4 +260,3 @@ impl ArgoResource {
         Some(self)
     }
 }
-

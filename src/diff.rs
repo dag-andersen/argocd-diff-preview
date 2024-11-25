@@ -24,27 +24,29 @@ pub async fn generate_diff(
         None => "".to_string(),
     };
 
-    let parse_diff_output = |output: Result<Output, Output>| -> String {
+    let parse_diff_output = |output: Result<Output, Output>| -> Result<String, Box<dyn Error>> {
         let o = match output {
-            Err(e) if !e.stderr.is_empty() => panic!(
-                "Error running diff command with error: {}",
-                String::from_utf8_lossy(&e.stderr)
-            ),
+            Err(e) if !e.stderr.is_empty() => {
+                return Err(format!(
+                    "Error running command: {}",
+                    String::from_utf8_lossy(&e.stderr)
+                )
+                .to_string()
+                .into())
+            }
             Ok(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
             Err(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
         };
         if o.trim().is_empty() {
-            "No changes found".to_string()
+            Ok("No changes found".to_string())
         } else {
-            o
+            Ok(o)
         }
     };
 
     let summary_diff_command = format!(
         "git --no-pager diff --compact-summary --no-index {} {} {}",
-        patterns_to_ignore,
-        base_branch.branch_type,
-        target_branch.branch_type
+        patterns_to_ignore, base_branch.branch_type, target_branch.branch_type
     );
 
     debug!(
@@ -53,7 +55,7 @@ pub async fn generate_diff(
     );
 
     let summary_as_string =
-        parse_diff_output(run_command(&summary_diff_command, Some(output_folder)).await);
+        parse_diff_output(run_command(&summary_diff_command, Some(output_folder)).await)?;
 
     let diff_command = &format!(
         "git --no-pager diff --no-prefix -U{} --no-index {} {} {}",
@@ -65,7 +67,7 @@ pub async fn generate_diff(
 
     debug!("Getting diff with command: {}", diff_command);
 
-    let diff_as_string = parse_diff_output(run_command(diff_command, Some(output_folder)).await);
+    let diff_as_string = parse_diff_output(run_command(diff_command, Some(output_folder)).await)?;
 
     let remaining_max_chars =
         max_diff_message_char_count - markdown_template_length() - summary_as_string.len();

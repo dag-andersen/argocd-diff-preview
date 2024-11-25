@@ -1,6 +1,6 @@
 use crate::{
     argo_resource::{ApplicationKind, ArgoResource},
-    utils::run_command,
+    utils::{run_command, CommandError},
     Branch, Selector,
 };
 use log::{debug, info};
@@ -205,7 +205,7 @@ async fn patch_applications(
                 .remove_sync_policy()
                 .set_project_to_default()
                 .point_destination_to_in_cluster()
-                .redirect_sources(&repo, &branch.name);
+                .redirect_sources(repo, &branch.name);
             debug!(
                 "Collected resources from application: {:?} in file: {}",
                 a.name, a.file_name
@@ -289,20 +289,15 @@ async fn generate_apps_from_app_set(
         app_set.file_name
     );
 
-    match app_set.kind {
-        ApplicationKind::ApplicationSet => {}
-        _ => {
-            panic!("Expected ApplicationSet in file: {}", app_set.file_name);
-        }
+    if app_set.kind != ApplicationKind::ApplicationSet {
+        return Err(format!("Expected ApplicationSet in file: {}", app_set.file_name).into());
     }
 
     let command = format!("argocd appset generate {} -o yaml", app_set.file_name);
-    let apps_string: String = match run_command(&command, Some(branch.folder_name())).await {
-        Ok(output) => String::from_utf8_lossy(&output.stdout).to_string(),
-        Err(e) => {
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    };
+    let output = run_command(&command, Some(branch.folder_name()))
+        .await
+        .map_err(CommandError::new)?;
+    let apps_string: String = String::from_utf8_lossy(&output.stdout).to_string();
 
     let yaml = match serde_yaml::from_str(apps_string.as_str()) {
         Ok(r) => r,

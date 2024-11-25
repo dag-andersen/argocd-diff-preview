@@ -1,9 +1,8 @@
-use crate::utils::run_command;
+use crate::utils::{run_command, spawn_command, CommandError};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use std::collections::HashSet;
 use std::fs;
-use std::process::{Command, Stdio};
 use std::{collections::BTreeMap, error::Error};
 
 static ERROR_MESSAGES: [&str; 10] = [
@@ -39,13 +38,13 @@ pub async fn get_resources(
     let app_file = branch.app_file();
 
     if fs::metadata(app_file).unwrap().len() != 0 {
-        if let Err(e) = apply_manifest(app_file) {
+        apply_manifest(app_file).map_err(|e| {
             error!(
                 "❌ Failed to apply applications for branch: {}",
                 branch.name
             );
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
+            CommandError::new(e)
+        })?;
     }
 
     let mut set_of_processed_apps = HashSet::new();
@@ -54,9 +53,17 @@ pub async fn get_resources(
     let start_time = std::time::Instant::now();
 
     loop {
-        let output = run_command("kubectl get applications -n argocd -oyaml", None)
-            .await
-            .expect("failed to get applications");
+        let output = match run_command("kubectl get applications -n argocd -oyaml", None).await {
+            Ok(o) => o,
+            Err(e) => {
+                return Err(format!(
+                    "❌ Failed to get applications: {}",
+                    String::from_utf8_lossy(&e.stderr)
+                )
+                .into())
+            }
+        };
+
         let applications: serde_yaml::Value =
             serde_yaml::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
 
@@ -210,7 +217,7 @@ pub async fn get_resources(
     Ok(())
 }
 
-pub async fn delete_applications() {
+pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     info!("🧼 Removing applications");
     loop {
         debug!("🗑 Deleting ApplicationSets");
@@ -232,16 +239,10 @@ pub async fn delete_applications() {
 
         debug!("🗑 Deleting Applications");
 
-        let args = "kubectl delete applications.argoproj.io --all -n argocd"
-            .split_whitespace()
-            .collect::<Vec<&str>>();
-        let mut child = Command::new(args[0])
-            .args(&args[1..])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("failed to execute process");
-
+        let mut child = spawn_command(
+            "kubectl delete applications.argoproj.io --all -n argocd",
+            None,
+        );
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if run_command("kubectl get applications -A --no-headers", None)
             .await
@@ -269,5 +270,6 @@ pub async fn delete_applications() {
             Err(e) => error!("❌ Failed to delete applications: {}", e),
         };
     }
-    info!("🧼 Removed applications successfully")
+    info!("🧼 Removed applications successfully");
+    Ok(())
 }

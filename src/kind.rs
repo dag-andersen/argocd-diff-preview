@@ -1,4 +1,7 @@
-use crate::{run_command, utils::spawn_command};
+use crate::{
+    run_command,
+    utils::{spawn_command, CommandError},
+};
 use log::{error, info};
 use std::error::Error;
 
@@ -8,48 +11,41 @@ pub async fn is_installed() -> bool {
 
 pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     // check if docker is running
-    match run_command("docker ps", None).await {
-        Ok(_) => (),
-        Err(e) => {
-            error!("❌ Docker is not running");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
+    run_command("docker ps", None).await.map_err(|o| {
+        error!("❌ Docker is not running");
+        CommandError::new(o)
+    })?;
 
     info!("🚀 Creating cluster...");
-    match run_command(
+    run_command(
         &format!("kind delete cluster --name {}", cluster_name),
         None,
     )
     .await
-    {
-        Ok(_) => (),
-        Err(e) => {
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    };
+    .map_err(CommandError::new)?;
 
-    match run_command(
+    run_command(
         &format!("kind create cluster --name {}", cluster_name),
         None,
     )
     .await
-    {
-        Ok(_) => {
-            info!("🚀 Cluster created successfully");
-            Ok(())
-        }
-        Err(e) => {
-            error!("❌ Failed to Create cluster");
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
-    }
+    .map(|_| {
+        info!("🚀 Cluster created successfully");
+        Ok(())
+    })
+    .map_err(|e| {
+        error!("❌ Failed to create cluster");
+        CommandError::new(e)
+    })?
 }
 
-pub fn delete_cluster(cluster_name: &str) {
+pub fn delete_cluster(cluster_name: &str, wait: bool) {
     info!("💥 Deleting cluster...");
-    spawn_command(
+    let mut child = spawn_command(
         &format!("kind delete cluster --name {}", cluster_name),
         None,
     );
+    if wait {
+        child.wait().unwrap();
+    }
 }
