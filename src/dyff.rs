@@ -2,7 +2,7 @@ use crate::utils::run_command;
 use crate::Branch;
 use log::{debug, info};
 use std::{fs, vec};
-use std::{error::Error, process::Output};
+use std::{error::Error};
 
 pub async fn generate_diff(
     output_folder: &str,
@@ -43,7 +43,7 @@ pub async fn generate_diff(
     };
 
     let diff_command = &format!(
-        "dyff between --color=false --omit-header --detect-kubernetes=false {} {}",
+        "dyff between -o github --omit-header --detect-kubernetes=false {} {}",
         Branch::Base,
         Branch::Target
     );
@@ -63,7 +63,7 @@ pub async fn generate_diff(
         if path.is_dir() {
             let folder_name = path.to_str().unwrap();
             let output_string: String = match run_command(diff_command, Some(folder_name)).await {
-                Ok(s) if !s.stdout.trim_ascii_end().is_empty() => String::from_utf8_lossy(&s.stdout).to_string(),
+                Ok(s) if !s.stdout.is_empty() => String::from_utf8_lossy(&s.stdout).to_string(),
                 _ => continue,
             };
             outputs.push(header(folder_name));
