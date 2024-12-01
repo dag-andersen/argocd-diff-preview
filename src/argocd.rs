@@ -1,7 +1,7 @@
-use crate::{run_command, utils::CommandError};
+use crate::utils::{run_command, CommandError, CommandOutput};
 use base64::prelude::*;
 use log::{debug, error, info};
-use std::{error::Error, process::Output};
+use std::error::Error;
 
 pub struct ArgoCDOptions<'a> {
     pub version: Option<&'a str>,
@@ -100,7 +100,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         let command =
             "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath={.data.password}";
 
-        let mut password_encoded: Option<Output> = None;
+        let mut password_encoded: Option<CommandOutput> = None;
         let mut counter = 0;
         while password_encoded.is_none() {
             password_encoded = match run_command(command, None).await {
@@ -153,20 +153,17 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         CommandError::new(e)
     })?;
 
-    match run_command("argocd app list", None).await {
-        Ok(_) => (),
-        Err(_) => {
-            return Err("Failed to run: argocd app list".into());
-        }
-    };
+    run_command("argocd app list", None).await.map_err(|e| {
+        error!("❌ Failed to run: argocd app list");
+        CommandError::new(e)
+    })?;
 
     if options.debug {
         let command = "kubectl get configmap -n argocd -o yaml argocd-cmd-params-cm argocd-cm";
         match run_command(command, None).await {
             Ok(o) => debug!(
                 "🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n{}\n{}",
-                command,
-                String::from_utf8_lossy(&o.stdout)
+                command, &o.stdout
             ),
             Err(e) => {
                 error!("❌ Failed to get ConfigMaps");

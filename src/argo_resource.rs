@@ -1,6 +1,6 @@
-use std::error::Error;
 use log::{debug, error, warn};
 use regex::Regex;
+use std::error::Error;
 
 use crate::{parsing::K8sResource, selector::Operator, Selector};
 

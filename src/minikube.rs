@@ -1,7 +1,4 @@
-use crate::{
-    run_command,
-    utils::{spawn_command, CommandError},
-};
+use crate::utils::{run_command, spawn_command, CommandError};
 use log::{error, info};
 use std::error::Error;
 
@@ -31,6 +28,10 @@ pub async fn create_cluster() -> Result<(), Box<dyn Error>> {
             error!("❌ Failed to create cluster");
             CommandError::new(e)
         })?
+}
+
+pub async fn cluster_exists() -> bool {
+    run_command("minikube status", None).await.is_ok()
 }
 
 pub fn delete_cluster(wait: bool) {

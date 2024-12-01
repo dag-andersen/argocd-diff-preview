@@ -1,4 +1,4 @@
-use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
+use crate::utils::{check_if_folder_exists, create_folder_if_not_exists};
 use branch::{Branch, BranchType};
 use log::{debug, error, info};
 use parsing::applications_to_string;
@@ -6,9 +6,9 @@ use regex::Regex;
 use selector::Selector;
 use std::fs;
 use std::path::PathBuf;
-use std::{error::Error, io::Write, process::Output};
+use std::{error::Error, io::Write};
 use structopt::StructOpt;
-use utils::run_command_from_list;
+use utils::{run_command_from_list, CommandOutput};
 mod argo_resource;
 mod argocd;
 mod branch;
@@ -110,12 +110,12 @@ async fn main() -> Result<(), ()> {
         Err(e) => {
             let opt = Opt::from_args();
             error!("❌ {}", e);
-            info!("🧼 Cleaning up...");
-            delete_cluster(
+            cleanup_cluster(
                 get_cluster_tool(&opt.local_cluster_tool).await.unwrap(),
                 &opt.cluster_name,
                 true,
-            );
+            )
+            .await;
             Err(())
         }
     }
@@ -328,7 +328,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
     }
 
     // Delete cluster
-    delete_cluster(cluster_tool, &cluster_name, false);
+    match cluster_tool {
+        ClusterTool::Kind => kind::delete_cluster(&cluster_name, false),
+        ClusterTool::Minikube => minikube::delete_cluster(false),
+    }
 
     diff::generate_diff(
         output_folder,
@@ -380,14 +383,18 @@ async fn get_cluster_tool(tool: &Option<String>) -> Result<ClusterTool, Box<dyn 
     Ok(tool)
 }
 
-fn delete_cluster(tool: ClusterTool, cluster_name: &str, wait: bool) {
+async fn cleanup_cluster(tool: ClusterTool, cluster_name: &str, wait: bool) {
+    info!("🧼 Cleaning up...");
     match tool {
-        ClusterTool::Kind => kind::delete_cluster(cluster_name, wait),
-        ClusterTool::Minikube => minikube::delete_cluster(wait),
+        ClusterTool::Kind if kind::cluster_exists(cluster_name).await => {
+            kind::delete_cluster(cluster_name, wait)
+        }
+        ClusterTool::Minikube if minikube::cluster_exists().await => minikube::delete_cluster(wait),
+        _ => debug!("🧼 No cluster to clean up"),
     }
 }
 
-fn apply_manifest(file_name: &str) -> Result<Output, Output> {
+fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
     run_command_from_list(vec!["kubectl", "apply", "-f", file_name], None).map_err(|e| {
         error!("❌ Failed to apply manifest: {}", file_name);
         e
@@ -406,7 +413,7 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
             if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                 match apply_manifest(file_name) {
                     Ok(_) => count += 1,
-                    Err(e) => return Err(String::from_utf8_lossy(&e.stderr).into()),
+                    Err(e) => return Err(e.stderr.into()),
                 }
             }
         }

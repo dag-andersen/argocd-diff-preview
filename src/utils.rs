@@ -2,10 +2,13 @@ use std::error::Error;
 use std::fmt;
 use std::path::PathBuf;
 use std::process::{Child, Stdio};
-use std::{
-    fs,
-    process::{Command, Output},
-};
+use std::{fs, process::Command};
+
+#[derive(Debug)]
+pub struct CommandOutput {
+    pub stdout: String,
+    pub stderr: String,
+}
 
 #[derive(Debug)]
 pub struct CommandError {
@@ -13,10 +16,8 @@ pub struct CommandError {
 }
 
 impl CommandError {
-    pub fn new(output: Output) -> Self {
-        CommandError {
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        }
+    pub fn new(s: CommandOutput) -> Self {
+        CommandError { stderr: s.stderr }
     }
 }
 
@@ -39,7 +40,10 @@ pub fn check_if_folder_exists(folder_name: &str) -> bool {
     PathBuf::from(folder_name).is_dir()
 }
 
-pub async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Output, Output> {
+pub async fn run_command(
+    command: &str,
+    current_dir: Option<&str>,
+) -> Result<CommandOutput, CommandOutput> {
     let args = command.split_whitespace().collect::<Vec<&str>>();
     run_command_from_list(args, current_dir)
 }
@@ -47,7 +51,7 @@ pub async fn run_command(command: &str, current_dir: Option<&str>) -> Result<Out
 pub fn run_command_from_list(
     command: Vec<&str>,
     current_dir: Option<&str>,
-) -> Result<Output, Output> {
+) -> Result<CommandOutput, CommandOutput> {
     let output = Command::new(command[0])
         .args(&command[1..])
         .env(
@@ -59,8 +63,14 @@ pub fn run_command_from_list(
         .unwrap_or_else(|_| panic!("Failed to execute command: {}", command.join(" ")));
 
     match output.status.success() {
-        true => Ok(output),
-        false => Err(output),
+        true => Ok(CommandOutput {
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        }),
+        false => Err(CommandOutput {
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        }),
     }
 }
 

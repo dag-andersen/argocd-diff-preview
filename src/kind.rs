@@ -1,7 +1,4 @@
-use crate::{
-    run_command,
-    utils::{spawn_command, CommandError},
-};
+use crate::utils::{run_command, spawn_command, CommandError};
 use log::{error, info};
 use std::error::Error;
 
@@ -37,6 +34,14 @@ pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
         error!("❌ Failed to create cluster");
         CommandError::new(e)
     })?
+}
+
+pub async fn cluster_exists(cluster_name: &str) -> bool {
+    let clusters = run_command("kind get clusters", None).await;
+    match clusters {
+        Ok(o) if o.stdout == cluster_name => true,
+        _ => false,
+    }
 }
 
 pub fn delete_cluster(cluster_name: &str, wait: bool) {

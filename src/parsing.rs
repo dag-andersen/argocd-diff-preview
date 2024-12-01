@@ -210,7 +210,7 @@ async fn patch_applications(
 
             if app.is_err() {
                 info!("❌ Failed to patch application: {}", app_name);
-                return app
+                return app;
             }
             app
         })
@@ -309,12 +309,12 @@ async fn generate_apps_from_app_set(
     }
 
     let command = format!("argocd appset generate {} -o yaml", app_set.file_name);
-    let output = run_command(&command, Some(branch.folder_name()))
+    let apps_string = run_command(&command, Some(branch.folder_name()))
         .await
-        .map_err(CommandError::new)?;
-    let apps_string: String = String::from_utf8_lossy(&output.stdout).to_string();
+        .map_err(CommandError::new)?
+        .stdout;
 
-    let yaml = match serde_yaml::from_str(apps_string.as_str()) {
+    let yaml = match serde_yaml::from_str(&apps_string) {
         Ok(r) => r,
         Err(_) => serde_yaml::Value::Null,
     };

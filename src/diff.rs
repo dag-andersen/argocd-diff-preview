@@ -1,8 +1,8 @@
-use crate::utils::run_command;
+use crate::utils::{run_command, CommandOutput};
 use crate::Branch;
 use log::{debug, info};
+use std::error::Error;
 use std::fs;
-use std::{error::Error, process::Output};
 
 pub async fn generate_diff(
     output_folder: &str,
@@ -24,25 +24,23 @@ pub async fn generate_diff(
         None => "".to_string(),
     };
 
-    let parse_diff_output = |output: Result<Output, Output>| -> Result<String, Box<dyn Error>> {
-        let o = match output {
-            Err(e) if !e.stderr.is_empty() => {
-                return Err(format!(
-                    "Error running command: {}",
-                    String::from_utf8_lossy(&e.stderr)
-                )
-                .to_string()
-                .into())
+    let parse_diff_output =
+        |output: Result<CommandOutput, CommandOutput>| -> Result<String, Box<dyn Error>> {
+            let o = match output {
+                Err(e) if !e.stderr.is_empty() => {
+                    return Err(format!("Error running command: {}", e.stderr)
+                        .into())
+                }
+
+                Ok(e) => e.stdout.trim_end().to_string(),
+                Err(e) => e.stdout.trim_end().to_string(),
+            };
+            if o.trim().is_empty() {
+                Ok("No changes found".to_string())
+            } else {
+                Ok(o)
             }
-            Ok(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
-            Err(e) => String::from_utf8_lossy(&e.stdout).trim_end().to_string(),
         };
-        if o.trim().is_empty() {
-            Ok("No changes found".to_string())
-        } else {
-            Ok(o)
-        }
-    };
 
     let summary_diff_command = format!(
         "git --no-pager diff --compact-summary --no-index {} {} {}",
