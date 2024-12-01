@@ -1,6 +1,7 @@
 use crate::utils::{run_command, spawn_command, CommandError};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
+use serde_yaml::Value;
 use std::collections::HashSet;
 use std::fs;
 use std::{collections::BTreeMap, error::Error};
@@ -37,7 +38,7 @@ pub async fn get_resources(
 
     let app_file = branch.app_file();
 
-    if fs::metadata(app_file).unwrap().len() != 0 {
+    if fs::metadata(app_file)?.len() != 0 {
         apply_manifest(app_file).map_err(|e| {
             error!(
                 "❌ Failed to apply applications for branch: {}",
@@ -53,7 +54,8 @@ pub async fn get_resources(
     let start_time = std::time::Instant::now();
 
     loop {
-        let output = match run_command("kubectl get applications -n argocd -oyaml", None).await {
+        let command = "kubectl get applications -n argocd -oyaml";
+        let output = match run_command(command, None).await {
             Ok(o) => o,
             Err(e) => {
                 return Err(format!(
@@ -64,24 +66,29 @@ pub async fn get_resources(
             }
         };
 
-        let applications: serde_yaml::Value =
-            serde_yaml::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+        let applications: Result<Value, serde_yaml::Error> =
+            serde_yaml::from_str(&String::from_utf8_lossy(&output.stdout));
 
-        let items = applications["items"].as_sequence().unwrap();
-        if items.is_empty() {
-            break;
-        }
+        let applications = match applications {
+            Ok(applications) => applications,
+            Err(_) => {
+                return Err(format!("❌ Failed to parse yaml from command: {}", command).into());
+            }
+        };
 
-        if items.len() == set_of_processed_apps.len() {
-            break;
-        }
+        let applications = match applications["items"].as_sequence() {
+            None => break,
+            Some(apps) if apps.is_empty() => break,
+            Some(apps) if apps.len() == set_of_processed_apps.len() => break,
+            Some(apps) => apps,
+        };
 
         let mut list_of_timed_out_apps = vec![];
         let mut other_errors = vec![];
 
         let mut apps_left = 0;
 
-        for item in items {
+        for item in applications {
             let name = item["metadata"]["name"].as_str().unwrap();
             if set_of_processed_apps.contains(name) {
                 continue;
@@ -155,7 +162,7 @@ pub async fn get_resources(
             return Err("Failed to process applications".into());
         }
 
-        if items.len() == set_of_processed_apps.len() {
+        if applications.len() == set_of_processed_apps.len() {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             continue;
         }
@@ -200,7 +207,7 @@ pub async fn get_resources(
             info!(
                 "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
                 apps_left,
-                items.len(),
+                applications.len(),
                 timeout - time_elapsed
             );
         }

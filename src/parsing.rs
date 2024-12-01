@@ -197,20 +197,22 @@ async fn patch_applications(
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     info!("🤖 Patching applications for branch: {}", branch.name);
 
-    let applications: Vec<ArgoResource> = applications
+    let applications: Vec<Result<ArgoResource, Box<dyn Error>>> = applications
         .into_iter()
         .map(|a| {
-            let a = a
+            let app_name = a.name.clone();
+            let app: Result<ArgoResource, Box<dyn Error>> = a
                 .set_namespace("argocd")
                 .remove_sync_policy()
                 .set_project_to_default()
-                .point_destination_to_in_cluster()
-                .redirect_sources(repo, &branch.name);
-            debug!(
-                "Collected resources from application: {:?} in file: {}",
-                a.name, a.file_name
-            );
-            a
+                .and_then(|a| a.point_destination_to_in_cluster())
+                .and_then(|a| a.redirect_sources(repo, &branch.name));
+
+            if app.is_err() {
+                info!("❌ Failed to patch application: {}", app_name);
+                return app
+            }
+            app
         })
         .collect();
 
@@ -220,7 +222,20 @@ async fn patch_applications(
         branch.name
     );
 
-    Ok(applications)
+    let errors: Vec<String> = applications
+        .iter()
+        .filter_map(|a| match a {
+            Ok(_) => None,
+            Err(e) => Some(e.to_string()),
+        })
+        .collect();
+
+    if !errors.is_empty() {
+        return Err(errors.join("\n").into());
+    }
+
+    let apps = applications.into_iter().filter_map(|a| a.ok()).collect();
+    Ok(apps)
 }
 
 async fn from_resource_to_application(

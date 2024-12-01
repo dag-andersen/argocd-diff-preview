@@ -46,6 +46,9 @@ pub fn delete_cluster(cluster_name: &str, wait: bool) {
         None,
     );
     if wait {
-        child.wait().unwrap();
+        match child.wait() {
+            Ok(_) => info!("💥 Cluster deleted successfully"),
+            Err(e) => error!("❌ Failed to delete cluster: {}", e),
+        }
     }
 }

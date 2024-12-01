@@ -37,6 +37,9 @@ pub fn delete_cluster(wait: bool) {
     info!("💥 Deleting cluster...");
     let mut child = spawn_command("minikube delete", None);
     if wait {
-        child.wait().unwrap();
+        match child.wait() {
+            Ok(_) => info!("💥 Cluster deleted successfully"),
+            Err(e) => error!("❌ Failed to delete cluster: {}", e),
+        }
     }
 }

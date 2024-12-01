@@ -142,7 +142,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
     let file_regex = opt
         .file_regex
         .filter(|f| !f.trim().is_empty())
-        .map(|f| Regex::new(&f).unwrap());
+        .map(|f| Regex::new(&f))
+        .transpose()?;
 
     let base_branch_name = opt.base_branch.trim();
     let target_branch_name = opt.target_branch.trim();

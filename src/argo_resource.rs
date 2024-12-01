@@ -1,3 +1,4 @@
+use std::error::Error;
 use log::{debug, error, warn};
 use regex::Regex;
 
@@ -37,84 +38,123 @@ impl ArgoResource {
         self
     }
 
-    pub fn set_project_to_default(mut self) -> ArgoResource {
+    pub fn set_project_to_default(mut self) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
-            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut().unwrap(),
-            ApplicationKind::ApplicationSet => self.yaml["spec"]["template"]["spec"]
-                .as_mapping_mut()
-                .unwrap(),
+            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
+            ApplicationKind::ApplicationSet => {
+                self.yaml["spec"]["template"]["spec"].as_mapping_mut()
+            }
         };
-        spec["project"] = serde_yaml::Value::String("default".to_string());
-        self
+
+        match spec {
+            None => Err(format!("No 'spec' key found in Application: {}", self.name).into()),
+            Some(spec) => {
+                spec["project"] = serde_yaml::Value::String("default".to_string());
+                Ok(self)
+            }
+        }
     }
 
-    pub fn point_destination_to_in_cluster(mut self) -> ArgoResource {
+    pub fn point_destination_to_in_cluster(mut self) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
-            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut().unwrap(),
-            ApplicationKind::ApplicationSet => self.yaml["spec"]["template"]["spec"]
-                .as_mapping_mut()
-                .unwrap(),
+            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
+            ApplicationKind::ApplicationSet => {
+                self.yaml["spec"]["template"]["spec"].as_mapping_mut()
+            }
         };
-        if spec.contains_key("destination") {
-            spec["destination"]["name"] = serde_yaml::Value::String("in-cluster".to_string());
-            spec["destination"]
-                .as_mapping_mut()
-                .map(|a| a.remove("server"));
+
+        match spec {
+            None => Err(format!("No 'spec' key found in Application: {}", self.name).into()),
+            Some(spec) if spec.contains_key("destination") => {
+                spec["destination"]["name"] = serde_yaml::Value::String("in-cluster".to_string());
+                spec["destination"]
+                    .as_mapping_mut()
+                    .map(|a| a.remove("server"));
+                Ok(self)
+            }
+            Some(_) => Err(format!(
+                "No 'spec.destination' key found in Application: {}",
+                self.name
+            )
+            .into()),
         }
-        self
     }
 
     pub fn remove_sync_policy(mut self) -> ArgoResource {
         let spec = match self.kind {
-            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut().unwrap(),
-            ApplicationKind::ApplicationSet => self.yaml["spec"]["template"]["spec"]
-                .as_mapping_mut()
-                .unwrap(),
+            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
+            ApplicationKind::ApplicationSet => {
+                self.yaml["spec"]["template"]["spec"].as_mapping_mut()
+            }
         };
-        spec.remove("syncPolicy");
+        match spec {
+            Some(spec) => {
+                spec.remove("syncPolicy");
+            }
+            None => debug!(
+                "Can't remove 'syncPolicy' because 'spec' key not found in file: {}",
+                self.file_name
+            ),
+        }
         self
     }
 
-    pub fn redirect_sources(mut self, repo: &str, branch: &str) -> ArgoResource {
+    pub fn redirect_sources(
+        mut self,
+        repo: &str,
+        branch: &str,
+    ) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
-            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut().unwrap(),
-            ApplicationKind::ApplicationSet => self.yaml["spec"]["template"]["spec"]
-                .as_mapping_mut()
-                .unwrap(),
+            ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
+            ApplicationKind::ApplicationSet => {
+                self.yaml["spec"]["template"]["spec"].as_mapping_mut()
+            }
         };
-        if spec.contains_key("source") {
-            if spec["source"]["chart"].as_str().is_some() {
-                return self;
-            }
-            match spec["source"]["repoURL"].as_str() {
-                Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                    spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string())
+
+        match spec {
+            None => Err(format!("No 'spec' key found in Application: {}", self.name).into()),
+            Some(spec) if spec.contains_key("source") => {
+                if spec["source"]["chart"].as_str().is_some() {
+                    return Ok(self);
                 }
-                _ => debug!(
-                    "Found no 'repoURL' under spec.source in file: {}",
-                    self.file_name
-                ),
-            }
-        } else if spec.contains_key("sources") {
-            if let Some(sources) = spec["sources"].as_sequence_mut() {
-                for source in sources {
-                    if source["chart"].as_str().is_some() {
-                        continue;
+                match spec["source"]["repoURL"].as_str() {
+                    Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
+                        spec["source"]["targetRevision"] =
+                            serde_yaml::Value::String(branch.to_string());
                     }
-                    match source["repoURL"].as_str() {
-                        Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                            source["targetRevision"] =
-                                serde_yaml::Value::String(branch.to_string());
+                    _ => debug!(
+                        "Found no 'repoURL' under spec.source in file: {}",
+                        self.file_name
+                    ),
+                }
+                Ok(self)
+            }
+            Some(spec) if spec.contains_key("sources") => {
+                if let Some(sources) = spec["sources"].as_sequence_mut() {
+                    for source in sources {
+                        if source["chart"].as_str().is_some() {
+                            continue;
                         }
-                        _ => debug!(
-                            "Found no 'repoURL' under spec.sources[] in file: {}",
-                            self.file_name
-                        ),
+                        match source["repoURL"].as_str() {
+                            Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
+                                source["targetRevision"] =
+                                    serde_yaml::Value::String(branch.to_string());
+                            }
+                            _ => debug!(
+                                "Found no 'repoURL' under spec.sources[] in file: {}",
+                                self.file_name
+                            ),
+                        }
                     }
                 }
+                Ok(self)
             }
+            Some(_) => Err(format!(
+                "No 'spec.source' or 'spec.sources' key found in Application: {}",
+                self.name
+            )
+            .into()),
         }
-        self
     }
 
     pub fn from_k8s_resource(k8s_resource: K8sResource) -> Option<ArgoResource> {
