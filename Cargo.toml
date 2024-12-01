@@ -1,16 +1,16 @@
 [package]
 name = "argocd-diff-preview"
-version = "0.0.24"
+version = "0.0.25"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = {version="1.40.0",features = ["full"]}
+tokio = {version="1.41.1",features = ["full"]}
 base64 = "0.22.1"
-serde = "1.0.210"
+serde = "1.0.215"
 serde_yaml = "0.9.33"
-serde_json = "1.0.131"
+serde_json = "1.0.133"
 walkdir = "2.5.0"
 schemars = "0.8.21"
 structopt = { version = "0.3" }
