@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app-new-namespace
+  namespace: test-namespace
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  sources:
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      ref: local-files
+    - path: examples/helm/charts/myApp
+      repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      helm:
+        valueFiles:
+          - $local-files/examples/helm/values/my-app.yaml
