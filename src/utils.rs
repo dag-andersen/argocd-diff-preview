@@ -2,12 +2,16 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
+use log::error;
 
 use crate::error::CommandOutput;
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
     if !PathBuf::from(folder_name).is_dir() {
-        fs::create_dir_all(folder_name)?;
+        fs::create_dir_all(folder_name).map_err(|e| {
+            error!("❌ Failed to create folder '{}': {}", folder_name, e);
+            e
+        })?;
     }
     Ok(())
 }

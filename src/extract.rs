@@ -1,5 +1,6 @@
+use crate::branch::BranchType;
 use crate::error::CommandError;
-use crate::utils::{run_command, spawn_command};
+use crate::utils::{create_folder_if_not_exists, run_command, spawn_command};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
@@ -92,11 +93,11 @@ pub async fn get_resources(
                     debug!("Getting manifests for application: {}", name);
                     match run_command(&format!("argocd app manifests {}", name), None) {
                         Ok(o) => {
-                            fs::write(
-                                format!("{}/{}/{}", output_folder, branch.branch_type, name),
-                                &o.stdout,
-                            )?;
-                            debug!("Got manifests for application: {}", name)
+                            let r = parse_yaml_string(
+                                o.stdout,
+                                name.to_string(),
+                            );
+                            k8s_resources.extend(r);
                         }
                         Err(e) => error!("error: {}", e.stderr),
                     }
@@ -214,7 +215,7 @@ pub async fn get_resources(
         branch.name
     );
 
-    store_resources(branch_type, output_folder, k8s_resources)?;
+    store_resources(branch, output_folder, k8s_resources)?;
 
     Ok(())
 }
@@ -280,9 +281,9 @@ fn store_resources(
     k8s_resources: Vec<K8sResource>,
 ) -> Result<(), Box<dyn Error>> {
     debug!("Storing resources in output folder: {}", output_folder);
-
+   
     for resource in k8s_resources {
-        let app = format!("hej-{}", resource.from_app.clone());
+        let app = resource.from_app.clone();
         let api_version = resource.api_version.clone().replace("/", "&");
         let kind = resource.kind.clone();
         let namespace = resource
@@ -298,7 +299,7 @@ fn store_resources(
         
         let file_path = format!(
             "{}/{}/{}&{}&{}&{}",
-            folder_path, branch_type, api_version, kind, namespace, name
+            folder_path, branch_type.branch_type, api_version, kind, namespace, name
         );
 
         debug!("Creating folder: {}", folder_path);
@@ -309,8 +310,8 @@ fn store_resources(
             app, api_version, kind, namespace, name
         );
 
-        create_folder_if_not_exists(format!("{}/{}", folder_path, Branch::Base).as_str());
-        create_folder_if_not_exists(format!("{}/{}", folder_path, Branch::Target).as_str());
+        create_folder_if_not_exists(format!("{}/{}", folder_path, BranchType::Base).as_str());
+        create_folder_if_not_exists(format!("{}/{}", folder_path, BranchType::Target).as_str());
         debug!("Writing file: {}", file_path);
         fs::write(file_path, serde_yaml::to_string(&resource.yaml)?)?;
     }

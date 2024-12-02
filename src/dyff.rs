@@ -1,13 +1,14 @@
+use crate::branch::BranchType;
 use crate::utils::run_command;
 use crate::Branch;
 use log::{debug, info};
 use std::{fs, vec};
-use std::{error::Error};
+use std::error::Error;
 
-pub async fn generate_diff(
+pub fn generate_diff(
     output_folder: &str,
-    base_branch_name: &str,
-    target_branch_name: &str,
+    base_branch: &Branch,
+    target_branch: &Branch,
     diff_ignore: Option<String>,
     max_char_count: Option<usize>,
 ) -> Result<(), Box<dyn Error>> {
@@ -15,7 +16,7 @@ pub async fn generate_diff(
 
     info!(
         "🔮 Generating diff between {} and {}",
-        base_branch_name, target_branch_name
+        base_branch.name, target_branch.name
     );
 
     let patterns_to_ignore = match diff_ignore {
@@ -44,8 +45,8 @@ pub async fn generate_diff(
 
     let diff_command = &format!(
         "dyff between -o github --omit-header --detect-kubernetes=false {} {}",
-        Branch::Base,
-        Branch::Target
+        BranchType::Base,
+        BranchType::Target,
     );
 
     debug!("Getting diff with command: {}", diff_command);
@@ -62,8 +63,8 @@ pub async fn generate_diff(
         debug!("Found entry: {:?}", path);
         if path.is_dir() {
             let folder_name = path.to_str().unwrap();
-            let output_string: String = match run_command(diff_command, Some(folder_name)).await {
-                Ok(s) if !s.stdout.is_empty() => String::from_utf8_lossy(&s.stdout).to_string(),
+            let output_string: String = match run_command(diff_command, Some(folder_name)) {
+                Ok(s) if !s.stdout.is_empty() => s.stdout,
                 _ => continue,
             };
             outputs.push(header(folder_name));
