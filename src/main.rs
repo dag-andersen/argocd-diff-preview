@@ -6,6 +6,7 @@ use regex::Regex;
 use selector::Selector;
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::{error::Error, io::Write};
 use structopt::StructOpt;
 use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command_from_list};
@@ -74,8 +75,8 @@ struct Opt {
     secrets_folder: String,
 
     /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
-    #[structopt(long, env)]
-    local_cluster_tool: Option<String>,
+    #[structopt(long, env, default_value = "auto")]
+    local_cluster_tool: ClusterTool,
 
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
@@ -104,6 +105,19 @@ enum ClusterTool {
     Minikube,
 }
 
+impl FromStr for ClusterTool {
+    type Err = &'static str;
+    fn from_str(day: &str) -> Result<Self, Self::Err> {
+        match day.to_lowercase().as_str() {
+            "kind" => Ok(ClusterTool::Kind),
+            "minikube" => Ok(ClusterTool::Minikube),
+            "auto" if kind::is_installed() => Ok(ClusterTool::Kind),
+            "auto" if minikube::is_installed() => Ok(ClusterTool::Minikube),
+            _ => Err("No local cluster tool found. Please install kind or minikube".into()),
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), ()> {
     match run().await {
@@ -111,11 +125,7 @@ async fn main() -> Result<(), ()> {
         Err(e) => {
             let opt = Opt::from_args();
             error!("❌ {}", e);
-            cleanup_cluster(
-                get_cluster_tool(&opt.local_cluster_tool).unwrap(),
-                &opt.cluster_name,
-                true,
-            );
+            cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
             Err(())
         }
     }
@@ -173,7 +183,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         });
 
     // select local cluster tool
-    let cluster_tool = get_cluster_tool(&opt.local_cluster_tool)?;
+    let cluster_tool = &opt.local_cluster_tool;
 
     let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
     if !repo_regex.is_match(repo) {
@@ -367,27 +377,16 @@ fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_cluster_tool(tool: &Option<String>) -> Result<ClusterTool, Box<dyn Error>> {
-    let tool = match tool {
-        Some(t) if t == "kind" => ClusterTool::Kind,
-        Some(t) if t == "minikube" => ClusterTool::Minikube,
-        _ if kind::is_installed() => ClusterTool::Kind,
-        _ if minikube::is_installed() => ClusterTool::Minikube,
-        _ => {
-            error!("❌ No local cluster tool found. Please install kind or minikube");
-            return Err("No local cluster tool found".into());
-        }
-    };
-    Ok(tool)
-}
-
-fn cleanup_cluster(tool: ClusterTool, cluster_name: &str, wait: bool) {
-    info!("🧼 Cleaning up...");
+fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
     match tool {
         ClusterTool::Kind if kind::cluster_exists(cluster_name) => {
-            kind::delete_cluster(cluster_name, wait)
+            info!("🧼 Cleaning up...");
+            kind::delete_cluster(cluster_name, true)
         }
-        ClusterTool::Minikube if minikube::cluster_exists() => minikube::delete_cluster(wait),
+        ClusterTool::Minikube if minikube::cluster_exists() => {
+            info!("🧼 Cleaning up...");
+            minikube::delete_cluster(true)
+        }
         _ => debug!("🧼 No cluster to clean up"),
     }
 }

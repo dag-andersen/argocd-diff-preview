@@ -28,10 +28,9 @@ pub fn generate_diff(
     let parse_diff_output =
         |output: Result<CommandOutput, CommandOutput>| -> Result<String, Box<dyn Error>> {
             let o = match output {
-                Err(e) if !e.stderr.is_empty() => {
+                Err(e) if !e.stderr.trim().is_empty() => {
                     return Err(format!("Error running command: {}", e.stderr).into())
                 }
-
                 Ok(e) => e.stdout.trim_end().to_string(),
                 Err(e) => e.stdout.trim_end().to_string(),
             };

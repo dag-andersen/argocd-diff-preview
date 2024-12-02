@@ -2,7 +2,7 @@ use crate::{
     error::CommandError,
     utils::{run_command, spawn_command},
 };
-use log::{error, info};
+use log::{debug, error, info};
 use std::error::Error;
 
 pub fn is_installed() -> bool {
@@ -39,8 +39,12 @@ pub fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
 
 pub fn cluster_exists(cluster_name: &str) -> bool {
     match run_command("kind get clusters", None) {
-        Ok(o) if o.stdout == cluster_name => true,
-        _ => false,
+        Ok(o) if o.stdout.trim() == cluster_name => true,
+        Ok(o) => {
+            debug!("❌ Cluster '{}' not found in: {}", cluster_name, o.stdout);
+            false
+        },
+        Err(_) => false,
     }
 }
 
