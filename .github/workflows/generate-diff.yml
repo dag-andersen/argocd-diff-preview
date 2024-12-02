@@ -25,6 +25,15 @@ jobs:
           ref: main
           path: main
 
+      - name: Set ArgoCD Custom Values
+        run: |
+          cat > values.yaml << "EOF"
+          # set whatever helm values you want
+          configs:
+            cm:
+              kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm
+          EOF
+
       - name: Generate Diff
         run: |
           docker run \
@@ -33,9 +42,10 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
+            -v $(pwd)/values.yaml:/argocd-config/values.yaml \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.28
+            dagandersen/argocd-diff-preview:v0.0.28 --debug
 
       - name: Post diff as comment
         run: |
