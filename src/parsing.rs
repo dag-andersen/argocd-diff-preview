@@ -1,72 +1,48 @@
-use crate::{filter_apps::filter, Selector};
+use crate::{argo_resource::ArgoResource, Branch, Selector};
 use log::{debug, info};
 use regex::Regex;
-use serde_yaml::{Mapping, Value};
+use serde_yaml::Value;
 use std::{error::Error, io::BufRead};
 
-struct K8sResource {
-    file_name: String,
-    yaml: serde_yaml::Value,
-}
-
-pub struct Application {
+pub struct K8sResource {
     pub file_name: String,
     pub yaml: serde_yaml::Value,
-    kind: ApplicationKind,
-    pub name: String,
 }
 
-impl std::fmt::Display for Application {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
+impl Clone for K8sResource {
+    fn clone(&self) -> Self {
+        K8sResource {
+            file_name: self.file_name.clone(),
+            yaml: self.yaml.clone(),
+        }
     }
 }
 
-impl PartialEq for Application {
-    fn eq(&self, other: &Self) -> bool {
-        self.yaml == other.yaml
-    }
-}
-
-enum ApplicationKind {
-    Application,
-    ApplicationSet,
-}
-
-pub struct GetApplicationOptions<'a> {
-    pub directory: &'a str,
-    pub branch: &'a str,
-}
-
-pub async fn get_applications_for_both_branches<'a>(
-    base_branch: GetApplicationOptions<'a>,
-    target_branch: GetApplicationOptions<'a>,
+pub fn get_applications_for_both_branches<'a>(
+    base_branch: &Branch,
+    target_branch: &Branch,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
     repo: &str,
     ignore_invalid_watch_pattern: bool,
-) -> Result<(Vec<Application>, Vec<Application>), Box<dyn Error>> {
+) -> Result<(Vec<ArgoResource>, Vec<ArgoResource>), Box<dyn Error>> {
     let base_apps = get_applications(
-        base_branch.directory,
-        base_branch.branch,
+        base_branch,
         regex,
         selector,
         files_changed,
         repo,
         ignore_invalid_watch_pattern,
-    )
-    .await?;
+    )?;
     let target_apps = get_applications(
-        target_branch.directory,
-        target_branch.branch,
+        target_branch,
         regex,
         selector,
         files_changed,
         repo,
         ignore_invalid_watch_pattern,
-    )
-    .await?;
+    )?;
 
     let duplicate_yaml = base_apps
         .iter()
@@ -103,17 +79,16 @@ pub async fn get_applications_for_both_branches<'a>(
     }
 }
 
-pub async fn get_applications(
-    directory: &str,
-    branch: &str,
+pub fn get_applications(
+    branch: &Branch,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
     repo: &str,
     ignore_invalid_watch_pattern: bool,
-) -> Result<Vec<Application>, Box<dyn Error>> {
-    let yaml_files = get_yaml_files(directory, regex).await;
-    let k8s_resources = parse_yaml(directory, yaml_files).await;
+) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
+    let yaml_files = get_yaml_files(branch.folder_name(), regex);
+    let k8s_resources = parse_yaml(branch.folder_name(), yaml_files);
     let applications = from_resource_to_application(
         k8s_resources,
         selector,
@@ -121,12 +96,12 @@ pub async fn get_applications(
         ignore_invalid_watch_pattern,
     );
     if !applications.is_empty() {
-        return patch_applications(applications, branch, repo).await;
+        return patch_applications(applications, branch, repo);
     }
     Ok(applications)
 }
 
-async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
+fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
     use walkdir::WalkDir;
 
     info!("🤖 Fetching all files in dir: {}", directory);
@@ -172,7 +147,7 @@ async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
     yaml_files
 }
 
-async fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
+fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
     files.iter()
         .flat_map(|f| {
             debug!("In dir '{}' found yaml file: {}", directory, f);
@@ -208,90 +183,52 @@ async fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
         .collect()
 }
 
-async fn patch_applications(
-    applications: Vec<Application>,
-    branch: &str,
+fn patch_applications(
+    applications: Vec<ArgoResource>,
+    branch: &Branch,
     repo: &str,
-) -> Result<Vec<Application>, Box<dyn Error>> {
-    info!("🤖 Patching applications for branch: {}", branch);
+) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
+    info!("🤖 Patching applications for branch: {}", branch.name);
 
-    let point_destination_to_in_cluster = |spec: &mut Mapping| {
-        if spec.contains_key("destination") {
-            spec["destination"]["name"] = serde_yaml::Value::String("in-cluster".to_string());
-            spec["destination"]
-                .as_mapping_mut()
-                .map(|a| a.remove("server"));
-        }
-    };
-
-    let set_project_to_default =
-        |spec: &mut Mapping| spec["project"] = serde_yaml::Value::String("default".to_string());
-
-    let remove_sync_policy = |spec: &mut Mapping| spec.remove("syncPolicy");
-
-    let redirect_sources = |spec: &mut Mapping, file: &str| {
-        if spec.contains_key("source") {
-            if spec["source"]["chart"].as_str().is_some() {
-                return;
-            }
-            match spec["source"]["repoURL"].as_str() {
-                Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                    spec["source"]["targetRevision"] = serde_yaml::Value::String(branch.to_string())
-                }
-                _ => debug!("Found no 'repoURL' under spec.source in file: {}", file),
-            }
-        } else if spec.contains_key("sources") {
-            if let Some(sources) = spec["sources"].as_sequence_mut() {
-                for source in sources {
-                    if source["chart"].as_str().is_some() {
-                        continue;
-                    }
-                    match source["repoURL"].as_str() {
-                        Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                            source["targetRevision"] =
-                                serde_yaml::Value::String(branch.to_string());
-                        }
-                        _ => debug!("Found no 'repoURL' under spec.sources[] in file: {}", file),
-                    }
-                }
-            }
-        }
-    };
-
-    let applications: Vec<Application> = applications
+    let applications: Vec<Result<ArgoResource, Box<dyn Error>>> = applications
         .into_iter()
-        .map(|mut a| {
-            // Update namesapce
-            a.yaml["metadata"]["namespace"] = serde_yaml::Value::String("argocd".to_string());
-            a
-        })
-        .filter_map(|mut a| {
-            // Clean up the spec
-            let spec = match a.kind {
-                ApplicationKind::Application => a.yaml["spec"].as_mapping_mut()?,
-                ApplicationKind::ApplicationSet => {
-                    a.yaml["spec"]["template"]["spec"].as_mapping_mut()?
-                }
-            };
-            remove_sync_policy(spec);
-            set_project_to_default(spec);
-            point_destination_to_in_cluster(spec);
-            redirect_sources(spec, &a.file_name);
-            debug!(
-                "Collected resources from application: {:?} in file: {}",
-                a.name, a.file_name
-            );
-            Some(a)
+        .map(|a| {
+            let app_name = a.name.clone();
+            let app: Result<ArgoResource, Box<dyn Error>> = a
+                .set_namespace("argocd")
+                .remove_sync_policy()
+                .set_project_to_default()
+                .and_then(|a| a.point_destination_to_in_cluster())
+                .and_then(|a| a.redirect_sources(repo, &branch.name));
+
+            if app.is_err() {
+                info!("❌ Failed to patch application: {}", app_name);
+                return app;
+            }
+            app
         })
         .collect();
 
     info!(
         "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
         applications.len(),
-        branch
+        branch.name
     );
 
-    Ok(applications)
+    let errors: Vec<String> = applications
+        .iter()
+        .filter_map(|a| match a {
+            Ok(_) => None,
+            Err(e) => Some(e.to_string()),
+        })
+        .collect();
+
+    if !errors.is_empty() {
+        return Err(errors.join("\n").into());
+    }
+
+    let apps = applications.into_iter().filter_map(|a| a.ok()).collect();
+    Ok(apps)
 }
 
 fn from_resource_to_application(
@@ -299,32 +236,10 @@ fn from_resource_to_application(
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
     ignore_invalid_watch_pattern: bool,
-) -> Vec<Application> {
-    let apps: Vec<Application> = k8s_resources
-        .into_iter()
-        .filter_map(|r| {
-            let kind =
-                r.yaml["kind"]
-                    .as_str()
-                    .map(|s| s.to_string())
-                    .and_then(|kind| match kind.as_str() {
-                        "Application" => Some(ApplicationKind::Application),
-                        "ApplicationSet" => Some(ApplicationKind::ApplicationSet),
-                        _ => None,
-                    })?;
-
-            let name = r.yaml["metadata"]["name"]
-                .as_str()
-                .unwrap_or("unknown")
-                .to_string();
-
-            Some(Application {
-                kind,
-                file_name: r.file_name,
-                name,
-                yaml: r.yaml,
-            })
-        })
+) -> Vec<ArgoResource> {
+    let apps: Vec<ArgoResource> = k8s_resources
+        .iter()
+        .filter_map(|r| ArgoResource::from_k8s_resource(r.clone()))
         .collect();
 
     match (selector, files_changed) {
@@ -352,7 +267,10 @@ fn from_resource_to_application(
 
     let number_of_apps_before_filtering = apps.len();
 
-    let filtered_apps: Vec<Application> = filter(apps, selector, files_changed, ignore_invalid_watch_pattern);
+    let filtered_apps: Vec<ArgoResource> = apps
+        .into_iter()
+        .filter_map(|a| a.filter(selector, files_changed, ignore_invalid_watch_pattern))
+        .collect();
 
     if number_of_apps_before_filtering != filtered_apps.len() {
         info!(
@@ -368,12 +286,4 @@ fn from_resource_to_application(
     }
 
     filtered_apps
-}
-
-pub fn applications_to_string(applications: Vec<Application>) -> String {
-    applications
-        .iter()
-        .map(|a| a.to_string())
-        .collect::<Vec<String>>()
-        .join("---\n")
 }

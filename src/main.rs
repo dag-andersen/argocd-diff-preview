@@ -1,23 +1,26 @@
-use crate::utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
+use argo_resource::ArgoResource;
+use branch::{Branch, BranchType};
+use error::CommandOutput;
 use log::{debug, error, info};
-use parsing::{applications_to_string, GetApplicationOptions};
 use regex::Regex;
+use selector::Selector;
 use std::fs;
 use std::path::PathBuf;
-use std::{
-    error::Error,
-    io::Write,
-    process::{Command, Output},
-};
+use std::str::FromStr;
+use std::{error::Error, io::Write};
 use structopt::StructOpt;
+use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command_from_list};
+mod argo_resource;
 mod argocd;
+mod branch;
 mod diff;
+mod error;
 mod extract;
-mod filter_apps;
 mod kind;
 mod minikube;
 mod no_apps_found;
 mod parsing;
+mod selector;
 mod utils;
 
 #[derive(Debug, StructOpt)]
@@ -72,8 +75,8 @@ struct Opt {
     secrets_folder: String,
 
     /// Local cluster tool. Options: kind, minikube, auto. Default: Auto
-    #[structopt(long, env)]
-    local_cluster_tool: Option<String>,
+    #[structopt(long, env, default_value = "auto")]
+    local_cluster_tool: ClusterTool,
 
     /// Max diff message character count. Default: 65536 (GitHub comment limit)
     #[structopt(long, env)]
@@ -102,58 +105,30 @@ enum ClusterTool {
     Minikube,
 }
 
-enum Branch {
-    Base,
-    Target,
-}
-
-impl std::fmt::Display for Branch {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Branch::Base => write!(f, "base"),
-            Branch::Target => write!(f, "target"),
+impl FromStr for ClusterTool {
+    type Err = &'static str;
+    fn from_str(day: &str) -> Result<Self, Self::Err> {
+        match day.to_lowercase().as_str() {
+            "kind" => Ok(ClusterTool::Kind),
+            "minikube" => Ok(ClusterTool::Minikube),
+            "auto" if kind::is_installed() => Ok(ClusterTool::Kind),
+            "auto" if minikube::is_installed() => Ok(ClusterTool::Minikube),
+            _ => Err("No local cluster tool found. Please install kind or minikube"),
         }
     }
 }
-
-enum Operator {
-    Eq,
-    Ne,
-}
-
-struct Selector {
-    key: String,
-    value: String,
-    operator: Operator,
-}
-
-impl std::fmt::Display for Selector {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Selector {
-                key,
-                value,
-                operator,
-            } => match operator {
-                Operator::Eq => write!(f, "{}={}", key, value),
-                Operator::Ne => write!(f, "{}!={}", key, value),
-            },
-        }
-    }
-}
-
-fn apps_file(branch: &Branch) -> &'static str {
-    match branch {
-        Branch::Base => "apps_base_branch.yaml",
-        Branch::Target => "apps_target_branch.yaml",
-    }
-}
-
-const BASE_BRANCH_FOLDER: &str = "base-branch";
-const TARGET_BRANCH_FOLDER: &str = "target-branch";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    run().await.map_err(|e| {
+        let opt = Opt::from_args();
+        error!("❌ {}", e);
+        cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
+        e
+    })
+}
+
+async fn run() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
     // Start timer
@@ -174,7 +149,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let file_regex = opt
         .file_regex
         .filter(|f| !f.trim().is_empty())
-        .map(|f| Regex::new(&f).unwrap());
+        .map(|f| Regex::new(&f))
+        .transpose()?;
 
     let base_branch_name = opt.base_branch.trim();
     let target_branch_name = opt.target_branch.trim();
@@ -204,25 +180,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         });
 
     // select local cluster tool
-    let tool = match opt.local_cluster_tool {
-        Some(t) if t == "kind" => ClusterTool::Kind,
-        Some(t) if t == "minikube" => ClusterTool::Minikube,
-        _ if kind::is_installed().await => ClusterTool::Kind,
-        _ if minikube::is_installed().await => ClusterTool::Minikube,
-        _ => {
-            error!("❌ No local cluster tool found. Please install kind or minikube");
-            panic!("No local cluster tool found")
-        }
-    };
+    let cluster_tool = &opt.local_cluster_tool;
 
     let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
     if !repo_regex.is_match(repo) {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
-        panic!("Invalid repository format");
+        return Err("Invalid repository format".into());
     }
 
     info!("✨ Running with:");
-    info!("✨ - local-cluster-tool: {:?}", tool);
+    info!("✨ - local-cluster-tool: {:?}", cluster_tool);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
     info!("✨ - secrets-folder: {}", secrets_folder);
@@ -251,48 +218,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("✨ Ignoring invalid watch patterns Regex on Applications");
     }
 
+    let base_branch = Branch {
+        name: base_branch_name.to_string(),
+        branch_type: BranchType::Base,
+    };
+
+    let target_branch = Branch {
+        name: target_branch_name.to_string(),
+        branch_type: BranchType::Target,
+    };
+
     // label selectors can be fined in the following format: key1==value1,key2=value2,key3!=value3
     let selector = opt.selector.filter(|s| !s.trim().is_empty()).map(|s| {
         let labels: Vec<Selector> = s
             .split(',')
             .filter(|l| !l.trim().is_empty())
-            .map(|l| {
-                let not_equal = l.split("!=").collect::<Vec<&str>>();
-                let equal_double = l.split("==").collect::<Vec<&str>>();
-                let equal_single = l.split('=').collect::<Vec<&str>>();
-                let selector = match (not_equal.len(), equal_double.len(), equal_single.len()) {
-                    (2, _, _) => Selector {
-                        key: not_equal[0].trim().to_string(),
-                        value: not_equal[1].trim().to_string(),
-                        operator: Operator::Ne,
-                    },
-                    (_, 2, _) => Selector {
-                        key: equal_double[0].trim().to_string(),
-                        value: equal_double[1].trim().to_string(),
-                        operator: Operator::Eq,
-                    },
-                    (_, _, 2) => Selector {
-                        key: equal_single[0].trim().to_string(),
-                        value: equal_single[1].trim().to_string(),
-                        operator: Operator::Eq,
-                    },
-                    _ => {
-                        error!("❌ Invalid label selector format: {}", l);
-                        panic!("Invalid label selector format");
-                    }
-                };
-                if selector.key.is_empty()
-                    || selector.key.contains('!')
-                    || selector.key.contains('=')
-                    || selector.value.is_empty()
-                    || selector.value.contains('!')
-                    || selector.value.contains('=')
-                {
-                    error!("❌ Invalid label selector format: {}", l);
-                    panic!("Invalid label selector format");
-                }
-                selector
-            })
+            .map(|l| Selector::from(l).expect("Invalid label selector format"))
             .collect();
         labels
     });
@@ -307,20 +248,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    if !check_if_folder_exists(&BASE_BRANCH_FOLDER) {
+    if !check_if_folder_exists(base_branch.folder_name()) {
         error!(
             "❌ Base branch folder does not exist: {}",
-            BASE_BRANCH_FOLDER
+            base_branch.folder_name()
         );
-        panic!("Base branch folder does not exist");
+        return Err("Base branch folder does not exist".into());
     }
 
-    if !check_if_folder_exists(&TARGET_BRANCH_FOLDER) {
+    if !check_if_folder_exists(target_branch.folder_name()) {
         error!(
             "❌ Target branch folder does not exist: {}",
-            TARGET_BRANCH_FOLDER
+            target_branch.folder_name()
         );
-        panic!("Target branch folder does not exist");
+        return Err("Target branch folder does not exist".into());
     }
 
     let cluster_name = opt.cluster_name;
@@ -328,21 +269,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
     let (base_apps, target_apps) = parsing::get_applications_for_both_branches(
-        GetApplicationOptions {
-            directory: BASE_BRANCH_FOLDER,
-            branch: &base_branch_name,
-        },
-        GetApplicationOptions {
-            directory: TARGET_BRANCH_FOLDER,
-            branch: &target_branch_name,
-        },
+        &base_branch,
+        &target_branch,
         &file_regex,
         &selector,
         &files_changed,
         repo,
         opt.ignore_invalid_watch_pattern,
-    )
-    .await?;
+    )?;
 
     let found_base_apps = !base_apps.is_empty();
     let found_target_apps = !target_apps.is_empty();
@@ -350,25 +284,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !found_base_apps && !found_target_apps {
         info!("👀 Nothing to compare");
         info!("👀 If this doesn't seem right, try running the tool with '--debug' to get more details about what is happening");
-        no_apps_found::write_message(output_folder, &selector, &files_changed).await?;
+        no_apps_found::write_message(output_folder, &selector, &files_changed)?;
         info!("🎉 Done in {} seconds", start.elapsed().as_secs());
         return Ok(());
     }
 
-    match tool {
-        ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
-        ClusterTool::Minikube => minikube::create_cluster().await?,
+    fs::write(base_branch.app_file(), applications_to_string(base_apps))?;
+    fs::write(
+        target_branch.app_file(),
+        applications_to_string(target_apps),
+    )?;
+
+    match cluster_tool {
+        ClusterTool::Kind => kind::create_cluster(&cluster_name)?,
+        ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
-    argocd::create_namespace().await?;
+    argocd::create_namespace()?;
 
-    create_folder_if_not_exists(secrets_folder);
+    create_folder_if_not_exists(secrets_folder)?;
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
-            panic!("error: {}", e)
+            return Err(e);
         }
     }
 
@@ -378,74 +318,86 @@ async fn main() -> Result<(), Box<dyn Error>> {
     })
     .await?;
 
-    fs::write(apps_file(&Branch::Base), applications_to_string(base_apps))?;
-    fs::write(
-        apps_file(&Branch::Target),
-        applications_to_string(target_apps),
-    )?;
-
     // Cleanup output folder
-    clean_output_folder(output_folder);
+    clean_output_folder(output_folder)?;
 
     // Extract resources from Argo CD
     if found_base_apps {
-        extract::get_resources(&Branch::Base, timeout, output_folder).await?;
+        extract::get_resources(&base_branch, timeout, output_folder).await?;
         if found_target_apps {
-            extract::delete_applications().await;
+            extract::delete_applications().await?;
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
     }
     if found_target_apps {
-        extract::get_resources(&Branch::Target, timeout, output_folder).await?;
+        extract::get_resources(&target_branch, timeout, output_folder).await?;
     }
 
     // Delete cluster
-    match tool {
-        ClusterTool::Kind => kind::delete_cluster(&cluster_name),
-        ClusterTool::Minikube => minikube::delete_cluster(),
+    match cluster_tool {
+        ClusterTool::Kind => kind::delete_cluster(&cluster_name, false),
+        ClusterTool::Minikube => minikube::delete_cluster(false),
     }
 
     diff::generate_diff(
         output_folder,
-        &base_branch_name,
-        &target_branch_name,
+        &base_branch,
+        &target_branch,
         diff_ignore,
         line_count,
         max_diff_length,
-    )
-    .await?;
+    )?;
 
     info!("🎉 Done in {} seconds", start.elapsed().as_secs());
 
     Ok(())
 }
 
-fn clean_output_folder(output_folder: &str) {
-    create_folder_if_not_exists(output_folder);
-    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Base)).unwrap_or_default();
-    fs::remove_dir_all(format!("{}/{}", output_folder, Branch::Target)).unwrap_or_default();
-    fs::create_dir(format!("{}/{}", output_folder, Branch::Base))
-        .expect("Unable to create directory");
-    fs::create_dir(format!("{}/{}", output_folder, Branch::Target))
-        .expect("Unable to create directory");
+fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
+    create_folder_if_not_exists(output_folder)?;
+    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Base)).unwrap_or_default();
+    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Target)).unwrap_or_default();
+    {
+        let dir = format!("{}/{}", output_folder, BranchType::Base);
+        match fs::create_dir(&dir) {
+            Ok(_) => (),
+            Err(_) => return Err(format!("❌ Failed to create directory: {}", dir).into()),
+        }
+    }
+    {
+        let dir = format!("{}/{}", output_folder, BranchType::Target);
+        match fs::create_dir(&dir) {
+            Ok(_) => (),
+            Err(_) => return Err(format!("❌ Failed to create directory: {}", dir).into()),
+        }
+    }
+    Ok(())
 }
 
-fn apply_manifest(file_name: &str) -> Result<Output, Output> {
-    let output = Command::new("kubectl")
-        .arg("apply")
-        .arg("-f")
-        .arg(file_name)
-        .output()
-        .unwrap_or_else(|_| panic!("failed to apply manifest: {}", file_name));
-    match output.status.success() {
-        true => Ok(output),
-        false => Err(output),
+fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
+    match tool {
+        ClusterTool::Kind if kind::cluster_exists(cluster_name) => {
+            info!("🧼 Cleaning up...");
+            kind::delete_cluster(cluster_name, true)
+        }
+        ClusterTool::Minikube if minikube::cluster_exists() => {
+            info!("🧼 Cleaning up...");
+            minikube::delete_cluster(true)
+        }
+        _ => debug!("🧼 No cluster to clean up"),
     }
 }
 
-fn apply_folder(folder_name: &str) -> Result<u64, String> {
+fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
+    run_command_from_list(vec!["kubectl", "apply", "-f", file_name], None).map_err(|e| {
+        error!("❌ Failed to apply manifest: {}", file_name);
+        e
+    })
+}
+
+fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
     if !PathBuf::from(folder_name).is_dir() {
-        return Err(format!("{} is not a directory", folder_name));
+        return Err(format!("{} is not a directory", folder_name).into());
     }
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(folder_name) {
@@ -455,10 +407,18 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
             if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                 match apply_manifest(file_name) {
                     Ok(_) => count += 1,
-                    Err(e) => return Err(String::from_utf8_lossy(&e.stderr).to_string()),
+                    Err(e) => return Err(e.stderr.into()),
                 }
             }
         }
     }
     Ok(count)
+}
+
+pub fn applications_to_string(applications: Vec<ArgoResource>) -> String {
+    applications
+        .iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<String>>()
+        .join("---\n")
 }

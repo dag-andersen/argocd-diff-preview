@@ -1,9 +1,10 @@
-use crate::utils::run_command;
-use crate::{apply_manifest, apps_file, Branch};
+use crate::error::CommandError;
+use crate::utils::{run_command, spawn_command};
+use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
+use serde_yaml::Value;
 use std::collections::HashSet;
 use std::fs;
-use std::process::{Command, Stdio};
 use std::{collections::BTreeMap, error::Error};
 
 static ERROR_MESSAGES: [&str; 10] = [
@@ -30,22 +31,22 @@ static TIMEOUT_MESSAGES: [&str; 7] = [
 ];
 
 pub async fn get_resources(
-    branch_type: &Branch,
+    branch: &Branch,
     timeout: u64,
     output_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
-    info!("🌚 Getting resources from {}-branch", branch_type);
+    info!("🌚 Getting resources from {}-branch", branch.branch_type);
 
-    let app_file = apps_file(branch_type);
+    let app_file = branch.app_file();
 
-    if fs::metadata(app_file).unwrap().len() != 0 {
-        if let Err(e) = apply_manifest(app_file) {
+    if fs::metadata(app_file)?.len() != 0 {
+        apply_manifest(app_file).map_err(|e| {
             error!(
                 "❌ Failed to apply applications for branch: {}",
-                branch_type
+                branch.name
             );
-            panic!("error: {}", String::from_utf8_lossy(&e.stderr))
-        }
+            CommandError::new(e)
+        })?;
     }
 
     let mut set_of_processed_apps = HashSet::new();
@@ -54,27 +55,32 @@ pub async fn get_resources(
     let start_time = std::time::Instant::now();
 
     loop {
-        let output = run_command("kubectl get applications -n argocd -oyaml", None)
-            .await
-            .expect("failed to get applications");
-        let applications: serde_yaml::Value =
-            serde_yaml::from_str(&String::from_utf8_lossy(&output.stdout)).unwrap();
+        let command = "kubectl get applications -n argocd -oyaml";
+        let applications: Result<Value, serde_yaml::Error> = match run_command(command, None) {
+            Ok(o) => serde_yaml::from_str(&o.stdout),
+            Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
+        };
 
-        let items = applications["items"].as_sequence().unwrap();
-        if items.is_empty() {
-            break;
-        }
+        let applications = match applications {
+            Ok(applications) => applications,
+            Err(_) => {
+                return Err(format!("❌ Failed to parse yaml from command: {}", command).into());
+            }
+        };
 
-        if items.len() == set_of_processed_apps.len() {
-            break;
-        }
+        let applications = match applications["items"].as_sequence() {
+            None => break,
+            Some(apps) if apps.is_empty() => break,
+            Some(apps) if apps.len() == set_of_processed_apps.len() => break,
+            Some(apps) => apps,
+        };
 
         let mut list_of_timed_out_apps = vec![];
         let mut other_errors = vec![];
 
         let mut apps_left = 0;
 
-        for item in items {
+        for item in applications {
             let name = item["metadata"]["name"].as_str().unwrap();
             if set_of_processed_apps.contains(name) {
                 continue;
@@ -82,15 +88,15 @@ pub async fn get_resources(
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
                     debug!("Getting manifests for application: {}", name);
-                    match run_command(&format!("argocd app manifests {}", name), None).await {
+                    match run_command(&format!("argocd app manifests {}", name), None) {
                         Ok(o) => {
                             fs::write(
-                                format!("{}/{}/{}", output_folder, branch_type, name),
+                                format!("{}/{}/{}", output_folder, branch.branch_type, name),
                                 &o.stdout,
                             )?;
                             debug!("Got manifests for application: {}", name)
                         }
-                        Err(e) => error!("error: {}", String::from_utf8_lossy(&e.stderr)),
+                        Err(e) => error!("error: {}", e.stderr),
                     }
                     set_of_processed_apps.insert(name.to_string().clone());
                     continue;
@@ -148,7 +154,7 @@ pub async fn get_resources(
             return Err("Failed to process applications".into());
         }
 
-        if items.len() == set_of_processed_apps.len() {
+        if applications.len() == set_of_processed_apps.len() {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             continue;
         }
@@ -178,12 +184,11 @@ pub async fn get_resources(
                 list_of_timed_out_apps.len(),
             );
             for app in &list_of_timed_out_apps {
-                match run_command(&format!("argocd app get {} --refresh", app), None).await {
+                match run_command(&format!("argocd app get {} --refresh", app), None) {
                     Ok(_) => info!("🔄 Refreshing application: {}", app),
                     Err(e) => error!(
                         "⚠️ Failed to refresh application: {} with {}",
-                        app,
-                        String::from_utf8_lossy(&e.stderr)
+                        app, &e.stderr
                     ),
                 }
             }
@@ -193,7 +198,7 @@ pub async fn get_resources(
             info!(
                 "⏳ Waiting for {} out of {} applications to become 'OutOfSync'. Retrying in 5 seconds. Timeout in {} seconds...",
                 apps_left,
-                items.len(),
+                applications.len(),
                 timeout - time_elapsed
             );
         }
@@ -204,13 +209,13 @@ pub async fn get_resources(
     info!(
         "🌚 Got all resources from {} applications for {}",
         set_of_processed_apps.len(),
-        branch_type
+        branch.name
     );
 
     Ok(())
 }
 
-pub async fn delete_applications() {
+pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     info!("🧼 Removing applications");
     loop {
         debug!("🗑 Deleting ApplicationSets");
@@ -218,35 +223,22 @@ pub async fn delete_applications() {
         match run_command(
             "kubectl delete applicationsets.argoproj.io --all -n argocd",
             None,
-        )
-        .await
-        {
+        ) {
             Ok(_) => debug!("🗑 Deleted ApplicationSets"),
             Err(e) => {
-                error!(
-                    "❌ Failed to delete applicationsets: {}",
-                    String::from_utf8_lossy(&e.stderr)
-                )
+                error!("❌ Failed to delete applicationsets: {}", &e.stderr)
             }
         };
 
         debug!("🗑 Deleting Applications");
 
-        let args = "kubectl delete applications.argoproj.io --all -n argocd"
-            .split_whitespace()
-            .collect::<Vec<&str>>();
-        let mut child = Command::new(args[0])
-            .args(&args[1..])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("failed to execute process");
-
+        let mut child = spawn_command(
+            "kubectl delete applications.argoproj.io --all -n argocd",
+            None,
+        );
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if run_command("kubectl get applications -A --no-headers", None)
-            .await
-            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-            .map(|e| e.trim().is_empty())
+            .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
         {
             let _ = child.kill();
@@ -255,9 +247,7 @@ pub async fn delete_applications() {
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if run_command("kubectl get applications -A --no-headers", None)
-            .await
-            .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
-            .map(|e| e.trim().is_empty())
+            .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
         {
             let _ = child.kill();
@@ -269,5 +259,6 @@ pub async fn delete_applications() {
             Err(e) => error!("❌ Failed to delete applications: {}", e),
         };
     }
-    info!("🧼 Removed applications successfully")
+    info!("🧼 Removed applications successfully");
+    Ok(())
 }
