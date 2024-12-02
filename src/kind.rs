@@ -43,7 +43,7 @@ pub fn cluster_exists(cluster_name: &str) -> bool {
         Ok(o) => {
             debug!("❌ Cluster '{}' not found in: {}", cluster_name, o.stdout);
             false
-        },
+        }
         Err(_) => false,
     }
 }

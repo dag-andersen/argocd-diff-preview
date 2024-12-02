@@ -113,7 +113,7 @@ impl FromStr for ClusterTool {
             "minikube" => Ok(ClusterTool::Minikube),
             "auto" if kind::is_installed() => Ok(ClusterTool::Kind),
             "auto" if minikube::is_installed() => Ok(ClusterTool::Minikube),
-            _ => Err("No local cluster tool found. Please install kind or minikube".into()),
+            _ => Err("No local cluster tool found. Please install kind or minikube"),
         }
     }
 }
