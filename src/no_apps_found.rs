@@ -5,7 +5,7 @@ use crate::Selector;
 
 // Message to show when no applications were found
 
-pub async fn write_message(
+pub fn write_message(
     output_folder: &str,
     selector: &Option<Vec<Selector>>,
     changed_files: &Option<Vec<String>>,

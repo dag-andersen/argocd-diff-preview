@@ -111,11 +111,10 @@ async fn main() -> Result<(), ()> {
             let opt = Opt::from_args();
             error!("❌ {}", e);
             cleanup_cluster(
-                get_cluster_tool(&opt.local_cluster_tool).await.unwrap(),
+                get_cluster_tool(&opt.local_cluster_tool).unwrap(),
                 &opt.cluster_name,
                 true,
-            )
-            .await;
+            );
             Err(())
         }
     }
@@ -173,7 +172,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         });
 
     // select local cluster tool
-    let cluster_tool = get_cluster_tool(&opt.local_cluster_tool).await?;
+    let cluster_tool = get_cluster_tool(&opt.local_cluster_tool)?;
 
     let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$").unwrap();
     if !repo_regex.is_match(repo) {
@@ -269,8 +268,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &files_changed,
         repo,
         opt.ignore_invalid_watch_pattern,
-    )
-    .await?;
+    )?;
 
     let found_base_apps = !base_apps.is_empty();
     let found_target_apps = !target_apps.is_empty();
@@ -278,7 +276,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
     if !found_base_apps && !found_target_apps {
         info!("👀 Nothing to compare");
         info!("👀 If this doesn't seem right, try running the tool with '--debug' to get more details about what is happening");
-        no_apps_found::write_message(output_folder, &selector, &files_changed).await?;
+        no_apps_found::write_message(output_folder, &selector, &files_changed)?;
         info!("🎉 Done in {} seconds", start.elapsed().as_secs());
         return Ok(());
     }
@@ -290,11 +288,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
     )?;
 
     match cluster_tool {
-        ClusterTool::Kind => kind::create_cluster(&cluster_name).await?,
-        ClusterTool::Minikube => minikube::create_cluster().await?,
+        ClusterTool::Kind => kind::create_cluster(&cluster_name)?,
+        ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
-    argocd::create_namespace().await?;
+    argocd::create_namespace()?;
 
     create_folder_if_not_exists(secrets_folder)?;
     match apply_folder(secrets_folder) {
@@ -340,8 +338,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         diff_ignore,
         line_count,
         max_diff_length,
-    )
-    .await?;
+    )?;
 
     info!("🎉 Done in {} seconds", start.elapsed().as_secs());
 
@@ -369,12 +366,12 @@ fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn get_cluster_tool(tool: &Option<String>) -> Result<ClusterTool, Box<dyn Error>> {
+fn get_cluster_tool(tool: &Option<String>) -> Result<ClusterTool, Box<dyn Error>> {
     let tool = match tool {
         Some(t) if t == "kind" => ClusterTool::Kind,
         Some(t) if t == "minikube" => ClusterTool::Minikube,
-        _ if kind::is_installed().await => ClusterTool::Kind,
-        _ if minikube::is_installed().await => ClusterTool::Minikube,
+        _ if kind::is_installed() => ClusterTool::Kind,
+        _ if minikube::is_installed() => ClusterTool::Minikube,
         _ => {
             error!("❌ No local cluster tool found. Please install kind or minikube");
             return Err("No local cluster tool found".into());
@@ -383,13 +380,13 @@ async fn get_cluster_tool(tool: &Option<String>) -> Result<ClusterTool, Box<dyn 
     Ok(tool)
 }
 
-async fn cleanup_cluster(tool: ClusterTool, cluster_name: &str, wait: bool) {
+fn cleanup_cluster(tool: ClusterTool, cluster_name: &str, wait: bool) {
     info!("🧼 Cleaning up...");
     match tool {
-        ClusterTool::Kind if kind::cluster_exists(cluster_name).await => {
+        ClusterTool::Kind if kind::cluster_exists(cluster_name) => {
             kind::delete_cluster(cluster_name, wait)
         }
-        ClusterTool::Minikube if minikube::cluster_exists().await => minikube::delete_cluster(wait),
+        ClusterTool::Minikube if minikube::cluster_exists() => minikube::delete_cluster(wait),
         _ => debug!("🧼 No cluster to clean up"),
     }
 }

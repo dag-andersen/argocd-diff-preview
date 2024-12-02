@@ -2,13 +2,13 @@ use crate::utils::{run_command, spawn_command, CommandError};
 use log::{error, info};
 use std::error::Error;
 
-pub async fn is_installed() -> bool {
-    run_command("which kind", None).await.is_ok()
+pub fn is_installed() -> bool {
+    run_command("which kind", None).is_ok()
 }
 
-pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
+pub fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     // check if docker is running
-    run_command("docker ps", None).await.map_err(|o| {
+    run_command("docker ps", None).map_err(|o| {
         error!("❌ Docker is not running");
         CommandError::new(o)
     })?;
@@ -18,14 +18,12 @@ pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
         &format!("kind delete cluster --name {}", cluster_name),
         None,
     )
-    .await
     .map_err(CommandError::new)?;
 
     run_command(
         &format!("kind create cluster --name {}", cluster_name),
         None,
     )
-    .await
     .map(|_| {
         info!("🚀 Cluster created successfully");
         Ok(())
@@ -36,9 +34,8 @@ pub async fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     })?
 }
 
-pub async fn cluster_exists(cluster_name: &str) -> bool {
-    let clusters = run_command("kind get clusters", None).await;
-    match clusters {
+pub fn cluster_exists(cluster_name: &str) -> bool {
+    match run_command("kind get clusters", None) {
         Ok(o) if o.stdout == cluster_name => true,
         _ => false,
     }

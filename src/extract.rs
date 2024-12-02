@@ -55,8 +55,7 @@ pub async fn get_resources(
 
     loop {
         let command = "kubectl get applications -n argocd -oyaml";
-        let applications: Result<Value, serde_yaml::Error> = match run_command(command, None).await
-        {
+        let applications: Result<Value, serde_yaml::Error> = match run_command(command, None) {
             Ok(o) => serde_yaml::from_str(&o.stdout),
             Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
         };
@@ -88,7 +87,7 @@ pub async fn get_resources(
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
                     debug!("Getting manifests for application: {}", name);
-                    match run_command(&format!("argocd app manifests {}", name), None).await {
+                    match run_command(&format!("argocd app manifests {}", name), None) {
                         Ok(o) => {
                             fs::write(
                                 format!("{}/{}/{}", output_folder, branch.branch_type, name),
@@ -184,7 +183,7 @@ pub async fn get_resources(
                 list_of_timed_out_apps.len(),
             );
             for app in &list_of_timed_out_apps {
-                match run_command(&format!("argocd app get {} --refresh", app), None).await {
+                match run_command(&format!("argocd app get {} --refresh", app), None) {
                     Ok(_) => info!("🔄 Refreshing application: {}", app),
                     Err(e) => error!(
                         "⚠️ Failed to refresh application: {} with {}",
@@ -223,9 +222,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         match run_command(
             "kubectl delete applicationsets.argoproj.io --all -n argocd",
             None,
-        )
-        .await
-        {
+        ) {
             Ok(_) => debug!("🗑 Deleted ApplicationSets"),
             Err(e) => {
                 error!("❌ Failed to delete applicationsets: {}", &e.stderr)
@@ -240,7 +237,6 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         );
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if run_command("kubectl get applications -A --no-headers", None)
-            .await
             .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
         {
@@ -250,7 +246,6 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if run_command("kubectl get applications -A --no-headers", None)
-            .await
             .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
         {

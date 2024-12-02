@@ -4,7 +4,7 @@ use log::{debug, info};
 use std::error::Error;
 use std::fs;
 
-pub async fn generate_diff(
+pub fn generate_diff(
     output_folder: &str,
     base_branch: &Branch,
     target_branch: &Branch,
@@ -28,8 +28,7 @@ pub async fn generate_diff(
         |output: Result<CommandOutput, CommandOutput>| -> Result<String, Box<dyn Error>> {
             let o = match output {
                 Err(e) if !e.stderr.is_empty() => {
-                    return Err(format!("Error running command: {}", e.stderr)
-                        .into())
+                    return Err(format!("Error running command: {}", e.stderr).into())
                 }
 
                 Ok(e) => e.stdout.trim_end().to_string(),
@@ -53,7 +52,7 @@ pub async fn generate_diff(
     );
 
     let summary_as_string =
-        parse_diff_output(run_command(&summary_diff_command, Some(output_folder)).await)?;
+        parse_diff_output(run_command(&summary_diff_command, Some(output_folder)))?;
 
     let diff_command = &format!(
         "git --no-pager diff --no-prefix -U{} --no-index {} {} {}",
@@ -65,7 +64,7 @@ pub async fn generate_diff(
 
     debug!("Getting diff with command: {}", diff_command);
 
-    let diff_as_string = parse_diff_output(run_command(diff_command, Some(output_folder)).await)?;
+    let diff_as_string = parse_diff_output(run_command(diff_command, Some(output_folder)))?;
 
     let remaining_max_chars =
         max_diff_message_char_count - markdown_template_length() - summary_as_string.len();

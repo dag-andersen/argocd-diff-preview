@@ -10,13 +10,11 @@ pub struct ArgoCDOptions<'a> {
 
 const CONFIG_PATH: &str = "argocd-config";
 
-pub async fn create_namespace() -> Result<(), Box<dyn Error>> {
-    run_command("kubectl create ns argocd", None)
-        .await
-        .map_err(|e| {
-            error!("❌ Failed to create namespace argocd");
-            CommandError::new(e)
-        })?;
+pub fn create_namespace() -> Result<(), Box<dyn Error>> {
+    run_command("kubectl create ns argocd", None).map_err(|e| {
+        error!("❌ Failed to create namespace argocd");
+        CommandError::new(e)
+    })?;
     debug!("🦑 Namespace argocd created successfully");
     Ok(())
 }
@@ -53,7 +51,6 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         "helm repo add argo https://argoproj.github.io/argo-helm",
         None,
     )
-    .await
     .map_err(|e| {
         error!("❌ Failed to add argo repo");
         CommandError::new(e)
@@ -69,12 +66,10 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
             .unwrap_or_default(),
     );
 
-    run_command(&helm_install_command, None)
-        .await
-        .map_err(|e| {
-            error!("❌ Failed to install Argo CD");
-            CommandError::new(e)
-        })?;
+    run_command(&helm_install_command, None).map_err(|e| {
+        error!("❌ Failed to install Argo CD");
+        CommandError::new(e)
+    })?;
 
     info!("🦑 Waiting for Argo CD to start...");
 
@@ -82,9 +77,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     match run_command(
         "kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s",
         None,
-    )
-    .await
-    {
+    ) {
         Ok(_) => info!("🦑 Argo CD is now available"),
         Err(_) => {
             error!("❌ Failed to wait for argocd-server");
@@ -103,7 +96,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         let mut password_encoded: Option<CommandOutput> = None;
         let mut counter = 0;
         while password_encoded.is_none() {
-            password_encoded = match run_command(command, None).await {
+            password_encoded = match run_command(command, None) {
                 Ok(a) => Some(a),
                 Err(e) if counter == 5 => {
                     error!("❌ Failed to get secret {}", secret_name);
@@ -147,20 +140,19 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         ),
         None,
     )
-    .await
     .map_err(|e| {
         error!("❌ Failed to login to argocd");
         CommandError::new(e)
     })?;
 
-    run_command("argocd app list", None).await.map_err(|e| {
+    run_command("argocd app list", None).map_err(|e| {
         error!("❌ Failed to run: argocd app list");
         CommandError::new(e)
     })?;
 
     if options.debug {
         let command = "kubectl get configmap -n argocd -o yaml argocd-cmd-params-cm argocd-cm";
-        match run_command(command, None).await {
+        match run_command(command, None) {
             Ok(o) => debug!(
                 "🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n{}\n{}",
                 command, &o.stdout

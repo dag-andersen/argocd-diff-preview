@@ -22,7 +22,7 @@ impl Clone for K8sResource {
     }
 }
 
-pub async fn get_applications_for_both_branches<'a>(
+pub fn get_applications_for_both_branches<'a>(
     base_branch: &Branch,
     target_branch: &Branch,
     regex: &Option<Regex>,
@@ -38,8 +38,7 @@ pub async fn get_applications_for_both_branches<'a>(
         files_changed,
         repo,
         ignore_invalid_watch_pattern,
-    )
-    .await?;
+    )?;
     let target_apps = get_applications(
         target_branch,
         regex,
@@ -47,8 +46,7 @@ pub async fn get_applications_for_both_branches<'a>(
         files_changed,
         repo,
         ignore_invalid_watch_pattern,
-    )
-    .await?;
+    )?;
 
     let duplicate_yaml = base_apps
         .iter()
@@ -85,7 +83,7 @@ pub async fn get_applications_for_both_branches<'a>(
     }
 }
 
-pub async fn get_applications(
+pub fn get_applications(
     branch: &Branch,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
@@ -93,22 +91,21 @@ pub async fn get_applications(
     repo: &str,
     ignore_invalid_watch_pattern: bool,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
-    let yaml_files = get_yaml_files(branch.folder_name(), regex).await;
-    let k8s_resources = parse_yaml(branch.folder_name(), yaml_files).await;
+    let yaml_files = get_yaml_files(branch.folder_name(), regex);
+    let k8s_resources = parse_yaml(branch.folder_name(), yaml_files);
     let applications = from_resource_to_application(
         k8s_resources,
         selector,
         files_changed,
         ignore_invalid_watch_pattern,
-    )
-    .await;
+    );
     if !applications.is_empty() {
-        return patch_applications(applications, branch, repo).await;
+        return patch_applications(applications, branch, repo);
     }
     Ok(applications)
 }
 
-async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
+fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
     use walkdir::WalkDir;
 
     info!("🤖 Fetching all files in dir: {}", directory);
@@ -154,7 +151,7 @@ async fn get_yaml_files(directory: &str, regex: &Option<Regex>) -> Vec<String> {
     yaml_files
 }
 
-async fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
+fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
     files.iter()
         .flat_map(|f| {
             debug!("In dir '{}' found yaml file: {}", directory, f);
@@ -190,7 +187,7 @@ async fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
         .collect()
 }
 
-async fn patch_applications(
+fn patch_applications(
     applications: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
@@ -238,7 +235,7 @@ async fn patch_applications(
     Ok(apps)
 }
 
-async fn from_resource_to_application(
+fn from_resource_to_application(
     k8s_resources: Vec<K8sResource>,
     selector: &Option<Vec<Selector>>,
     files_changed: &Option<Vec<String>>,
@@ -295,7 +292,7 @@ async fn from_resource_to_application(
     filtered_apps
 }
 
-async fn generate_apps_from_app_set(
+fn generate_apps_from_app_set(
     app_set: &ArgoResource,
     branch: &Branch,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
@@ -310,7 +307,6 @@ async fn generate_apps_from_app_set(
 
     let command = format!("argocd appset generate {} -o yaml", app_set.file_name);
     let apps_string = run_command(&command, Some(branch.folder_name()))
-        .await
         .map_err(CommandError::new)?
         .stdout;
 

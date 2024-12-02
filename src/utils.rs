@@ -40,7 +40,7 @@ pub fn check_if_folder_exists(folder_name: &str) -> bool {
     PathBuf::from(folder_name).is_dir()
 }
 
-pub async fn run_command(
+pub fn run_command(
     command: &str,
     current_dir: Option<&str>,
 ) -> Result<CommandOutput, CommandOutput> {
