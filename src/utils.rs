@@ -1,33 +1,9 @@
 use std::error::Error;
-use std::fmt;
 use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
 
-#[derive(Debug)]
-pub struct CommandOutput {
-    pub stdout: String,
-    pub stderr: String,
-}
-
-#[derive(Debug)]
-pub struct CommandError {
-    stderr: String,
-}
-
-impl CommandError {
-    pub fn new(s: CommandOutput) -> Self {
-        CommandError { stderr: s.stderr }
-    }
-}
-
-impl Error for CommandError {}
-
-impl fmt::Display for CommandError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.stderr)
-    }
-}
+use crate::error::CommandOutput;
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
     if !PathBuf::from(folder_name).is_dir() {

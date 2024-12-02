@@ -1,4 +1,5 @@
-use crate::utils::{run_command, CommandOutput};
+use crate::error::CommandOutput;
+use crate::utils::run_command;
 use crate::Branch;
 use log::{debug, info};
 use std::error::Error;

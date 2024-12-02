@@ -1,4 +1,7 @@
-use crate::utils::{run_command, spawn_command, CommandError};
+use crate::{
+    error::CommandError,
+    utils::{run_command, spawn_command},
+};
 use log::{error, info};
 use std::error::Error;
 

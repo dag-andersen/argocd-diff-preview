@@ -1,4 +1,7 @@
-use crate::utils::{run_command, CommandError, CommandOutput};
+use crate::{
+    error::{CommandError, CommandOutput},
+    utils::run_command,
+};
 use base64::prelude::*;
 use log::{debug, error, info};
 use std::error::Error;

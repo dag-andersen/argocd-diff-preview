@@ -1,6 +1,7 @@
 use crate::{
     argo_resource::{ApplicationKind, ArgoResource},
-    utils::{run_command, CommandError},
+    error::CommandError,
+    utils::run_command,
     Branch, Selector,
 };
 use log::{debug, info};

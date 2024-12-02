@@ -1,4 +1,5 @@
-use crate::utils::{run_command, spawn_command, CommandError};
+use crate::error::CommandError;
+use crate::utils::{run_command, spawn_command};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
