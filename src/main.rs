@@ -119,16 +119,13 @@ impl FromStr for ClusterTool {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), ()> {
-    match run().await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            let opt = Opt::from_args();
-            error!("❌ {}", e);
-            cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
-            Err(())
-        }
-    }
+async fn main() -> Result<(), Box<dyn Error>> {
+    run().await.map_err(|e| {
+        let opt = Opt::from_args();
+        error!("❌ {}", e);
+        cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
+        e
+    })
 }
 
 async fn run() -> Result<(), Box<dyn Error>> {
