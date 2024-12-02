@@ -1,7 +1,7 @@
+use argo_resource::ArgoResource;
 use branch::{Branch, BranchType};
 use error::CommandOutput;
 use log::{debug, error, info};
-use parsing::applications_to_string;
 use regex::Regex;
 use selector::Selector;
 use std::fs;
@@ -413,4 +413,12 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
         }
     }
     Ok(count)
+}
+
+pub fn applications_to_string(applications: Vec<ArgoResource>) -> String {
+    applications
+        .iter()
+        .map(|a| a.to_string())
+        .collect::<Vec<String>>()
+        .join("---\n")
 }

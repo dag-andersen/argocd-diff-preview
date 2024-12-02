@@ -1,9 +1,4 @@
-use crate::{
-    argo_resource::{ApplicationKind, ArgoResource},
-    error::CommandError,
-    utils::run_command,
-    Branch, Selector,
-};
+use crate::{argo_resource::ArgoResource, Branch, Selector};
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Value;
