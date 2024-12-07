@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
 
+use log::debug;
+
 use crate::error::CommandOutput;
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
@@ -20,6 +22,7 @@ pub fn run_command(
     command: &str,
     current_dir: Option<&str>,
 ) -> Result<CommandOutput, CommandOutput> {
+    debug!("Running command: {}", command);
     let args = command.split_whitespace().collect::<Vec<&str>>();
     run_command_from_list(args, current_dir)
 }

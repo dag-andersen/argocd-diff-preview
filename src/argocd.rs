@@ -13,13 +13,23 @@ pub struct ArgoCDOptions<'a> {
 
 const CONFIG_PATH: &str = "argocd-config";
 
-pub fn create_namespace() -> Result<(), Box<dyn Error>> {
-    run_command("kubectl create ns argocd", None).map_err(|e| {
-        error!("❌ Failed to create namespace argocd");
-        CommandError::new(e)
-    })?;
-    debug!("🦑 Namespace argocd created successfully");
-    Ok(())
+pub fn create_namespace(s: &str) -> Result<(), Box<dyn Error>> {
+    let already_exist = run_command(&format!("kubectl get ns {}", s), None).is_ok();
+
+    match already_exist {
+        true => {
+            debug!("🦑 Namespace {} already exists", s);
+            Ok(())
+        }
+        false => {
+            run_command(&format!("kubectl create ns {}", s), None).map_err(|e| {
+                error!("❌ Failed to create namespace {}", s);
+                CommandError::new(e)
+            })?;
+            debug!("🦑 Namespace {} created successfully", s);
+            Ok(())
+        }
+    }
 }
 
 pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn Error>> {
@@ -28,24 +38,26 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         options.version.unwrap_or("latest")
     );
 
-    let (values, values_override) = match std::fs::read_dir(CONFIG_PATH) {
+    let (values_pre, values, values_post) = match std::fs::read_dir(CONFIG_PATH) {
         Ok(dir) => {
             debug!("📂 Files in folder 'argocd-config':");
             for file in dir {
                 debug!("- 📄 {:?}", file.unwrap().file_name());
             }
-            let values_exist = std::fs::metadata(format!("{}/values.yaml", CONFIG_PATH))
+            let values_pre = std::fs::metadata(format!("{}/values-pre.yaml", CONFIG_PATH))
+                .is_ok()
+                .then_some(format!("-f {}/values-pre.yaml", CONFIG_PATH));
+            let values = std::fs::metadata(format!("{}/values.yaml", CONFIG_PATH))
                 .is_ok()
                 .then_some(format!("-f {}/values.yaml", CONFIG_PATH));
-            let values_override_exist =
-                std::fs::metadata(format!("{}/values-override.yaml", CONFIG_PATH))
-                    .is_ok()
-                    .then_some(format!("-f {}/values-override.yaml", CONFIG_PATH));
-            (values_exist, values_override_exist)
+            let values_post = std::fs::metadata(format!("{}/values-post.yaml", CONFIG_PATH))
+                .is_ok()
+                .then_some(format!("-f {}/values-post.yaml", CONFIG_PATH));
+            (values, values_pre, values_post)
         }
         Err(_e) => {
             info!("📂 Folder '{}' doesn't exist. Installing Argo CD Helm Chart with default configuration", CONFIG_PATH);
-            (None, None)
+            (None, None, None)
         }
     };
 
@@ -60,15 +72,17 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     })?;
 
     let helm_install_command = format!(
-        "helm install argocd argo/argo-cd -n argocd {} {} {}",
+        "helm install argocd argo/argo-cd -n argocd {} {} {} {}",
+        values_pre.unwrap_or_default(),
         values.unwrap_or_default(),
-        values_override.unwrap_or_default(),
+        values_post.unwrap_or_default(),
         options
             .version
             .map(|a| format!("--version {}", a))
             .unwrap_or_default(),
     );
 
+    debug!("Installing Argo CD Helm Chart...");
     run_command(&helm_install_command, None).map_err(|e| {
         error!("❌ Failed to install Argo CD");
         CommandError::new(e)
@@ -166,6 +180,9 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
             }
         }
     }
+
+    // Add extra permissions to the default AppProject
+    let _ = run_command("argocd proj add-source-namespace default *", None);
 
     info!("🦑 Argo CD installed successfully");
     Ok(())

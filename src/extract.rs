@@ -221,7 +221,8 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         debug!("🗑 Deleting ApplicationSets");
 
         match run_command(
-            "kubectl delete applicationsets.argoproj.io --all -n argocd",
+            "kubectl delete applicationsets.argoproj.io --all --all-namespaces
+",
             None,
         ) {
             Ok(_) => debug!("🗑 Deleted ApplicationSets"),
@@ -233,22 +234,32 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         debug!("🗑 Deleting Applications");
 
         let mut child = spawn_command(
-            "kubectl delete applications.argoproj.io --all -n argocd",
+            "kubectl delete applications.argoproj.io --all --all-namespaces
+",
             None,
         );
+
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        if run_command("kubectl get applications -A --no-headers", None)
-            .map(|e| e.stdout.trim().is_empty())
-            .unwrap_or_default()
+        if run_command(
+            "kubectl get applications --all-namespaces
+ --no-headers",
+            None,
+        )
+        .map(|e| e.stdout.trim().is_empty())
+        .unwrap_or_default()
         {
             let _ = child.kill();
             break;
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        if run_command("kubectl get applications -A --no-headers", None)
-            .map(|e| e.stdout.trim().is_empty())
-            .unwrap_or_default()
+        if run_command(
+            "kubectl get applications --all-namespaces
+ --no-headers",
+            None,
+        )
+        .map(|e| e.stdout.trim().is_empty())
+        .unwrap_or_default()
         {
             let _ = child.kill();
             break;

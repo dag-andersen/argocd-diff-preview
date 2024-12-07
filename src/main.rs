@@ -1,6 +1,7 @@
 use argo_resource::ArgoResource;
+use argocd::create_namespace;
 use branch::{Branch, BranchType};
-use error::CommandOutput;
+use error::{CommandError, CommandOutput};
 use log::{debug, error, info};
 use regex::Regex;
 use selector::Selector;
@@ -9,7 +10,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{error::Error, io::Write};
 use structopt::StructOpt;
-use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command_from_list};
+use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_from_list};
 mod argo_resource;
 mod argocd;
 mod branch;
@@ -289,6 +290,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    let unique_namespaces = base_apps
+        .iter()
+        .map(|a| a.namespace.clone())
+        .chain(target_apps.iter().map(|a| a.namespace.clone()))
+        .collect::<std::collections::HashSet<String>>();
+
     fs::write(base_branch.app_file(), applications_to_string(base_apps))?;
     fs::write(
         target_branch.app_file(),
@@ -300,15 +307,17 @@ async fn run() -> Result<(), Box<dyn Error>> {
         ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
-    argocd::create_namespace()?;
+    // Create a namespace for each application
+    for namespace in unique_namespaces {
+        create_namespace(&namespace)?;
+    }
 
-    create_folder_if_not_exists(secrets_folder)?;
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -395,7 +404,7 @@ fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
     })
 }
 
-fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
+fn apply_folder(folder_name: &str) -> Result<u64, String> {
     if !PathBuf::from(folder_name).is_dir() {
         return Err(format!("{} is not a directory", folder_name).into());
     }

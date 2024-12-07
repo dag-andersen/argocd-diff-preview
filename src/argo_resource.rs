@@ -18,6 +18,7 @@ pub struct ArgoResource {
     pub yaml: serde_yaml::Value,
     pub kind: ApplicationKind,
     pub name: String,
+    pub namespace: String,
 }
 
 impl std::fmt::Display for ArgoResource {
@@ -166,11 +167,15 @@ impl ArgoResource {
                 _ => None,
             })?;
 
-        match k8s_resource.yaml["metadata"]["name"].as_str() {
-            Some(name) => Some(ArgoResource {
+        match (
+            k8s_resource.yaml["metadata"]["name"].as_str(),
+            k8s_resource.yaml["metadata"]["namespace"].as_str(),
+        ) {
+            (Some(name), Some(namespace)) => Some(ArgoResource {
                 kind,
                 file_name: k8s_resource.file_name,
                 name: name.to_string(),
+                namespace: namespace.to_string(),
                 yaml: k8s_resource.yaml,
             }),
             _ => None,
