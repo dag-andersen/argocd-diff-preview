@@ -8,3 +8,5 @@ output/
 /apps_target_branch.yaml
 /apps_base_branch.yaml
 venv/
+base-branch/
+target-branch/

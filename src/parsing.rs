@@ -18,7 +18,7 @@ impl Clone for K8sResource {
     }
 }
 
-pub fn get_applications_for_both_branches<'a>(
+pub fn get_applications_for_both_branches(
     base_branch: &Branch,
     target_branch: &Branch,
     regex: &Option<Regex>,
@@ -195,7 +195,6 @@ fn patch_applications(
         .map(|a| {
             let app_name = a.name.clone();
             let app: Result<ArgoResource, Box<dyn Error>> = a
-                .set_namespace(ARGO_CD_NAMESPACE)
                 .remove_sync_policy()
                 .set_project_to_default()
                 .and_then(|a| a.point_destination_to_in_cluster())
