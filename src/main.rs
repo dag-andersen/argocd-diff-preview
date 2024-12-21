@@ -400,7 +400,7 @@ fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
 }
 
 fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
-    run_command(&format!("kubectl apply -f {}", file_name)).inspect_err(|e| {
+    run_command(&format!("kubectl apply -f {}", file_name)).inspect_err(|_e| {
         error!("❌ Failed to apply manifest: {}", file_name);
     })
 }

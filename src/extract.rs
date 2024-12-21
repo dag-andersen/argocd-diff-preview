@@ -56,10 +56,7 @@ pub async fn get_resources(
     let start_time = std::time::Instant::now();
 
     loop {
-        let command = format!(
-            "kubectl get applications -n {} -oyaml",
-            ARGO_CD_NAMESPACE
-        );
+        let command = format!("kubectl get applications -n {} -oyaml", ARGO_CD_NAMESPACE);
         let applications: Result<Value, serde_yaml::Error> = match run_command(&command) {
             Ok(o) => serde_yaml::from_str(&o.stdout),
             Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
@@ -237,7 +234,10 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         debug!("🗑 Deleting Applications");
 
         let mut child = spawn_command(
-            &format!("kubectl delete applications.argoproj.io --all -n {}", ARGO_CD_NAMESPACE),
+            &format!(
+                "kubectl delete applications.argoproj.io --all -n {}",
+                ARGO_CD_NAMESPACE
+            ),
             None,
         );
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
