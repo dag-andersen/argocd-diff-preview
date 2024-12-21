@@ -1,4 +1,4 @@
-use crate::{argo_resource::ArgoResource, Branch, Selector};
+use crate::{argo_resource::ArgoResource, argocd::ARGO_CD_NAMESPACE, Branch, Selector};
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Value;
@@ -195,7 +195,7 @@ fn patch_applications(
         .map(|a| {
             let app_name = a.name.clone();
             let app: Result<ArgoResource, Box<dyn Error>> = a
-                .set_namespace("argocd")
+                .set_namespace(ARGO_CD_NAMESPACE)
                 .remove_sync_policy()
                 .set_project_to_default()
                 .and_then(|a| a.point_destination_to_in_cluster())

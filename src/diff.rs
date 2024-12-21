@@ -1,5 +1,5 @@
 use crate::error::CommandOutput;
-use crate::utils::run_command;
+use crate::utils::run_command_in_dir;
 use crate::Branch;
 use log::{debug, info};
 use std::error::Error;
@@ -52,7 +52,7 @@ pub fn generate_diff(
     );
 
     let summary_as_string =
-        parse_diff_output(run_command(&summary_diff_command, Some(output_folder)))?;
+        parse_diff_output(run_command_in_dir(&summary_diff_command, output_folder))?;
 
     let diff_command = &format!(
         "git --no-pager diff --no-prefix -U{} --no-index {} {} {}",
@@ -64,7 +64,7 @@ pub fn generate_diff(
 
     debug!("Getting diff with command: {}", diff_command);
 
-    let diff_as_string = parse_diff_output(run_command(diff_command, Some(output_folder)))?;
+    let diff_as_string = parse_diff_output(run_command_in_dir(diff_command, output_folder))?;
 
     let remaining_max_chars =
         max_diff_message_char_count - markdown_template_length() - summary_as_string.len();
