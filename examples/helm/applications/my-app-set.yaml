@@ -12,6 +12,7 @@ spec:
       - name: dev
       - name: prod
       - name: staging
+      - name: uat
   template:
     metadata:
       name: 'my-app-set-{{.name}}'
