@@ -200,7 +200,6 @@ fn patch_applications(
         .map(|a| {
             let app_name = a.name.clone();
             let app: Result<ArgoResource, Box<dyn Error>> = a
-                .set_namespace(argo_cd_namespace)
                 .remove_sync_policy()
                 .set_project_to_default()
                 .and_then(|a| a.point_destination_to_in_cluster())

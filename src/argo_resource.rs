@@ -19,6 +19,7 @@ pub struct ArgoResource {
     pub yaml: serde_yaml::Value,
     pub kind: ApplicationKind,
     pub name: String,
+    pub namespace: String,
 }
 
 impl std::fmt::Display for ArgoResource {
@@ -34,11 +35,6 @@ impl PartialEq for ArgoResource {
 }
 
 impl ArgoResource {
-    pub fn set_namespace(mut self, namespace: &str) -> ArgoResource {
-        self.yaml["metadata"]["namespace"] = serde_yaml::Value::String(namespace.to_string());
-        self
-    }
-
     pub fn set_project_to_default(mut self) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
             ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
@@ -207,11 +203,16 @@ impl ArgoResource {
                 _ => None,
             })?;
 
+        let namespace = k8s_resource.yaml["metadata"]["namespace"]
+            .as_str()
+            .unwrap_or("default");
+
         match k8s_resource.yaml["metadata"]["name"].as_str() {
             Some(name) => Some(ArgoResource {
                 kind,
                 file_name: k8s_resource.file_name,
                 name: name.to_string(),
+                namespace: namespace.to_string(),
                 yaml: k8s_resource.yaml,
             }),
             _ => None,
