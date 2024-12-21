@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
 
+use crate::argocd::ARGO_CD_NAMESPACE;
 use crate::error::CommandOutput;
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
@@ -37,7 +38,7 @@ pub fn run_command_from_list(
         .args(&command[1..])
         .env(
             "ARGOCD_OPTS",
-            "--port-forward --port-forward-namespace=argocd",
+            format!("--port-forward --port-forward-namespace={}", ARGO_CD_NAMESPACE),
         )
         .current_dir(current_dir.unwrap_or("."))
         .output()

@@ -1,3 +1,4 @@
+use crate::argocd::ARGO_CD_NAMESPACE;
 use crate::error::CommandError;
 use crate::utils::{run_command, spawn_command};
 use crate::{apply_manifest, Branch};
@@ -55,8 +56,11 @@ pub async fn get_resources(
     let start_time = std::time::Instant::now();
 
     loop {
-        let command = "kubectl get applications -n argocd -oyaml";
-        let applications: Result<Value, serde_yaml::Error> = match run_command(command) {
+        let command = format!(
+            "kubectl get applications -n {} -oyaml",
+            ARGO_CD_NAMESPACE
+        );
+        let applications: Result<Value, serde_yaml::Error> = match run_command(&command) {
             Ok(o) => serde_yaml::from_str(&o.stdout),
             Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
         };
@@ -220,7 +224,10 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     loop {
         debug!("🗑 Deleting ApplicationSets");
 
-        match run_command("kubectl delete applicationsets.argoproj.io --all -n argocd") {
+        match run_command(&format!(
+            "kubectl delete applicationsets.argoproj.io --all -n {}",
+            ARGO_CD_NAMESPACE
+        )) {
             Ok(_) => debug!("🗑 Deleted ApplicationSets"),
             Err(e) => {
                 error!("❌ Failed to delete applicationsets: {}", &e.stderr)
@@ -230,7 +237,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         debug!("🗑 Deleting Applications");
 
         let mut child = spawn_command(
-            "kubectl delete applications.argoproj.io --all -n argocd",
+            &format!("kubectl delete applications.argoproj.io --all -n {}", ARGO_CD_NAMESPACE),
             None,
         );
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
