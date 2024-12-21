@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{error::Error, io::Write};
 use structopt::StructOpt;
-use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command_from_list};
+use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command, run_command_from_list};
 mod argo_resource;
 mod argocd;
 mod branch;
@@ -401,7 +401,7 @@ fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
 }
 
 fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
-    run_command_from_list(vec!["kubectl", "apply", "-f", file_name], None).map_err(|e| {
+    run_command(&format!("kubectl apply -f {}", file_name)).map_err(|e| {
         error!("❌ Failed to apply manifest: {}", file_name);
         e
     })

@@ -6,39 +6,33 @@ use log::{debug, error, info};
 use std::error::Error;
 
 pub fn is_installed() -> bool {
-    run_command("which kind", None).is_ok()
+    run_command("which kind").is_ok()
 }
 
 pub fn create_cluster(cluster_name: &str) -> Result<(), Box<dyn Error>> {
     // check if docker is running
-    run_command("docker ps", None).map_err(|o| {
+    run_command("docker ps").map_err(|o| {
         error!("❌ Docker is not running");
         CommandError::new(o)
     })?;
 
     info!("🚀 Creating cluster...");
-    run_command(
-        &format!("kind delete cluster --name {}", cluster_name),
-        None,
-    )
-    .map_err(CommandError::new)?;
+    run_command(&format!("kind delete cluster --name {}", cluster_name))
+        .map_err(CommandError::new)?;
 
-    run_command(
-        &format!("kind create cluster --name {}", cluster_name),
-        None,
-    )
-    .map(|_| {
-        info!("🚀 Cluster created successfully");
-        Ok(())
-    })
-    .map_err(|e| {
-        error!("❌ Failed to create cluster");
-        CommandError::new(e)
-    })?
+    run_command(&format!("kind create cluster --name {}", cluster_name))
+        .map(|_| {
+            info!("🚀 Cluster created successfully");
+            Ok(())
+        })
+        .map_err(|e| {
+            error!("❌ Failed to create cluster");
+            CommandError::new(e)
+        })?
 }
 
 pub fn cluster_exists(cluster_name: &str) -> bool {
-    match run_command("kind get clusters", None) {
+    match run_command("kind get clusters") {
         Ok(o) if o.stdout.trim() == cluster_name => true,
         Ok(o) => {
             debug!("❌ Cluster '{}' not found in: {}", cluster_name, o.stdout);

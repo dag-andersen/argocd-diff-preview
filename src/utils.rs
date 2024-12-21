@@ -16,12 +16,17 @@ pub fn check_if_folder_exists(folder_name: &str) -> bool {
     PathBuf::from(folder_name).is_dir()
 }
 
-pub fn run_command(
+pub fn run_command(command: &str) -> Result<CommandOutput, CommandOutput> {
+    let args = command.split_whitespace().collect::<Vec<&str>>();
+    run_command_from_list(args, None)
+}
+
+pub fn run_command_in_dir(
     command: &str,
-    current_dir: Option<&str>,
+    current_dir: &str,
 ) -> Result<CommandOutput, CommandOutput> {
     let args = command.split_whitespace().collect::<Vec<&str>>();
-    run_command_from_list(args, current_dir)
+    run_command_from_list(args, Some(current_dir))
 }
 
 pub fn run_command_from_list(
