@@ -97,6 +97,10 @@ struct Opt {
     /// Cluster name (only applicable to kind)
     #[structopt(long, default_value = "argocd-diff-preview", env)]
     cluster_name: String,
+
+    /// Keep cluster alive after the tool finishes
+    #[structopt(long)]
+    keep_cluster_alive: bool,
 }
 
 #[derive(Debug)]
@@ -123,7 +127,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     run().await.map_err(|e| {
         let opt = Opt::from_args();
         error!("❌ {}", e);
-        cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
+        if !opt.keep_cluster_alive {
+            cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
+        }
         e
     })
 }
@@ -164,6 +170,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .argocd_chart_version
         .as_deref()
         .filter(|f| !f.trim().is_empty());
+    let keep_cluster_alive = opt.keep_cluster_alive;
     let max_diff_length = opt.max_diff_length;
     let files_changed: Option<Vec<String>> = opt
         .files_changed
@@ -196,6 +203,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
     info!("✨ - output-folder: {}", output_folder);
     info!("✨ - repo: {}", repo);
     info!("✨ - timeout: {} seconds", timeout);
+    if keep_cluster_alive {
+        info!("✨ - keep-cluster-alive: true");
+    }
     if let Some(a) = file_regex.clone() {
         info!("✨ - file-regex: {}", a.as_str());
     }
@@ -334,9 +344,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
     }
 
     // Delete cluster
-    match cluster_tool {
-        ClusterTool::Kind => kind::delete_cluster(&cluster_name, false),
-        ClusterTool::Minikube => minikube::delete_cluster(false),
+    if !keep_cluster_alive {
+        match cluster_tool {
+            ClusterTool::Kind => kind::delete_cluster(&cluster_name, false),
+            ClusterTool::Minikube => minikube::delete_cluster(false),
+        }
     }
 
     diff::generate_diff(
