@@ -38,7 +38,10 @@ pub fn run_command_from_list(
         .args(&command[1..])
         .env(
             "ARGOCD_OPTS",
-            format!("--port-forward --port-forward-namespace={}", ARGO_CD_NAMESPACE),
+            format!(
+                "--port-forward --port-forward-namespace={}",
+                ARGO_CD_NAMESPACE
+            ),
         )
         .current_dir(current_dir.unwrap_or("."))
         .output()

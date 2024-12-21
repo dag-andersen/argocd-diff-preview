@@ -199,7 +199,8 @@ fn patch_applications(
                 .remove_sync_policy()
                 .set_project_to_default()
                 .and_then(|a| a.point_destination_to_in_cluster())
-                .and_then(|a| a.redirect_sources(repo, &branch.name));
+                .and_then(|a| a.redirect_sources(repo, &branch.name))
+                .and_then(|a| a.redirect_generators(repo, &branch.name));
 
             if app.is_err() {
                 info!("❌ Failed to patch application: {}", app_name);

@@ -1,5 +1,6 @@
 use log::{debug, error, warn};
 use regex::Regex;
+use serde_yaml::Mapping;
 use std::error::Error;
 
 use crate::{parsing::K8sResource, selector::Operator, Selector};
@@ -157,6 +158,35 @@ impl ArgoResource {
         }
     }
 
+    pub fn redirect_generators(
+        mut self,
+        repo: &str,
+        branch: &str,
+    ) -> Result<ArgoResource, Box<dyn Error>> {
+        if self.kind != ApplicationKind::ApplicationSet {
+            return Ok(self);
+        }
+
+        let spec = self.yaml["spec"].as_mapping_mut();
+
+        match spec {
+            None => Err(format!("No 'spec' key found in ApplicationSet: {}", self.name).into()),
+            Some(spec) => {
+                if spec.contains_key("generators") {
+                    if let Some(g) = spec["generators"].as_sequence_mut() {
+                        for generator in g {
+                            if let Some(i) = generator["matrix"].as_mapping_mut() {
+                                debug!("Found matrix generators in file: {}", &self.file_name);
+                                redirect_generators_inner(i, repo, branch);
+                            }
+                        }
+                    }
+                }
+                Ok(self)
+            }
+        }
+    }
+
     pub fn from_k8s_resource(k8s_resource: K8sResource) -> Option<ArgoResource> {
         let kind = k8s_resource.yaml["kind"]
             .as_str()
@@ -298,5 +328,25 @@ impl ArgoResource {
         }
 
         Some(self)
+    }
+}
+
+fn redirect_generators_inner(v: &mut Mapping, repo: &str, branch: &str) {
+    if v.contains_key("generators") {
+        if let Some(i) = v["generators"].as_sequence_mut() {
+            for generator in i {
+                if let Some(git) = generator["git"].as_mapping_mut() {
+                    if git.contains_key("repoURL") {
+                        match git["repoURL"].as_str() {
+                            Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
+                                git["revision"] = serde_yaml::Value::String(branch.to_string());
+                                debug!("Redirected 'repoURL' in git generator",);
+                            }
+                            _ => debug!("Found no 'repoURL' under spec.generators.git",),
+                        }
+                    }
+                }
+            }
+        }
     }
 }
