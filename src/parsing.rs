@@ -24,7 +24,6 @@ impl Clone for K8sResource {
 }
 
 pub fn get_applications_for_branches(
-    argo_cd_namespace: &str,
     base_branch: &Branch,
     target_branch: &Branch,
     regex: &Option<Regex>,
@@ -34,7 +33,6 @@ pub fn get_applications_for_branches(
     ignore_invalid_watch_pattern: bool,
 ) -> Result<(Vec<ArgoResource>, Vec<ArgoResource>), Box<dyn Error>> {
     let base_apps = get_applications(
-        argo_cd_namespace,
         base_branch,
         regex,
         selector,
@@ -43,7 +41,6 @@ pub fn get_applications_for_branches(
         ignore_invalid_watch_pattern,
     )?;
     let target_apps = get_applications(
-        argo_cd_namespace,
         target_branch,
         regex,
         selector,
@@ -115,7 +112,6 @@ pub fn get_applications_for_branches(
 }
 
 fn get_applications(
-    argo_cd_namespace: &str,
     branch: &Branch,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
@@ -133,7 +129,7 @@ fn get_applications(
     );
     if !applications.is_empty() {
         info!("🤖 Patching Application[Sets] for branch: {}", branch.name);
-        let apps = patch_applications(argo_cd_namespace, applications, branch, repo)?;
+        let apps = patch_applications(applications, branch, repo)?;
         info!(
             "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
             apps.len(),
@@ -227,14 +223,12 @@ fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
 }
 
 fn patch_application(
-    argo_cd_namespace: &str,
     application: ArgoResource,
     branch: &Branch,
     repo: &str,
 ) -> Result<ArgoResource, Box<dyn Error>> {
     let app_name = application.name.clone();
     let app = application
-        .set_namespace(argo_cd_namespace)
         .remove_sync_policy()
         .set_project_to_default()
         .and_then(|a| a.point_destination_to_in_cluster())
@@ -249,14 +243,13 @@ fn patch_application(
 }
 
 fn patch_applications(
-    argo_cd_namespace: &str,
     applications: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     applications
         .into_iter()
-        .map(|a| patch_application(argo_cd_namespace, a, branch, repo))
+        .map(|a| patch_application(a, branch, repo))
         .collect()
 }
 
@@ -379,7 +372,7 @@ pub fn generate_apps_from_app_set(
                         })
                     })
                     .collect::<Vec<ArgoResource>>();
-                patch_applications(&argocd.namespace, apps, branch, repo)
+                patch_applications( apps, branch, repo)
             }
         };
 

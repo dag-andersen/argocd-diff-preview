@@ -46,6 +46,7 @@ pub fn run_command_in_dir(
     command: &str,
     current_dir: &str,
 ) -> Result<CommandOutput, CommandOutput> {
+    debug!("Running command: {}", command);
     let args = command.split_whitespace().collect::<Vec<&str>>();
     run_command_from_list(args, Some(current_dir), None)
 }
