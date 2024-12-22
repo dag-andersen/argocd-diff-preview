@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: git-generator-example-appset
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        revision: HEAD
+        directories:
+          - path: examples/git-generator/resources/**
+        values:
+          name: "{{ index .path.segments 3 }}"
+  template:
+    metadata:
+      name: "{{ .values.name }}"
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        path: "{{ .path.path }}"
+      destination:
+        name: in-cluster
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
