@@ -1,4 +1,5 @@
 use argo_resource::ArgoResource;
+use argocd::create_namespace;
 use branch::{Branch, BranchType};
 use error::CommandOutput;
 use log::{debug, error, info};
@@ -124,13 +125,12 @@ impl FromStr for ClusterTool {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    run().await.map_err(|e| {
+    run().await.inspect_err(|e| {
         let opt = Opt::from_args();
         error!("❌ {}", e);
         if !opt.keep_cluster_alive {
             cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
         }
-        e
     })
 }
 
@@ -298,6 +298,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    let unique_namespaces = base_apps
+        .iter()
+        .map(|a| a.namespace.clone())
+        .chain(target_apps.iter().map(|a| a.namespace.clone()))
+        .collect::<std::collections::HashSet<String>>();
+
     fs::write(base_branch.app_file(), applications_to_string(base_apps))?;
     fs::write(
         target_branch.app_file(),
@@ -309,15 +315,17 @@ async fn run() -> Result<(), Box<dyn Error>> {
         ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
-    argocd::create_namespace()?;
+    // Create a namespace for each application
+    for namespace in unique_namespaces {
+        create_namespace(&namespace)?;
+    }
 
-    create_folder_if_not_exists(secrets_folder)?;
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -400,14 +408,14 @@ fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
 }
 
 fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
-    run_command(&format!("kubectl apply -f {}", file_name)).inspect_err(|e| {
+    run_command(&format!("kubectl apply -f {}", file_name)).inspect_err(|_e| {
         error!("❌ Failed to apply manifest: {}", file_name);
     })
 }
 
-fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
+fn apply_folder(folder_name: &str) -> Result<u64, String> {
     if !PathBuf::from(folder_name).is_dir() {
-        return Err(format!("{} is not a directory", folder_name).into());
+        return Err(format!("{} is not a directory", folder_name));
     }
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(folder_name) {
@@ -417,7 +425,7 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
             if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                 match apply_manifest(file_name) {
                     Ok(_) => count += 1,
-                    Err(e) => return Err(e.stderr.into()),
+                    Err(e) => return Err(e.stderr),
                 }
             }
         }

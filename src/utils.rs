@@ -4,6 +4,8 @@ use std::process::{Child, Stdio};
 use std::{fs, process::Command};
 
 use crate::argocd::ARGO_CD_NAMESPACE;
+use log::debug;
+
 use crate::error::CommandOutput;
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
@@ -26,6 +28,7 @@ pub fn run_command_in_dir(
     command: &str,
     current_dir: &str,
 ) -> Result<CommandOutput, CommandOutput> {
+    debug!("Running command: {}", command);
     let args = command.split_whitespace().collect::<Vec<&str>>();
     run_command_from_list(args, Some(current_dir))
 }
