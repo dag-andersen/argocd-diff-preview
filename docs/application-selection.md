@@ -78,7 +78,7 @@ jobs:
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
             -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}"
-            dagandersen/argocd-diff-preview:v0.0.25
+            dagandersen/argocd-diff-preview:v0.0.26
 ```
 
 ## Ignoring individual applications
