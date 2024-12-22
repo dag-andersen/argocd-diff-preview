@@ -11,7 +11,7 @@ pub struct ArgoCDOptions<'a> {
     pub debug: bool,
 }
 
-pub const ARGO_CD_NAMESPACE: &str = "argocd-diff-preview";
+pub const ARGO_CD_NAMESPACE: &str = "argocd";
 
 const CONFIG_PATH: &str = "argocd-config";
 
