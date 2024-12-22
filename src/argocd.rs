@@ -76,12 +76,10 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
     info!("🦑 Waiting for Argo CD to start...");
 
     // wait for argocd-server to be ready
-    match run_command(
-        &format!(
-            "kubectl wait --for=condition=available deployment/argocd-server -n {} --timeout=300s",
-            ARGO_CD_NAMESPACE
-        )
-    ) {
+    match run_command(&format!(
+        "kubectl wait --for=condition=available deployment/argocd-server -n {} --timeout=300s",
+        ARGO_CD_NAMESPACE
+    )) {
         Ok(_) => info!("🦑 Argo CD is now available"),
         Err(_) => {
             error!("❌ Failed to wait for argocd-server");
@@ -96,8 +94,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         let secret_name = "argocd-initial-admin-secret";
         let command = &format!(
             "kubectl -n {} get secret {} -o jsonpath={{.data.password}}",
-            ARGO_CD_NAMESPACE,
-            secret_name
+            ARGO_CD_NAMESPACE, secret_name
         );
 
         let mut password_encoded: Option<CommandOutput> = None;
@@ -123,7 +120,7 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
             e
         })?;
 
-        String::from_utf8(password_decoded).inspect_err(|e| {
+        String::from_utf8(password_decoded).inspect_err(|_e| {
             error!("❌ failed to convert password to string");
         })?
     };
