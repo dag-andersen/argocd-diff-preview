@@ -14,6 +14,9 @@ FLAGS:
     -h, --help
                 Prints help information
 
+        --keep-cluster-alive
+                Keep cluster alive after the tool finishes
+
     -V, --version
                 Prints version information
 
@@ -21,6 +24,10 @@ OPTIONS:
         --argocd-chart-version <version>
                 Argo CD Helm Chart version
                 [env: ARGOCD_CHART_VERSION=]
+
+        --argocd-namespace <argocd-namespace>
+                Namespace to use for Argo CD
+                [env: ARGOCD_NAMESPACE=]  [default: argocd]
 
     -b, --base-branch <base-branch>
                 Base branch name
