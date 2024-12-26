@@ -1,6 +1,6 @@
-use crate::argocd::{get_manifests, refresh_app, ARGO_CD_NAMESPACE};
+use crate::argocd::ArgoCDInstallation;
 use crate::error::CommandError;
-use crate::utils::{run_command, spawn_command};
+use crate::utils::{run_command, spawn_command, write_to_file};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
@@ -32,6 +32,7 @@ static TIMEOUT_MESSAGES: [&str; 7] = [
 ];
 
 pub async fn get_resources(
+    argocd: &ArgoCDInstallation,
     branch: &Branch,
     timeout: u64,
     output_folder: &str,
@@ -50,13 +51,15 @@ pub async fn get_resources(
         })?;
     }
 
+    let destination_folder = format!("{}/{}", output_folder, branch.branch_type);
+
     let mut processed_apps = HashSet::new();
     let mut failed_apps = BTreeMap::new();
 
     let start_time = std::time::Instant::now();
 
     loop {
-        let command = format!("kubectl get applications -n {} -oyaml", ARGO_CD_NAMESPACE);
+        let command = "kubectl get applications -A -oyaml".to_string();
         let applications: Result<Value, serde_yaml::Error> = match run_command(&command) {
             Ok(o) => serde_yaml::from_str(&o.stdout),
             Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
@@ -89,12 +92,9 @@ pub async fn get_resources(
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
                     debug!("Getting manifests for application: {}", name);
-                    match get_manifests(name) {
+                    match argocd.get_manifests(name) {
                         Ok(o) => {
-                            fs::write(
-                                format!("{}/{}/{}", output_folder, branch.branch_type, name),
-                                &o.stdout,
-                            )?;
+                            write_to_file(&format!("{}/{}", destination_folder, name), &o.stdout)?;
                             debug!("Got manifests for application: {}", name)
                         }
                         Err(e) => error!("error: {}", e.stderr),
@@ -180,12 +180,9 @@ pub async fn get_resources(
 
         // TIMED OUT APPS
         if !timed_out_apps.is_empty() {
-            info!(
-                "💤 {} Applications timed out.",
-                timed_out_apps.len(),
-            );
+            info!("💤 {} Applications timed out.", timed_out_apps.len(),);
             for app in &timed_out_apps {
-                match refresh_app(app) {
+                match &argocd.refresh_app(app) {
                     Ok(_) => info!("🔄 Refreshing application: {}", app),
                     Err(e) => error!(
                         "⚠️ Failed to refresh application: {} with {}",
@@ -213,6 +210,9 @@ pub async fn get_resources(
         branch.name
     );
 
+    // info about where it was stored
+    info!("💾 Resources stored in: '{}/<app_name>'", destination_folder);
+
     Ok(())
 }
 
@@ -221,10 +221,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     loop {
         debug!("🗑 Deleting ApplicationSets");
 
-        match run_command(&format!(
-            "kubectl delete applicationsets.argoproj.io --all -n {}",
-            ARGO_CD_NAMESPACE
-        )) {
+        match run_command("kubectl delete applicationsets.argoproj.io --all -A") {
             Ok(_) => debug!("🗑 Deleted ApplicationSets"),
             Err(e) => {
                 error!("❌ Failed to delete applicationsets: {}", &e.stderr)
@@ -233,13 +230,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
 
         debug!("🗑 Deleting Applications");
 
-        let mut child = spawn_command(
-            &format!(
-                "kubectl delete applications.argoproj.io --all -n {}",
-                ARGO_CD_NAMESPACE
-            ),
-            None,
-        );
+        let mut child = spawn_command("kubectl delete applications.argoproj.io --all -A", None);
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         if run_command("kubectl get applications -A --no-headers")
             .map(|e| e.stdout.trim().is_empty())

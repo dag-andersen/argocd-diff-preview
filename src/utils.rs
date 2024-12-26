@@ -1,9 +1,8 @@
+use log::debug;
 use std::error::Error;
 use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
-
-use log::debug;
 
 use crate::error::CommandOutput;
 
@@ -49,7 +48,6 @@ pub fn run_command_from_list(
     current_dir: Option<&str>,
     envs: Option<Vec<StringPair>>,
 ) -> Result<CommandOutput, CommandOutput> {
-
     debug!("Running shell command: {}", command.join(" "));
 
     let output = match envs {
@@ -84,6 +82,7 @@ pub fn spawn_command(command: &str, current_dir: Option<&str>) -> Child {
 }
 
 pub fn spawn_command_from_list(args: Vec<&str>, current_dir: Option<&str>) -> Child {
+    debug!("Spawning command: {}", args.join(" "));
     Command::new(args[0])
         .args(&args[1..])
         .current_dir(current_dir.unwrap_or("."))
@@ -93,7 +92,8 @@ pub fn spawn_command_from_list(args: Vec<&str>, current_dir: Option<&str>) -> Ch
         .unwrap_or_else(|_| panic!("Failed to execute command: {}", args.join(" ")))
 }
 
-pub fn write_file(file_name: &str, content: &str) -> Result<(), Box<dyn Error>> {
+pub fn write_to_file(file_name: &str, content: &str) -> Result<(), Box<dyn Error>> {
+    debug!("Writing to file: {}", file_name);
     fs::write(file_name, content)?;
     Ok(())
 }

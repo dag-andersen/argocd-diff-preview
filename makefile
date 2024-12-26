@@ -2,6 +2,7 @@ gitops_repo ?= argocd-diff-preview
 github_org ?= dag-andersen
 base_branch := main
 docker_file := Dockerfile
+argocd_namespace := argocd-diff-preview
 timeout := 120
 
 pull-repository:
@@ -20,6 +21,7 @@ run-with-cargo: pull-repository
 		--diff-ignore "$(diff_ignore)" \
 		--timeout $(timeout) \
 		-l "$(selector)" \
+		--argocd-namespace "$(argocd_namespace)" \
 		--files-changed="$(files_changed)"
 
 run-with-docker: pull-repository
