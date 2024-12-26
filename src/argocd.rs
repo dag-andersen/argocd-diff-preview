@@ -31,38 +31,47 @@ impl ArgoCDInstallation {
             self.version.clone().unwrap_or("latest".to_string())
         );
 
-        let (values, values_override) = match std::fs::read_dir(&self.config_path) {
+        let (values_pre, values, values_post) = match std::fs::read_dir(&self.config_path) {
             Ok(dir) => {
-                debug!("📂 Files in folder '{}':", self.config_path);
+                debug!("📂 Files in folder 'argocd-config':");
                 for file in dir {
                     debug!("- 📄 {:?}", file.unwrap().file_name());
                 }
-                let values_exist = std::fs::metadata(format!("{}/values.yaml", self.config_path))
+                let values_pre = std::fs::metadata(format!("{}/values-pre.yaml", self.config_path))
+                    .is_ok()
+                    .then_some(format!("-f {}/values-pre.yaml", self.config_path));
+                let values = std::fs::metadata(format!("{}/values.yaml", self.config_path))
                     .is_ok()
                     .then_some(format!("-f {}/values.yaml", self.config_path));
-                let values_override_exist =
-                    std::fs::metadata(format!("{}/values-override.yaml", self.config_path))
+                let values_post =
+                    std::fs::metadata(format!("{}/values-post.yaml", self.config_path))
                         .is_ok()
-                        .then_some(format!("-f {}/values-override.yaml", self.config_path));
-                (values_exist, values_override_exist)
+                        .then_some(format!("-f {}/values-post.yaml", self.config_path));
+                (values, values_pre, values_post)
             }
             Err(_e) => {
-                info!("📂 Folder '{}' doesn't exist. Installing Argo CD Helm Chart with default configuration", self.config_path);
-                (None, None)
+                info!(
+                    "📂 Folder '{}' doesn't exist. Installing Argo CD Helm Chart with default configuration",
+                    self.config_path
+                );
+                (None, None, None)
             }
         };
 
         // add argo repo to helm
-        run_command("helm repo add argo https://argoproj.github.io/argo-helm").map_err(|e| {
-            error!("❌ Failed to add argo repo");
-            CommandError::new(e)
-        })?;
+        run_command("helm repo add argo https://argoproj.github.io/argo-helm").map_err(
+            |e| {
+                error!("❌ Failed to add argo repo");
+                CommandError::new(e)
+            },
+        )?;
 
         let helm_install_command = format!(
-            "helm install argocd argo/argo-cd -n {} {} {} {}",
+            "helm install argocd argo/argo-cd -n {} {} {} {} {}",
             self.namespace,
             values.unwrap_or_default(),
-            values_override.unwrap_or_default(),
+            values_pre.unwrap_or_default(),
+            values_post.unwrap_or_default(),
             self.version
                 .clone()
                 .map(|a| format!("--version {}", a))
@@ -116,9 +125,8 @@ impl ArgoCDInstallation {
                 }
             }
             let password_encoded = password_encoded.unwrap().stdout;
-            let password_decoded = BASE64_STANDARD.decode(password_encoded).map_err(|e| {
+            let password_decoded = BASE64_STANDARD.decode(password_encoded).inspect_err(|e| {
                 error!("❌ Failed to decode password: {}", e);
-                e
             })?;
 
             String::from_utf8(password_decoded).inspect_err(|_e| {
@@ -167,6 +175,9 @@ impl ArgoCDInstallation {
                 }
             }
         }
+
+        // Add extra permissions to the default AppProject
+        let _ = self.run_argocd_command("argocd proj add-source-namespace default *");
 
         info!("🦑 Argo CD installed successfully");
         Ok(())

@@ -1,9 +1,9 @@
 # Overrides done by argocd-diff-preview
-# These will happen after the values.yaml file is loaded
+# These will happen BEFORE the values.yaml file is loaded
 notifications:
   enabled: false
 dex:
   enabled: false
 configs:
   params:
-    reposerver.git.request.timeout: "150s"
+    application.namespaces: "*"

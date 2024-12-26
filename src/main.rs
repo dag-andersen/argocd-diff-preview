@@ -128,13 +128,12 @@ impl FromStr for ClusterTool {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    run().await.map_err(|e| {
+    run().await.inspect_err(|e| {
         let opt = Opt::from_args();
         error!("❌ {}", e);
         if !opt.keep_cluster_alive {
             cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
         }
-        e
     })
 }
 
@@ -283,6 +282,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
+
     let (base_apps, target_apps) = parsing::get_applications_for_branches(
         &argocd_namespace,
         &base_branch,
@@ -305,6 +305,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    let unique_namespaces = base_apps
+        .iter()
+        .map(|a| a.namespace.clone())
+        .chain(target_apps.iter().map(|a| a.namespace.clone()))
+        .collect::<std::collections::HashSet<String>>();
+
     info!(
         "💾 Writing applications from '{}' to ./{}",
         base_branch.name,
@@ -326,15 +332,20 @@ async fn run() -> Result<(), Box<dyn Error>> {
         ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
+    // create Argo CD namespace
     create_namespace(&argocd_namespace)?;
 
-    create_folder_if_not_exists(secrets_folder)?;
+    // Create a namespace for each application
+    for namespace in unique_namespaces {
+        create_namespace(&namespace)?;
+    }
+
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -433,9 +444,9 @@ fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
     })
 }
 
-fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
+fn apply_folder(folder_name: &str) -> Result<u64, String> {
     if !PathBuf::from(folder_name).is_dir() {
-        return Err(format!("{} is not a directory", folder_name).into());
+        return Err(format!("{} is not a directory", folder_name));
     }
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(folder_name) {
@@ -445,7 +456,7 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
             if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                 match apply_manifest(file_name) {
                     Ok(_) => count += 1,
-                    Err(e) => return Err(e.stderr.into()),
+                    Err(e) => return Err(e.stderr),
                 }
             }
         }
