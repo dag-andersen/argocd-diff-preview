@@ -11,6 +11,9 @@ pull-repository:
 	cd base-branch   && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(base_branch)"   && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
+docker-build:
+	docker build . -f $(docker_file) -t image
+
 run-with-cargo: pull-repository
 	cargo run -- -b "$(base_branch)" \
 		-t "$(target_branch)" \
@@ -24,8 +27,7 @@ run-with-cargo: pull-repository
 		--argocd-namespace "$(argocd_namespace)" \
 		--files-changed="$(files_changed)"
 
-run-with-docker: pull-repository
-	docker build . -f $(docker_file) -t image
+run-with-docker: pull-repository docker-build
 	docker run \
 		--network=host \
 		-v ~/.kube:/root/.kube \

@@ -128,13 +128,12 @@ impl FromStr for ClusterTool {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    run().await.map_err(|e| {
+    run().await.inspect_err(|e| {
         let opt = Opt::from_args();
         error!("❌ {}", e);
         if !opt.keep_cluster_alive {
             cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
         }
-        e
     })
 }
 
@@ -305,21 +304,23 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    info!(
-        "💾 Writing applications from '{}' to ./{}",
-        base_branch.name,
-        base_branch.app_file()
-    );
-    utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps))?;
-    info!(
-        "💾 Writing applications from '{}' to ./{}",
-        target_branch.name,
-        target_branch.app_file()
-    );
-    utils::write_to_file(
-        target_branch.app_file(),
-        &applications_to_string(target_apps),
-    )?;
+    {
+        info!(
+            "💾 Writing applications from '{}' to ./{}",
+            base_branch.name,
+            base_branch.app_file()
+        );
+        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps))?;
+        info!(
+            "💾 Writing applications from '{}' to ./{}",
+            target_branch.name,
+            target_branch.app_file()
+        );
+        utils::write_to_file(
+            target_branch.app_file(),
+            &applications_to_string(target_apps),
+        )?;
+    }
 
     match cluster_tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name)?,
@@ -334,7 +335,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -433,9 +434,9 @@ fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
     })
 }
 
-fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
+fn apply_folder(folder_name: &str) -> Result<u64, String> {
     if !PathBuf::from(folder_name).is_dir() {
-        return Err(format!("{} is not a directory", folder_name).into());
+        return Err(format!("{} is not a directory", folder_name));
     }
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(folder_name) {
@@ -445,7 +446,7 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
             if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                 match apply_manifest(file_name) {
                     Ok(_) => count += 1,
-                    Err(e) => return Err(e.stderr.into()),
+                    Err(e) => return Err(e.stderr),
                 }
             }
         }
