@@ -1,4 +1,4 @@
-use crate::argocd::ARGO_CD_NAMESPACE;
+use crate::argocd::{get_manifests, refresh_app, ARGO_CD_NAMESPACE};
 use crate::error::CommandError;
 use crate::utils::{run_command, spawn_command};
 use crate::{apply_manifest, Branch};
@@ -50,8 +50,8 @@ pub async fn get_resources(
         })?;
     }
 
-    let mut set_of_processed_apps = HashSet::new();
-    let mut set_of_failed_apps = BTreeMap::new();
+    let mut processed_apps = HashSet::new();
+    let mut failed_apps = BTreeMap::new();
 
     let start_time = std::time::Instant::now();
 
@@ -72,24 +72,24 @@ pub async fn get_resources(
         let applications = match applications["items"].as_sequence() {
             None => break,
             Some(apps) if apps.is_empty() => break,
-            Some(apps) if apps.len() == set_of_processed_apps.len() => break,
+            Some(apps) if apps.len() == processed_apps.len() => break,
             Some(apps) => apps,
         };
 
-        let mut list_of_timed_out_apps = vec![];
+        let mut timed_out_apps = vec![];
         let mut other_errors = vec![];
 
         let mut apps_left = 0;
 
         for item in applications {
             let name = item["metadata"]["name"].as_str().unwrap();
-            if set_of_processed_apps.contains(name) {
+            if processed_apps.contains(name) {
                 continue;
             }
             match item["status"]["sync"]["status"].as_str() {
                 Some("OutOfSync") | Some("Synced") => {
                     debug!("Getting manifests for application: {}", name);
-                    match run_command(&format!("argocd app manifests {}", name)) {
+                    match get_manifests(name) {
                         Ok(o) => {
                             fs::write(
                                 format!("{}/{}/{}", output_folder, branch.branch_type, name),
@@ -99,7 +99,7 @@ pub async fn get_resources(
                         }
                         Err(e) => error!("error: {}", e.stderr),
                     }
-                    set_of_processed_apps.insert(name.to_string().clone());
+                    processed_apps.insert(name.to_string().clone());
                     continue;
                 }
                 Some("Unknown") => {
@@ -111,7 +111,7 @@ pub async fn get_resources(
                                         Some(msg)
                                             if ERROR_MESSAGES.iter().any(|e| msg.contains(e)) =>
                                         {
-                                            set_of_failed_apps
+                                            failed_apps
                                                 .insert(name.to_string().clone(), msg.to_string());
                                             continue;
                                         }
@@ -122,7 +122,7 @@ pub async fn get_resources(
                                                 "Application: {} timed out with error: {}",
                                                 name, msg
                                             );
-                                            list_of_timed_out_apps.push(name.to_string().clone());
+                                            timed_out_apps.push(name.to_string().clone());
                                             other_errors.push((name.to_string(), msg.to_string()));
                                         }
                                         Some(msg) => {
@@ -132,7 +132,7 @@ pub async fn get_resources(
                                             );
                                             other_errors.push((name.to_string(), msg.to_string()));
                                         }
-                                        _ => (),
+                                        None => (),
                                     }
                                 }
                             }
@@ -145,8 +145,8 @@ pub async fn get_resources(
         }
 
         // ERRORS
-        if !set_of_failed_apps.is_empty() {
-            for (name, msg) in &set_of_failed_apps {
+        if !failed_apps.is_empty() {
+            for (name, msg) in &failed_apps {
                 error!(
                     "❌ Failed to process application: {} with error: \n{}",
                     name, msg
@@ -155,7 +155,7 @@ pub async fn get_resources(
             return Err("Failed to process applications".into());
         }
 
-        if applications.len() == set_of_processed_apps.len() {
+        if applications.len() == processed_apps.len() {
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             continue;
         }
@@ -166,7 +166,7 @@ pub async fn get_resources(
             error!("❌ Timed out after {} seconds", timeout);
             error!(
                 "❌ Processed {} applications, but {} applications still remain",
-                set_of_processed_apps.len(),
+                processed_apps.len(),
                 apps_left
             );
             if !other_errors.is_empty() {
@@ -179,13 +179,13 @@ pub async fn get_resources(
         }
 
         // TIMED OUT APPS
-        if !list_of_timed_out_apps.is_empty() {
+        if !timed_out_apps.is_empty() {
             info!(
                 "💤 {} Applications timed out.",
-                list_of_timed_out_apps.len(),
+                timed_out_apps.len(),
             );
-            for app in &list_of_timed_out_apps {
-                match run_command(&format!("argocd app get {} --refresh", app)) {
+            for app in &timed_out_apps {
+                match refresh_app(app) {
                     Ok(_) => info!("🔄 Refreshing application: {}", app),
                     Err(e) => error!(
                         "⚠️ Failed to refresh application: {} with {}",
@@ -209,7 +209,7 @@ pub async fn get_resources(
 
     info!(
         "🌚 Got all resources from {} applications for {}",
-        set_of_processed_apps.len(),
+        processed_apps.len(),
         branch.name
     );
 

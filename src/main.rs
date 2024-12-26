@@ -298,11 +298,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    fs::write(base_branch.app_file(), applications_to_string(base_apps))?;
-    fs::write(
-        target_branch.app_file(),
-        applications_to_string(target_apps),
-    )?;
+    info!("💾 Writing applications from {}-branch to {}", base_branch.name, base_branch.app_file());
+    utils::write_file(base_branch.app_file(), &applications_to_string(base_apps))?;
+    info!("💾 Writing applications from {}-branch to {}", target_branch.name, target_branch.app_file());
+    utils::write_file(target_branch.app_file(), &applications_to_string(target_apps))?;
 
     match cluster_tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name)?,

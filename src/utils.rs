@@ -3,8 +3,14 @@ use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
 
-use crate::argocd::ARGO_CD_NAMESPACE;
+use log::debug;
+
 use crate::error::CommandOutput;
+
+pub struct StringPair {
+    pub key: String,
+    pub value: String,
+}
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
     if !PathBuf::from(folder_name).is_dir() {
@@ -19,7 +25,15 @@ pub fn check_if_folder_exists(folder_name: &str) -> bool {
 
 pub fn run_command(command: &str) -> Result<CommandOutput, CommandOutput> {
     let args = command.split_whitespace().collect::<Vec<&str>>();
-    run_command_from_list(args, None)
+    run_command_from_list(args, None, None)
+}
+
+pub fn run_command_with_envs(
+    command: &str,
+    envs: Option<Vec<StringPair>>,
+) -> Result<CommandOutput, CommandOutput> {
+    let args = command.split_whitespace().collect::<Vec<&str>>();
+    run_command_from_list(args, None, envs)
 }
 
 pub fn run_command_in_dir(
@@ -27,25 +41,30 @@ pub fn run_command_in_dir(
     current_dir: &str,
 ) -> Result<CommandOutput, CommandOutput> {
     let args = command.split_whitespace().collect::<Vec<&str>>();
-    run_command_from_list(args, Some(current_dir))
+    run_command_from_list(args, Some(current_dir), None)
 }
 
 pub fn run_command_from_list(
     command: Vec<&str>,
     current_dir: Option<&str>,
+    envs: Option<Vec<StringPair>>,
 ) -> Result<CommandOutput, CommandOutput> {
-    let output = Command::new(command[0])
-        .args(&command[1..])
-        .env(
-            "ARGOCD_OPTS",
-            format!(
-                "--port-forward --port-forward-namespace={}",
-                ARGO_CD_NAMESPACE
-            ),
-        )
-        .current_dir(current_dir.unwrap_or("."))
-        .output()
-        .unwrap_or_else(|_| panic!("Failed to execute command: {}", command.join(" ")));
+
+    debug!("Running shell command: {}", command.join(" "));
+
+    let output = match envs {
+        Some(envs) => envs
+            .iter()
+            .fold(Command::new(command[0]), |mut output, env_var| {
+                output.env(&env_var.key, &env_var.value);
+                output
+            }),
+        None => Command::new(command[0]),
+    }
+    .args(&command[1..])
+    .current_dir(current_dir.unwrap_or("."))
+    .output()
+    .unwrap_or_else(|_| panic!("Failed to execute command: {}", command.join(" ")));
 
     match output.status.success() {
         true => Ok(CommandOutput {
@@ -72,4 +91,9 @@ pub fn spawn_command_from_list(args: Vec<&str>, current_dir: Option<&str>) -> Ch
         .stderr(Stdio::null())
         .spawn()
         .unwrap_or_else(|_| panic!("Failed to execute command: {}", args.join(" ")))
+}
+
+pub fn write_file(file_name: &str, content: &str) -> Result<(), Box<dyn Error>> {
+    fs::write(file_name, content)?;
+    Ok(())
 }

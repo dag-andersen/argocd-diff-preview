@@ -1,6 +1,6 @@
 use crate::{
     error::{CommandError, CommandOutput},
-    utils::run_command,
+    utils::{run_command, run_command_with_envs, StringPair},
 };
 use base64::prelude::*;
 use log::{debug, error, info};
@@ -10,6 +10,17 @@ pub struct ArgoCDOptions<'a> {
     pub version: Option<&'a str>,
     pub debug: bool,
 }
+
+// pub struct ArgoCDInstallion {
+//     namespace: String,
+//     version: String,
+// }
+
+// impl ArgoCDInstallion {
+//     pub fn new(namespace: String, version: String) -> Self {
+//         Self { namespace, version }
+//     }
+// }
 
 pub const ARGO_CD_NAMESPACE: &str = "argocd";
 
@@ -136,16 +147,18 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
         username, password
     );
 
-    run_command(&format!(
-        "argocd login localhost:8080 --insecure --username {} --password {}",
-        username, password
-    ))
+    run_argocd_command(
+        &format!(
+            "argocd login localhost:8080 --insecure --username {} --password {}",
+            username, password
+        ),
+    )
     .map_err(|e| {
         error!("❌ Failed to login to argocd");
         CommandError::new(e)
     })?;
 
-    run_command("argocd app list").map_err(|e| {
+    run_argocd_command("argocd app list").map_err(|e| {
         error!("❌ Failed to run: argocd app list");
         CommandError::new(e)
     })?;
@@ -169,4 +182,25 @@ pub async fn install_argo_cd(options: ArgoCDOptions<'_>) -> Result<(), Box<dyn E
 
     info!("🦑 Argo CD installed successfully");
     Ok(())
+}
+
+fn run_argocd_command(command: &str) -> Result<CommandOutput, CommandOutput> {
+    run_command_with_envs(
+        command,
+        Some(vec![StringPair {
+            key: "ARGOCD_OPTS".to_string(),
+            value: format!(
+                "--port-forward --port-forward-namespace={}",
+                ARGO_CD_NAMESPACE
+            )
+        }]),
+    )
+}
+
+pub fn get_manifests(app_name: &str) -> Result<CommandOutput, CommandOutput> {
+    run_argocd_command(&format!("argocd app manifests {}", app_name))
+}
+
+pub fn refresh_app(app_name: &str) -> Result<CommandOutput, CommandOutput> {
+    run_argocd_command(&format!("argocd app get {} --refresh", app_name))
 }
