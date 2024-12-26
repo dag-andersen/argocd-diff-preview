@@ -1,4 +1,4 @@
-use crate::{argo_resource::ArgoResource, argocd::ARGO_CD_NAMESPACE, Branch, Selector};
+use crate::{argo_resource::ArgoResource, Branch, Selector};
 use log::{debug, info};
 use regex::Regex;
 use serde_yaml::Value;
@@ -18,7 +18,8 @@ impl Clone for K8sResource {
     }
 }
 
-pub fn get_applications_for_both_branches<'a>(
+pub fn get_applications_for_branches<'a>(
+    argo_cd_namespace: &str,
     base_branch: &Branch,
     target_branch: &Branch,
     regex: &Option<Regex>,
@@ -28,6 +29,7 @@ pub fn get_applications_for_both_branches<'a>(
     ignore_invalid_watch_pattern: bool,
 ) -> Result<(Vec<ArgoResource>, Vec<ArgoResource>), Box<dyn Error>> {
     let base_apps = get_applications(
+        argo_cd_namespace,
         base_branch,
         regex,
         selector,
@@ -36,6 +38,7 @@ pub fn get_applications_for_both_branches<'a>(
         ignore_invalid_watch_pattern,
     )?;
     let target_apps = get_applications(
+        argo_cd_namespace,
         target_branch,
         regex,
         selector,
@@ -79,7 +82,8 @@ pub fn get_applications_for_both_branches<'a>(
     }
 }
 
-pub fn get_applications(
+fn get_applications(
+    argo_cd_namespace: &str,
     branch: &Branch,
     regex: &Option<Regex>,
     selector: &Option<Vec<Selector>>,
@@ -96,7 +100,7 @@ pub fn get_applications(
         ignore_invalid_watch_pattern,
     );
     if !applications.is_empty() {
-        return patch_applications(applications, branch, repo);
+        return patch_applications(argo_cd_namespace, applications, branch, repo);
     }
     Ok(applications)
 }
@@ -184,6 +188,7 @@ fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
 }
 
 fn patch_applications(
+    argo_cd_namespace: &str,
     applications: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
@@ -195,7 +200,7 @@ fn patch_applications(
         .map(|a| {
             let app_name = a.name.clone();
             let app: Result<ArgoResource, Box<dyn Error>> = a
-                .set_namespace(ARGO_CD_NAMESPACE)
+                .set_namespace(argo_cd_namespace)
                 .remove_sync_policy()
                 .set_project_to_default()
                 .and_then(|a| a.point_destination_to_in_cluster())

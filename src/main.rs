@@ -1,6 +1,6 @@
 use argo_resource::ArgoResource;
 use branch::{Branch, BranchType};
-use error::CommandOutput;
+use error::{CommandError, CommandOutput};
 use log::{debug, error, info};
 use regex::Regex;
 use selector::Selector;
@@ -98,6 +98,10 @@ struct Opt {
     #[structopt(long, default_value = "argocd-diff-preview", env)]
     cluster_name: String,
 
+    /// Namespace to use for Argo CD
+    #[structopt(long, default_value = "argocd", env)]
+    argocd_namespace: String,
+
     /// Keep cluster alive after the tool finishes
     #[structopt(long)]
     keep_cluster_alive: bool,
@@ -166,6 +170,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
     let output_folder = opt.output_folder.as_str();
     let secrets_folder = opt.secrets_folder.as_str();
     let line_count = opt.line_count;
+    let cluster_name = opt.cluster_name;
+    let argocd_namespace = opt.argocd_namespace;
     let argocd_version = opt
         .argocd_chart_version
         .as_deref()
@@ -196,10 +202,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     info!("✨ Running with:");
     info!("✨ - local-cluster-tool: {:?}", cluster_tool);
+    info!("✨ - cluster-name: {}", cluster_name);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
+    info!("✨ - argocd-namespace: {}", argocd_namespace);
     info!("✨ - repo: {}", repo);
     info!("✨ - timeout: {} seconds", timeout);
     if keep_cluster_alive {
@@ -273,11 +281,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Err("Target branch folder does not exist".into());
     }
 
-    let cluster_name = opt.cluster_name;
-
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
-    let (base_apps, target_apps) = parsing::get_applications_for_both_branches(
+    let (base_apps, target_apps) = parsing::get_applications_for_branches(
+        &argocd_namespace,
         &base_branch,
         &target_branch,
         &file_regex,
@@ -298,10 +305,20 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    fs::write(base_branch.app_file(), applications_to_string(base_apps))?;
-    fs::write(
+    info!(
+        "💾 Writing applications from '{}' to ./{}",
+        base_branch.name,
+        base_branch.app_file()
+    );
+    utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps))?;
+    info!(
+        "💾 Writing applications from '{}' to ./{}",
+        target_branch.name,
+        target_branch.app_file()
+    );
+    utils::write_to_file(
         target_branch.app_file(),
-        applications_to_string(target_apps),
+        &applications_to_string(target_apps),
     )?;
 
     match cluster_tool {
@@ -309,7 +326,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
-    argocd::create_namespace()?;
+    create_namespace(&argocd_namespace)?;
 
     create_folder_if_not_exists(secrets_folder)?;
     match apply_folder(secrets_folder) {
@@ -321,25 +338,27 @@ async fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    argocd::install_argo_cd(argocd::ArgoCDOptions {
-        version: argocd_version,
-        debug: opt.debug,
-    })
-    .await?;
+    let argocd = argocd::ArgoCDInstallation::new(
+        &argocd_namespace,
+        argocd_version.map(|v| v.to_string()),
+        None,
+    );
+
+    argocd.install_argo_cd(opt.debug).await?;
 
     // Cleanup output folder
     clean_output_folder(output_folder)?;
 
     // Extract resources from Argo CD
     if found_base_apps {
-        extract::get_resources(&base_branch, timeout, output_folder).await?;
+        extract::get_resources(&argocd, &base_branch, timeout, output_folder).await?;
         if found_target_apps {
             extract::delete_applications().await?;
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
     }
     if found_target_apps {
-        extract::get_resources(&target_branch, timeout, output_folder).await?;
+        extract::get_resources(&argocd, &target_branch, timeout, output_folder).await?;
     }
 
     // Delete cluster
@@ -397,6 +416,15 @@ fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
         }
         _ => debug!("🧼 No cluster to clean up"),
     }
+}
+
+pub fn create_namespace(namespace: &str) -> Result<(), Box<dyn Error>> {
+    run_command(&format!("kubectl create ns {}", namespace)).map_err(|e| {
+        error!("❌ Failed to create namespace '{}'", namespace);
+        CommandError::new(e)
+    })?;
+    debug!("🤖 Namespace '{}' created successfully", namespace);
+    Ok(())
 }
 
 fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
