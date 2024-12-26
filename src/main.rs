@@ -202,12 +202,12 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     info!("✨ Running with:");
     info!("✨ - local-cluster-tool: {:?}", cluster_tool);
-    info!("✨ - argocd-installation-namespace: {}", argocd_namespace);
     info!("✨ - cluster-name: {}", cluster_name);
     info!("✨ - base-branch: {}", base_branch_name);
     info!("✨ - target-branch: {}", target_branch_name);
     info!("✨ - secrets-folder: {}", secrets_folder);
     info!("✨ - output-folder: {}", output_folder);
+    info!("✨ - argocd-namespace: {}", argocd_namespace);
     info!("✨ - repo: {}", repo);
     info!("✨ - timeout: {} seconds", timeout);
     if keep_cluster_alive {
