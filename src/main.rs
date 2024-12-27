@@ -4,6 +4,7 @@ use error::{CommandError, CommandOutput};
 use log::{debug, error, info};
 use regex::Regex;
 use selector::Selector;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -293,6 +294,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
         opt.ignore_invalid_watch_pattern,
     )?;
 
+    let base_apps = unique_names(base_apps);
+    let target_apps = unique_names(target_apps);
+
     let found_base_apps = !base_apps.is_empty();
     let found_target_apps = !target_apps.is_empty();
 
@@ -403,6 +407,32 @@ fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
         }
     }
     Ok(())
+}
+
+// Give new name for duplicate names in Vec<ArgoResource>
+fn unique_names(apps: Vec<ArgoResource>) -> Vec<ArgoResource> {
+    let mut duplicate_names: HashMap<String, Vec<ArgoResource>> = HashMap::new();
+    apps.into_iter().for_each(|a| {
+        duplicate_names.entry(a.name.clone()).or_default().push(a);
+    });
+    let mut new_vec: Vec<ArgoResource> = vec![];
+    for (name, apps) in duplicate_names {
+        if apps.len() > 1 {
+            info!("🔍 Found {} duplicate applications with name: '{}'. Suffixing with -1, -2, -3, etc.", apps.len(), name);
+            let mut sorted_apps = apps.clone();
+            sorted_apps.sort_by_key(|a| a.to_string());
+            for (i, app) in sorted_apps.into_iter().enumerate() {
+                let new_name = format!("{}-{}", name, i + 1);
+                let mut new_app = app.clone();
+                new_app.name = new_name.clone();
+                new_app.yaml["metadata"]["name"] = serde_yaml::Value::String(new_name);
+                new_vec.push(new_app);
+            }
+        } else {
+            new_vec.push(apps[0].clone());
+        }
+    }
+    new_vec
 }
 
 fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
