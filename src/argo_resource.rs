@@ -8,22 +8,24 @@ use crate::{parsing::K8sResource, selector::Operator, Selector};
 const ANNOTATION_WATCH_PATTERN: &str = "argocd-diff-preview/watch-pattern";
 const ANNOTATION_IGNORE: &str = "argocd-diff-preview/ignore";
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum ApplicationKind {
     Application,
     ApplicationSet,
 }
 
+#[derive(Clone)]
 pub struct ArgoResource {
-    pub file_name: String,
     pub yaml: serde_yaml::Value,
     pub kind: ApplicationKind,
     pub name: String,
+    // Where the resource was found
+    pub file_name: String,
 }
 
-impl std::fmt::Display for ArgoResource {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
+impl ArgoResource {
+    pub fn as_string(&self) -> Result<String, Box<dyn Error>> {
+        Ok(serde_yaml::to_string(&self.yaml)?)
     }
 }
 

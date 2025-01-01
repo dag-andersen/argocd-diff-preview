@@ -211,7 +211,10 @@ pub async fn get_resources(
     );
 
     // info about where it was stored
-    info!("💾 Resources stored in: '{}/<app_name>'", destination_folder);
+    info!(
+        "💾 Resources stored in: '{}/<app_name>'",
+        destination_folder
+    );
 
     Ok(())
 }
