@@ -23,9 +23,9 @@ pub struct ArgoResource {
     pub file_name: String,
 }
 
-impl std::fmt::Display for ArgoResource {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", serde_yaml::to_string(&self.yaml).unwrap())
+impl ArgoResource {
+    pub fn as_string(&self) -> Result<String, Box<dyn Error>> {
+        Ok(serde_yaml::to_string(&self.yaml)?)
     }
 }
 

@@ -194,7 +194,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     let cluster_tool = &opt.local_cluster_tool;
 
-    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9\._-]+$").unwrap();
+    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9\._-]+$")?;
     if !repo_regex.is_match(repo) {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
         return Err("Invalid repository format".into());
@@ -315,7 +315,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             base_branch.name,
             base_branch.app_file()
         );
-        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps))?;
+        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps)?)?;
         info!(
             "💾 Writing {} applications from '{}' to ./{}",
             target_apps.len(),
@@ -324,7 +324,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         );
         utils::write_to_file(
             target_branch.app_file(),
-            &applications_to_string(target_apps),
+            &applications_to_string(target_apps)?,
         )?;
     }
 
@@ -428,7 +428,7 @@ fn unique_names(apps: Vec<ArgoResource>, branch: &Branch) -> Vec<ArgoResource> {
                 name
             );
             let mut sorted_apps = apps.clone();
-            sorted_apps.sort_by_key(|a| a.to_string());
+            sorted_apps.sort_by_key(|a| a.as_string().unwrap_or_default());
             for (i, app) in sorted_apps.into_iter().enumerate() {
                 let new_name = format!("{}-{}", name, i + 1);
                 let mut new_app = app.clone();
@@ -498,10 +498,17 @@ fn apply_folder(folder_name: &str) -> Result<u64, String> {
     Ok(count)
 }
 
-pub fn applications_to_string(applications: Vec<ArgoResource>) -> String {
-    applications
+pub fn applications_to_string(applications: Vec<ArgoResource>) -> Result<String, Box<dyn Error>> {
+    let output = applications
         .iter()
-        .map(|a| a.to_string())
-        .collect::<Vec<String>>()
-        .join("---\n")
+        .map(|a| {
+            a.as_string().inspect_err(|e| {
+                error!(
+                    "❌ Failed to convert application '{}' (path: {}) to valid YAML: {}",
+                    a.name, a.file_name, e
+                );
+            })
+        })
+        .collect::<Result<Vec<String>, Box<dyn Error>>>()?;
+    Ok(output.join("---\n"))
 }
