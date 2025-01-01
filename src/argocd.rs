@@ -116,9 +116,8 @@ impl ArgoCDInstallation {
                 }
             }
             let password_encoded = password_encoded.unwrap().stdout;
-            let password_decoded = BASE64_STANDARD.decode(password_encoded).map_err(|e| {
+            let password_decoded = BASE64_STANDARD.decode(password_encoded).inspect_err(|e| {
                 error!("❌ Failed to decode password: {}", e);
-                e
             })?;
 
             String::from_utf8(password_decoded).inspect_err(|_e| {

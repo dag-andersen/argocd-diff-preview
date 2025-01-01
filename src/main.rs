@@ -4,6 +4,7 @@ use error::{CommandError, CommandOutput};
 use log::{debug, error, info};
 use regex::Regex;
 use selector::Selector;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -128,13 +129,12 @@ impl FromStr for ClusterTool {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    run().await.map_err(|e| {
+    run().await.inspect_err(|e| {
         let opt = Opt::from_args();
         error!("❌ {}", e);
         if !opt.keep_cluster_alive {
             cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
         }
-        e
     })
 }
 
@@ -194,7 +194,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     let cluster_tool = &opt.local_cluster_tool;
 
-    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9\._-]+$").unwrap();
+    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9\._-]+$")?;
     if !repo_regex.is_match(repo) {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
         return Err("Invalid repository format".into());
@@ -294,6 +294,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
         opt.ignore_invalid_watch_pattern,
     )?;
 
+    let base_apps = unique_names(base_apps, &base_branch);
+    let target_apps = unique_names(target_apps, &target_branch);
+
     let found_base_apps = !base_apps.is_empty();
     let found_target_apps = !target_apps.is_empty();
 
@@ -305,21 +308,25 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    info!(
-        "💾 Writing applications from '{}' to ./{}",
-        base_branch.name,
-        base_branch.app_file()
-    );
-    utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps))?;
-    info!(
-        "💾 Writing applications from '{}' to ./{}",
-        target_branch.name,
-        target_branch.app_file()
-    );
-    utils::write_to_file(
-        target_branch.app_file(),
-        &applications_to_string(target_apps),
-    )?;
+    {
+        info!(
+            "💾 Writing {} applications from '{}' to ./{}",
+            base_apps.len(),
+            base_branch.name,
+            base_branch.app_file()
+        );
+        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps)?)?;
+        info!(
+            "💾 Writing {} applications from '{}' to ./{}",
+            target_apps.len(),
+            target_branch.name,
+            target_branch.app_file()
+        );
+        utils::write_to_file(
+            target_branch.app_file(),
+            &applications_to_string(target_apps)?,
+        )?;
+    }
 
     match cluster_tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name)?,
@@ -334,7 +341,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
         Err(e) => {
             error!("❌ Failed to apply secrets");
-            return Err(e);
+            return Err(e.into());
         }
     }
 
@@ -404,6 +411,44 @@ fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// Give new name for duplicate names in Vec<ArgoResource>
+fn unique_names(apps: Vec<ArgoResource>, branch: &Branch) -> Vec<ArgoResource> {
+    let mut duplicate_names: HashMap<String, Vec<ArgoResource>> = HashMap::new();
+    apps.into_iter().for_each(|a| {
+        duplicate_names.entry(a.name.clone()).or_default().push(a);
+    });
+    let mut new_vec: Vec<ArgoResource> = vec![];
+    let mut duplicate_counter = 0;
+    for (name, apps) in duplicate_names {
+        if apps.len() > 1 {
+            duplicate_counter += 1;
+            debug!(
+                "Found {} duplicate applications with name: '{}'",
+                apps.len(),
+                name
+            );
+            let mut sorted_apps = apps.clone();
+            sorted_apps.sort_by_key(|a| a.as_string().unwrap_or_default());
+            for (i, app) in sorted_apps.into_iter().enumerate() {
+                let new_name = format!("{}-{}", name, i + 1);
+                let mut new_app = app.clone();
+                new_app.name.clone_from(&new_name);
+                new_app.yaml["metadata"]["name"] = serde_yaml::Value::String(new_name);
+                new_vec.push(new_app);
+            }
+        } else {
+            new_vec.push(apps[0].clone());
+        }
+    }
+    if duplicate_counter > 0 {
+        info!(
+            "🔍 Found {} duplicate applications names for branch: {}. Suffixing with -1, -2, -3, etc.",
+            duplicate_counter, branch.name
+        );
+    }
+    new_vec
+}
+
 fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
     match tool {
         ClusterTool::Kind if kind::cluster_exists(cluster_name) => {
@@ -433,9 +478,9 @@ fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
     })
 }
 
-fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
+fn apply_folder(folder_name: &str) -> Result<u64, String> {
     if !PathBuf::from(folder_name).is_dir() {
-        return Err(format!("{} is not a directory", folder_name).into());
+        return Err(format!("{} is not a directory", folder_name));
     }
     let mut count = 0;
     if let Ok(entries) = fs::read_dir(folder_name) {
@@ -445,7 +490,7 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
             if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                 match apply_manifest(file_name) {
                     Ok(_) => count += 1,
-                    Err(e) => return Err(e.stderr.into()),
+                    Err(e) => return Err(e.stderr),
                 }
             }
         }
@@ -453,10 +498,17 @@ fn apply_folder(folder_name: &str) -> Result<u64, Box<dyn Error>> {
     Ok(count)
 }
 
-pub fn applications_to_string(applications: Vec<ArgoResource>) -> String {
-    applications
+pub fn applications_to_string(applications: Vec<ArgoResource>) -> Result<String, Box<dyn Error>> {
+    let output = applications
         .iter()
-        .map(|a| a.to_string())
-        .collect::<Vec<String>>()
-        .join("---\n")
+        .map(|a| {
+            a.as_string().inspect_err(|e| {
+                error!(
+                    "❌ Failed to convert application '{}' (path: {}) to valid YAML: {}",
+                    a.name, a.file_name, e
+                );
+            })
+        })
+        .collect::<Result<Vec<String>, Box<dyn Error>>>()?;
+    Ok(output.join("---\n"))
 }
