@@ -2,6 +2,7 @@ use argo_resource::ArgoResource;
 use branch::{Branch, BranchType};
 use error::{CommandError, CommandOutput};
 use log::{debug, error, info};
+use parsing::generate_apps_from_app_set;
 use regex::Regex;
 use selector::Selector;
 use std::collections::HashMap;
@@ -294,9 +295,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
         opt.ignore_invalid_watch_pattern,
     )?;
 
-    let base_apps = unique_names(base_apps, &base_branch);
-    let target_apps = unique_names(target_apps, &target_branch);
-
     let found_base_apps = !base_apps.is_empty();
     let found_target_apps = !target_apps.is_empty();
 
@@ -306,26 +304,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
         no_apps_found::write_message(output_folder, &selector, &files_changed)?;
         info!("🎉 Done in {} seconds", start.elapsed().as_secs());
         return Ok(());
-    }
-
-    {
-        info!(
-            "💾 Writing {} applications from '{}' to ./{}",
-            base_apps.len(),
-            base_branch.name,
-            base_branch.app_file()
-        );
-        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps)?)?;
-        info!(
-            "💾 Writing {} applications from '{}' to ./{}",
-            target_apps.len(),
-            target_branch.name,
-            target_branch.app_file()
-        );
-        utils::write_to_file(
-            target_branch.app_file(),
-            &applications_to_string(target_apps)?,
-        )?;
     }
 
     match cluster_tool {
@@ -352,6 +330,32 @@ async fn run() -> Result<(), Box<dyn Error>> {
     );
 
     argocd.install_argo_cd(opt.debug).await?;
+
+    let base_apps = generate_apps_from_app_set(&argocd, &base_apps, &base_branch, repo)?;
+    let target_apps = generate_apps_from_app_set(&argocd, &target_apps, &target_branch, repo)?;
+
+    let base_apps = unique_names(base_apps, &base_branch);
+    let target_apps = unique_names(target_apps, &target_branch);
+
+    {
+        info!(
+            "💾 Writing {} applications from '{}' to ./{}",
+            base_apps.len(),
+            base_branch.name,
+            base_branch.app_file()
+        );
+        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps)?)?;
+        info!(
+            "💾 Writing {} applications from '{}' to ./{}",
+            target_apps.len(),
+            target_branch.name,
+            target_branch.app_file()
+        );
+        utils::write_to_file(
+            target_branch.app_file(),
+            &applications_to_string(target_apps)?,
+        )?;
+    }
 
     // Cleanup output folder
     clean_output_folder(output_folder)?;

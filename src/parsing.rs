@@ -1,5 +1,10 @@
-use crate::{argo_resource::ArgoResource, Branch, Selector};
-use log::{debug, info};
+use crate::{
+    argo_resource::{ApplicationKind, ArgoResource},
+    argocd::ArgoCDInstallation,
+    error::CommandError,
+    Branch, Selector,
+};
+use log::{debug, error, info};
 use regex::Regex;
 use serde_yaml::Value;
 use std::{error::Error, io::BufRead};
@@ -127,7 +132,14 @@ fn get_applications(
         ignore_invalid_watch_pattern,
     );
     if !applications.is_empty() {
-        return patch_applications(argo_cd_namespace, applications, branch, repo);
+        info!("🤖 Patching applications for branch: {}", branch.name);
+        let apps = patch_applications(argo_cd_namespace, applications, branch, repo)?;
+        info!(
+            "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
+            apps.len(),
+            branch.name
+        );
+        return Ok(apps);
     }
     Ok(applications)
 }
@@ -220,8 +232,6 @@ fn patch_applications(
     branch: &Branch,
     repo: &str,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
-    info!("🤖 Patching applications for branch: {}", branch.name);
-
     let applications: Vec<Result<ArgoResource, Box<dyn Error>>> = applications
         .into_iter()
         .map(|a| {
@@ -240,12 +250,6 @@ fn patch_applications(
             app
         })
         .collect();
-
-    info!(
-        "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
-        applications.len(),
-        branch.name
-    );
 
     let errors: Vec<String> = applications
         .iter()
@@ -318,4 +322,93 @@ fn from_resource_to_application(
     }
 
     filtered_apps
+}
+
+pub fn generate_apps_from_app_set(
+    argocd: &ArgoCDInstallation,
+    app_sets: &Vec<ArgoResource>,
+    branch: &Branch,
+    repo: &str,
+) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
+    let mut apps_new: Vec<ArgoResource> = vec![];
+
+    let mut app_set_counter = 0;
+    let mut generated_apps_counter = 0;
+
+    for app_set in app_sets {
+        match app_set.kind {
+            ApplicationKind::ApplicationSet => (),
+            ApplicationKind::Application => {
+                apps_new.push(app_set.clone());
+                continue;
+            }
+        }
+
+        app_set_counter += 1;
+
+        let file_name = format!("{}/{}", branch.folder_name(), app_set.file_name);
+
+        debug!(
+            "Generating applications from ApplicationSet in file: {}",
+            file_name
+        );
+
+        let apps_string = argocd
+            .appset_generate(&file_name)
+            .map_err(|e| {
+                error!(
+                    "❌ Failed to generate applications from ApplicationSet in file: {}",
+                    app_set.file_name
+                );
+                CommandError::new(e)
+            })?
+            .stdout;
+
+        let yaml = match serde_yaml::from_str(apps_string.as_str()) {
+            Ok(r) => r,
+            Err(_) => serde_yaml::Value::Null,
+        };
+
+        let apps = match yaml.as_sequence() {
+            None => continue,
+            Some(s) => {
+                let apps = s
+                    .iter()
+                    .filter_map(|a| {
+                        ArgoResource::from_k8s_resource(K8sResource {
+                            file_name: app_set.file_name.clone(),
+                            yaml: a.clone(),
+                        })
+                    })
+                    .collect::<Vec<ArgoResource>>();
+                patch_applications(&argocd.namespace, apps, branch, repo)
+            }
+        };
+
+        match apps {
+            Ok(apps) => {
+                debug!(
+                    "🤖 Generated {} applications from ApplicationSet in file: {}",
+                    apps.len(),
+                    app_set.file_name
+                );
+                generated_apps_counter += apps.len();
+                apps_new.extend(apps);
+            }
+            Err(e) => {
+                error!(
+                    "❌ Failed to generate applications from ApplicationSet in file: {}",
+                    app_set.file_name
+                );
+                return Err(e);
+            }
+        }
+    }
+
+    info!(
+        "🤖 Generated {} applications from {} ApplicationSets for branch: {}",
+        generated_apps_counter, app_set_counter, branch.name
+    );
+
+    Ok(apps_new)
 }
