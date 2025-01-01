@@ -57,7 +57,7 @@ The safest way to make changes to you Helm Charts and Kustomize Overlays in your
 >    -v $(pwd)/target-branch:/target-branch \
 >    -e TARGET_BRANCH=helm-example-3 \
 >    -e REPO=dag-andersen/argocd-diff-preview \
->    dagandersen/argocd-diff-preview:v0.0.27
+>    dagandersen/argocd-diff-preview:v0.0.28
 > ```
 > 
 > and the output would be something like this:
@@ -118,7 +118,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.27
+            dagandersen/argocd-diff-preview:v0.0.28
 
       - name: Post diff as comment
         run: |
