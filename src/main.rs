@@ -294,8 +294,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
         opt.ignore_invalid_watch_pattern,
     )?;
 
-    let base_apps = unique_names(base_apps);
-    let target_apps = unique_names(target_apps);
+    let base_apps = unique_names(base_apps, &base_branch);
+    let target_apps = unique_names(target_apps, &target_branch);
 
     let found_base_apps = !base_apps.is_empty();
     let found_target_apps = !target_apps.is_empty();
@@ -310,13 +310,15 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     {
         info!(
-            "💾 Writing applications from '{}' to ./{}",
+            "💾 Writing {} applications from '{}' to ./{}",
+            base_apps.len(),
             base_branch.name,
             base_branch.app_file()
         );
         utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps))?;
         info!(
-            "💾 Writing applications from '{}' to ./{}",
+            "💾 Writing {} applications from '{}' to ./{}",
+            target_apps.len(),
             target_branch.name,
             target_branch.app_file()
         );
@@ -410,27 +412,39 @@ fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
 }
 
 // Give new name for duplicate names in Vec<ArgoResource>
-fn unique_names(apps: Vec<ArgoResource>) -> Vec<ArgoResource> {
+fn unique_names(apps: Vec<ArgoResource>, branch: &Branch) -> Vec<ArgoResource> {
     let mut duplicate_names: HashMap<String, Vec<ArgoResource>> = HashMap::new();
     apps.into_iter().for_each(|a| {
         duplicate_names.entry(a.name.clone()).or_default().push(a);
     });
     let mut new_vec: Vec<ArgoResource> = vec![];
+    let mut duplicate_counter = 0;
     for (name, apps) in duplicate_names {
         if apps.len() > 1 {
-            info!("🔍 Found {} duplicate applications with name: '{}'. Suffixing with -1, -2, -3, etc.", apps.len(), name);
+            duplicate_counter += 1;
+            debug!(
+                "Found {} duplicate applications with name: '{}'",
+                apps.len(),
+                name
+            );
             let mut sorted_apps = apps.clone();
             sorted_apps.sort_by_key(|a| a.to_string());
             for (i, app) in sorted_apps.into_iter().enumerate() {
                 let new_name = format!("{}-{}", name, i + 1);
                 let mut new_app = app.clone();
-                new_app.name = new_name.clone();
+                new_app.name.clone_from(&new_name);
                 new_app.yaml["metadata"]["name"] = serde_yaml::Value::String(new_name);
                 new_vec.push(new_app);
             }
         } else {
             new_vec.push(apps[0].clone());
         }
+    }
+    if duplicate_counter > 0 {
+        info!(
+            "🔍 Found {} duplicate applications names for branch: {}. Suffixing with -1, -2, -3, etc.",
+            duplicate_counter, branch.name
+        );
     }
     new_vec
 }

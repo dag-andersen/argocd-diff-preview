@@ -68,15 +68,42 @@ pub fn get_applications_for_branches<'a>(
     if duplicate_yaml.is_empty() {
         Ok((base_apps, target_apps))
     } else {
+        let base_apps_before = base_apps.len();
+        let target_apps_before = target_apps.len();
+
         // remove duplicates
-        let base_apps = base_apps
+        let base_apps: Vec<ArgoResource> = base_apps
             .into_iter()
             .filter(|a| !duplicate_yaml.contains(&a.yaml))
             .collect();
-        let target_apps = target_apps
+        let target_apps: Vec<ArgoResource> = target_apps
             .into_iter()
             .filter(|a| !duplicate_yaml.contains(&a.yaml))
             .collect();
+
+        info!(
+            "🤖 Skipped {} applications for branch: '{}' because they have not changed after patching",
+            base_apps_before - base_apps.len(),
+            base_branch.name
+        );
+
+        info!(
+            "🤖 Skipped {} applications for branch: '{}' because they have not changed after patching",
+            target_apps_before - target_apps.len(),
+            target_branch.name
+        );
+
+        info!(
+            "🤖 Using the remaining {} applications for branch: '{}'",
+            base_apps.len(),
+            base_branch.name
+        );
+
+        info!(
+            "🤖 Using the remaining {} applications for branch: '{}'",
+            target_apps.len(),
+            target_branch.name
+        );
 
         Ok((base_apps, target_apps))
     }
@@ -209,7 +236,6 @@ fn patch_applications(
 
             if app.is_err() {
                 info!("❌ Failed to patch application: {}", app_name);
-                return app;
             }
             app
         })
