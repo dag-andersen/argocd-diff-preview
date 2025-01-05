@@ -4,6 +4,7 @@ use crate::{
 };
 use base64::prelude::*;
 use log::{debug, error, info};
+use serde_yaml::Value;
 use std::error::Error;
 
 pub struct ArgoCDInstallation {
@@ -90,7 +91,31 @@ impl ArgoCDInstallation {
             Ok(_) => info!("🦑 Argo CD is now available"),
             Err(_) => {
                 error!("❌ Failed to wait for argocd-server");
-                return Err("Failed to wait for argocd-server".to_string().into());
+                return Err("Failed to wait for argocd-server".into());
+            }
+        }
+
+        match run_command("helm list -A -o yaml") {
+            Ok(o) => {
+                let as_yaml: Value = serde_yaml::from_str(&o.stdout)?;
+                match (
+                    as_yaml[0]["chart"].as_str(),
+                    as_yaml[0]["app_version"].as_str(),
+                ) {
+                    (Some(chart_version), Some(app_version)) => {
+                        info!(
+                            "🦑 Installed Chart version: '{}' and App version: '{}'",
+                            chart_version, app_version
+                        );
+                    }
+                    _ => {
+                        error!("❌ Failed to get chart version");
+                    }
+                }
+            }
+            Err(e) => {
+                error!("❌ Failed to list helm charts");
+                return Err(Box::new(CommandError::new(e)));
             }
         }
 

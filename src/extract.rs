@@ -60,19 +60,14 @@ pub async fn get_resources(
 
     loop {
         let command = "kubectl get applications -A -oyaml".to_string();
-        let applications: Result<Value, serde_yaml::Error> = match run_command(&command) {
-            Ok(o) => serde_yaml::from_str(&o.stdout),
+        let yaml_output: Value = match run_command(&command) {
             Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
-        };
+            Ok(o) => serde_yaml::from_str(&o.stdout).inspect_err(|_e| {
+                error!("❌ Failed to parse yaml from command: {}", command);
+            }),
+        }?;
 
-        let applications = match applications {
-            Ok(applications) => applications,
-            Err(_) => {
-                return Err(format!("❌ Failed to parse yaml from command: {}", command).into());
-            }
-        };
-
-        let applications = match applications["items"].as_sequence() {
+        let applications = match yaml_output["items"].as_sequence() {
             None => break,
             Some(apps) if apps.is_empty() => break,
             Some(apps) if apps.len() == processed_apps.len() => break,
