@@ -36,12 +36,17 @@ pub async fn get_resources(
     branch: &Branch,
     timeout: u64,
     output_folder: &str,
+    input_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
     info!("🌚 Getting resources from {}-branch", branch.branch_type);
 
-    let app_file = branch.app_file();
+    let app_file = &format!("{}/{}", input_folder, branch.app_file());
 
-    if fs::metadata(app_file)?.len() != 0 {
+    if fs::metadata(app_file)
+        .inspect_err(|_| error!("❌ File does not exist: {}", app_file))?
+        .len()
+        != 0
+    {
         apply_manifest(app_file).map_err(|e| {
             error!(
                 "❌ Failed to apply applications for branch: {}",

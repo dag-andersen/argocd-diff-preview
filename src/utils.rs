@@ -22,6 +22,13 @@ pub fn check_if_folder_exists(folder_name: &str) -> bool {
     PathBuf::from(folder_name).is_dir()
 }
 
+pub fn delete_folder(folder_name: &str) -> Result<(), Box<dyn Error>> {
+    if check_if_folder_exists(folder_name) {
+        fs::remove_dir_all(folder_name)?;
+    }
+    Ok(())
+}
+
 pub fn run_command(command: &str) -> Result<CommandOutput, CommandOutput> {
     let args = command.split_whitespace().collect::<Vec<&str>>();
     run_command_from_list(args, None, None)

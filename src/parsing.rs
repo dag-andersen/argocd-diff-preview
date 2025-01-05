@@ -1,5 +1,8 @@
 use crate::{
-    argo_resource::{ApplicationKind, ArgoResource}, argocd::ArgoCDInstallation, error::CommandError, utils, Branch, Selector
+    argo_resource::{ApplicationKind, ArgoResource},
+    argocd::ArgoCDInstallation,
+    error::CommandError,
+    utils, Branch, Selector,
 };
 use log::{debug, error, info};
 use regex::Regex;
@@ -20,7 +23,7 @@ impl Clone for K8sResource {
     }
 }
 
-pub fn get_applications_for_branches<'a>(
+pub fn get_applications_for_branches(
     argo_cd_namespace: &str,
     base_branch: &Branch,
     target_branch: &Branch,
@@ -251,27 +254,10 @@ fn patch_applications(
     branch: &Branch,
     repo: &str,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
-    let applications: Vec<Result<ArgoResource, Box<dyn Error>>> = applications
+    applications
         .into_iter()
-        .map(|a| {
-            patch_application(argo_cd_namespace, a, branch, repo)
-        })
-        .collect();
-
-    let errors: Vec<String> = applications
-        .iter()
-        .filter_map(|a| match a {
-            Ok(_) => None,
-            Err(e) => Some(e.to_string()),
-        })
-        .collect();
-
-    if !errors.is_empty() {
-        return Err(errors.join("\n").into());
-    }
-
-    let apps = applications.into_iter().filter_map(|a| a.ok()).collect();
-    Ok(apps)
+        .map(|a| patch_application(argo_cd_namespace, a, branch, repo))
+        .collect()
 }
 
 fn from_resource_to_application(
@@ -336,6 +322,7 @@ pub fn generate_apps_from_app_set(
     app_sets: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
+    temp_folder: &str,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     let mut apps_new: Vec<ArgoResource> = vec![];
 
@@ -343,26 +330,20 @@ pub fn generate_apps_from_app_set(
     let mut generated_apps_counter = 0;
 
     for app_set in app_sets {
-
-        match app_set.kind {
-            ApplicationKind::Application => {
-                apps_new.push(app_set);
-                continue;
-            }
-            _ => (),
+        if app_set.kind != ApplicationKind::ApplicationSet {
+            apps_new.push(app_set);
+            continue;
         }
 
         app_set_counter += 1;
 
-        let app_set = patch_application(
-            &argocd.namespace,
-            app_set,
-            branch,
-            repo,
-        )?;
-
         // generate random name for ApplicationSet
-        let random_file_name = format!("{}-{}.yaml", app_set.name, rand::random::<u32>());
+        let random_file_name = format!(
+            "{}/{}-{}.yaml",
+            temp_folder,
+            app_set.name,
+            rand::random::<u32>()
+        );
         utils::write_to_file(&random_file_name, &app_set.as_string()?)?;
 
         debug!(
@@ -427,7 +408,12 @@ pub fn generate_apps_from_app_set(
         generated_apps_counter, app_set_counter, branch.name
     );
 
-    debug_assert!(apps_new.iter().all(|a| a.kind == ApplicationKind::Application), "All applications should be of kind Application");
+    debug_assert!(
+        apps_new
+            .iter()
+            .all(|a| a.kind == ApplicationKind::Application),
+        "All applications should be of kind Application"
+    );
 
     Ok(apps_new)
 }

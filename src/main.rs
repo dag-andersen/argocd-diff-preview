@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{error::Error, io::Write};
 use structopt::StructOpt;
-use utils::{check_if_folder_exists, create_folder_if_not_exists, run_command};
+use utils::{check_if_folder_exists, create_folder_if_not_exists, delete_folder, run_command};
 mod argo_resource;
 mod argocd;
 mod branch;
@@ -178,6 +178,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .as_deref()
         .filter(|f| !f.trim().is_empty());
     let keep_cluster_alive = opt.keep_cluster_alive;
+    let debug = opt.debug;
     let max_diff_length = opt.max_diff_length;
     let files_changed: Option<Vec<String>> = opt
         .files_changed
@@ -213,6 +214,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
     info!("✨ - timeout: {} seconds", timeout);
     if keep_cluster_alive {
         info!("✨ - keep-cluster-alive: true");
+    }
+    if debug {
+        info!("✨ - debug: true");
     }
     if let Some(a) = file_regex.clone() {
         info!("✨ - file-regex: {}", a.as_str());
@@ -329,47 +333,62 @@ async fn run() -> Result<(), Box<dyn Error>> {
         None,
     );
 
-    argocd.install_argo_cd(opt.debug).await?;
+    argocd.install_argo_cd(debug).await?;
 
-    let base_apps = generate_apps_from_app_set(&argocd, base_apps, &base_branch, repo)?;
-    let target_apps = generate_apps_from_app_set(&argocd, target_apps, &target_branch, repo)?;
+    let temp_folder = "./temp";
+    create_folder_if_not_exists(temp_folder)?;
 
     let base_apps = unique_names(base_apps, &base_branch);
+    let base_apps =
+        generate_apps_from_app_set(&argocd, base_apps, &base_branch, repo, temp_folder)?;
+    let base_apps = unique_names(base_apps, &base_branch);
+
+    let target_apps = unique_names(target_apps, &target_branch);
+    let target_apps =
+        generate_apps_from_app_set(&argocd, target_apps, &target_branch, repo, temp_folder)?;
     let target_apps = unique_names(target_apps, &target_branch);
 
     {
+        let file_path = format!("{}/{}", temp_folder, base_branch.app_file());
         info!(
             "💾 Writing {} applications from '{}' to ./{}",
             base_apps.len(),
             base_branch.name,
-            base_branch.app_file()
+            file_path
         );
-        utils::write_to_file(base_branch.app_file(), &applications_to_string(base_apps)?)?;
+        utils::write_to_file(&file_path, &applications_to_string(base_apps)?)?;
+        let file_path = format!("{}/{}", temp_folder, target_branch.app_file());
         info!(
             "💾 Writing {} applications from '{}' to ./{}",
             target_apps.len(),
             target_branch.name,
-            target_branch.app_file()
+            file_path
         );
-        utils::write_to_file(
-            target_branch.app_file(),
-            &applications_to_string(target_apps)?,
-        )?;
+        utils::write_to_file(&file_path, &applications_to_string(target_apps)?)?;
     }
 
     // Cleanup output folder
-    clean_output_folder(output_folder)?;
+    clean_output_folder(output_folder).inspect_err(|_| {
+        error!("❌ Failed to clean output folder: {}", output_folder);
+    })?;
 
     // Extract resources from Argo CD
     if found_base_apps {
-        extract::get_resources(&argocd, &base_branch, timeout, output_folder).await?;
+        extract::get_resources(&argocd, &base_branch, timeout, output_folder, temp_folder).await?;
         if found_target_apps {
             extract::delete_applications().await?;
             tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         }
     }
     if found_target_apps {
-        extract::get_resources(&argocd, &target_branch, timeout, output_folder).await?;
+        extract::get_resources(&argocd, &target_branch, timeout, output_folder, temp_folder)
+            .await?;
+    }
+
+    if !debug {
+        delete_folder(temp_folder).inspect_err(|_| {
+            error!("❌ Failed to delete folder: {}", temp_folder);
+        })?;
     }
 
     // Delete cluster
@@ -396,22 +415,16 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
 fn clean_output_folder(output_folder: &str) -> Result<(), Box<dyn Error>> {
     create_folder_if_not_exists(output_folder)?;
-    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Base)).unwrap_or_default();
-    fs::remove_dir_all(format!("{}/{}", output_folder, BranchType::Target)).unwrap_or_default();
-    {
-        let dir = format!("{}/{}", output_folder, BranchType::Base);
-        match fs::create_dir(&dir) {
-            Ok(_) => (),
-            Err(_) => return Err(format!("❌ Failed to create directory: {}", dir).into()),
-        }
-    }
-    {
-        let dir = format!("{}/{}", output_folder, BranchType::Target);
-        match fs::create_dir(&dir) {
-            Ok(_) => (),
-            Err(_) => return Err(format!("❌ Failed to create directory: {}", dir).into()),
-        }
-    }
+    let base_path = format!("{}/{}", output_folder, BranchType::Base);
+    let target_path = format!("{}/{}", output_folder, BranchType::Target);
+    delete_folder(&base_path)?;
+    delete_folder(&target_path)?;
+    fs::create_dir(&base_path).inspect_err(|_| {
+        error!("❌ Failed to create directory: {}", base_path);
+    })?;
+    fs::create_dir(&target_path).inspect_err(|_| {
+        error!("❌ Failed to create directory: {}", target_path);
+    })?;
     Ok(())
 }
 
