@@ -1,6 +1,6 @@
 use crate::argocd::ArgoCDInstallation;
 use crate::error::CommandError;
-use crate::utils::{run_command, spawn_command, write_to_file};
+use crate::utils::{self, run_command, spawn_command, write_to_file};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
@@ -159,7 +159,7 @@ pub async fn get_resources(
         }
 
         if applications.len() == processed_apps.len() {
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            utils::sleep(5).await;
             continue;
         }
 
@@ -204,7 +204,7 @@ pub async fn get_resources(
             );
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        utils::sleep(5).await;
     }
 
     info!(
@@ -237,7 +237,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         debug!("🗑 Deleting Applications");
 
         let mut child = spawn_command("kubectl delete applications.argoproj.io --all -A", None);
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        utils::sleep(5).await;
         if run_command("kubectl get applications -A --no-headers")
             .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
@@ -246,7 +246,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
             break;
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        utils::sleep(5).await;
         if run_command("kubectl get applications -A --no-headers")
             .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()

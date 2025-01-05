@@ -311,7 +311,10 @@ fn from_resource_to_application(
             filtered_apps.len()
         );
     } else {
-        info!("🤖 Found {} Application[Sets]", number_of_apps_before_filtering);
+        info!(
+            "🤖 Found {} Application[Sets]",
+            number_of_apps_before_filtering
+        );
     }
 
     filtered_apps
