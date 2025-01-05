@@ -335,6 +335,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     argocd.install_argo_cd(debug).await?;
 
+    utils::sleep(5).await;
+
     let temp_folder = "temp";
     create_folder_if_not_exists(temp_folder)?;
 
@@ -377,7 +379,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         extract::get_resources(&argocd, &base_branch, timeout, output_folder, temp_folder).await?;
         if found_target_apps {
             extract::delete_applications().await?;
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            utils::sleep(5).await;
         }
     }
     if found_target_apps {

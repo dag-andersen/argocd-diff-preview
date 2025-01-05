@@ -104,3 +104,8 @@ pub fn write_to_file(file_name: &str, content: &str) -> Result<(), Box<dyn Error
     fs::write(file_name, content)?;
     Ok(())
 }
+
+pub async fn sleep(seconds: u64) {
+    debug!("Sleeping for {} seconds", seconds);
+    tokio::time::sleep(tokio::time::Duration::from_secs(seconds)).await;
+}

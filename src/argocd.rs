@@ -1,6 +1,6 @@
 use crate::{
     error::{CommandError, CommandOutput},
-    utils::{run_command, run_command_with_envs, StringPair},
+    utils::{self, run_command, run_command_with_envs, StringPair},
 };
 use base64::prelude::*;
 use log::{debug, error, info};
@@ -140,7 +140,7 @@ impl ArgoCDInstallation {
                     }
                     Err(_) => {
                         counter += 1;
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        utils::sleep(2).await;
                         debug!("⏳ Retrying to get secret {}", secret_name);
                         None
                     }
@@ -156,11 +156,9 @@ impl ArgoCDInstallation {
             })?
         };
 
-        // sleep for 5 seconds
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        utils::sleep(5).await;
 
         // log into Argo CD
-
         let username = "admin";
         debug!(
             "Logging in to Argo CD with username, {} and password, {}",
