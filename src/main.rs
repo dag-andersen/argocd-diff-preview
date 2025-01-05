@@ -351,7 +351,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
     {
         let file_path = format!("{}/{}", temp_folder, base_branch.app_file());
         info!(
-            "💾 Writing {} applications from '{}' to ./{}",
+            "💾 Writing {} Applications from '{}' to ./{}",
             base_apps.len(),
             base_branch.name,
             file_path
@@ -359,7 +359,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         utils::write_to_file(&file_path, &applications_to_string(base_apps)?)?;
         let file_path = format!("{}/{}", temp_folder, target_branch.app_file());
         info!(
-            "💾 Writing {} applications from '{}' to ./{}",
+            "💾 Writing {} Applications from '{}' to ./{}",
             target_apps.len(),
             target_branch.name,
             file_path
@@ -383,12 +383,6 @@ async fn run() -> Result<(), Box<dyn Error>> {
     if found_target_apps {
         extract::get_resources(&argocd, &target_branch, timeout, output_folder, temp_folder)
             .await?;
-    }
-
-    if !debug {
-        delete_folder(temp_folder).inspect_err(|_| {
-            error!("❌ Failed to delete folder: {}", temp_folder);
-        })?;
     }
 
     // Delete cluster

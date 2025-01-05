@@ -132,7 +132,7 @@ fn get_applications(
         ignore_invalid_watch_pattern,
     );
     if !applications.is_empty() {
-        info!("🤖 Patching applications for branch: {}", branch.name);
+        info!("🤖 Patching Application[Sets] for branch: {}", branch.name);
         let apps = patch_applications(argo_cd_namespace, applications, branch, repo)?;
         info!(
             "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
@@ -303,15 +303,15 @@ fn from_resource_to_application(
 
     if number_of_apps_before_filtering != filtered_apps.len() {
         info!(
-            "🤖 Found {} applications before filtering",
+            "🤖 Found {} Application[Sets] before filtering",
             number_of_apps_before_filtering
         );
         info!(
-            "🤖 Found {} applications after filtering",
+            "🤖 Found {} Application[Sets] after filtering",
             filtered_apps.len()
         );
     } else {
-        info!("🤖 Found {} applications", number_of_apps_before_filtering);
+        info!("🤖 Found {} Application[Sets]", number_of_apps_before_filtering);
     }
 
     filtered_apps
@@ -362,10 +362,7 @@ pub fn generate_apps_from_app_set(
             })?
             .stdout;
 
-        let yaml = match serde_yaml::from_str(apps_string.as_str()) {
-            Ok(r) => r,
-            Err(_) => serde_yaml::Value::Null,
-        };
+        let yaml = serde_yaml::from_str(&apps_string).unwrap_or(serde_yaml::Value::Null);
 
         let apps = match yaml.as_sequence() {
             None => continue,
