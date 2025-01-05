@@ -335,7 +335,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     argocd.install_argo_cd(debug).await?;
 
-    let temp_folder = "./temp";
+    let temp_folder = "temp";
     create_folder_if_not_exists(temp_folder)?;
 
     let base_apps = unique_names(base_apps, &base_branch);

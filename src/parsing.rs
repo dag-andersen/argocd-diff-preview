@@ -87,25 +87,25 @@ pub fn get_applications_for_branches(
             .collect();
 
         info!(
-            "🤖 Skipped {} applications for branch: '{}' because they have not changed after patching",
+            "🤖 Skipped {} Application[Sets] for branch: '{}' because they have not changed after patching",
             base_apps_before - base_apps.len(),
             base_branch.name
         );
 
         info!(
-            "🤖 Skipped {} applications for branch: '{}' because they have not changed after patching",
+            "🤖 Skipped {} Application[Sets] for branch: '{}' because they have not changed after patching",
             target_apps_before - target_apps.len(),
             target_branch.name
         );
 
         info!(
-            "🤖 Using the remaining {} applications for branch: '{}'",
+            "🤖 Using the remaining {} Application[Sets] for branch: '{}'",
             base_apps.len(),
             base_branch.name
         );
 
         info!(
-            "🤖 Using the remaining {} applications for branch: '{}'",
+            "🤖 Using the remaining {} Application[Sets] for branch: '{}'",
             target_apps.len(),
             target_branch.name
         );
@@ -386,7 +386,7 @@ pub fn generate_apps_from_app_set(
         match apps {
             Ok(apps) => {
                 debug!(
-                    "Generated {} applications from ApplicationSet in file: {}",
+                    "Generated {} Applications from ApplicationSet in file: {}",
                     apps.len(),
                     app_set.file_name
                 );
@@ -395,7 +395,7 @@ pub fn generate_apps_from_app_set(
             }
             Err(e) => {
                 error!(
-                    "❌ Failed to generate applications from ApplicationSet in file: {}",
+                    "❌ Failed to generate Applications from ApplicationSet in file: {}",
                     app_set.file_name
                 );
                 return Err(e);
