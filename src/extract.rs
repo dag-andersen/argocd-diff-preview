@@ -90,11 +90,14 @@ pub async fn get_resources(
                     match argocd.get_manifests(name) {
                         Ok(o) => {
                             write_to_file(&format!("{}/{}", destination_folder, name), &o.stdout)?;
-                            debug!("Got manifests for application: {}", name)
+                            debug!("Got manifests for application: {}", name);
+                            processed_apps.insert(name.to_string().clone());
                         }
-                        Err(e) => error!("error: {}", e.stderr),
+                        Err(e) => {
+                            error!("❌ Failed to get manifests for application: {}", name);
+                            failed_apps.insert(name.to_string().clone(), e.stderr);
+                        }
                     }
-                    processed_apps.insert(name.to_string().clone());
                     continue;
                 }
                 Some("Unknown") => {
