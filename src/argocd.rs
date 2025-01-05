@@ -58,6 +58,12 @@ impl ArgoCDInstallation {
             CommandError::new(e)
         })?;
 
+        // helm update
+        run_command("helm repo update").map_err(|e| {
+            error!("❌ Failed to update helm repo");
+            CommandError::new(e)
+        })?;
+
         let helm_install_command = format!(
             "helm install argocd argo/argo-cd -n {} {} {} {}",
             self.namespace,
@@ -166,6 +172,9 @@ impl ArgoCDInstallation {
                 }
             }
         }
+
+        // Add extra permissions to the default AppProject
+        let _ = self.run_argocd_command("argocd proj add-source-namespace default *");
 
         info!("🦑 Argo CD installed successfully");
         Ok(())
