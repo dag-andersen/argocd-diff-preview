@@ -331,8 +331,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     argocd.install_argo_cd(opt.debug).await?;
 
-    let base_apps = generate_apps_from_app_set(&argocd, &base_apps, &base_branch, repo)?;
-    let target_apps = generate_apps_from_app_set(&argocd, &target_apps, &target_branch, repo)?;
+    let base_apps = generate_apps_from_app_set(&argocd, base_apps, &base_branch, repo)?;
+    let target_apps = generate_apps_from_app_set(&argocd, target_apps, &target_branch, repo)?;
 
     let base_apps = unique_names(base_apps, &base_branch);
     let target_apps = unique_names(target_apps, &target_branch);

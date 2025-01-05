@@ -91,6 +91,7 @@ dependencies = [
  "env_logger",
  "log",
  "once_cell",
+ "rand",
  "regex",
  "schemars",
  "serde",

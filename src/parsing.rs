@@ -1,8 +1,5 @@
 use crate::{
-    argo_resource::{ApplicationKind, ArgoResource},
-    argocd::ArgoCDInstallation,
-    error::CommandError,
-    Branch, Selector,
+    argo_resource::{ApplicationKind, ArgoResource}, argocd::ArgoCDInstallation, error::CommandError, utils, Branch, Selector
 };
 use log::{debug, error, info};
 use regex::Regex;
@@ -226,6 +223,28 @@ fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
         .collect()
 }
 
+fn patch_application(
+    argo_cd_namespace: &str,
+    application: ArgoResource,
+    branch: &Branch,
+    repo: &str,
+) -> Result<ArgoResource, Box<dyn Error>> {
+    let app_name = application.name.clone();
+    let app = application
+        .set_namespace(argo_cd_namespace)
+        .remove_sync_policy()
+        .set_project_to_default()
+        .and_then(|a| a.point_destination_to_in_cluster())
+        .and_then(|a| a.redirect_sources(repo, &branch.name))
+        .and_then(|a| a.redirect_generators(repo, &branch.name));
+
+    if app.is_err() {
+        error!("❌ Failed to patch application: {}", app_name);
+    }
+
+    app
+}
+
 fn patch_applications(
     argo_cd_namespace: &str,
     applications: Vec<ArgoResource>,
@@ -235,19 +254,7 @@ fn patch_applications(
     let applications: Vec<Result<ArgoResource, Box<dyn Error>>> = applications
         .into_iter()
         .map(|a| {
-            let app_name = a.name.clone();
-            let app: Result<ArgoResource, Box<dyn Error>> = a
-                .set_namespace(argo_cd_namespace)
-                .remove_sync_policy()
-                .set_project_to_default()
-                .and_then(|a| a.point_destination_to_in_cluster())
-                .and_then(|a| a.redirect_sources(repo, &branch.name))
-                .and_then(|a| a.redirect_generators(repo, &branch.name));
-
-            if app.is_err() {
-                info!("❌ Failed to patch application: {}", app_name);
-            }
-            app
+            patch_application(argo_cd_namespace, a, branch, repo)
         })
         .collect();
 
@@ -326,7 +333,7 @@ fn from_resource_to_application(
 
 pub fn generate_apps_from_app_set(
     argocd: &ArgoCDInstallation,
-    app_sets: &Vec<ArgoResource>,
+    app_sets: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
@@ -336,25 +343,35 @@ pub fn generate_apps_from_app_set(
     let mut generated_apps_counter = 0;
 
     for app_set in app_sets {
+
         match app_set.kind {
-            ApplicationKind::ApplicationSet => (),
             ApplicationKind::Application => {
-                apps_new.push(app_set.clone());
+                apps_new.push(app_set);
                 continue;
             }
+            _ => (),
         }
 
         app_set_counter += 1;
 
-        let file_name = format!("{}/{}", branch.folder_name(), app_set.file_name);
+        let app_set = patch_application(
+            &argocd.namespace,
+            app_set,
+            branch,
+            repo,
+        )?;
+
+        // generate random name for ApplicationSet
+        let random_file_name = format!("{}-{}.yaml", app_set.name, rand::random::<u32>());
+        utils::write_to_file(&random_file_name, &app_set.as_string()?)?;
 
         debug!(
             "Generating applications from ApplicationSet in file: {}",
-            file_name
+            random_file_name
         );
 
         let apps_string = argocd
-            .appset_generate(&file_name)
+            .appset_generate(&random_file_name)
             .map_err(|e| {
                 error!(
                     "❌ Failed to generate applications from ApplicationSet in file: {}",
@@ -388,7 +405,7 @@ pub fn generate_apps_from_app_set(
         match apps {
             Ok(apps) => {
                 debug!(
-                    "🤖 Generated {} applications from ApplicationSet in file: {}",
+                    "Generated {} applications from ApplicationSet in file: {}",
                     apps.len(),
                     app_set.file_name
                 );
@@ -409,6 +426,8 @@ pub fn generate_apps_from_app_set(
         "🤖 Generated {} applications from {} ApplicationSets for branch: {}",
         generated_apps_counter, app_set_counter, branch.name
     );
+
+    debug_assert!(apps_new.iter().all(|a| a.kind == ApplicationKind::Application), "All applications should be of kind Application");
 
     Ok(apps_new)
 }
