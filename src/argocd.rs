@@ -8,7 +8,7 @@ use serde_yaml::Value;
 use std::error::Error;
 
 pub struct ArgoCDInstallation {
-    namespace: String,
+    pub namespace: String,
     version: Option<String>,
     config_path: String,
 }
@@ -221,5 +221,9 @@ impl ArgoCDInstallation {
 
     pub fn refresh_app(&self, app_name: &str) -> Result<CommandOutput, CommandOutput> {
         self.run_argocd_command(&format!("argocd app get {} --refresh", app_name))
+    }
+
+    pub fn appset_generate(&self, app_set_path: &str) -> Result<CommandOutput, CommandOutput> {
+        self.run_argocd_command(&format!("argocd appset generate {} -o yaml", app_set_path))
     }
 }

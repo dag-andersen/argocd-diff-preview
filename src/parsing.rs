@@ -1,5 +1,10 @@
-use crate::{argo_resource::ArgoResource, Branch, Selector};
-use log::{debug, info};
+use crate::{
+    argo_resource::{ApplicationKind, ArgoResource},
+    argocd::ArgoCDInstallation,
+    error::CommandError,
+    utils, Branch, Selector,
+};
+use log::{debug, error, info};
 use regex::Regex;
 use serde_yaml::Value;
 use std::{error::Error, io::BufRead};
@@ -18,7 +23,7 @@ impl Clone for K8sResource {
     }
 }
 
-pub fn get_applications_for_branches<'a>(
+pub fn get_applications_for_branches(
     argo_cd_namespace: &str,
     base_branch: &Branch,
     target_branch: &Branch,
@@ -82,25 +87,25 @@ pub fn get_applications_for_branches<'a>(
             .collect();
 
         info!(
-            "🤖 Skipped {} applications for branch: '{}' because they have not changed after patching",
+            "🤖 Skipped {} Application[Sets] for branch: '{}' because they have not changed after patching",
             base_apps_before - base_apps.len(),
             base_branch.name
         );
 
         info!(
-            "🤖 Skipped {} applications for branch: '{}' because they have not changed after patching",
+            "🤖 Skipped {} Application[Sets] for branch: '{}' because they have not changed after patching",
             target_apps_before - target_apps.len(),
             target_branch.name
         );
 
         info!(
-            "🤖 Using the remaining {} applications for branch: '{}'",
+            "🤖 Using the remaining {} Application[Sets] for branch: '{}'",
             base_apps.len(),
             base_branch.name
         );
 
         info!(
-            "🤖 Using the remaining {} applications for branch: '{}'",
+            "🤖 Using the remaining {} Application[Sets] for branch: '{}'",
             target_apps.len(),
             target_branch.name
         );
@@ -127,7 +132,14 @@ fn get_applications(
         ignore_invalid_watch_pattern,
     );
     if !applications.is_empty() {
-        return patch_applications(argo_cd_namespace, applications, branch, repo);
+        info!("🤖 Patching Application[Sets] for branch: {}", branch.name);
+        let apps = patch_applications(argo_cd_namespace, applications, branch, repo)?;
+        info!(
+            "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
+            apps.len(),
+            branch.name
+        );
+        return Ok(apps);
     }
     Ok(applications)
 }
@@ -214,53 +226,38 @@ fn parse_yaml(directory: &str, files: Vec<String>) -> Vec<K8sResource> {
         .collect()
 }
 
+fn patch_application(
+    argo_cd_namespace: &str,
+    application: ArgoResource,
+    branch: &Branch,
+    repo: &str,
+) -> Result<ArgoResource, Box<dyn Error>> {
+    let app_name = application.name.clone();
+    let app = application
+        .set_namespace(argo_cd_namespace)
+        .remove_sync_policy()
+        .set_project_to_default()
+        .and_then(|a| a.point_destination_to_in_cluster())
+        .and_then(|a| a.redirect_sources(repo, &branch.name))
+        .and_then(|a| a.redirect_generators(repo, &branch.name));
+
+    if app.is_err() {
+        error!("❌ Failed to patch application: {}", app_name);
+    }
+
+    app
+}
+
 fn patch_applications(
     argo_cd_namespace: &str,
     applications: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
-    info!("🤖 Patching applications for branch: {}", branch.name);
-
-    let applications: Vec<Result<ArgoResource, Box<dyn Error>>> = applications
+    applications
         .into_iter()
-        .map(|a| {
-            let app_name = a.name.clone();
-            let app: Result<ArgoResource, Box<dyn Error>> = a
-                .set_namespace(argo_cd_namespace)
-                .remove_sync_policy()
-                .set_project_to_default()
-                .and_then(|a| a.point_destination_to_in_cluster())
-                .and_then(|a| a.redirect_sources(repo, &branch.name))
-                .and_then(|a| a.redirect_generators(repo, &branch.name));
-
-            if app.is_err() {
-                info!("❌ Failed to patch application: {}", app_name);
-            }
-            app
-        })
-        .collect();
-
-    info!(
-        "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
-        applications.len(),
-        branch.name
-    );
-
-    let errors: Vec<String> = applications
-        .iter()
-        .filter_map(|a| match a {
-            Ok(_) => None,
-            Err(e) => Some(e.to_string()),
-        })
-        .collect();
-
-    if !errors.is_empty() {
-        return Err(errors.join("\n").into());
-    }
-
-    let apps = applications.into_iter().filter_map(|a| a.ok()).collect();
-    Ok(apps)
+        .map(|a| patch_application(argo_cd_namespace, a, branch, repo))
+        .collect()
 }
 
 fn from_resource_to_application(
@@ -306,16 +303,114 @@ fn from_resource_to_application(
 
     if number_of_apps_before_filtering != filtered_apps.len() {
         info!(
-            "🤖 Found {} applications before filtering",
+            "🤖 Found {} Application[Sets] before filtering",
             number_of_apps_before_filtering
         );
         info!(
-            "🤖 Found {} applications after filtering",
+            "🤖 Found {} Application[Sets] after filtering",
             filtered_apps.len()
         );
     } else {
-        info!("🤖 Found {} applications", number_of_apps_before_filtering);
+        info!("🤖 Found {} Application[Sets]", number_of_apps_before_filtering);
     }
 
     filtered_apps
+}
+
+pub fn generate_apps_from_app_set(
+    argocd: &ArgoCDInstallation,
+    app_sets: Vec<ArgoResource>,
+    branch: &Branch,
+    repo: &str,
+    temp_folder: &str,
+) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
+    let mut apps_new: Vec<ArgoResource> = vec![];
+
+    let mut app_set_counter = 0;
+    let mut generated_apps_counter = 0;
+
+    for app_set in app_sets {
+        if app_set.kind != ApplicationKind::ApplicationSet {
+            apps_new.push(app_set);
+            continue;
+        }
+
+        app_set_counter += 1;
+
+        // generate random name for ApplicationSet
+        let random_file_name = format!(
+            "{}/{}-{}.yaml",
+            temp_folder,
+            app_set.name,
+            rand::random::<u32>()
+        );
+        utils::write_to_file(&random_file_name, &app_set.as_string()?)?;
+
+        debug!(
+            "Generating applications from ApplicationSet in file: {}",
+            random_file_name
+        );
+
+        let apps_string = argocd
+            .appset_generate(&random_file_name)
+            .map_err(|e| {
+                error!(
+                    "❌ Failed to generate applications from ApplicationSet in file: {}",
+                    app_set.file_name
+                );
+                CommandError::new(e)
+            })?
+            .stdout;
+
+        let yaml = serde_yaml::from_str(&apps_string).unwrap_or(serde_yaml::Value::Null);
+
+        let apps = match yaml.as_sequence() {
+            None => continue,
+            Some(s) => {
+                let apps = s
+                    .iter()
+                    .filter_map(|a| {
+                        ArgoResource::from_k8s_resource(K8sResource {
+                            file_name: app_set.file_name.clone(),
+                            yaml: a.clone(),
+                        })
+                    })
+                    .collect::<Vec<ArgoResource>>();
+                patch_applications(&argocd.namespace, apps, branch, repo)
+            }
+        };
+
+        match apps {
+            Ok(apps) => {
+                debug!(
+                    "Generated {} Applications from ApplicationSet in file: {}",
+                    apps.len(),
+                    app_set.file_name
+                );
+                generated_apps_counter += apps.len();
+                apps_new.extend(apps);
+            }
+            Err(e) => {
+                error!(
+                    "❌ Failed to generate Applications from ApplicationSet in file: {}",
+                    app_set.file_name
+                );
+                return Err(e);
+            }
+        }
+    }
+
+    info!(
+        "🤖 Generated {} applications from {} ApplicationSets for branch: {}",
+        generated_apps_counter, app_set_counter, branch.name
+    );
+
+    debug_assert!(
+        apps_new
+            .iter()
+            .all(|a| a.kind == ApplicationKind::Application),
+        "All applications should be of kind Application"
+    );
+
+    Ok(apps_new)
 }
