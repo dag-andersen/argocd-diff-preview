@@ -36,17 +36,12 @@ pub async fn get_resources(
     branch: &Branch,
     timeout: u64,
     output_folder: &str,
-    input_folder: &str,
 ) -> Result<(), Box<dyn Error>> {
     info!("🌚 Getting resources from {}-branch", branch.branch_type);
 
-    let app_file = &format!("{}/{}", input_folder, branch.app_file());
+    let app_file = branch.app_file();
 
-    if fs::metadata(app_file)
-        .inspect_err(|_| error!("❌ File does not exist: {}", app_file))?
-        .len()
-        != 0
-    {
+    if fs::metadata(app_file)?.len() != 0 {
         apply_manifest(app_file).map_err(|e| {
             error!(
                 "❌ Failed to apply applications for branch: {}",
@@ -95,14 +90,11 @@ pub async fn get_resources(
                     match argocd.get_manifests(name) {
                         Ok(o) => {
                             write_to_file(&format!("{}/{}", destination_folder, name), &o.stdout)?;
-                            debug!("Got manifests for application: {}", name);
-                            processed_apps.insert(name.to_string().clone());
+                            debug!("Got manifests for application: {}", name)
                         }
-                        Err(e) => {
-                            error!("❌ Failed to get manifests for application: {}", name);
-                            failed_apps.insert(name.to_string().clone(), e.stderr);
-                        }
+                        Err(e) => error!("error: {}", e.stderr),
                     }
+                    processed_apps.insert(name.to_string().clone());
                     continue;
                 }
                 Some("Unknown") => {
