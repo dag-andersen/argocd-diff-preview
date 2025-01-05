@@ -51,6 +51,67 @@ pub async fn get_resources(
         })?;
     }
 
+    let start_time = std::time::Instant::now();
+    loop {
+        let command = "kubectl get applicationsets -A -oyaml".to_string();
+        let applicationsets: Result<Value, serde_yaml::Error> = match run_command(&command) {
+            Ok(o) => serde_yaml::from_str(&o.stdout),
+            Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
+        };
+
+        let applicationsets = match applicationsets {
+            Ok(applicationsets) => applicationsets,
+            Err(_) => {
+                return Err(format!("❌ Failed to parse yaml from command: {}", command).into());
+            }
+        };
+
+        let applicationsets = match applicationsets["items"].as_sequence() {
+            None => break,
+            Some(appsets) if appsets.is_empty() => break,
+            Some(appsets) => appsets,
+        };
+
+        let time_elapsed = start_time.elapsed().as_secs();
+        if time_elapsed > timeout {
+            error!("❌ Timed out after {} seconds", timeout);
+            return Err("Timed out".into());
+        }
+
+        let mut some_appset_not_processed = false;
+        for appset in applicationsets {
+            if let Some(conditions) = appset["status"]["conditions"].as_sequence() {
+                let mut found_up_to_date_condition = false;
+                for condition in conditions {
+                    if condition["type"] == "ResourcesUpToDate" && condition["status"] == "True" {
+                        debug!("ApplicationSet {} was processed", appset["metadata"]["name"].as_str().unwrap());
+                        found_up_to_date_condition = true;
+                    }
+                }
+
+                if !found_up_to_date_condition {
+                    some_appset_not_processed = true;
+                    debug!("ApplicationSet {} not yet processed", appset["metadata"]["name"].as_str().unwrap());
+                }
+            }
+            else {
+                some_appset_not_processed = true;
+                debug!("ApplicationSet {} not yet processed", appset["metadata"]["name"].as_str().unwrap());
+            }
+        }
+
+        if !some_appset_not_processed {
+            info!("🌚 All ApplicationSets were processed");
+            break;
+        }
+
+        info!(
+            "⏳ Waiting for ApplicationSets to be processed. Retrying in 5 seconds. Timeout in {} seconds...",
+            timeout - time_elapsed
+        );
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    }
+
     let destination_folder = format!("{}/{}", output_folder, branch.branch_type);
 
     let mut processed_apps = HashSet::new();
