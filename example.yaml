@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: myapp
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - matrix:
+              generators:
+                - git:
+                    repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+                    revision: HEAD
+                    files:
+                      - path: "customers/infra/{{.name}}/cluster-config.yaml"
+  template:
+    metadata:
+      name: "{{.name}}-myapp-app"
+    spec:
+      project: "default"
+      sources:
+        - repoURL: somethinghelmregistry.azurecr.io/helm
+          chart: 'myapp'
+          targetRevision: '{{.apps.myapp}}'
+          helm:
+            releaseName: 'myapp'
+      destination:
+        server: '{{.server}}'
+        namespace: 'storage'
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
