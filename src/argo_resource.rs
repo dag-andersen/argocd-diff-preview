@@ -181,19 +181,6 @@ impl ArgoResource {
                             self.name, self.file_name
                         );
                     }
-                    if let Some(g) = spec["generators"].as_sequence_mut() {
-                        for generator in g {
-                            if let Some(i) = generator["matrix"].as_mapping_mut() {
-                                if redirect_git_generator(i, repo, branch) {
-                                    debug!(
-                                        "Patched git generators in matrix generators in ApplicationSet: {} in file: {}",
-                                        self.name,
-                                        &self.file_name
-                                    );
-                                }
-                            }
-                        }
-                    }
                 }
                 Ok(self)
             }
@@ -350,18 +337,26 @@ fn redirect_git_generator(v: &mut Mapping, repo: &str, branch: &str) -> bool {
     if v.contains_key("generators") {
         if let Some(i) = v["generators"].as_sequence_mut() {
             for generator in i {
-                if let Some(git) = generator["git"].as_mapping_mut() {
-                    if git.contains_key("repoURL") {
-                        match git["repoURL"].as_str() {
-                            Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                                git["revision"] = serde_yaml::Value::String(branch.to_string());
-                                debug!("Redirected 'repoURL' in git generator",);
-                                patched = true;
+                if generator["matrix"].is_mapping() {
+                    if let Some(i) = generator["matrix"].as_mapping_mut() {
+                        let redirected = redirect_git_generator(i, repo, branch);
+                        patched = redirected || patched;
+                    }
+                }
+                if generator["git"].is_mapping() {
+                    if let Some(git) = generator["git"].as_mapping_mut() {
+                        if git.contains_key("repoURL") {
+                            match git["repoURL"].as_str() {
+                                Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
+                                    git["revision"] = serde_yaml::Value::String(branch.to_string());
+                                    debug!("Redirected 'repoURL' in git generator",);
+                                    patched = true;
+                                }
+                                Some(_url) => {
+                                    debug!("Found no matching 'repoURL' in git generator")
+                                }
+                                _ => (),
                             }
-                            Some(_url) => {
-                                debug!("Found no matching 'repoURL' in git generator")
-                            }
-                            _ => (),
                         }
                     }
                 }
