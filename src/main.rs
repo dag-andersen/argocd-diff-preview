@@ -288,8 +288,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
+
     let (base_apps, target_apps) = parsing::get_applications_for_branches(
-        &argocd_namespace,
         &base_branch,
         &target_branch,
         &file_regex,
@@ -310,14 +310,24 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    let unique_namespaces = base_apps
+        .iter()
+        .map(|a| a.namespace.clone())
+        .chain(target_apps.iter().map(|a| a.namespace.clone()))
+        .collect::<std::collections::HashSet<String>>();
     match cluster_tool {
         ClusterTool::Kind => kind::create_cluster(&cluster_name)?,
         ClusterTool::Minikube => minikube::create_cluster()?,
     }
 
+    // create Argo CD namespace
     create_namespace(&argocd_namespace)?;
 
-    create_folder_if_not_exists(secrets_folder)?;
+    // Create a namespace for each application
+    for namespace in unique_namespaces {
+        create_namespace(&namespace)?;
+    }
+
     match apply_folder(secrets_folder) {
         Ok(count) if count > 0 => info!("🤫 Applied {} secrets", count),
         Ok(_) => info!("🤷 No secrets found in {}", secrets_folder),
