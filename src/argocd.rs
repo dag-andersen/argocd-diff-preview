@@ -1,6 +1,6 @@
 use crate::{
     error::{CommandError, CommandOutput},
-    utils::{self, run_command, run_command_with_envs, StringPair},
+    utils::{self, run_command, run_simple_command, CommandConfig, StringPair},
 };
 use base64::prelude::*;
 use log::{debug, error, info};
@@ -54,13 +54,15 @@ impl ArgoCDInstallation {
         };
 
         // add argo repo to helm
-        run_command("helm repo add argo https://argoproj.github.io/argo-helm").map_err(|e| {
-            error!("❌ Failed to add argo repo");
-            CommandError::new(e)
-        })?;
+        run_simple_command("helm repo add argo https://argoproj.github.io/argo-helm").map_err(
+            |e| {
+                error!("❌ Failed to add argo repo");
+                CommandError::new(e)
+            },
+        )?;
 
         // helm update
-        run_command("helm repo update").map_err(|e| {
+        run_simple_command("helm repo update").map_err(|e| {
             error!("❌ Failed to update helm repo");
             CommandError::new(e)
         })?;
@@ -76,7 +78,7 @@ impl ArgoCDInstallation {
                 .unwrap_or_default(),
         );
 
-        run_command(&helm_install_command).map_err(|e| {
+        run_simple_command(&helm_install_command).map_err(|e| {
             error!("❌ Failed to install Argo CD");
             CommandError::new(e)
         })?;
@@ -84,7 +86,7 @@ impl ArgoCDInstallation {
         info!("🦑 Waiting for Argo CD to start...");
 
         // wait for argocd-server to be ready
-        match run_command(&format!(
+        match run_simple_command(&format!(
             "kubectl wait --for=condition=available deployment/argocd-server -n {} --timeout=300s",
             self.namespace
         )) {
@@ -95,7 +97,7 @@ impl ArgoCDInstallation {
             }
         }
 
-        match run_command("helm list -A -o yaml") {
+        match run_simple_command("helm list -A -o yaml") {
             Ok(o) => {
                 let as_yaml: Value = serde_yaml::from_str(&o.stdout)?;
                 match (
@@ -132,7 +134,7 @@ impl ArgoCDInstallation {
             let mut password_encoded: Option<CommandOutput> = None;
             let mut counter = 0;
             while password_encoded.is_none() {
-                password_encoded = match run_command(command) {
+                password_encoded = match run_simple_command(command) {
                     Ok(a) => Some(a),
                     Err(e) if counter == 5 => {
                         error!("❌ Failed to get secret {}", secret_name);
@@ -184,7 +186,7 @@ impl ArgoCDInstallation {
                 "kubectl get configmap -n {} -o yaml argocd-cmd-params-cm argocd-cm",
                 self.namespace
             );
-            match run_command(&command) {
+            match run_simple_command(&command) {
                 Ok(o) => debug!(
                     "🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n{}\n{}",
                     command, &o.stdout
@@ -204,13 +206,14 @@ impl ArgoCDInstallation {
     }
 
     fn run_argocd_command(&self, command: &str) -> Result<CommandOutput, CommandOutput> {
-        run_command_with_envs(
+        run_command(CommandConfig {
             command,
-            Some(vec![StringPair {
-                key: "ARGOCD_OPTS".to_string(),
-                value: format!("--port-forward --port-forward-namespace={}", self.namespace),
+            envs: Some(vec![StringPair {
+                key: "ARGOCD_OPTS",
+                value: &format!("--port-forward --port-forward-namespace={}", self.namespace),
             }]),
-        )
+            ..Default::default()
+        })
     }
 
     pub fn get_manifests(&self, app_name: &str) -> Result<CommandOutput, CommandOutput> {

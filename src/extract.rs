@@ -1,6 +1,6 @@
 use crate::argocd::ArgoCDInstallation;
 use crate::error::CommandError;
-use crate::utils::{self, run_command, spawn_command, write_to_file};
+use crate::utils::{self, run_simple_command, spawn_command, write_to_file};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
@@ -65,7 +65,7 @@ pub async fn get_resources(
 
     loop {
         let command = "kubectl get applications -A -oyaml".to_string();
-        let yaml_output: Value = match run_command(&command) {
+        let yaml_output: Value = match run_simple_command(&command) {
             Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
             Ok(o) => serde_yaml::from_str(&o.stdout).inspect_err(|_e| {
                 error!("❌ Failed to parse yaml from command: {}", command);
@@ -227,7 +227,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     loop {
         debug!("🗑 Deleting ApplicationSets");
 
-        match run_command("kubectl delete applicationsets.argoproj.io --all -A") {
+        match run_simple_command("kubectl delete applicationsets.argoproj.io --all -A") {
             Ok(_) => debug!("🗑 Deleted ApplicationSets"),
             Err(e) => {
                 error!("❌ Failed to delete applicationsets: {}", &e.stderr)
@@ -238,7 +238,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
 
         let mut child = spawn_command("kubectl delete applications.argoproj.io --all -A", None);
         utils::sleep(5).await;
-        if run_command("kubectl get applications -A --no-headers")
+        if run_simple_command("kubectl get applications -A --no-headers")
             .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
         {
@@ -247,7 +247,7 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         }
 
         utils::sleep(5).await;
-        if run_command("kubectl get applications -A --no-headers")
+        if run_simple_command("kubectl get applications -A --no-headers")
             .map(|e| e.stdout.trim().is_empty())
             .unwrap_or_default()
         {
