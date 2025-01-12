@@ -1,9 +1,9 @@
 use crate::error::CommandOutput;
+use crate::utils;
 use crate::utils::run_command_in_dir;
 use crate::Branch;
 use log::{debug, info};
 use std::error::Error;
-use std::fs;
 
 pub fn generate_diff(
     output_folder: &str,
@@ -90,7 +90,7 @@ pub fn generate_diff(
     let markdown = print_diff(&summary_as_string, &diff_truncated);
 
     let markdown_path = format!("{}/diff.md", output_folder);
-    fs::write(&markdown_path, markdown)?;
+    utils::write_to_file(&markdown_path, &markdown)?;
 
     info!("🙏 Please check the {} file for differences", markdown_path);
 

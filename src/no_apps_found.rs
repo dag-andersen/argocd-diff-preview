@@ -1,7 +1,6 @@
 use std::error::Error;
-use std::fs;
 
-use crate::Selector;
+use crate::{utils, Selector};
 
 // Message to show when no applications were found
 
@@ -14,7 +13,7 @@ pub fn write_message(
 
     let markdown = generate_markdown(&message);
     let markdown_path = format!("{}/diff.md", output_folder);
-    fs::write(markdown_path, markdown)?;
+    utils::write_to_file(&markdown_path, &markdown)?;
 
     Ok(())
 }
