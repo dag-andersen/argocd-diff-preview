@@ -1,5 +1,6 @@
 use log::debug;
 use std::error::Error;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Stdio};
 use std::{fs, process::Command};
@@ -48,7 +49,7 @@ pub fn run_command(config: CommandConfig) -> Result<CommandOutput, CommandOutput
     let args = config.command.split_whitespace().collect::<Vec<&str>>();
     debug!("Running shell command: {}", config.command);
 
-    let output = match config.envs {
+    let mut child = match config.envs {
         Some(envs) => envs
             .iter()
             .fold(Command::new(args[0]), |mut output, env_var| {
@@ -59,8 +60,25 @@ pub fn run_command(config: CommandConfig) -> Result<CommandOutput, CommandOutput
     }
     .args(&args[1..])
     .current_dir(config.current_dir.unwrap_or("."))
-    .output()
+    .stdin(Stdio::piped())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
     .unwrap_or_else(|_| panic!("Failed to execute command: {}", config.command));
+
+    if let Some(stdin_str) = config.stdin {
+        let mut stdin = child
+            .stdin
+            .take()
+            .unwrap_or_else(|| panic!("Failed to open stdin for command: {}", config.command));
+        stdin
+            .write_all(stdin_str.as_bytes())
+            .unwrap_or_else(|_| panic!("Failed to write to stdin for command: {}", config.command));
+    }
+
+    let output = child
+        .wait_with_output()
+        .unwrap_or_else(|_| panic!("Failed to wait for output for command: {}", config.command));
 
     match output.status.success() {
         true => Ok(CommandOutput {
