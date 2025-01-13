@@ -289,7 +289,7 @@ fn from_resource_to_application(
         ),
         (None, Some(f)) => info!(
             "🤖 Will only run on Applications that watch these files: '{}'",
-            f.join("`, `")
+            f.join("', '")
         ),
         (None, None) => {}
     }
@@ -403,10 +403,14 @@ pub fn generate_apps_from_app_set(
         }
     }
 
-    info!(
-        "🤖 Generated {} applications from {} ApplicationSets for branch: {}",
-        generated_apps_counter, app_set_counter, branch.name
-    );
+    if app_set_counter > 0 {
+        info!(
+            "🤖 Generated {} applications from {} ApplicationSets for branch: {}",
+            generated_apps_counter, app_set_counter, branch.name
+        );
+    } else {
+        info!("🤖 No ApplicationSets found for branch: {}", branch.name);
+    }
 
     debug_assert!(
         apps_new
