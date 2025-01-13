@@ -11,7 +11,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::{error::Error, io::Write};
 use structopt::StructOpt;
-use utils::{check_if_folder_exists, create_folder_if_not_exists, delete_folder, run_command};
+use utils::{
+    check_if_folder_exists, create_folder_if_not_exists, delete_folder, run_simple_command,
+};
 mod argo_resource;
 mod argocd;
 mod branch;
@@ -344,11 +346,19 @@ async fn run() -> Result<(), Box<dyn Error>> {
     let base_apps =
         generate_apps_from_app_set(&argocd, base_apps, &base_branch, repo, temp_folder)?;
     let base_apps = unique_names(base_apps, &base_branch);
+    let base_apps: Vec<ArgoResource> = base_apps
+        .into_iter()
+        .filter_map(|a| a.filter(&selector, &files_changed, opt.ignore_invalid_watch_pattern))
+        .collect();
 
     let target_apps = unique_names(target_apps, &target_branch);
     let target_apps =
         generate_apps_from_app_set(&argocd, target_apps, &target_branch, repo, temp_folder)?;
     let target_apps = unique_names(target_apps, &target_branch);
+    let target_apps: Vec<ArgoResource> = target_apps
+        .into_iter()
+        .filter_map(|a| a.filter(&selector, &files_changed, opt.ignore_invalid_watch_pattern))
+        .collect();
 
     {
         let file_path = format!("{}/{}", temp_folder, base_branch.app_file());
@@ -477,7 +487,7 @@ fn cleanup_cluster(tool: ClusterTool, cluster_name: &str) {
 }
 
 pub fn create_namespace(namespace: &str) -> Result<(), Box<dyn Error>> {
-    run_command(&format!("kubectl create ns {}", namespace)).map_err(|e| {
+    run_simple_command(&format!("kubectl create ns {}", namespace)).map_err(|e| {
         error!("❌ Failed to create namespace '{}'", namespace);
         CommandError::new(e)
     })?;
@@ -486,7 +496,7 @@ pub fn create_namespace(namespace: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn apply_manifest(file_name: &str) -> Result<CommandOutput, CommandOutput> {
-    run_command(&format!("kubectl apply -f {}", file_name)).inspect_err(|_e| {
+    run_simple_command(&format!("kubectl apply -f {}", file_name)).inspect_err(|_e| {
         error!("❌ Failed to apply manifest: {}", file_name);
     })
 }

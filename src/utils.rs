@@ -6,9 +6,17 @@ use std::{fs, process::Command};
 
 use crate::error::CommandOutput;
 
-pub struct StringPair {
-    pub key: String,
-    pub value: String,
+#[derive(Default)]
+pub struct CommandConfig<'a> {
+    pub command: &'a str,
+    pub current_dir: Option<&'a str>,
+    pub stdin: Option<&'a str>,
+    pub envs: Option<Vec<StringPair<'a>>>,
+}
+
+pub struct StringPair<'a> {
+    pub key: &'a str,
+    pub value: &'a str,
 }
 
 pub fn create_folder_if_not_exists(folder_name: &str) -> Result<(), Box<dyn Error>> {
@@ -29,47 +37,30 @@ pub fn delete_folder(folder_name: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn run_command(command: &str) -> Result<CommandOutput, CommandOutput> {
-    let args = command.split_whitespace().collect::<Vec<&str>>();
-    run_command_from_list(args, None, None)
+pub fn run_simple_command(command: &str) -> Result<CommandOutput, CommandOutput> {
+    run_command(CommandConfig {
+        command,
+        ..Default::default()
+    })
 }
 
-pub fn run_command_with_envs(
-    command: &str,
-    envs: Option<Vec<StringPair>>,
-) -> Result<CommandOutput, CommandOutput> {
-    let args = command.split_whitespace().collect::<Vec<&str>>();
-    run_command_from_list(args, None, envs)
-}
+pub fn run_command(config: CommandConfig) -> Result<CommandOutput, CommandOutput> {
+    let args = config.command.split_whitespace().collect::<Vec<&str>>();
+    debug!("Running shell command: {}", config.command);
 
-pub fn run_command_in_dir(
-    command: &str,
-    current_dir: &str,
-) -> Result<CommandOutput, CommandOutput> {
-    let args = command.split_whitespace().collect::<Vec<&str>>();
-    run_command_from_list(args, Some(current_dir), None)
-}
-
-pub fn run_command_from_list(
-    command: Vec<&str>,
-    current_dir: Option<&str>,
-    envs: Option<Vec<StringPair>>,
-) -> Result<CommandOutput, CommandOutput> {
-    debug!("Running shell command: {}", command.join(" "));
-
-    let output = match envs {
+    let output = match config.envs {
         Some(envs) => envs
             .iter()
-            .fold(Command::new(command[0]), |mut output, env_var| {
-                output.env(&env_var.key, &env_var.value);
+            .fold(Command::new(args[0]), |mut output, env_var| {
+                output.env(env_var.key, env_var.value);
                 output
             }),
-        None => Command::new(command[0]),
+        None => Command::new(args[0]),
     }
-    .args(&command[1..])
-    .current_dir(current_dir.unwrap_or("."))
+    .args(&args[1..])
+    .current_dir(config.current_dir.unwrap_or("."))
     .output()
-    .unwrap_or_else(|_| panic!("Failed to execute command: {}", command.join(" ")));
+    .unwrap_or_else(|_| panic!("Failed to execute command: {}", config.command));
 
     match output.status.success() {
         true => Ok(CommandOutput {
@@ -88,7 +79,7 @@ pub fn spawn_command(command: &str, current_dir: Option<&str>) -> Child {
     spawn_command_from_list(args, current_dir)
 }
 
-pub fn spawn_command_from_list(args: Vec<&str>, current_dir: Option<&str>) -> Child {
+fn spawn_command_from_list(args: Vec<&str>, current_dir: Option<&str>) -> Child {
     debug!("Spawning command: {}", args.join(" "));
     Command::new(args[0])
         .args(&args[1..])

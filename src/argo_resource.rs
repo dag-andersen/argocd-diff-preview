@@ -174,13 +174,11 @@ impl ArgoResource {
         match spec {
             None => Err(format!("No 'spec' key found in ApplicationSet: {}", self.name).into()),
             Some(spec) => {
-                if spec.contains_key("generators") {
-                    if redirect_git_generator(spec, repo, branch) {
-                        debug!(
-                            "Patched git generators in ApplicationSet: {} in file: {}",
-                            self.name, self.file_name
-                        );
-                    }
+                if spec.contains_key("generators") && redirect_git_generator(spec, repo, branch) {
+                    debug!(
+                        "Patched git generators in ApplicationSet: {} in file: {}",
+                        self.name, self.file_name
+                    );
                 }
                 Ok(self)
             }
