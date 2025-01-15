@@ -198,7 +198,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     let cluster_tool = &opt.local_cluster_tool;
 
-    let repo_regex = Regex::new(r"^[a-zA-Z0-9-]+/[a-zA-Z0-9\._-]+$")?;
+    let repo_regex = Regex::new(r"^[a-zA-Z0-9\.\{\}_-]+/[a-zA-Z0-9\.\{\}_-]+$")?;
     if !repo_regex.is_match(repo) {
         error!("❌ Invalid repository format. Please use OWNER/REPO");
         return Err("Invalid repository format".into());
