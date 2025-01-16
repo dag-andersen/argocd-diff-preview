@@ -109,6 +109,11 @@ struct Opt {
     /// Keep cluster alive after the tool finishes
     #[structopt(long)]
     keep_cluster_alive: bool,
+
+    /// List of revisions to redirect to a target branch name which is used to generate a diff
+    /// while keeping unselected revision as is.
+    #[structopt(long, env)]
+    target_revision_redirect_selector: Option<String>,
 }
 
 #[derive(Debug)]
@@ -288,6 +293,28 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Err("Target branch folder does not exist".into());
     }
 
+    let target_revision_redirect_selector = opt
+        .target_revision_redirect_selector
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| {
+            let revisions: Vec<String> = s
+                .split(',')
+                .filter(|b| !b.trim().is_empty())
+                .map(|b| b.to_string())
+                .collect();
+            revisions
+        });
+
+    if let Some(list) = &target_revision_redirect_selector {
+        info!(
+            "✨ - target-revision-redirect-selector: {}",
+            list.iter()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>()
+                .join(",")
+        );
+    }
+
     // remove .git from repo
     let repo = repo.trim_end_matches(".git");
     let (base_apps, target_apps) = parsing::get_applications_for_branches(
@@ -299,6 +326,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &files_changed,
         repo,
         opt.ignore_invalid_watch_pattern,
+        &target_revision_redirect_selector,
     )?;
 
     let found_base_apps = !base_apps.is_empty();
@@ -343,8 +371,14 @@ async fn run() -> Result<(), Box<dyn Error>> {
     create_folder_if_not_exists(temp_folder)?;
 
     let base_apps = unique_names(base_apps, &base_branch);
-    let base_apps =
-        generate_apps_from_app_set(&argocd, base_apps, &base_branch, repo, temp_folder)?;
+    let base_apps = generate_apps_from_app_set(
+        &argocd,
+        base_apps,
+        &base_branch,
+        repo,
+        temp_folder,
+        &target_revision_redirect_selector,
+    )?;
     let base_apps = unique_names(base_apps, &base_branch);
     let base_apps: Vec<ArgoResource> = base_apps
         .into_iter()
@@ -352,8 +386,14 @@ async fn run() -> Result<(), Box<dyn Error>> {
         .collect();
 
     let target_apps = unique_names(target_apps, &target_branch);
-    let target_apps =
-        generate_apps_from_app_set(&argocd, target_apps, &target_branch, repo, temp_folder)?;
+    let target_apps = generate_apps_from_app_set(
+        &argocd,
+        target_apps,
+        &target_branch,
+        repo,
+        temp_folder,
+        &target_revision_redirect_selector,
+    )?;
     let target_apps = unique_names(target_apps, &target_branch);
     let target_apps: Vec<ArgoResource> = target_apps
         .into_iter()
