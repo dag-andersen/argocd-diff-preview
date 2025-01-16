@@ -34,6 +34,39 @@ spec:
   ...
 ```
 
+```yaml title="ApplicationSet" hl_lines="7 19"
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-appset
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/.*, examples/helm/values/filtered.yaml"
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview
+        revision: HEAD
+        directories:
+          - path: examples/helm/charts/*
+  template:
+    metadata:
+      name: '{{ .path.basename }}'
+      annotaitons:
+        argocd-diff-preview/watch-pattern: 'examples/helm/charts/{{ .path.basename }}/.*, examples/helm/values/filtered.yaml'
+    spec:
+      project: {{ .path.basename }}
+      source:
+        repoURL: hhttps://github.com/dag-andersen/argocd-diff-preview
+        targetRevision: HEAD
+        path: '{{ .path.path }}'
+        helm:
+          valueFiles:
+            - ../../values/filtered.yaml
+            - values.yaml
+  ...
+```
+
 #### How to use it in a GitHub Actions Workflow
 
 You can use the [`tj-actions/changed-files`](https://github.com/tj-actions/changed-files) action in your workflow and pass the output to the `argocd-diff-preview` tool. Providing the tool with a list of changed files will ensure you only render applications that watch those file paths. Any application without the `argocd-diff-preview/watch-pattern` annotation will be ignored.
