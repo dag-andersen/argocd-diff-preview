@@ -11,7 +11,7 @@ You can configure the tool to render only the applications affected by changes i
 To achieve this, you need to add the annotation: `argocd-diff-preview/watch-pattern` to all your Applications `metadata.annotations` and ApplicationSets `metadata.annotations` and `spec.template.metadata.annotations`. Then, in your GitHub Actions workflow, provide the tool with a list of changed files. If no list is provided, the annotation will be ignored. The `watch-pattern` annotation takes a comma-separated list of file paths or regex patterns. The tool will render the application if any of the patterns match the changed files.
 
 !!! important "Note"
-    In order to filter appliations based on changed files, the annotation `argocd-diff-preview/watch-pattern` must exist in the target branch. 
+    In order to filter appliations based on changed files, the annotation `argocd-diff-preview/watch-pattern` must exist in the base branch.
 
 *Example:*
 
