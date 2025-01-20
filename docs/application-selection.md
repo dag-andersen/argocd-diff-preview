@@ -37,6 +37,9 @@ spec:
   ...
 ```
 
+
+**ApplicationSet Example**
+
 ```yaml title="ApplicationSet" hl_lines="7 19"
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
