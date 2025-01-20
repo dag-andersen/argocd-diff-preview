@@ -106,7 +106,7 @@ impl ArgoResource {
         mut self,
         repo: &str,
         branch: &str,
-        redirect_selector: &Option<Vec<String>>,
+        redirect_target_revisions: &Option<Vec<String>>,
     ) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
             ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
@@ -123,9 +123,10 @@ impl ArgoResource {
                 }
                 match spec["source"]["repoURL"].as_str() {
                     Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                        let redirect = match redirect_selector {
+                        let redirect = match redirect_target_revisions {
                             Some(revisions) => revisions.iter().any(|revision| {
-                                Some(revision.as_str()) == spec["source"]["targetRevision"].as_str()
+                                revision.as_str()
+                                    == spec["source"]["targetRevision"].as_str().unwrap_or("HEAD")
                             }),
                             None => true,
                         };
@@ -150,9 +151,10 @@ impl ArgoResource {
                         }
                         match source["repoURL"].as_str() {
                             Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                                let redirect = match redirect_selector {
+                                let redirect = match redirect_target_revisions {
                                     Some(revisions) => revisions.iter().any(|revision| {
-                                        Some(revision.as_str()) == source["targetRevision"].as_str()
+                                        revision.as_str()
+                                            == source["targetRevision"].as_str().unwrap_or("HEAD")
                                     }),
                                     None => true,
                                 };
@@ -183,7 +185,7 @@ impl ArgoResource {
         mut self,
         repo: &str,
         branch: &str,
-        redirect_selector: &Option<Vec<String>>,
+        redirect_target_revisions: &Option<Vec<String>>,
     ) -> Result<ArgoResource, Box<dyn Error>> {
         if self.kind != ApplicationKind::ApplicationSet {
             return Ok(self);
@@ -195,7 +197,7 @@ impl ArgoResource {
             None => Err(format!("No 'spec' key found in ApplicationSet: {}", self.name).into()),
             Some(spec) => {
                 if spec.contains_key("generators")
-                    && redirect_git_generator(spec, repo, branch, redirect_selector)
+                    && redirect_git_generator(spec, repo, branch, redirect_target_revisions)
                 {
                     debug!(
                         "Patched git generators in ApplicationSet: {} in file: {}",
@@ -356,7 +358,7 @@ fn redirect_git_generator(
     v: &mut Mapping,
     repo: &str,
     branch: &str,
-    redirect_selector: &Option<Vec<String>>,
+    redirect_target_revisions: &Option<Vec<String>>,
 ) -> bool {
     let mut patched = false;
     if v.contains_key("generators") {
@@ -364,7 +366,8 @@ fn redirect_git_generator(
             for generator in i {
                 if generator["matrix"].is_mapping() {
                     if let Some(i) = generator["matrix"].as_mapping_mut() {
-                        let redirected = redirect_git_generator(i, repo, branch, redirect_selector);
+                        let redirected =
+                            redirect_git_generator(i, repo, branch, redirect_target_revisions);
                         patched = redirected || patched;
                     }
                 }
@@ -373,9 +376,10 @@ fn redirect_git_generator(
                         if git.contains_key("repoURL") {
                             match git["repoURL"].as_str() {
                                 Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                                    let redirect = match redirect_selector {
+                                    let redirect = match redirect_target_revisions {
                                         Some(revisions) => revisions.iter().any(|revision| {
-                                            Some(revision.as_str()) == git["revision"].as_str()
+                                            revision.as_str()
+                                                == git["revision"].as_str().unwrap_or("HEAD")
                                         }),
                                         None => true,
                                     };

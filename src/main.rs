@@ -110,10 +110,9 @@ struct Opt {
     #[structopt(long)]
     keep_cluster_alive: bool,
 
-    /// List of revisions to redirect to a target branch name which is used to generate a diff
-    /// while keeping unselected revision as is.
+    /// List of target revisions to redirect to the target branch name while ignoring the rest. Default: Redirect all Applications to the target branch.
     #[structopt(long, env)]
-    target_revision_redirect_selector: Option<String>,
+    redirect_target_revisions: Option<String>,
 }
 
 #[derive(Debug)]
@@ -293,21 +292,21 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Err("Target branch folder does not exist".into());
     }
 
-    let target_revision_redirect_selector = opt
-        .target_revision_redirect_selector
+    let redirect_target_revisions = opt
+        .redirect_target_revisions
         .filter(|s| !s.trim().is_empty())
         .map(|s| {
             let revisions: Vec<String> = s
                 .split(',')
-                .filter(|b| !b.trim().is_empty())
-                .map(|b| b.to_string())
+                .map(|b| b.trim().to_string())
+                .filter(|b| !b.is_empty())
                 .collect();
             revisions
         });
 
-    if let Some(list) = &target_revision_redirect_selector {
+    if let Some(list) = &redirect_target_revisions {
         info!(
-            "✨ - target-revision-redirect-selector: {}",
+            "✨ - redirect-target-revisions: {}",
             list.iter()
                 .map(|s| s.to_string())
                 .collect::<Vec<String>>()
@@ -326,7 +325,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &files_changed,
         repo,
         opt.ignore_invalid_watch_pattern,
-        &target_revision_redirect_selector,
+        &redirect_target_revisions,
     )?;
 
     let found_base_apps = !base_apps.is_empty();
@@ -377,7 +376,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &base_branch,
         repo,
         temp_folder,
-        &target_revision_redirect_selector,
+        &redirect_target_revisions,
     )?;
     let base_apps = unique_names(base_apps, &base_branch);
     let base_apps: Vec<ArgoResource> = base_apps
@@ -392,7 +391,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &target_branch,
         repo,
         temp_folder,
-        &target_revision_redirect_selector,
+        &redirect_target_revisions,
     )?;
     let target_apps = unique_names(target_apps, &target_branch);
     let target_apps: Vec<ArgoResource> = target_apps
