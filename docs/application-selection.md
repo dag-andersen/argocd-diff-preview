@@ -8,7 +8,10 @@ Here are _4_ ways to limit which applications are rendered:
 
 You can configure the tool to render only the applications affected by changes in a pull request. This optimizes the rendering process by focusing on the applications directly impacted by the modified files.
 
-To achieve this, you need to add the annotation: `argocd-diff-preview/watch-pattern` to all your Applications/ApplicationSets, and provide the tool with a list of changed files. If no list is provided, the annotation will be ignored. The `watch-pattern` annotation takes a comma-separated list of file paths or regex patterns. The tool will render the application if any of the patterns match the changed files.
+To achieve this, you need to add the annotation `argocd-diff-preview/watch-pattern` to all your Applications’ `metadata.annotations` and your ApplicationSets’ metadata.annotations and `spec.template.metadata.annotations`. Then, in your CI pipeline, provide the tool with a list of changed files. If no list is provided, the annotation will be ignored. The `watch-pattern` annotation takes a comma-separated list of file paths or regex patterns. The tool will render the application if any of the patterns match the changed files.
+
+!!! important "Note"
+    In order to filter appliations based on changed files, the annotation `argocd-diff-preview/watch-pattern` must exist in the base branch.
 
 *Example:*
 
@@ -31,6 +34,42 @@ spec:
       helm:
         valueFiles:
           - $local-files/examples/helm/values/filtered.yaml
+  ...
+```
+
+
+**ApplicationSet Example**
+
+```yaml title="ApplicationSet" hl_lines="7 19"
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-appset
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/.*, examples/helm/values/filtered.yaml"
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview
+        revision: HEAD
+        directories:
+          - path: examples/helm/charts/*
+  template:
+    metadata:
+      name: '{{ .path.basename }}'
+      annotaitons:
+        argocd-diff-preview/watch-pattern: 'examples/helm/charts/{{ .path.basename }}/.*, examples/helm/values/filtered.yaml'
+    spec:
+      project: {{ .path.basename }}
+      source:
+        repoURL: hhttps://github.com/dag-andersen/argocd-diff-preview
+        targetRevision: HEAD
+        path: '{{ .path.path }}'
+        helm:
+          valueFiles:
+            - ../../values/filtered.yaml
+            - values.yaml
   ...
 ```
 
