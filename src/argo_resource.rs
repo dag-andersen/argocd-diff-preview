@@ -51,10 +51,15 @@ impl ArgoResource {
 
         match spec {
             None => Err(format!("No 'spec' key found in Application: {}", self.name).into()),
-            Some(spec) => {
+            Some(spec) if spec.contains_key("project") => {
                 spec["project"] = serde_yaml::Value::String("default".to_string());
                 Ok(self)
             }
+            Some(_) => Err(format!(
+                "No 'spec.project' key found in Application: {} (file: {})",
+                self.name, self.file_name
+            )
+            .into()),
         }
     }
 
@@ -76,8 +81,8 @@ impl ArgoResource {
                 Ok(self)
             }
             Some(_) => Err(format!(
-                "No 'spec.destination' key found in Application: {}",
-                self.name
+                "No 'spec.destination' key found in Application: {} (file: {})",
+                self.name, self.file_name
             )
             .into()),
         }
