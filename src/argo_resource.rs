@@ -106,6 +106,7 @@ impl ArgoResource {
         mut self,
         repo: &str,
         branch: &str,
+        redirect_target_revisions: &Option<Vec<String>>,
     ) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
             ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
@@ -122,8 +123,18 @@ impl ArgoResource {
                 }
                 match spec["source"]["repoURL"].as_str() {
                     Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                        spec["source"]["targetRevision"] =
-                            serde_yaml::Value::String(branch.to_string());
+                        let redirect = match redirect_target_revisions {
+                            Some(revisions) => revisions.iter().any(|revision| {
+                                revision.as_str()
+                                    == spec["source"]["targetRevision"].as_str().unwrap_or("HEAD")
+                            }),
+                            None => true,
+                        };
+
+                        if redirect {
+                            spec["source"]["targetRevision"] =
+                                serde_yaml::Value::String(branch.to_string());
+                        }
                     }
                     _ => debug!(
                         "Found no 'repoURL' under spec.source in file: {}",
@@ -140,8 +151,18 @@ impl ArgoResource {
                         }
                         match source["repoURL"].as_str() {
                             Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                                source["targetRevision"] =
-                                    serde_yaml::Value::String(branch.to_string());
+                                let redirect = match redirect_target_revisions {
+                                    Some(revisions) => revisions.iter().any(|revision| {
+                                        revision.as_str()
+                                            == source["targetRevision"].as_str().unwrap_or("HEAD")
+                                    }),
+                                    None => true,
+                                };
+
+                                if redirect {
+                                    source["targetRevision"] =
+                                        serde_yaml::Value::String(branch.to_string());
+                                }
                             }
                             _ => debug!(
                                 "Found no 'repoURL' under spec.sources[] in file: {}",
@@ -164,6 +185,7 @@ impl ArgoResource {
         mut self,
         repo: &str,
         branch: &str,
+        redirect_target_revisions: &Option<Vec<String>>,
     ) -> Result<ArgoResource, Box<dyn Error>> {
         if self.kind != ApplicationKind::ApplicationSet {
             return Ok(self);
@@ -174,7 +196,9 @@ impl ArgoResource {
         match spec {
             None => Err(format!("No 'spec' key found in ApplicationSet: {}", self.name).into()),
             Some(spec) => {
-                if spec.contains_key("generators") && redirect_git_generator(spec, repo, branch) {
+                if spec.contains_key("generators")
+                    && redirect_git_generator(spec, repo, branch, redirect_target_revisions)
+                {
                     debug!(
                         "Patched git generators in ApplicationSet: {} in file: {}",
                         self.name, self.file_name
@@ -330,14 +354,20 @@ impl ArgoResource {
 }
 
 // Returns true if the generators were patched
-fn redirect_git_generator(v: &mut Mapping, repo: &str, branch: &str) -> bool {
+fn redirect_git_generator(
+    v: &mut Mapping,
+    repo: &str,
+    branch: &str,
+    redirect_target_revisions: &Option<Vec<String>>,
+) -> bool {
     let mut patched = false;
     if v.contains_key("generators") {
         if let Some(i) = v["generators"].as_sequence_mut() {
             for generator in i {
                 if generator["matrix"].is_mapping() {
                     if let Some(i) = generator["matrix"].as_mapping_mut() {
-                        let redirected = redirect_git_generator(i, repo, branch);
+                        let redirected =
+                            redirect_git_generator(i, repo, branch, redirect_target_revisions);
                         patched = redirected || patched;
                     }
                 }
@@ -346,9 +376,25 @@ fn redirect_git_generator(v: &mut Mapping, repo: &str, branch: &str) -> bool {
                         if git.contains_key("repoURL") {
                             match git["repoURL"].as_str() {
                                 Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                                    git["revision"] = serde_yaml::Value::String(branch.to_string());
-                                    debug!("Redirected 'repoURL' in git generator",);
-                                    patched = true;
+                                    let redirect = match redirect_target_revisions {
+                                        Some(revisions) => revisions.iter().any(|revision| {
+                                            revision.as_str()
+                                                == git["revision"].as_str().unwrap_or("HEAD")
+                                        }),
+                                        None => true,
+                                    };
+
+                                    if redirect {
+                                        git["revision"] =
+                                            serde_yaml::Value::String(branch.to_string());
+                                        debug!("Redirected 'repoURL' in git generator",);
+
+                                        patched = true;
+                                    } else {
+                                        debug!(
+                                            "Skipped unselected `targetRevision` in git generator"
+                                        )
+                                    }
                                 }
                                 Some(_url) => {
                                     debug!("Found no matching 'repoURL' in git generator")

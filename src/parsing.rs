@@ -32,6 +32,7 @@ pub fn get_applications_for_branches(
     files_changed: &Option<Vec<String>>,
     repo: &str,
     ignore_invalid_watch_pattern: bool,
+    redirect_target_revisions: &Option<Vec<String>>,
 ) -> Result<(Vec<ArgoResource>, Vec<ArgoResource>), Box<dyn Error>> {
     let base_apps = get_applications(
         argo_cd_namespace,
@@ -41,6 +42,7 @@ pub fn get_applications_for_branches(
         files_changed,
         repo,
         ignore_invalid_watch_pattern,
+        redirect_target_revisions,
     )?;
     let target_apps = get_applications(
         argo_cd_namespace,
@@ -50,6 +52,7 @@ pub fn get_applications_for_branches(
         files_changed,
         repo,
         ignore_invalid_watch_pattern,
+        redirect_target_revisions,
     )?;
 
     let duplicate_yaml = base_apps
@@ -122,6 +125,7 @@ fn get_applications(
     files_changed: &Option<Vec<String>>,
     repo: &str,
     ignore_invalid_watch_pattern: bool,
+    redirect_target_revisions: &Option<Vec<String>>,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     let yaml_files = get_yaml_files(branch.folder_name(), regex);
     let k8s_resources = parse_yaml(branch.folder_name(), yaml_files);
@@ -133,7 +137,13 @@ fn get_applications(
     );
     if !applications.is_empty() {
         info!("🤖 Patching Application[Sets] for branch: {}", branch.name);
-        let apps = patch_applications(argo_cd_namespace, applications, branch, repo)?;
+        let apps = patch_applications(
+            argo_cd_namespace,
+            applications,
+            branch,
+            repo,
+            redirect_target_revisions,
+        )?;
         info!(
             "🤖 Patching {} Argo CD Application[Sets] for branch: {}",
             apps.len(),
@@ -231,6 +241,7 @@ fn patch_application(
     application: ArgoResource,
     branch: &Branch,
     repo: &str,
+    redirect_target_revisions: &Option<Vec<String>>,
 ) -> Result<ArgoResource, Box<dyn Error>> {
     let app_name = application.name.clone();
     let app = application
@@ -238,8 +249,8 @@ fn patch_application(
         .remove_sync_policy()
         .set_project_to_default()
         .and_then(|a| a.point_destination_to_in_cluster())
-        .and_then(|a| a.redirect_sources(repo, &branch.name))
-        .and_then(|a| a.redirect_generators(repo, &branch.name));
+        .and_then(|a| a.redirect_sources(repo, &branch.name, redirect_target_revisions))
+        .and_then(|a| a.redirect_generators(repo, &branch.name, redirect_target_revisions));
 
     if app.is_err() {
         error!("❌ Failed to patch application: {}", app_name);
@@ -253,10 +264,19 @@ fn patch_applications(
     applications: Vec<ArgoResource>,
     branch: &Branch,
     repo: &str,
+    redirect_target_revisions: &Option<Vec<String>>,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     applications
         .into_iter()
-        .map(|a| patch_application(argo_cd_namespace, a, branch, repo))
+        .map(|a| {
+            patch_application(
+                argo_cd_namespace,
+                a,
+                branch,
+                repo,
+                redirect_target_revisions,
+            )
+        })
         .collect()
 }
 
@@ -326,6 +346,7 @@ pub fn generate_apps_from_app_set(
     branch: &Branch,
     repo: &str,
     temp_folder: &str,
+    redirect_target_revisions: &Option<Vec<String>>,
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     let mut apps_new: Vec<ArgoResource> = vec![];
 
@@ -379,7 +400,13 @@ pub fn generate_apps_from_app_set(
                         })
                     })
                     .collect::<Vec<ArgoResource>>();
-                patch_applications(&argocd.namespace, apps, branch, repo)
+                patch_applications(
+                    &argocd.namespace,
+                    apps,
+                    branch,
+                    repo,
+                    redirect_target_revisions,
+                )
             }
         };
 
