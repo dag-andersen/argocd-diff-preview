@@ -292,7 +292,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         return Err("Target branch folder does not exist".into());
     }
 
-    let redirect_target_revisions = opt
+    let redirect_revisions = opt
         .redirect_target_revisions
         .filter(|s| !s.trim().is_empty())
         .map(|s| {
@@ -304,7 +304,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
             revisions
         });
 
-    if let Some(list) = &redirect_target_revisions {
+    if let Some(list) = &redirect_revisions {
         info!(
             "✨ - redirect-target-revisions: {}",
             list.iter()
@@ -325,7 +325,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &files_changed,
         repo,
         opt.ignore_invalid_watch_pattern,
-        &redirect_target_revisions,
+        &redirect_revisions,
     )?;
 
     let found_base_apps = !base_apps.is_empty();
@@ -376,7 +376,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &base_branch,
         repo,
         temp_folder,
-        &redirect_target_revisions,
+        &redirect_revisions,
     )?;
     let base_apps = unique_names(base_apps, &base_branch);
     let base_apps: Vec<ArgoResource> = base_apps
@@ -391,7 +391,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         &target_branch,
         repo,
         temp_folder,
-        &redirect_target_revisions,
+        &redirect_revisions,
     )?;
     let target_apps = unique_names(target_apps, &target_branch);
     let target_apps: Vec<ArgoResource> = target_apps
