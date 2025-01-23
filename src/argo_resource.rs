@@ -111,7 +111,7 @@ impl ArgoResource {
         mut self,
         repo: &str,
         branch: &str,
-        redirect_target_revisions: &Option<Vec<String>>,
+        redirect_revisions: &Option<Vec<String>>,
     ) -> Result<ArgoResource, Box<dyn Error>> {
         let spec = match self.kind {
             ApplicationKind::Application => self.yaml["spec"].as_mapping_mut(),
@@ -128,7 +128,7 @@ impl ArgoResource {
                 }
                 match spec["source"]["repoURL"].as_str() {
                     Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                        let redirect = match redirect_target_revisions {
+                        let redirect = match redirect_revisions {
                             Some(revisions) => revisions.iter().any(|revision| {
                                 revision.as_str()
                                     == spec["source"]["targetRevision"].as_str().unwrap_or("HEAD")
@@ -156,7 +156,7 @@ impl ArgoResource {
                         }
                         match source["repoURL"].as_str() {
                             Some(url) if url.to_lowercase().contains(&repo.to_lowercase()) => {
-                                let redirect = match redirect_target_revisions {
+                                let redirect = match redirect_revisions {
                                     Some(revisions) => revisions.iter().any(|revision| {
                                         revision.as_str()
                                             == source["targetRevision"].as_str().unwrap_or("HEAD")
@@ -190,7 +190,7 @@ impl ArgoResource {
         mut self,
         repo: &str,
         branch: &str,
-        redirect_target_revisions: &Option<Vec<String>>,
+        redirect_revisions: &Option<Vec<String>>,
     ) -> Result<ArgoResource, Box<dyn Error>> {
         if self.kind != ApplicationKind::ApplicationSet {
             return Ok(self);
@@ -202,7 +202,7 @@ impl ArgoResource {
             None => Err(format!("No 'spec' key found in ApplicationSet: {}", self.name).into()),
             Some(spec) => {
                 if spec.contains_key("generators")
-                    && redirect_git_generator(spec, repo, branch, redirect_target_revisions)
+                    && redirect_git_generator(spec, repo, branch, redirect_revisions)
                 {
                     debug!(
                         "Patched git generators in ApplicationSet: {} in file: {}",
