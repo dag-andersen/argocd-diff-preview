@@ -10,4 +10,4 @@ spec:
         - name: my-deployment
           image: dag-andersen/myapp:latest
           ports:
-            - containerPort: 80
+            - containerPort: 8080
