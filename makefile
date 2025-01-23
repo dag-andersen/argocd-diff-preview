@@ -25,7 +25,8 @@ run-with-cargo: pull-repository
 		--timeout $(timeout) \
 		-l "$(selector)" \
 		--argocd-namespace "$(argocd_namespace)" \
-		--files-changed="$(files_changed)"
+		--files-changed="$(files_changed)" \
+		--redirect-target-revisions="HEAD"
 
 run-with-docker: pull-repository docker-build
 	docker run \
