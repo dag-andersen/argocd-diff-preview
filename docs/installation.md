@@ -45,7 +45,7 @@
       - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/)
       - [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
 
-    ## Find the correct binary for your operating system
+    ## Download binary from GitHub releases
 
     Check the [releases](https://github.com/dag-andersen/argocd-diff-preview/releases) and find the correct binary for your operating system.
 
@@ -121,3 +121,44 @@
 
     If base-branch is not specified it will default to `main`.
 
+=== "Aqua"
+
+    ## Pre-requisites
+
+    Install:
+
+      - [Git](https://git-scm.com/downloads)
+      - [Docker](https://docs.docker.com/get-docker/)
+      - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+      - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/)
+      - [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
+
+    ## Install binary with [aquaproj/aqua](https://github.com/aquaproj/aqua)
+    `argocd-diff-preview` also supports installation by aqua. See [documentation](https://aquaproj.github.io/docs/install) for aqua setup instructions.
+
+    ```bash
+    aqua init
+    aqua g -i dag-andersen/argocd-diff-preview
+    aqua i
+    argocd-diff-preview --help
+    ```
+
+    ## Usage
+
+    You need to pull down the two branches you want to compare. The first branch will be cloned into the `base-branch` folder, and the other branch will be cloned into the `target-branch` folder.
+
+    ```bash
+    git clone https://github.com/<owner>/<repo> base-branch --depth 1 -q -b <branch-a>
+
+    git clone https://github.com/<owner>/<repo> target-branch --depth 1 -q -b <branch-b>
+    ```
+
+    ## Run the binary
+    ```bash
+    argocd-diff-preview \
+      --repo <owner>/<repo-name> \
+      --base-branch <branch-a> \
+      --target-branch <branch-b>
+    ```
+
+    If base-branch is not specified it will default to `main`.
