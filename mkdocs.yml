@@ -28,6 +28,7 @@ nav:
   - application-selection.md
 - All Options: options.md
 - Troubleshooting: troubleshooting.md
+- FAQ: faq.md
 
 markdown_extensions:
   - pymdownx.highlight:

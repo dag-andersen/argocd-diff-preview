@@ -48,8 +48,8 @@ run-with-docker: pull-repository docker-build
 		image
 
 mkdocs:
-	pip install mkdocs-material \
-	&& python3 -m venv venv \
+	python3 -m venv venv \
 	&& source venv/bin/activate \
+	&& pip3 install mkdocs-material \
 	&& open http://localhost:8000 \
 	&& mkdocs serve

@@ -11,11 +11,13 @@ You can configure the tool to render only the applications affected by changes i
 To achieve this, you need to add the annotation `argocd-diff-preview/watch-pattern` to all your Applications’ `metadata.annotations` and your ApplicationSets’ metadata.annotations and `spec.template.metadata.annotations`. Then, in your CI pipeline, provide the tool with a list of changed files. If no list is provided, the annotation will be ignored. The `watch-pattern` annotation takes a comma-separated list of file paths or regex patterns. The tool will render the application if any of the patterns match the changed files.
 
 !!! important "Note"
-    In order to filter appliations based on changed files, the annotation `argocd-diff-preview/watch-pattern` must exist in the base branch.
+    In order to filter applications based on changed files, the annotation `argocd-diff-preview/watch-pattern` must exist in the base branch.
 
 *Example:*
 
 By adding the annotation `argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered.yaml"` to the Application manifest, the `my-app` application will only be rendered if the `filtered.yaml` file or a file in the `examples/helm/charts/myApp/` folder is modified in the PR. However, the `my-app` application will also be rendered if its own `Application` manifest is changed, so there's no need to include the application's file path in the watch-pattern annotation.
+
+**Application Example**
 
 ```yaml title="Application" hl_lines="7"
 apiVersion: argoproj.io/v1alpha1
@@ -36,7 +38,6 @@ spec:
           - $local-files/examples/helm/values/filtered.yaml
   ...
 ```
-
 
 **ApplicationSet Example**
 
