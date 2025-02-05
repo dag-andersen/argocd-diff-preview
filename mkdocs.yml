@@ -20,6 +20,7 @@ nav:
 - Demo: demo.md
 - Getting started:
   - github-actions-workflow.md
+  - gitlab-cicd.md
   - Local Installation: installation.md
   - custom-argo-cd-installation.md
 - Developer Guide: 
