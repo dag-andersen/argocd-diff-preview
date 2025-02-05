@@ -69,7 +69,7 @@ In the simple code example above, we do not provide the cluster with any credent
     - apk add -q curl jq git
     - |
       mkdir secrets
-      cat > secrets/secret.yaml << "EOF"
+      cat > secrets/secret.yaml << EOF
       apiVersion: v1
       kind: Secret
       metadata:
