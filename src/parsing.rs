@@ -55,23 +55,7 @@ pub fn get_applications_for_branches(
         redirect_revisions,
     )?;
 
-    let duplicate_yaml = base_apps
-        .iter()
-        .filter(|a| target_apps.iter().any(|b| a.name == b.name))
-        .filter(|a| {
-            target_apps.iter().any(|b| {
-                let equal = a.yaml == b.yaml;
-                if equal {
-                    debug!(
-                        "Skipping application '{}' because it has not changed",
-                        a.name
-                    )
-                }
-                equal
-            })
-        })
-        .map(|a| a.yaml.clone())
-        .collect::<Vec<Value>>();
+    let duplicate_yaml: Vec<Value> = Vec::new();
 
     if duplicate_yaml.is_empty() {
         Ok((base_apps, target_apps))
@@ -268,7 +252,16 @@ fn patch_applications(
 ) -> Result<Vec<ArgoResource>, Box<dyn Error>> {
     applications
         .into_iter()
-        .map(|a| patch_application(argo_cd_namespace, a, branch, repo, redirect_revisions))
+        .map(|a| {
+            let patched_app = patch_application(
+                argo_cd_namespace,
+                a.clone(),
+                branch,
+                repo,
+                redirect_revisions,
+            );
+            patched_app
+        })
         .collect()
 }
 
@@ -282,6 +275,8 @@ fn from_resource_to_application(
         .iter()
         .filter_map(|r| ArgoResource::from_k8s_resource(r.clone()))
         .collect();
+
+    debug!("Found {} applications before filtering", apps.len());
 
     match (selector, files_changed) {
         (Some(s), Some(f)) => info!(
@@ -313,6 +308,8 @@ fn from_resource_to_application(
         .filter_map(|a| a.filter(selector, files_changed, ignore_invalid_watch_pattern))
         .collect();
 
+    debug!("Found {} applications after filtering", filtered_apps.len());
+
     if number_of_apps_before_filtering != filtered_apps.len() {
         info!(
             "🤖 Found {} Application[Sets] before filtering",
@@ -330,6 +327,42 @@ fn from_resource_to_application(
     }
 
     filtered_apps
+}
+
+fn process_yaml_sequence(
+    sequence: Vec<serde_yaml::Value>,
+    app_set: &ArgoResource,
+    argocd: &ArgoCDInstallation,
+    branch: &Branch,
+    repo: &str,
+    redirect_target_revisions: &Option<Vec<String>>,
+    apps_new: &mut Vec<ArgoResource>,
+) -> Result<(), Box<dyn Error>> {
+    let apps = sequence
+        .iter()
+        .filter_map(|a| {
+            ArgoResource::from_k8s_resource(K8sResource {
+                file_name: app_set.file_name.clone(),
+                yaml: a.clone(),
+            })
+        })
+        .collect::<Vec<ArgoResource>>();
+    let patched_apps = patch_applications(
+        &argocd.namespace,
+        apps,
+        branch,
+        repo,
+        redirect_target_revisions,
+    )?;
+
+    debug!(
+        "Generated {} Applications from ApplicationSet in file: {}",
+        patched_apps.len(),
+        app_set.file_name
+    );
+
+    apps_new.extend(patched_apps);
+    Ok(())
 }
 
 pub fn generate_apps_from_app_set(
@@ -378,10 +411,54 @@ pub fn generate_apps_from_app_set(
             })?
             .stdout;
 
-        let yaml = serde_yaml::from_str(&apps_string).unwrap_or(serde_yaml::Value::Null);
+        let yaml = serde_yaml::from_str(&apps_string).unwrap_or_else(|e| {
+            error!("Failed to parse generated YAML: {}", e);
+            serde_yaml::Value::Null
+        });
+
+        let yaml_docs: Vec<serde_yaml::Value> = apps_string
+            .split("---")
+            .filter_map(|doc| serde_yaml::from_str(doc).ok())
+            .collect();
+
+        for yaml in yaml_docs {
+            if let Some(_mapping) = yaml.as_mapping() {
+                debug!("YAML document is a mapping: {:?}", app_set.file_name);
+                // Convert mapping to a sequence of one element
+                let sequence = vec![yaml];
+                process_yaml_sequence(
+                    sequence,
+                    &app_set,
+                    &argocd,
+                    &branch,
+                    &repo,
+                    &redirect_target_revisions,
+                    &mut apps_new,
+                )?;
+            } else if let Some(sequence) = yaml.as_sequence() {
+                debug!("YAML document is a sequence: {:?}", app_set.file_name);
+                process_yaml_sequence(
+                    sequence.clone(),
+                    &app_set,
+                    &argocd,
+                    &branch,
+                    &repo,
+                    &redirect_target_revisions,
+                    &mut apps_new,
+                )?;
+            } else {
+                debug!("YAML document is neither a mapping nor a sequence");
+            }
+        }
 
         let apps = match yaml.as_sequence() {
-            None => continue,
+            None => {
+                debug!(
+                    "No applications generated from ApplicationSet in file: {}",
+                    random_file_name
+                );
+                continue;
+            }
             Some(s) => {
                 let apps = s
                     .iter()
