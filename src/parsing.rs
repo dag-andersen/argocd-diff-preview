@@ -329,8 +329,8 @@ fn from_resource_to_application(
     filtered_apps
 }
 
-fn process_yaml_sequence(
-    sequence: Vec<serde_yaml::Value>,
+fn process_yaml_document(
+    yaml: serde_yaml::Value,
     app_set: &ArgoResource,
     argocd: &ArgoCDInstallation,
     branch: &Branch,
@@ -338,15 +338,22 @@ fn process_yaml_sequence(
     redirect_target_revisions: &Option<Vec<String>>,
     apps_new: &mut Vec<ArgoResource>,
 ) -> Result<(), Box<dyn Error>> {
+    let sequence = match yaml {
+        serde_yaml::Value::Mapping(_) => vec![yaml],
+        serde_yaml::Value::Sequence(seq) => seq,
+        _ => return Ok(()),
+    };
+
     let apps = sequence
-        .iter()
+        .into_iter()
         .filter_map(|a| {
             ArgoResource::from_k8s_resource(K8sResource {
                 file_name: app_set.file_name.clone(),
-                yaml: a.clone(),
+                yaml: a,
             })
         })
         .collect::<Vec<ArgoResource>>();
+
     let patched_apps = patch_applications(
         &argocd.namespace,
         apps,
@@ -354,12 +361,6 @@ fn process_yaml_sequence(
         repo,
         redirect_target_revisions,
     )?;
-
-    debug!(
-        "Generated {} Applications from ApplicationSet in file: {}",
-        patched_apps.len(),
-        app_set.file_name
-    );
 
     apps_new.extend(patched_apps);
     Ok(())
@@ -422,33 +423,15 @@ pub fn generate_apps_from_app_set(
             .collect();
 
         for yaml in yaml_docs {
-            if let Some(_mapping) = yaml.as_mapping() {
-                debug!("YAML document is a mapping: {:?}", app_set.file_name);
-                // Convert mapping to a sequence of one element
-                let sequence = vec![yaml];
-                process_yaml_sequence(
-                    sequence,
-                    &app_set,
-                    &argocd,
-                    &branch,
-                    &repo,
-                    &redirect_target_revisions,
-                    &mut apps_new,
-                )?;
-            } else if let Some(sequence) = yaml.as_sequence() {
-                debug!("YAML document is a sequence: {:?}", app_set.file_name);
-                process_yaml_sequence(
-                    sequence.clone(),
-                    &app_set,
-                    &argocd,
-                    &branch,
-                    &repo,
-                    &redirect_target_revisions,
-                    &mut apps_new,
-                )?;
-            } else {
-                debug!("YAML document is neither a mapping nor a sequence");
-            }
+            process_yaml_document(
+                yaml,
+                &app_set,
+                &argocd,
+                &branch,
+                &repo,
+                &redirect_target_revisions,
+                &mut apps_new,
+            )?;
         }
 
         let apps = match yaml.as_sequence() {
