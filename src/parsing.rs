@@ -4,7 +4,7 @@ use crate::{
     error::CommandError,
     utils, Branch, Selector,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use regex::Regex;
 use serde_yaml::Value;
 use std::{error::Error, io::BufRead};
@@ -378,11 +378,25 @@ pub fn generate_apps_from_app_set(
             })?
             .stdout;
 
-        let yaml = serde_yaml::from_str(&apps_string).unwrap_or(serde_yaml::Value::Null);
+        let yaml: Value = match serde_yaml::from_str(&apps_string) {
+            Ok(y) => y,
+            Err(e) => {
+                warn!(
+                    "⚠️ Failed to parse yaml from generated ApplicationSet output (in file: {}) with error: '{}'",
+                    app_set.file_name,
+                    e
+                );
+                continue;
+            }
+        };
 
-        let apps = match yaml.as_sequence() {
-            None => continue,
-            Some(s) => {
+        let apps = match (yaml.as_sequence(), yaml.is_mapping()) {
+            (Some(s), _) => {
+                debug!(
+                    "Got a list of {} Applications from ApplicationSet in file: {}",
+                    s.len(),
+                    app_set.file_name,
+                );
                 let apps = s
                     .iter()
                     .filter_map(|a| {
@@ -392,6 +406,11 @@ pub fn generate_apps_from_app_set(
                         })
                     })
                     .collect::<Vec<ArgoResource>>();
+                debug!(
+                    "Generated {} Applications from ApplicationSet in file: {}",
+                    app_set.file_name,
+                    apps.len(),
+                );
                 patch_applications(
                     &argocd.namespace,
                     apps,
@@ -400,6 +419,34 @@ pub fn generate_apps_from_app_set(
                     redirect_target_revisions,
                 )
             }
+            (_, true) => {
+                debug!(
+                    "Got a single Application from ApplicationSet in file: {}",
+                    app_set.file_name
+                );
+                let resource = ArgoResource::from_k8s_resource(K8sResource {
+                    file_name: app_set.file_name.clone(),
+                    yaml,
+                });
+                match resource {
+                    None => {
+                        warn!(
+                        "⚠️ Failed to parse yaml from generated applications from ApplicationSet (in file: {})",
+                        app_set.file_name
+                    );
+                        continue;
+                    }
+                    Some(r) => patch_application(
+                        &argocd.namespace,
+                        r,
+                        branch,
+                        repo,
+                        redirect_target_revisions,
+                    )
+                    .map(|a| vec![a]),
+                }
+            }
+            (None, false) => continue,
         };
 
         match apps {
