@@ -42,7 +42,7 @@
 
 Yes. More info [docs](https://dag-andersen.github.io/argocd-diff-preview/custom-argo-cd-installation)
 
-### Does it work with Git providers other than GitHub?
+### Does it work with Git providers other than GitHub and GitLab?
 
 **Short answer:** Yes.
 
