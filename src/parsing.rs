@@ -394,8 +394,8 @@ pub fn generate_apps_from_app_set(
             (Some(s), _) => {
                 debug!(
                     "Got a list of {} Applications from ApplicationSet in file: {}",
-                    app_set.file_name,
                     s.len()
+                    app_set.file_name,
                 );
                 let apps = s
                     .iter()
