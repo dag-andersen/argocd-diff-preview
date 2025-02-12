@@ -5,6 +5,7 @@ use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
 use std::collections::HashSet;
+use std::env;
 use std::fs;
 use std::{collections::BTreeMap, error::Error};
 
@@ -222,8 +223,85 @@ pub async fn get_resources(
     Ok(())
 }
 
+pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
+    // Remove obstructive finalizers from applications
+    // The finalizers:
+    //   - post-delete-finalizer.argocd.argoproj.io
+    //   - post-delete-finalizer.argoproj.io/cleanup
+    // are added by ArgoCD when the rendered manifests include a post-delete hook.
+    // In this case, the application will not be deleted since we could not
+    // satisfy the finalizer condition. Therefore, removed the finalizers.
+
+    let command = "kubectl get applications -A -oyaml".to_string();
+    let yaml_output: Value = match run_simple_command(&command) {
+        Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
+        Ok(o) => serde_yaml::from_str(&o.stdout).inspect_err(|_e| {
+            error!("❌ Failed to parse yaml from command: {}", command);
+        }),
+    }?;
+
+    let applications = match yaml_output["items"].as_sequence() {
+        None => return Ok(()),
+        Some(apps) => apps,
+    };
+
+    let finalizers_patch_file = format!("{}/finalizers_patch.json", env::temp_dir().display());
+    write_to_file(
+        &finalizers_patch_file,
+        r#"{"metadata":{"finalizers": null}}"#,
+    )?;
+
+    for item in applications {
+        let name = item["metadata"]["name"].as_str().unwrap();
+        let namespace = item["metadata"]["namespace"].as_str().unwrap();
+        let finalizers = match item["metadata"]["finalizers"].as_sequence() {
+            None => continue,
+            Some(f) => {
+                match f.iter().position(|x| {
+                    x == "post-delete-finalizer.argocd.argoproj.io"
+                        || x == "post-delete-finalizer.argoproj.io/cleanup"
+                }) {
+                    None => continue,
+                    Some(_) => f,
+                }
+            }
+        };
+
+        debug!(
+            "Removing finalizers from application: {}/{} - {:?}",
+            namespace, name, finalizers
+        );
+
+        // Patch application using a patch file with the finalizers set to null
+        // Instead of using --patch, use --patch-file to avoid issues of command argument
+        // escaped.
+        let command = format!(
+            "kubectl patch --namespace={} application {} --type=merge --patch-file={}",
+            namespace, name, finalizers_patch_file
+        );
+        match run_simple_command(&command) {
+            Ok(_) => debug!(
+                "🧼 Removed finalizers from application: {}/{}",
+                namespace, name
+            ),
+            Err(e) => {
+                return Err(format!(
+                    "❌ Failed to remove finalizers from application: {}/{} - {}",
+                    namespace, name, e.stderr
+                )
+                .into())
+            }
+        };
+    }
+
+    Ok(())
+}
+
 pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     info!("🧼 Removing applications");
+
+    remove_obstructive_finalizers()?;
+
     loop {
         debug!("🗑 Deleting ApplicationSets");
 
