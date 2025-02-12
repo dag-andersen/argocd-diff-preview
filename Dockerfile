@@ -20,7 +20,7 @@ COPY ./src ./src
 
 # install kind
 RUN apt-get update && apt-get install -y curl
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-${TARGETARCH}
+RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.26.0/kind-linux-${TARGETARCH}
 RUN chmod +x ./kind
 
 # install helm
