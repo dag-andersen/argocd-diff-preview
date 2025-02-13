@@ -39,7 +39,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.0.32
+            dagandersen/argocd-diff-preview:v0.0.33
 
       - name: Post diff as comment
         run: |
@@ -88,7 +88,7 @@ In the simple code examples above, we do not provide the cluster with any creden
           -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
           -e TARGET_BRANCH=${{ github.head_ref }} \
           -e REPO=${{ github.repository }} \
-          dagandersen/argocd-diff-preview:v0.0.32
+          dagandersen/argocd-diff-preview:v0.0.33
 ```
 
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
