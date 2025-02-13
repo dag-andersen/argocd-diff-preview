@@ -33,6 +33,8 @@ jobs:
           push: true
           platforms: linux/${{ matrix.platform }}
           tags: dagandersen/argocd-diff-preview:${{ env.RELEASE_VERSION }}-${{ matrix.platform }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   create-manifest:
     runs-on: ubuntu-latest

@@ -33,3 +33,5 @@ jobs:
           push: false
           platforms: linux/${{ matrix.platform }}
           tags: test-${{ matrix.platform }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
