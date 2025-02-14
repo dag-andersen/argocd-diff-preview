@@ -5,7 +5,6 @@ use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
 use std::collections::HashSet;
-use std::env;
 use std::fs;
 use std::{collections::BTreeMap, error::Error};
 
@@ -230,7 +229,6 @@ static FINALIZERS: [&str; 2] = [
 ];
 
 pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
-
     let command = "kubectl get applications -A -oyaml";
     let command_output = run_simple_command(command).map_err(|e| {
         error!("❌ Failed to get applications: {}", e.stderr);
@@ -246,7 +244,10 @@ pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
     };
 
     for item in applications {
-        let (name, namespace) = match (item["metadata"]["name"].as_str(), item["metadata"]["namespace"].as_str()) {
+        let (name, namespace) = match (
+            item["metadata"]["name"].as_str(),
+            item["metadata"]["namespace"].as_str(),
+        ) {
             (Some(name), Some(namespace)) => (name, namespace),
             _ => continue,
         };
@@ -254,7 +255,8 @@ pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
             .as_sequence()
             .and_then(|f| {
                 // check if any of the finalizers are in the list of finalizers to remove
-                f.iter().find(|f| FINALIZERS.contains(&f.as_str().unwrap_or_default()))
+                f.iter()
+                    .find(|f| FINALIZERS.contains(&f.as_str().unwrap_or_default()))
             })
             .is_some();
 
