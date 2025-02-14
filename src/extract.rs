@@ -245,50 +245,29 @@ pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
         Some(apps) => apps,
     };
 
-    let finalizers_patch_file = format!("{}/finalizers_patch.json", env::temp_dir().display());
-    write_to_file(
-        &finalizers_patch_file,
-        r#"{"metadata":{"finalizers": null}}"#,
-    )?;
-
     for item in applications {
-        let name = item["metadata"]["name"].as_str().unwrap();
-        let namespace = item["metadata"]["namespace"].as_str().unwrap();
-        let finalizers = item["metadata"]["finalizers"].as_sequence().filter(|f| {
-            f.iter()
-                .position(|x| {
-                    x == "post-delete-finalizer.argocd.argoproj.io"
-                        || x == "post-delete-finalizer.argoproj.io/cleanup"
-                })
-                .is_some()
-        });
+        let (name, namespace) = match (item["metadata"]["name"].as_str(), item["metadata"]["namespace"].as_str()) {
+            (Some(name), Some(namespace)) => (name, namespace),
+            _ => continue,
+        };
+        let has_finalizers = item["metadata"]["finalizers"]
+            .as_sequence()
+            .and_then(|f| {
+                // check if any of the finalizers are in the list of finalizers to remove
+                f.iter().find(|f| FINALIZERS.contains(&f.as_str().unwrap_or_default()))
+            })
+            .is_some();
 
-        if let Some(finalizers) = finalizers {
-            debug!(
-                "Removing finalizers from application: {}/{} - {:?}",
-                namespace, name, finalizers
-            );
-
-            // Patch application using a patch file with the finalizers set to null
-            // Instead of using --patch, use --patch-file to avoid issues of command argument
-            // escaped.
-            let command = format!(
-                "kubectl patch --namespace={} application {} --type=merge --patch-file={}",
-                namespace, name, finalizers_patch_file
-            );
-            match run_simple_command(&command) {
-                Ok(_) => debug!(
-                    "🧼 Removed finalizers from application: {}/{}",
-                    namespace, name
-                ),
-                Err(e) => {
-                    return Err(format!(
-                        "❌ Failed to remove finalizers from application: {}/{} - {}",
-                        namespace, name, e.stderr
-                    )
-                    .into())
-                }
-            };
+        if has_finalizers {
+            debug!("Removing finalizers from Application: {}", name);
+            run_simple_command(&format!(
+                    "kubectl patch application.argoproj.io {} --type merge --patch {{\"metadata\":{{\"finalizers\":null}}}} -n {}",
+                    name, namespace
+                ))
+                .map_err(|e| {
+                    error!("❌ Failed to remove finalizers from Application {} with error: {}", name, e.stderr);
+                    CommandError::new(e)
+                })?;
         }
     }
 
