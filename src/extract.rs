@@ -223,22 +223,22 @@ pub async fn get_resources(
     Ok(())
 }
 
-pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
-    // Remove obstructive finalizers from applications
-    // The finalizers:
-    //   - post-delete-finalizer.argocd.argoproj.io
-    //   - post-delete-finalizer.argoproj.io/cleanup
-    // are added by ArgoCD when the rendered manifests include a post-delete hook.
-    // In this case, the application will not be deleted since we could not
-    // satisfy the finalizer condition. Therefore, removed the finalizers.
+// List of finalizers that prevent deletion of applications
+static FINALIZERS: [&str; 2] = [
+    "post-delete-finalizer.argocd.argoproj.io",
+    "post-delete-finalizer.argoproj.io/cleanup",
+];
 
-    let command = "kubectl get applications -A -oyaml".to_string();
-    let yaml_output: Value = match run_simple_command(&command) {
-        Err(e) => return Err(format!("❌ Failed to get applications: {}", e.stderr).into()),
-        Ok(o) => serde_yaml::from_str(&o.stdout).inspect_err(|_e| {
-            error!("❌ Failed to parse yaml from command: {}", command);
-        }),
-    }?;
+pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
+
+    let command = "kubectl get applications -A -oyaml";
+    let command_output = run_simple_command(command).map_err(|e| {
+        error!("❌ Failed to get applications: {}", e.stderr);
+        CommandError::new(e)
+    })?;
+    let yaml_output: Value = serde_yaml::from_str(&command_output.stdout).inspect_err(|_| {
+        error!("❌ Failed to parse yaml from command: {}", command);
+    })?;
 
     let applications = match yaml_output["items"].as_sequence() {
         None => return Ok(()),
@@ -298,7 +298,9 @@ pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
 pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     info!("🧼 Removing applications");
 
-    remove_obstructive_finalizers()?;
+    remove_obstructive_finalizers().inspect_err(|_| {
+        error!("❌ Failed to remove delete finalizers from Applications");
+    })?;
 
     loop {
         debug!("🗑 Deleting ApplicationSets");
