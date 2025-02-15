@@ -283,42 +283,39 @@ pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
         error!("❌ Failed to remove delete finalizers from Applications");
     })?;
 
+    let verify_no_apps = || -> bool {
+        run_simple_command("kubectl get applications -A --no-headers")
+            .map(|e| e.stdout.trim().is_empty())
+            .unwrap_or_default()
+    };
+
+    let mut counter = 0;
+    let retry_count = 3;
     loop {
-        debug!("🗑 Deleting ApplicationSets");
-
-        match run_simple_command("kubectl delete applicationsets.argoproj.io --all -A") {
-            Ok(_) => debug!("🗑 Deleted ApplicationSets"),
-            Err(e) => {
-                error!("❌ Failed to delete applicationsets: {}", &e.stderr)
-            }
-        };
-
         debug!("🗑 Deleting Applications");
 
-        let mut child = spawn_command("kubectl delete applications.argoproj.io --all -A", None);
-        utils::sleep(5).await;
-        if run_simple_command("kubectl get applications -A --no-headers")
-            .map(|e| e.stdout.trim().is_empty())
-            .unwrap_or_default()
-        {
-            let _ = child.kill();
+        let _result =
+            run_simple_command("kubectl delete applications.argoproj.io --all -A --timeout 10s")
+                .inspect_err(|e| {
+                    debug!("Error: {}", e.stderr);
+                });
+
+        if verify_no_apps() {
             break;
         }
 
-        utils::sleep(5).await;
-        if run_simple_command("kubectl get applications -A --no-headers")
-            .map(|e| e.stdout.trim().is_empty())
-            .unwrap_or_default()
-        {
-            let _ = child.kill();
-            break;
+        if counter == retry_count {
+            error!(
+                "❌ Failed to delete applications after {} retries",
+                retry_count
+            );
+            return Err("Failed to delete applications".into());
         }
 
-        match child.kill() {
-            Ok(_) => debug!("Timed out. Retrying..."),
-            Err(e) => error!("❌ Failed to delete applications: {}", e),
-        };
+        info!("⚠️ Failed to delete applications. Retrying...");
+        counter += 1;
     }
+
     info!("🧼 Removed applications successfully");
     Ok(())
 }

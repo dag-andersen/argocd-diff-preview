@@ -142,6 +142,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if !opt.keep_cluster_alive {
             cleanup_cluster(opt.local_cluster_tool, &opt.cluster_name);
         }
+        if !opt.debug {
+            error!("👀 Run with '--debug' for more details");
+        } else {
+            info!("If you think this error is caused by a bug, please open an issue on GitHub");
+        }
     })
 }
 
