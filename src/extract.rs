@@ -222,8 +222,67 @@ pub async fn get_resources(
     Ok(())
 }
 
+// List of finalizers that prevent deletion of applications
+static FINALIZERS: [&str; 2] = [
+    "post-delete-finalizer.argocd.argoproj.io",
+    "post-delete-finalizer.argoproj.io/cleanup",
+];
+
+pub fn remove_obstructive_finalizers() -> Result<(), Box<dyn Error>> {
+    let command = "kubectl get applications -A -oyaml";
+    let command_output = run_simple_command(command).map_err(|e| {
+        error!("❌ Failed to get applications: {}", e.stderr);
+        CommandError::new(e)
+    })?;
+    let yaml_output: Value = serde_yaml::from_str(&command_output.stdout).inspect_err(|_| {
+        error!("❌ Failed to parse yaml from command: {}", command);
+    })?;
+
+    let applications = match yaml_output["items"].as_sequence() {
+        None => return Ok(()),
+        Some(apps) => apps,
+    };
+
+    for item in applications {
+        let (name, namespace) = match (
+            item["metadata"]["name"].as_str(),
+            item["metadata"]["namespace"].as_str(),
+        ) {
+            (Some(name), Some(namespace)) => (name, namespace),
+            _ => continue,
+        };
+        let has_finalizers = item["metadata"]["finalizers"]
+            .as_sequence()
+            .and_then(|f| {
+                // check if any of the finalizers are in the list of finalizers to remove
+                f.iter()
+                    .find(|f| FINALIZERS.contains(&f.as_str().unwrap_or_default()))
+            })
+            .is_some();
+
+        if has_finalizers {
+            debug!("Removing finalizers from Application: {}", name);
+            run_simple_command(&format!(
+                    "kubectl patch application.argoproj.io {} --type merge --patch {{\"metadata\":{{\"finalizers\":null}}}} -n {}",
+                    name, namespace
+                ))
+                .map_err(|e| {
+                    error!("❌ Failed to remove finalizers from Application {} with error: {}", name, e.stderr);
+                    CommandError::new(e)
+                })?;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn delete_applications() -> Result<(), Box<dyn Error>> {
     info!("🧼 Removing applications");
+
+    remove_obstructive_finalizers().inspect_err(|_| {
+        error!("❌ Failed to remove delete finalizers from Applications");
+    })?;
+
     loop {
         debug!("🗑 Deleting ApplicationSets");
 
