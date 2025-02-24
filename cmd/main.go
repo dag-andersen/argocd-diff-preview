@@ -100,7 +100,7 @@ func main() {
 
 	// Install Argo CD
 	argocd := argocd.New(opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
-	if err := argocd.Install(opts.Debug); err != nil {
+	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
 		log.Fatalf("Failed to install Argo CD: %v", err)
 	}
 

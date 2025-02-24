@@ -6,7 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
+
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
 )
 
 type ArgoCDInstallation struct {
@@ -46,7 +49,7 @@ func (a *ArgoCDInstallation) createNamespace() error {
 	return nil
 }
 
-func (a *ArgoCDInstallation) Install(debug bool) error {
+func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	log.Printf("🦑 Installing Argo CD Helm Chart version: '%s'", a.Version)
 
 	// Create namespace if it doesn't exist
@@ -54,8 +57,13 @@ func (a *ArgoCDInstallation) Install(debug bool) error {
 		return err
 	}
 
+	// Apply secrets before installing ArgoCD
+	if err := a.applySecrets(secretsFolder); err != nil {
+		return fmt.Errorf("failed to apply secrets: %w", err)
+	}
+
 	// Check for values files
-	values, valuesOverride, err := a.findValuesFiles()
+	valuesFiles, err := a.findValuesFiles()
 	if err != nil {
 		log.Printf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with default configuration", a.ConfigPath)
 	}
@@ -77,11 +85,8 @@ func (a *ArgoCDInstallation) Install(debug bool) error {
 		"install", "argocd", "argo/argo-cd",
 		"-n", a.Namespace,
 	}
-	if values != "" {
-		args = append(args, "-f", values)
-	}
-	if valuesOverride != "" {
-		args = append(args, "-f", valuesOverride)
+	for _, valuesFile := range valuesFiles {
+		args = append(args, "-f", valuesFile)
 	}
 	if a.Version != "" {
 		args = append(args, "--version", a.Version)
@@ -115,23 +120,29 @@ func (a *ArgoCDInstallation) Install(debug bool) error {
 	return nil
 }
 
-func (a *ArgoCDInstallation) findValuesFiles() (string, string, error) {
+func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
+
+	// check if the folder exists
+	if _, err := os.Stat(a.ConfigPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("values folder does not exist: %s", a.ConfigPath)
+	}
+
 	values := fmt.Sprintf("%s/values.yaml", a.ConfigPath)
 	valuesOverride := fmt.Sprintf("%s/values-override.yaml", a.ConfigPath)
 
-	if _, err := exec.Command("test", "-f", values).Output(); err != nil {
-		values = ""
+	valuesFiles := []string{}
+	if _, err := os.Stat(values); err == nil {
+		valuesFiles = append(valuesFiles, values)
 	}
-	if _, err := exec.Command("test", "-f", valuesOverride).Output(); err != nil {
-		valuesOverride = ""
+	if _, err := os.Stat(valuesOverride); err == nil {
+		valuesFiles = append(valuesFiles, valuesOverride)
 	}
 
-	return values, valuesOverride, nil
+	return valuesFiles, nil
 }
 
 func (a *ArgoCDInstallation) runArgocdCommand(args ...string) error {
 	cmd := exec.Command("argocd", args...)
-	// Set ARGOCD_OPTS environment variable
 	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -248,6 +259,41 @@ func (a *ArgoCDInstallation) RefreshApp(appName string) error {
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to refresh app: %w", err)
+	}
+
+	return nil
+}
+
+func (a *ArgoCDInstallation) applySecrets(secretsFolder string) error {
+	// Check if folder exists
+	if _, err := os.Stat(secretsFolder); os.IsNotExist(err) {
+		log.Printf("🤷 No secrets folder found at %s", secretsFolder)
+		return nil
+	}
+
+	// Apply all yaml files in the secrets folder
+	files, err := os.ReadDir(secretsFolder)
+	if err != nil {
+		return fmt.Errorf("failed to read secrets folder: %w", err)
+	}
+
+	secretCount := 0
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		if err := utils.KubectlApply(filepath.Join(secretsFolder, file.Name())); err != nil {
+			return fmt.Errorf("failed to apply secret %s: %w", file.Name(), err)
+		}
+
+		secretCount++
+	}
+
+	if secretCount > 0 {
+		log.Printf("🤫 Applied %d secrets", secretCount)
+	} else {
+		log.Printf("🤷 No secrets found in %s", secretsFolder)
 	}
 
 	return nil

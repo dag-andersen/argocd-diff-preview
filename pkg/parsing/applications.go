@@ -52,7 +52,7 @@ func GetApplicationsForBranches(
 		return nil, nil, err
 	}
 
-	// Find and remove duplicates
+	// Find duplicates
 	var duplicateYaml []*yaml.Node
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
@@ -71,6 +71,14 @@ func GetApplicationsForBranches(
 	// Remove duplicates and log stats
 	baseAppsBefore := len(baseApps)
 	targetAppsBefore := len(targetApps)
+
+	if len(duplicateYaml) == 0 {
+		return baseApps, targetApps, nil
+	}
+
+	// Actually filter out the duplicates using the helper function
+	baseApps = filterDuplicates(baseApps, duplicateYaml)
+	targetApps = filterDuplicates(targetApps, duplicateYaml)
 
 	log.Printf(
 		"🤖 Skipped %d Application[Sets] for branch: '%s' because they have not changed after patching",

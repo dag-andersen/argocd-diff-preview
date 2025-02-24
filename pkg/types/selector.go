@@ -60,10 +60,16 @@ func FromString(s string) (*Selector, error) {
 			Operator: Eq,
 		}
 	case len(equalSingle) == 2:
-		selector = &Selector{
-			Key:      strings.TrimSpace(equalSingle[0]),
-			Value:    strings.TrimSpace(equalSingle[1]),
-			Operator: Eq,
+		// Only use single equals if it's not actually a double equals
+		if !strings.Contains(s, "==") {
+			selector = &Selector{
+				Key:      strings.TrimSpace(equalSingle[0]),
+				Value:    strings.TrimSpace(equalSingle[1]),
+				Operator: Eq,
+			}
+		} else {
+			log.Printf("❌ Invalid label selector format: %s", s)
+			return nil, fmt.Errorf("invalid label selector format")
 		}
 	default:
 		log.Printf("❌ Invalid label selector format: %s", s)
@@ -71,14 +77,21 @@ func FromString(s string) (*Selector, error) {
 	}
 
 	// Validate selector
-	if selector.Key == "" ||
-		strings.Contains(selector.Key, "!") ||
-		strings.Contains(selector.Key, "=") ||
-		selector.Value == "" ||
-		strings.Contains(selector.Value, "!") ||
-		strings.Contains(selector.Value, "=") {
-		log.Printf("❌ Invalid label selector format: %s", s)
-		return nil, fmt.Errorf("invalid label selector format")
+	if selector.Key == "" || selector.Value == "" {
+		log.Printf("❌ Invalid label selector format: empty key or value: %s", s)
+		return nil, fmt.Errorf("invalid label selector format: empty key or value")
+	}
+
+	// Check for invalid characters in key
+	if strings.Contains(selector.Key, "!") || strings.Contains(selector.Key, "=") {
+		log.Printf("❌ Invalid label selector format: key contains invalid characters: %s", s)
+		return nil, fmt.Errorf("invalid label selector format: key contains invalid characters")
+	}
+
+	// Check for invalid characters in value
+	if strings.Contains(selector.Value, "!") || strings.Contains(selector.Value, "=") {
+		log.Printf("❌ Invalid label selector format: value contains invalid characters: %s", s)
+		return nil, fmt.Errorf("invalid label selector format: value contains invalid characters")
 	}
 
 	return selector, nil
