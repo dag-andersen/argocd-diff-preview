@@ -38,6 +38,11 @@ type Options struct {
 	redirectTargetRevisions   string
 }
 
+const (
+	dirMode  = os.ModePerm // 0755 - read/write/execute for owner, read/execute for group and others
+	fileMode = 0644        // 0644 - read/write for owner, read-only for group and others
+)
+
 func main() {
 	opts := parseFlags()
 
@@ -135,20 +140,66 @@ func main() {
 
 	logOptions(opts)
 
+	// Create cluster and install Argo CD
 	if err := provider.CreateCluster(); err != nil {
 		log.Fatalf("Failed to create cluster: %v", err)
 	}
 
-	if !provider.ClusterExists() {
-		log.Fatal("Cluster was not created successfully")
-	}
-
-	log.Printf("🚀 %s cluster is ready!", opts.clusterType)
-
-	// Create and install ArgoCD
 	argocd := argocd.New(opts.argocdNamespace, opts.argocdChartVersion, "")
 	if err := argocd.Install(opts.debug); err != nil {
-		log.Fatalf("Failed to install ArgoCD: %v", err)
+		log.Fatalf("Failed to install Argo CD: %v", err)
+	}
+
+	tempFolder := "temp"
+
+	// Write applications to files
+	if err := os.MkdirAll(tempFolder, dirMode); err != nil {
+		log.Fatalf("Failed to create temp folder: %v", err)
+	}
+
+	// Generate applications from ApplicationSets
+	baseApps, err = parsing.GenerateAppsFromAppSet(
+		argocd,
+		baseApps,
+		baseBranch,
+		opts.repo,
+		tempFolder,
+		redirectRevisions,
+	)
+	if err != nil {
+		log.Fatalf("Failed to generate base apps: %v", err)
+	}
+
+	targetApps, err = parsing.GenerateAppsFromAppSet(
+		argocd,
+		targetApps,
+		targetBranch,
+		opts.repo,
+		tempFolder,
+		redirectRevisions,
+	)
+	if err != nil {
+		log.Fatalf("Failed to generate target apps: %v", err)
+	}
+
+	// Write base apps
+	baseAppsPath := fmt.Sprintf("%s/%s.yaml", tempFolder, baseBranch.FolderName())
+	log.Printf("💾 Writing %d Applications from '%s' to ./%s",
+		len(baseApps), baseBranch.Name, baseAppsPath)
+
+	baseYaml := applicationsToString(baseApps)
+	if err := os.WriteFile(baseAppsPath, []byte(baseYaml), fileMode); err != nil {
+		log.Fatalf("Failed to write base apps: %v", err)
+	}
+
+	// Write target apps
+	targetAppsPath := fmt.Sprintf("%s/%s.yaml", tempFolder, targetBranch.FolderName())
+	log.Printf("💾 Writing %d Applications from '%s' to ./%s",
+		len(targetApps), targetBranch.Name, targetAppsPath)
+
+	targetYaml := applicationsToString(targetApps)
+	if err := os.WriteFile(targetAppsPath, []byte(targetYaml), fileMode); err != nil {
+		log.Fatalf("Failed to write target apps: %v", err)
 	}
 
 	if !opts.keepClusterAlive {
@@ -261,4 +312,20 @@ func logOptions(opts Options) {
 	if opts.ignoreInvalidWatchPattern {
 		log.Println("✨ Ignoring invalid watch patterns Regex on Applications")
 	}
+}
+
+func applicationsToString(apps []types.ArgoResource) string {
+	var yamlStrings []string
+	for _, app := range apps {
+		yamlStr, err := app.AsString()
+		if err != nil {
+			log.Printf("Failed to convert app %s to YAML: %v", app.Name, err)
+			continue
+		}
+		// add a comment with the name of the file
+		yamlStr = fmt.Sprintf("# File: %s\n%s", app.FileName, yamlStr)
+
+		yamlStrings = append(yamlStrings, yamlStr)
+	}
+	return strings.Join(yamlStrings, "---\n")
 }
