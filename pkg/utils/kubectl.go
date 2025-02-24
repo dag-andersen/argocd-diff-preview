@@ -59,7 +59,7 @@ func DeleteApplications() error {
 		if err != nil {
 			return false
 		}
-		return len(strings.TrimSpace(string(output))) == 0
+		return len(strings.TrimSpace(string(output))) == 0 || strings.Contains(string(output), "No resources found")
 	}
 
 	retryCount := 3

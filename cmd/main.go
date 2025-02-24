@@ -140,10 +140,10 @@ func main() {
 
 	logOptions(opts)
 
-	// // Create cluster and install Argo CD
-	// if err := provider.CreateCluster(); err != nil {
-	// 	log.Fatalf("Failed to create cluster: %v", err)
-	// }
+	// Create cluster and install Argo CD
+	if err := provider.CreateCluster(); err != nil {
+		log.Fatalf("Failed to create cluster: %v", err)
+	}
 
 	argocd := argocd.New(opts.argocdNamespace, opts.argocdChartVersion, "")
 	if err := argocd.Install(opts.debug); err != nil {
@@ -155,10 +155,6 @@ func main() {
 	// Write applications to files
 	if err := os.MkdirAll(tempFolder, dirMode); err != nil {
 		log.Fatalf("Failed to create temp folder: %v", err)
-	}
-
-	if err := extract.GetResources(argocd, baseBranch, opts.timeout, opts.outputFolder, tempFolder); err != nil {
-		log.Fatalf("Failed to get resources: %v", err)
 	}
 
 	// Generate applications from ApplicationSets
@@ -216,8 +212,8 @@ func main() {
 	}
 
 	// delete applications
-	if err := utils.DeleteManifest(baseAppsPath); err != nil {
-		log.Fatalf("Failed to delete base apps: %v", err)
+	if err := utils.DeleteApplications(); err != nil {
+		log.Fatalf("Failed to delete applications: %v", err)
 	}
 
 	// apply target apps
@@ -230,16 +226,12 @@ func main() {
 	}
 
 	// Generate diff between base and target branches
-	var diffIgnore *string
-	if opts.diffIgnore != "" {
-		diffIgnore = &opts.diffIgnore
-	}
 
 	if err := diff.GenerateDiff(
 		opts.outputFolder,
 		baseBranch,
 		targetBranch,
-		diffIgnore,
+		&opts.diffIgnore,
 		opts.lineCount,
 		opts.maxDiffLength,
 	); err != nil {
