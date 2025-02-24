@@ -9,6 +9,7 @@ import (
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/diff"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/extract"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/kind"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/minikube"
@@ -85,12 +86,9 @@ func main() {
 		redirectRevisions = strings.Split(opts.redirectTargetRevisions, ",")
 	}
 
-	var baseBranchFolderName = "base-branch"
-	var targetBranchFolderName = "target-branch"
-
 	// Create branches
-	baseBranch := types.NewBranch(opts.baseBranch, baseBranchFolderName, types.Base)
-	targetBranch := types.NewBranch(opts.targetBranch, targetBranchFolderName, types.Target)
+	baseBranch := types.NewBranch(opts.baseBranch, types.Base)
+	targetBranch := types.NewBranch(opts.targetBranch, types.Target)
 
 	// Get applications for both branches
 	baseApps, targetApps, err := parsing.GetApplicationsForBranches(
@@ -229,6 +227,23 @@ func main() {
 
 	if err := extract.GetResources(argocd, targetBranch, opts.timeout, opts.outputFolder, tempFolder); err != nil {
 		log.Fatalf("Failed to get resources: %v", err)
+	}
+
+	// Generate diff between base and target branches
+	var diffIgnore *string
+	if opts.diffIgnore != "" {
+		diffIgnore = &opts.diffIgnore
+	}
+
+	if err := diff.GenerateDiff(
+		opts.outputFolder,
+		baseBranch,
+		targetBranch,
+		diffIgnore,
+		opts.lineCount,
+		opts.maxDiffLength,
+	); err != nil {
+		log.Fatalf("Failed to generate diff: %v", err)
 	}
 
 	if !opts.keepClusterAlive {
