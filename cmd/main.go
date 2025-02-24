@@ -9,10 +9,12 @@ import (
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/extract"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/kind"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/minikube"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/parsing"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
 )
 
 type Options struct {
@@ -87,8 +89,8 @@ func main() {
 	var targetBranchFolderName = "target-branch"
 
 	// Create branches
-	baseBranch := types.NewBranch(opts.baseBranch, baseBranchFolderName)
-	targetBranch := types.NewBranch(opts.targetBranch, targetBranchFolderName)
+	baseBranch := types.NewBranch(opts.baseBranch, baseBranchFolderName, types.Base)
+	targetBranch := types.NewBranch(opts.targetBranch, targetBranchFolderName, types.Target)
 
 	// Get applications for both branches
 	baseApps, targetApps, err := parsing.GetApplicationsForBranches(
@@ -140,10 +142,10 @@ func main() {
 
 	logOptions(opts)
 
-	// Create cluster and install Argo CD
-	if err := provider.CreateCluster(); err != nil {
-		log.Fatalf("Failed to create cluster: %v", err)
-	}
+	// // Create cluster and install Argo CD
+	// if err := provider.CreateCluster(); err != nil {
+	// 	log.Fatalf("Failed to create cluster: %v", err)
+	// }
 
 	argocd := argocd.New(opts.argocdNamespace, opts.argocdChartVersion, "")
 	if err := argocd.Install(opts.debug); err != nil {
@@ -155,6 +157,10 @@ func main() {
 	// Write applications to files
 	if err := os.MkdirAll(tempFolder, dirMode); err != nil {
 		log.Fatalf("Failed to create temp folder: %v", err)
+	}
+
+	if err := extract.GetResources(argocd, baseBranch, opts.timeout, opts.outputFolder, tempFolder); err != nil {
+		log.Fatalf("Failed to get resources: %v", err)
 	}
 
 	// Generate applications from ApplicationSets
@@ -200,6 +206,29 @@ func main() {
 	targetYaml := applicationsToString(targetApps)
 	if err := os.WriteFile(targetAppsPath, []byte(targetYaml), fileMode); err != nil {
 		log.Fatalf("Failed to write target apps: %v", err)
+	}
+
+	// Apply files to cluster with kubectl
+	if err := utils.ApplyManifest(baseAppsPath); err != nil {
+		log.Fatalf("Failed to apply base apps: %v", err)
+	}
+
+	if err := extract.GetResources(argocd, baseBranch, opts.timeout, opts.outputFolder, tempFolder); err != nil {
+		log.Fatalf("Failed to get resources: %v", err)
+	}
+
+	// delete applications
+	if err := utils.DeleteManifest(baseAppsPath); err != nil {
+		log.Fatalf("Failed to delete base apps: %v", err)
+	}
+
+	// apply target apps
+	if err := utils.ApplyManifest(targetAppsPath); err != nil {
+		log.Fatalf("Failed to apply target apps: %v", err)
+	}
+
+	if err := extract.GetResources(argocd, targetBranch, opts.timeout, opts.outputFolder, tempFolder); err != nil {
+		log.Fatalf("Failed to get resources: %v", err)
 	}
 
 	if !opts.keepClusterAlive {
