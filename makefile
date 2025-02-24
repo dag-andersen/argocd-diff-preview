@@ -28,6 +28,21 @@ run-with-cargo: pull-repository
 		--files-changed="$(files_changed)" \
 		--redirect-target-revisions="HEAD"
 
+run-with-go:
+	go run cmd/main.go \
+		--base-branch="$(base_branch)" \
+		--target-branch="$(target_branch)" \
+		--repo="$(github_org)/$(gitops_repo)" \
+		--debug \
+		--keep-cluster-alive \
+		--file-regex="$(regex)" \
+		--diff-ignore="$(diff_ignore)" \
+		--timeout=$(timeout) \
+		--selector="$(selector)" \
+		--argocd-namespace="$(argocd_namespace)" \
+		--files-changed="$(files_changed)" \
+		--redirect-target-revisions="HEAD"
+
 run-with-docker: pull-repository docker-build
 	docker run \
 		--network=host \
