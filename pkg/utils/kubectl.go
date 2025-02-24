@@ -8,30 +8,30 @@ import (
 	"time"
 )
 
-// ApplyManifest applies a Kubernetes manifest file using kubectl
-func ApplyManifest(filePath string) error {
-	log.Printf("🚀 Applying manifest: %s", filePath)
+// KubectlApply applies a Kubernetes manifest file using kubectl
+func KubectlApply(path string) error {
+	log.Printf("🚀 Applying manifest: %s", path)
 
 	// Try to apply the manifest multiple times in case of temporary failures
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
-		cmd := exec.Command("kubectl", "apply", "-f", filePath)
+		cmd := exec.Command("kubectl", "apply", "-f", path)
 		output, err := cmd.CombinedOutput()
 
 		if err == nil {
-			log.Printf("✅ Successfully applied manifest: %s", filePath)
+			log.Printf("✅ Successfully applied manifest: %s", path)
 			return nil
 		}
 
 		log.Printf("⚠️ Failed to apply manifest (attempt %d/%d): %s\nError: %s",
-			i+1, maxRetries, filePath, string(output))
+			i+1, maxRetries, path, string(output))
 
 		if i < maxRetries-1 {
 			time.Sleep(2 * time.Second)
 		}
 	}
 
-	return fmt.Errorf("failed to apply manifest after %d attempts: %s", maxRetries, filePath)
+	return fmt.Errorf("failed to apply manifest after %d attempts: %s", maxRetries, path)
 }
 
 // DeleteManifest deletes a Kubernetes manifest file using kubectl

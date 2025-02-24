@@ -49,7 +49,7 @@ func GetResourcesFromBothBranches(
 ) error {
 	// Apply files to cluster with kubectl
 	baseAppsPath := fmt.Sprintf("%s/%s.yaml", inputFolder, baseBranch.FolderName())
-	if err := utils.ApplyManifest(baseAppsPath); err != nil {
+	if err := utils.KubectlApply(baseAppsPath); err != nil {
 		return fmt.Errorf("failed to apply base apps: %w", err)
 	}
 
@@ -64,7 +64,7 @@ func GetResourcesFromBothBranches(
 
 	// apply target apps
 	targetAppsPath := fmt.Sprintf("%s/%s.yaml", inputFolder, targetBranch.FolderName())
-	if err := utils.ApplyManifest(targetAppsPath); err != nil {
+	if err := utils.KubectlApply(targetAppsPath); err != nil {
 		return fmt.Errorf("failed to apply target apps: %w", err)
 	}
 
