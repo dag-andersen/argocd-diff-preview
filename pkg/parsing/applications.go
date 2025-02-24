@@ -3,8 +3,11 @@ package parsing
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
+	"time"
 
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"gopkg.in/yaml.v3"
 )
@@ -69,9 +72,6 @@ func GetApplicationsForBranches(
 	baseAppsBefore := len(baseApps)
 	targetAppsBefore := len(targetApps)
 
-	baseApps = filterDuplicates(baseApps, duplicateYaml)
-	targetApps = filterDuplicates(targetApps, duplicateYaml)
-
 	log.Printf(
 		"🤖 Skipped %d Application[Sets] for branch: '%s' because they have not changed after patching",
 		baseAppsBefore-len(baseApps),
@@ -111,13 +111,9 @@ func GetApplications(
 	redirectRevisions []string,
 ) ([]types.ArgoResource, error) {
 	yamlFiles := GetYamlFiles(branch.FolderName(), regex)
-
-	// print number of files found
 	log.Printf("🤖 Found %d files", len(yamlFiles))
 
 	k8sResources := ParseYaml(branch.FolderName(), yamlFiles)
-
-	// print number of k8sResources found
 	log.Printf("🤖 Found %d k8sResources", len(k8sResources))
 
 	applications := FromResourceToApplication(
@@ -127,25 +123,23 @@ func GetApplications(
 		ignoreInvalidWatchPattern,
 	)
 
-	if len(applications) > 0 {
-		log.Printf("🤖 Patching Application[Sets] for branch: %s", branch.Name)
-		apps, err := PatchApplications(
-			argocdNamespace,
-			applications,
-			branch,
-			repo,
-			redirectRevisions,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to patch applications: %w", err)
-		}
+	applications, err := PatchApplications(
+		argocdNamespace,
+		applications,
+		branch,
+		repo,
+		redirectRevisions,
+	)
+	if err != nil {
+		return nil, err
+	}
 
+	if len(applications) > 0 {
 		log.Printf(
-			"🤖 Patching %d Argo CD Application[Sets] for branch: %s",
-			len(apps),
+			"🤖 Processing %d Argo CD Application[Sets] for branch: %s",
+			len(applications),
 			branch.Name,
 		)
-		return apps, nil
 	}
 
 	return applications, nil
@@ -271,13 +265,20 @@ func PatchApplication(
 	app = app.SetNamespace(argocdNamespace)
 
 	var err error
-	app, err = app.RemoveSyncPolicy()
+	appAfterRemoveSyncPolicy, err := app.RemoveSyncPolicy()
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
 	}
 
-	app, err = app.SetProjectToDefault()
+	// compare yaml of app and appAfterRemoveSyncPolicy
+	if !yamlEqual(app.Yaml, appAfterRemoveSyncPolicy.Yaml) {
+		log.Printf("❌ YAML of app and appAfterRemoveSyncPolicy are not equal")
+	} else {
+		log.Printf("✅ YAML of app and appAfterRemoveSyncPolicy are equal")
+	}
+
+	app, err = appAfterRemoveSyncPolicy.SetProjectToDefault()
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to set project to default: %w", err)
@@ -289,13 +290,20 @@ func PatchApplication(
 		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
 	}
 
-	app, err = app.RedirectSources(repo, branch.Name, redirectRevisions)
+	appAfterRedirectSources, err := app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to redirect sources: %w", err)
 	}
 
-	app, err = app.RedirectGenerators(repo, branch.Name, redirectRevisions)
+	// compare yaml of app and appAfterRedirectSources
+	if !yamlEqual(app.Yaml, appAfterRedirectSources.Yaml) {
+		log.Printf("❌ YAML of app and appAfterRedirectSources are not equal")
+	} else {
+		log.Printf("✅ YAML of app and appAfterRedirectSources are equal")
+	}
+
+	app, err = appAfterRedirectSources.RedirectGenerators(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to redirect generators: %w", err)
@@ -329,4 +337,130 @@ func PatchApplications(
 	}
 
 	return patchedApps, nil
+}
+
+// GenerateAppsFromAppSet generates Applications from ApplicationSets
+func GenerateAppsFromAppSet(
+	argocd *argocd.ArgoCDInstallation,
+	appSets []types.ArgoResource,
+	branch *types.Branch,
+	repo string,
+	tempFolder string,
+	redirectRevisions []string,
+) ([]types.ArgoResource, error) {
+	var appsNew []types.ArgoResource
+	appSetCounter := 0
+	generatedAppsCounter := 0
+
+	log.Printf("🤖 Generating Applications from ApplicationSets for branch: %s", branch.Name)
+
+	for _, appSet := range appSets {
+		// Skip non-ApplicationSets
+		if appSet.Kind != types.ApplicationSet {
+			appsNew = append(appsNew, appSet)
+			continue
+		}
+
+		appSetCounter++
+
+		// Generate random filename for the patched ApplicationSet
+		randomFileName := fmt.Sprintf("%s/%s-%d.yaml",
+			tempFolder,
+			appSet.Name,
+			time.Now().UnixNano(),
+		)
+
+		// Write patched ApplicationSet to file
+		yamlStr, err := appSet.AsString()
+		if err != nil {
+			log.Printf("❌ Failed to convert ApplicationSet to YAML: %v", err)
+			continue
+		}
+
+		if err := os.WriteFile(randomFileName, []byte(yamlStr), 0644); err != nil {
+			log.Printf("❌ Failed to write ApplicationSet to file: %v", err)
+			continue
+		}
+		defer os.Remove(randomFileName)
+
+		// Generate applications using argocd appset generate
+		output, err := argocd.AppsetGenerate(randomFileName)
+		if err != nil {
+			log.Printf("❌ Failed to generate applications from ApplicationSet %s: %v", appSet.Name, err)
+			continue
+		}
+
+		// check if is list of applications
+		isList := strings.HasPrefix(output, "-")
+
+		var yamlData []yaml.Node
+		if isList {
+			var yamlOutput []yaml.Node
+			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err == nil {
+				yamlData = yamlOutput
+			}
+		} else {
+			var yamlOutput yaml.Node
+			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err == nil {
+				yamlData = []yaml.Node{yamlOutput}
+			}
+		}
+
+		if len(yamlData) == 0 {
+			log.Printf("❌ No applications found in ApplicationSet %s", appSet.Name)
+			continue
+		}
+
+		// Convert each document to ArgoResource
+		for _, doc := range yamlData {
+			kind := types.GetYamlValue(&doc, []string{"kind"})
+			if kind == nil || kind.Value != "Application" {
+				continue
+			}
+
+			name := types.GetYamlValue(&doc, []string{"metadata", "name"})
+			if name == nil {
+				continue
+			}
+
+			app := types.ArgoResource{
+				Yaml:     &doc,
+				Kind:     types.Application,
+				Name:     name.Value,
+				FileName: appSet.FileName,
+			}
+
+			patchedApp, err := PatchApplication(
+				argocd.Namespace,
+				app,
+				branch,
+				repo,
+				redirectRevisions,
+			)
+			if err != nil {
+				log.Printf("❌ Failed to patch application: %s", name.Value)
+				continue
+			}
+
+			generatedAppsCounter++
+			appsNew = append(appsNew, *patchedApp)
+		}
+
+		log.Printf(
+			"Generated %d Applications from ApplicationSet in file: %s",
+			generatedAppsCounter,
+			appSet.FileName,
+		)
+	}
+
+	if appSetCounter > 0 {
+		log.Printf(
+			"🤖 Generated %d applications from %d ApplicationSets for branch: %s",
+			generatedAppsCounter, appSetCounter, branch.Name,
+		)
+	} else {
+		log.Printf("🤖 No ApplicationSets found for branch: %s", branch.Name)
+	}
+
+	return appsNew, nil
 }

@@ -64,7 +64,7 @@ func (a *ArgoResource) SetProjectToDefault() (*ArgoResource, error) {
 		return nil, fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
 	}
 
-	project := getYamlValue(spec, []string{"project"})
+	project := GetYamlValue(spec, []string{"project"})
 	if project == nil {
 		return nil, fmt.Errorf("no 'spec.project' key found in Application: %s (file: %s)",
 			a.Name, a.FileName)
@@ -81,7 +81,7 @@ func (a *ArgoResource) PointDestinationToInCluster() (*ArgoResource, error) {
 		return nil, fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
 	}
 
-	dest := getYamlValue(spec, []string{"destination"})
+	dest := GetYamlValue(spec, []string{"destination"})
 	if dest == nil {
 		return nil, fmt.Errorf("no 'spec.destination' key found in Application: %s (file: %s)",
 			a.Name, a.FileName)
@@ -106,18 +106,7 @@ func (a *ArgoResource) RemoveSyncPolicy() (*ArgoResource, error) {
 		return a, nil
 	}
 
-	// Debug logging
-	log.Printf("YAML Content length: %d for file: %s", len(a.Yaml.Content), a.FileName)
-	log.Printf("YAML Kind: %v", a.Yaml.Kind)
-
-	// Print the first level keys
-	for i := 0; i < len(a.Yaml.Content); i += 2 {
-		if i+1 < len(a.Yaml.Content) {
-			log.Printf("Key at %d: %s", i/2, a.Yaml.Content[i].Value)
-		}
-	}
-
-	spec := getYamlValue(a.Yaml, []string{"spec"})
+	spec := GetYamlValue(a.Yaml, []string{"spec"})
 	if spec == nil {
 		log.Printf("Can't remove 'syncPolicy' because 'spec' key not found in file: %s",
 			a.FileName)
@@ -136,7 +125,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 	}
 
 	// Handle single source
-	source := getYamlValue(spec, []string{"source"})
+	source := GetYamlValue(spec, []string{"source"})
 	if source != nil {
 		if err := a.redirectSource(source, repo, branch, redirectRevisions); err != nil {
 			return nil, err
@@ -145,7 +134,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 	}
 
 	// Handle multiple sources
-	sources := getYamlValue(spec, []string{"sources"})
+	sources := GetYamlValue(spec, []string{"sources"})
 	if sources != nil {
 		for _, src := range sources.Content {
 			if err := a.redirectSource(src, repo, branch, redirectRevisions); err != nil {
@@ -171,7 +160,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		return nil, fmt.Errorf("no 'spec' key found in ApplicationSet: %s", a.Name)
 	}
 
-	generators := getYamlValue(spec, []string{"generators"})
+	generators := GetYamlValue(spec, []string{"generators"})
 	if generators == nil {
 		return a, nil
 	}
@@ -183,19 +172,19 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		}
 
 		// Look for git generator
-		gitGen := getYamlValue(generator, []string{"git"})
+		gitGen := GetYamlValue(generator, []string{"git"})
 		if gitGen == nil {
 			continue
 		}
 
 		// Check repoURL
-		repoURL := getYamlValue(gitGen, []string{"repoURL"})
+		repoURL := GetYamlValue(gitGen, []string{"repoURL"})
 		if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
 			continue
 		}
 
 		// Check targetRevision
-		targetRevision := getYamlValue(gitGen, []string{"targetRevision"})
+		targetRevision := GetYamlValue(gitGen, []string{"targetRevision"})
 		if targetRevision == nil {
 			continue
 		}
@@ -223,18 +212,18 @@ func (a *ArgoResource) Filter(
 ) *ArgoResource {
 	// Check selectors
 	if len(selectors) > 0 {
-		metadata := getYamlValue(a.Yaml, []string{"metadata"})
+		metadata := GetYamlValue(a.Yaml, []string{"metadata"})
 		if metadata == nil {
 			return nil
 		}
 
-		labels := getYamlValue(metadata, []string{"labels"})
+		labels := GetYamlValue(metadata, []string{"labels"})
 		if labels == nil {
 			return nil
 		}
 
 		for _, selector := range selectors {
-			labelValue := getYamlValue(labels, []string{selector.Key})
+			labelValue := GetYamlValue(labels, []string{selector.Key})
 			if labelValue == nil {
 				return nil
 			}
@@ -248,17 +237,17 @@ func (a *ArgoResource) Filter(
 
 	// Check files changed
 	if len(filesChanged) > 0 {
-		metadata := getYamlValue(a.Yaml, []string{"metadata"})
+		metadata := GetYamlValue(a.Yaml, []string{"metadata"})
 		if metadata == nil {
 			return nil
 		}
 
-		annotations := getYamlValue(metadata, []string{"annotations"})
+		annotations := GetYamlValue(metadata, []string{"annotations"})
 		if annotations == nil {
 			return nil
 		}
 
-		watchPattern := getYamlValue(annotations, []string{AnnotationWatchPattern})
+		watchPattern := GetYamlValue(annotations, []string{AnnotationWatchPattern})
 		if watchPattern == nil {
 			return nil
 		}
@@ -294,27 +283,28 @@ func (a *ArgoResource) Filter(
 func (a *ArgoResource) getSpec() *yaml.Node {
 	switch a.Kind {
 	case Application:
-		return getYamlValue(a.Yaml, []string{"spec"})
+		return GetYamlValue(a.Yaml, []string{"spec"})
 	case ApplicationSet:
-		return getYamlValue(a.Yaml, []string{"spec", "template", "spec"})
+		return GetYamlValue(a.Yaml, []string{"spec", "template", "spec"})
 	default:
 		return nil
 	}
 }
 
 func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, redirectRevisions []string) error {
-	// Skip if it's a helm chart
-	if getYamlValue(source, []string{"chart"}) != nil {
+
+	if GetYamlValue(source, []string{"chart"}) != nil {
+		log.Printf("Found helm chart in file: %s", a.FileName)
 		return nil
 	}
 
-	repoURL := getYamlValue(source, []string{"repoURL"})
+	repoURL := GetYamlValue(source, []string{"repoURL"})
 	if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
 		log.Printf("Found no 'repoURL' under spec.source in file: %s", a.FileName)
 		return nil
 	}
 
-	targetRev := getYamlValue(source, []string{"targetRevision"})
+	targetRev := GetYamlValue(source, []string{"targetRevision"})
 	if targetRev == nil {
 		targetRev = &yaml.Node{Value: "HEAD"}
 	}
@@ -323,14 +313,15 @@ func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, re
 		contains(redirectRevisions, targetRev.Value)
 
 	if shouldRedirect {
+		log.Printf("Redirecting targetRevision from %s to %s in file: %s", targetRev.Value, branch, a.FileName)
 		setYamlValue(source, []string{"targetRevision"}, branch)
 	}
 
 	return nil
 }
 
-// Helper functions for YAML manipulation
-func getYamlValue(node *yaml.Node, path []string) *yaml.Node {
+// GetYamlValue gets a value from a YAML node by path
+func GetYamlValue(node *yaml.Node, path []string) *yaml.Node {
 	if node == nil || len(path) == 0 {
 		return node
 	}
@@ -344,7 +335,7 @@ func getYamlValue(node *yaml.Node, path []string) *yaml.Node {
 			if len(path) == 1 {
 				return node.Content[i+1]
 			}
-			return getYamlValue(node.Content[i+1], path[1:])
+			return GetYamlValue(node.Content[i+1], path[1:])
 		}
 	}
 	return nil
@@ -416,7 +407,7 @@ func FromK8sResource(resource *K8sResource) *ArgoResource {
 		return nil
 	}
 
-	kind := getYamlValue(resource.Yaml.Content[0], []string{"kind"})
+	kind := GetYamlValue(resource.Yaml.Content[0], []string{"kind"})
 	if kind == nil {
 		log.Printf("⚠️ No 'kind' field found in file: %s", resource.FileName)
 		return nil
@@ -433,7 +424,7 @@ func FromK8sResource(resource *K8sResource) *ArgoResource {
 		return nil
 	}
 
-	name := getYamlValue(resource.Yaml.Content[0], []string{"metadata", "name"})
+	name := GetYamlValue(resource.Yaml.Content[0], []string{"metadata", "name"})
 	if name == nil {
 		log.Printf("⚠️ No 'metadata.name' field found in file: %s", resource.FileName)
 		return nil
