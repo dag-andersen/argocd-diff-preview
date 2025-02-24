@@ -34,6 +34,7 @@ var timeoutMessages = []string{
 	"Could not resolve host: github.com",
 	":8081: connect: connection refused",
 	"Temporary failure in name resolution",
+	"=git-upload-pack",
 }
 
 // GetResources extracts resources from Argo CD for a specific branch

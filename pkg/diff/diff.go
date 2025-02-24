@@ -1,8 +1,10 @@
 package diff
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"os/exec"
 	"strings"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
@@ -53,14 +55,9 @@ func GenerateDiff(
 	// Get summary diff
 	summaryDiffCmd := fmt.Sprintf("git --no-pager diff --compact-summary --no-index %s %s/%s %s/%s",
 		patternsToIgnore, outputFolder, baseBranch.Type(), outputFolder, targetBranch.Type())
-
-	log.Printf("Getting summary diff with command: %s", summaryDiffCmd)
-	summaryOutput, err := utils.RunCommand(summaryDiffCmd)
+	summaryOutput, err := gitDiffOutputCommand(summaryDiffCmd)
 	if err != nil {
-		if !strings.Contains(err.Error(), "exit status 1") {
-			return fmt.Errorf("failed to get summary diff: %w", err)
-		}
-		summaryOutput = err.Error()
+		return fmt.Errorf("failed to get summary diff: %w", err)
 	}
 
 	summaryAsString := parseDiffOutput(summaryOutput)
@@ -72,14 +69,9 @@ func GenerateDiff(
 
 	diffCmd := fmt.Sprintf("git --no-pager diff --no-prefix -U%d --no-index %s %s/%s %s/%s",
 		lineCount, patternsToIgnore, outputFolder, baseBranch.Type(), outputFolder, targetBranch.Type())
-
-	log.Printf("Getting diff with command: %s", diffCmd)
-	diffOutput, err := utils.RunCommand(diffCmd)
+	diffOutput, err := gitDiffOutputCommand(diffCmd)
 	if err != nil {
-		if !strings.Contains(err.Error(), "exit status 1") {
-			return fmt.Errorf("failed to get detailed diff: %w", err)
-		}
-		diffOutput = err.Error()
+		return fmt.Errorf("failed to get detailed diff: %w", err)
 	}
 
 	diffAsString := parseDiffOutput(diffOutput)
@@ -111,6 +103,26 @@ func GenerateDiff(
 
 	log.Printf("🙏 Please check the %s file for differences", markdownPath)
 	return nil
+}
+
+// Git diff command that gets the error output of a command
+func gitDiffOutputCommand(cmd string) (string, error) {
+	log.Printf("Getting summary diff with command: %s", cmd)
+	command := exec.Command("sh", "-c", cmd)
+	log.Printf("Getting summary diff with command: %s", command.String())
+	var stderr bytes.Buffer
+	var stdout bytes.Buffer
+	command.Stderr = &stderr
+	command.Stdout = &stdout
+	err := command.Run()
+	if err != nil && strings.TrimSpace(stderr.String()) != "" {
+		return "", fmt.Errorf("command failed: %s", stderr.String())
+	}
+	s := strings.TrimSpace(stdout.String())
+	if s == "" {
+		return "No changes found", nil
+	}
+	return s, nil
 }
 
 func markdownTemplateLength() int {
