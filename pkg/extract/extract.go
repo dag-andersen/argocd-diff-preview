@@ -37,13 +37,50 @@ var timeoutMessages = []string{
 	"=git-upload-pack",
 }
 
-// GetResources extracts resources from Argo CD for a specific branch
-func GetResources(
+// GetResourcesFromBothBranches extracts resources from both base and target branches
+// by applying their manifests to the cluster and capturing the resulting resources
+func GetResourcesFromBothBranches(
+	argocd *argocd.ArgoCDInstallation,
+	baseBranch *types.Branch,
+	targetBranch *types.Branch,
+	timeout uint64,
+	inputFolder string,
+	outputFolder string,
+) error {
+	// Apply files to cluster with kubectl
+	baseAppsPath := fmt.Sprintf("%s/%s.yaml", inputFolder, baseBranch.FolderName())
+	if err := utils.ApplyManifest(baseAppsPath); err != nil {
+		return fmt.Errorf("failed to apply base apps: %w", err)
+	}
+
+	if err := extractResourcesFromCluster(argocd, baseBranch, timeout, outputFolder); err != nil {
+		return fmt.Errorf("failed to get resources: %w", err)
+	}
+
+	// delete applications
+	if err := utils.DeleteApplications(); err != nil {
+		return fmt.Errorf("failed to delete applications: %w", err)
+	}
+
+	// apply target apps
+	targetAppsPath := fmt.Sprintf("%s/%s.yaml", inputFolder, targetBranch.FolderName())
+	if err := utils.ApplyManifest(targetAppsPath); err != nil {
+		return fmt.Errorf("failed to apply target apps: %w", err)
+	}
+
+	if err := extractResourcesFromCluster(argocd, targetBranch, timeout, outputFolder); err != nil {
+		return fmt.Errorf("failed to get resources: %w", err)
+	}
+
+	return nil
+}
+
+// extractResourcesFromCluster extracts resources from Argo CD for a specific branch
+func extractResourcesFromCluster(
 	argocd *argocd.ArgoCDInstallation,
 	branch *types.Branch,
 	timeout uint64,
 	outputFolder string,
-	inputFolder string,
 ) error {
 	log.Printf("🌚 Getting resources from %s-branch", branch.FolderName())
 
