@@ -328,8 +328,8 @@ func PatchApplications(
 	return patchedApps, nil
 }
 
-// GenerateAppsFromAppSet generates Applications from ApplicationSets
-func GenerateAppsFromAppSet(
+// ConvertAppSetsToApps generates Applications from ApplicationSets
+func ConvertAppSetsToApps(
 	argocd *argocd.ArgoCDInstallation,
 	appSets []types.ArgoResource,
 	branch *types.Branch,

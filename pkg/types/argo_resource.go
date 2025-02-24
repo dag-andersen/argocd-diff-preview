@@ -467,3 +467,19 @@ func FromK8sResource(resource *K8sResource) *ArgoResource {
 		FileName: resource.FileName,
 	}
 }
+
+func ApplicationsToString(apps []ArgoResource) string {
+	var yamlStrings []string
+	for _, app := range apps {
+		yamlStr, err := app.AsString()
+		if err != nil {
+			log.Printf("Failed to convert app %s to YAML: %v", app.Name, err)
+			continue
+		}
+		// add a comment with the name of the file
+		yamlStr = fmt.Sprintf("# File: %s\n%s", app.FileName, yamlStr)
+
+		yamlStrings = append(yamlStrings, yamlStr)
+	}
+	return strings.Join(yamlStrings, "---\n")
+}
