@@ -52,85 +52,85 @@ func (a *ArgoResource) AsString() (string, error) {
 }
 
 // SetNamespace sets the namespace of the resource
-func (a *ArgoResource) SetNamespace(namespace string) *ArgoResource {
+func (a *ArgoResource) SetNamespace(namespace string) error {
 	setYamlValue(a.Yaml, []string{"metadata", "namespace"}, namespace)
-	return a
+	return nil
 }
 
 // SetProjectToDefault sets the project to "default"
-func (a *ArgoResource) SetProjectToDefault() (*ArgoResource, error) {
+func (a *ArgoResource) SetProjectToDefault() error {
 	spec := a.getSpec()
 	if spec == nil {
-		return nil, fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
+		return fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
 	}
 
 	project := GetYamlValue(spec, []string{"project"})
 	if project == nil {
-		return nil, fmt.Errorf("no 'spec.project' key found in Application: %s (file: %s)",
+		return fmt.Errorf("no 'spec.project' key found in Application: %s (file: %s)",
 			a.Name, a.FileName)
 	}
 
 	setYamlValue(spec, []string{"project"}, "default")
-	return a, nil
+	return nil
 }
 
 // PointDestinationToInCluster updates the destination to point to the in-cluster service
-func (a *ArgoResource) PointDestinationToInCluster() (*ArgoResource, error) {
+func (a *ArgoResource) PointDestinationToInCluster() error {
 	spec := a.getSpec()
 	if spec == nil {
-		return nil, fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
+		return fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
 	}
 
 	dest := GetYamlValue(spec, []string{"destination"})
 	if dest == nil {
-		return nil, fmt.Errorf("no 'spec.destination' key found in Application: %s (file: %s)",
+		return fmt.Errorf("no 'spec.destination' key found in Application: %s (file: %s)",
 			a.Name, a.FileName)
 	}
 
 	setYamlValue(dest, []string{"name"}, "in-cluster")
 	removeYamlValue(dest, []string{"server"})
-	return a, nil
+	return nil
 }
 
 // RemoveSyncPolicy removes the syncPolicy from the resource
-func (a *ArgoResource) RemoveSyncPolicy() (*ArgoResource, error) {
+func (a *ArgoResource) RemoveSyncPolicy() error {
 	if a.Yaml == nil {
 		log.Printf("Can't remove 'syncPolicy' because YAML is nil in file: %s",
 			a.FileName)
-		return a, nil
+		return nil
 	}
 
 	if a.Yaml.Content == nil {
 		log.Printf("Can't remove 'syncPolicy' because YAML content is nil in file: %s",
 			a.FileName)
-		return a, nil
+		return nil
 	}
 
 	spec := GetYamlValue(a.Yaml, []string{"spec"})
 	if spec == nil {
 		log.Printf("Can't remove 'syncPolicy' because 'spec' key not found in file: %s",
 			a.FileName)
-		return a, nil
+		return nil
 	}
 
 	removeYamlValue(spec, []string{"syncPolicy"})
-	return a, nil
+	return nil
 }
 
 // RedirectSources updates the source/sources targetRevision to point to the specified branch
-func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) (*ArgoResource, error) {
+func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) error {
 	spec := a.getSpec()
 	if spec == nil {
-		return nil, fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
+		return fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
 	}
 
 	// Handle single source
 	source := GetYamlValue(spec, []string{"source"})
 	if source != nil {
 		if err := a.redirectSource(source, repo, branch, redirectRevisions); err != nil {
-			return nil, err
+			return err
 		}
-		return a, nil
+		return nil
 	}
 
 	// Handle multiple sources
@@ -138,31 +138,31 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 	if sources != nil {
 		for _, src := range sources.Content {
 			if err := a.redirectSource(src, repo, branch, redirectRevisions); err != nil {
-				return nil, err
+				return err
 			}
 		}
-		return a, nil
+		return nil
 	}
 
-	return nil, fmt.Errorf("no 'spec.source' or 'spec.sources' key found in Application: %s",
+	return fmt.Errorf("no 'spec.source' or 'spec.sources' key found in Application: %s",
 		a.Name)
 }
 
 // RedirectGenerators updates the git generator targetRevision to point to the specified branch
-func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions []string) (*ArgoResource, error) {
+func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions []string) error {
 	// Only process ApplicationSets
 	if a.Kind != ApplicationSet {
-		return a, nil
+		return nil
 	}
 
 	spec := a.getSpec()
 	if spec == nil {
-		return nil, fmt.Errorf("no 'spec' key found in ApplicationSet: %s", a.Name)
+		return fmt.Errorf("no 'spec' key found in ApplicationSet: %s", a.Name)
 	}
 
 	generators := GetYamlValue(spec, []string{"generators"})
 	if generators == nil {
-		return a, nil
+		return nil
 	}
 
 	// Process each generator
@@ -201,7 +201,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		}
 	}
 
-	return a, nil
+	return nil
 }
 
 // Filter checks if the application matches the given selectors and watches the given files
@@ -306,7 +306,9 @@ func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, re
 
 	targetRev := GetYamlValue(source, []string{"targetRevision"})
 	if targetRev == nil {
+		log.Printf("Found no 'targetRevision' under spec.source in file: %s", a.FileName)
 		targetRev = &yaml.Node{Value: "HEAD"}
+		setYamlValue(source, []string{"targetRevision"}, "HEAD")
 	}
 
 	shouldRedirect := len(redirectRevisions) == 0 ||
@@ -343,22 +345,50 @@ func GetYamlValue(node *yaml.Node, path []string) *yaml.Node {
 
 func setYamlValue(node *yaml.Node, path []string, value string) {
 	if node == nil || len(path) == 0 {
+		log.Printf("Can't set value because node is nil or path is empty")
 		return
 	}
 
 	if node.Kind != yaml.MappingNode {
+		log.Printf("Can't set value because node is not a mapping node")
 		return
 	}
 
 	for i := 0; i < len(node.Content); i += 2 {
 		if node.Content[i].Value == path[0] {
 			if len(path) == 1 {
-				node.Content[i+1].Value = value
+				// Create new node if it doesn't exist
+				if node.Content[i+1] == nil {
+					node.Content[i+1] = &yaml.Node{
+						Kind:  yaml.ScalarNode,
+						Value: value,
+					}
+				} else {
+					// Update existing node
+					node.Content[i+1].Kind = yaml.ScalarNode
+					node.Content[i+1].Value = value
+					node.Content[i+1].Tag = "!!str"
+				}
 				return
 			}
 			setYamlValue(node.Content[i+1], path[1:], value)
 			return
 		}
+	}
+
+	// Key not found, create new key-value pair
+	if len(path) == 1 {
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: path[0]},
+			&yaml.Node{Kind: yaml.ScalarNode, Value: value},
+		)
+	} else {
+		newMap := &yaml.Node{Kind: yaml.MappingNode}
+		node.Content = append(node.Content,
+			&yaml.Node{Kind: yaml.ScalarNode, Value: path[0]},
+			newMap,
+		)
+		setYamlValue(newMap, path[1:], value)
 	}
 }
 

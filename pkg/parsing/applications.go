@@ -262,48 +262,37 @@ func PatchApplication(
 
 	// Chain the modifications
 	app := &application
-	app = app.SetNamespace(argocdNamespace)
+	err := app.SetNamespace(argocdNamespace)
+	if err != nil {
+		log.Printf("❌ Failed to patch application: %s", appName)
+		return nil, fmt.Errorf("failed to set namespace: %w", err)
+	}
 
-	var err error
-	appAfterRemoveSyncPolicy, err := app.RemoveSyncPolicy()
+	err = app.RemoveSyncPolicy()
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
 	}
 
-	// compare yaml of app and appAfterRemoveSyncPolicy
-	if !yamlEqual(app.Yaml, appAfterRemoveSyncPolicy.Yaml) {
-		log.Printf("❌ YAML of app and appAfterRemoveSyncPolicy are not equal")
-	} else {
-		log.Printf("✅ YAML of app and appAfterRemoveSyncPolicy are equal")
-	}
-
-	app, err = appAfterRemoveSyncPolicy.SetProjectToDefault()
+	err = app.SetProjectToDefault()
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to set project to default: %w", err)
 	}
 
-	app, err = app.PointDestinationToInCluster()
+	err = app.PointDestinationToInCluster()
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
 	}
 
-	appAfterRedirectSources, err := app.RedirectSources(repo, branch.Name, redirectRevisions)
+	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to redirect sources: %w", err)
 	}
 
-	// compare yaml of app and appAfterRedirectSources
-	if !yamlEqual(app.Yaml, appAfterRedirectSources.Yaml) {
-		log.Printf("❌ YAML of app and appAfterRedirectSources are not equal")
-	} else {
-		log.Printf("✅ YAML of app and appAfterRedirectSources are equal")
-	}
-
-	app, err = appAfterRedirectSources.RedirectGenerators(repo, branch.Name, redirectRevisions)
+	err = app.RedirectGenerators(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Printf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to redirect generators: %w", err)
