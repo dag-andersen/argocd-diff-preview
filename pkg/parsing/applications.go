@@ -413,12 +413,17 @@ func ConvertAppSetsToApps(
 			continue
 		}
 
-		// check if is list of applications
+		// check if output is empty / null
+		if strings.TrimSpace(output) == "" || strings.TrimSpace(output) == "null" {
+			log.Warn().Str("branch", branch.Name).Str("file", appSet.FileName).Msgf("⚠️ ApplicationSet %s generated empty output", appSet.Name)
+			continue
+		}
+
+		// check if output is list of applications
 		isList := strings.HasPrefix(output, "-")
 
 		var yamlData []yaml.Node
 		if isList {
-			log.Debug().Str("file", appSet.FileName).Msgf("is list")
 			var yamlOutput []yaml.Node
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
 				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
@@ -426,7 +431,6 @@ func ConvertAppSetsToApps(
 			}
 			yamlData = yamlOutput
 		} else {
-			log.Debug().Str("file", appSet.FileName).Msgf("is not list")
 			var yamlOutput yaml.Node
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
 				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
