@@ -443,10 +443,16 @@ func ConvertAppSetsToApps(
 		// Convert each document to ArgoResource
 		for _, doc := range yamlData {
 			kind := types.GetYamlValue(&doc, []string{"kind"})
-			if kind == nil || kind.Value != "Application" {
+			if kind == nil {
 				log.Error().
 					Str("file", appSet.FileName).
-					Msg("❌ ApplicationSet contains non-Application resources")
+					Msg("❌ Output from ApplicationSet contains no kind")
+				continue
+			}
+			if kind.Value != "Application" {
+				log.Error().
+					Str("file", appSet.FileName).
+					Msg("❌ Output from ApplicationSet contains non-Application resources")
 				continue
 			}
 
