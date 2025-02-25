@@ -64,6 +64,7 @@ func main() {
 	// Configure logging based on debug mode
 	if opts.Debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC850})
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
@@ -116,13 +117,12 @@ func main() {
 		log.Error().Msgf("Failed to install Argo CD: %v", err)
 	}
 
-	// Generate applications from ApplicationSets
-
 	tempFolder := "temp"
 	if err := os.MkdirAll(tempFolder, dirMode); err != nil {
 		log.Error().Msgf("Failed to create temp folder: %v", err)
 	}
 
+	// Generate applications from ApplicationSets
 	baseApps, targetApps, err = parsing.ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		baseApps,
