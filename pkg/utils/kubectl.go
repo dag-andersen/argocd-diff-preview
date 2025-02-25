@@ -2,29 +2,31 @@ package utils
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // KubectlApply applies a Kubernetes manifest file using kubectl
 func KubectlApply(path string) error {
-	log.Printf("🚀 Applying manifest: %s", path)
+	log.Debug().Str("path", path).Msg("Applying manifest")
 
 	// Try to apply the manifest multiple times in case of temporary failures
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
 		cmd := exec.Command("kubectl", "apply", "-f", path)
-		output, err := cmd.CombinedOutput()
+		_, err := cmd.CombinedOutput()
 
 		if err == nil {
-			log.Printf("✅ Successfully applied manifest: %s", path)
+			log.Debug().Str("path", path).Msg("Successfully applied manifest")
 			return nil
 		}
 
-		log.Printf("⚠️ Failed to apply manifest (attempt %d/%d): %s\nError: %s",
-			i+1, maxRetries, path, string(output))
+		log.Warn().Err(err).Str("path", path).Msgf("⚠️ Failed to apply manifest (attempt %d/%d)", i+1, maxRetries)
 
 		if i < maxRetries-1 {
 			time.Sleep(2 * time.Second)
@@ -36,7 +38,7 @@ func KubectlApply(path string) error {
 
 // DeleteManifest deletes a Kubernetes manifest file using kubectl
 func DeleteManifest(filePath string) error {
-	log.Printf("🗑️ Deleting manifest: %s", filePath)
+	log.Debug().Str("path", filePath).Msg("Deleting manifest")
 
 	cmd := exec.Command("kubectl", "delete", "-f", filePath)
 	output, err := cmd.CombinedOutput()
@@ -45,13 +47,13 @@ func DeleteManifest(filePath string) error {
 		return fmt.Errorf("failed to delete manifest: %s\nError: %s", filePath, string(output))
 	}
 
-	log.Printf("✅ Successfully deleted manifest: %s", filePath)
+	log.Debug().Str("path", filePath).Msg("Successfully deleted manifest")
 	return nil
 }
 
 // DeleteApplications deletes all Argo CD applications
 func DeleteApplications() error {
-	log.Printf("🧼 Removing applications")
+	log.Info().Msg("🧼 Removing applications")
 
 	verifyNoApps := func() bool {
 		cmd := exec.Command("kubectl", "get", "applications", "-A", "--no-headers")
@@ -64,23 +66,58 @@ func DeleteApplications() error {
 
 	retryCount := 3
 	for i := 0; i < retryCount; i++ {
-		log.Printf("🗑 Deleting Applications (attempt %d/%d)", i+1, retryCount)
+		log.Info().Msgf("🗑 Deleting Applications (attempt %d/%d)", i+1, retryCount)
 
 		cmd := exec.Command("kubectl", "delete", "applications.argoproj.io", "--all", "-A", "--timeout", "10s")
 		if output, err := cmd.CombinedOutput(); err != nil {
-			log.Printf("⚠️ Delete command output: %s", string(output))
+			log.Warn().Err(err).Str("output", string(output)).Msg("⚠️ Delete command output")
 		}
 
 		if verifyNoApps() {
-			log.Printf("🧼 Removed applications successfully")
+			log.Info().Msg("🧼 Removed applications successfully")
 			return nil
 		}
 
 		if i < retryCount-1 {
-			log.Printf("⚠️ Failed to delete applications. Retrying...")
+			log.Warn().Msg("⚠️ Failed to delete applications. Retrying...")
 			time.Sleep(5 * time.Second)
 		}
 	}
 
 	return fmt.Errorf("failed to delete applications after %d retries", retryCount)
+}
+
+// ApplySecretsFromFolder applies all secrets from a folder using kubectl
+func ApplySecretsFromFolder(secretsFolder string) error {
+	// Check if folder exists
+	if _, err := os.Stat(secretsFolder); os.IsNotExist(err) {
+		log.Info().Msgf("🤷 No secrets folder found at %s", secretsFolder)
+		return nil
+	}
+
+	// Apply all files in the secrets folder
+	files, err := os.ReadDir(secretsFolder)
+	if err != nil {
+		return fmt.Errorf("failed to read secrets folder: %w", err)
+	}
+
+	secretCount := 0
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		if err := KubectlApply(filepath.Join(secretsFolder, file.Name())); err != nil {
+			return fmt.Errorf("failed to apply secret %s: %w", file.Name(), err)
+		}
+		secretCount++
+	}
+
+	if secretCount > 0 {
+		log.Info().Msgf("🤫 Applied %d secrets", secretCount)
+	} else {
+		log.Info().Msgf("🤷 No secrets found in %s", secretsFolder)
+	}
+
+	return nil
 }

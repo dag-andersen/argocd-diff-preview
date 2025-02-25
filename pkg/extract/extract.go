@@ -2,9 +2,10 @@ package extract
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
@@ -82,7 +83,7 @@ func extractResourcesFromCluster(
 	timeout uint64,
 	outputFolder string,
 ) error {
-	log.Printf("🌚 Getting resources from %s-branch", branch.FolderName())
+	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")
 
 	destinationFolder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
 	processedApps := make(map[string]bool)
@@ -135,10 +136,10 @@ func extractResourcesFromCluster(
 
 			switch item.Status.Sync.Status {
 			case "OutOfSync", "Synced":
-				log.Printf("Getting manifests for application: %s", name)
+				log.Debug().Msgf("Getting manifests for application: %s", name)
 				manifests, err := argocd.GetManifests(name)
 				if err != nil {
-					log.Printf("❌ Failed to get manifests for application: %s, error: %v", name, err)
+					log.Error().Msgf("❌ Failed to get manifests for application: %s, error: %v", name, err)
 					failedApps[name] = err.Error()
 					continue
 				}
@@ -156,11 +157,11 @@ func extractResourcesFromCluster(
 						if containsAny(msg, errorMessages) {
 							failedApps[name] = msg
 						} else if containsAny(msg, timeoutMessages) {
-							log.Printf("Application: %s timed out with error: %s", name, msg)
+							log.Info().Msgf("Application: %s timed out with error: %s", name, msg)
 							timedOutApps = append(timedOutApps, name)
 							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
 						} else {
-							log.Printf("Application: %s failed with error: %s", name, msg)
+							log.Info().Msgf("Application: %s failed with error: %s", name, msg)
 							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
 						}
 					}
@@ -172,20 +173,20 @@ func extractResourcesFromCluster(
 		// Handle errors
 		if len(failedApps) > 0 {
 			for name, msg := range failedApps {
-				log.Printf("❌ Failed to process application: %s with error: \n%s", name, msg)
+				log.Error().Msgf("❌ Failed to process application: %s with error: \n%s", name, msg)
 			}
 			return fmt.Errorf("failed to process applications")
 		}
 
 		// Handle timeouts
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			log.Printf("❌ Timed out after %d seconds", timeout)
-			log.Printf("❌ Processed %d applications, but %d applications still remain",
+			log.Error().Msgf("❌ Timed out after %d seconds", timeout)
+			log.Info().Msgf("❌ Processed %d applications, but %d applications still remain",
 				len(processedApps), appsLeft)
 			if len(otherErrors) > 0 {
-				log.Printf("❌ Applications with 'ComparisonError' errors:")
+				log.Error().Msg("❌ Applications with 'ComparisonError' errors:")
 				for _, err := range otherErrors {
-					log.Printf("❌ %s, %s", err.name, err.msg)
+					log.Error().Msgf("❌ %s, %s", err.name, err.msg)
 				}
 			}
 			return fmt.Errorf("timed out")
@@ -193,12 +194,12 @@ func extractResourcesFromCluster(
 
 		// Handle timed out apps
 		if len(timedOutApps) > 0 {
-			log.Printf("💤 %d Applications timed out", len(timedOutApps))
+			log.Info().Msgf("💤 %d Applications timed out", len(timedOutApps))
 			for _, app := range timedOutApps {
 				if err := argocd.RefreshApp(app); err != nil {
-					log.Printf("⚠️ Failed to refresh application: %s with %v", app, err)
+					log.Error().Msgf("⚠️ Failed to refresh application: %s with %v", app, err)
 				} else {
-					log.Printf("🔄 Refreshing application: %s", app)
+					log.Info().Msgf("🔄 Refreshing application: %s", app)
 				}
 			}
 		}
@@ -206,6 +207,9 @@ func extractResourcesFromCluster(
 		// Sleep before next iteration
 		time.Sleep(5 * time.Second)
 	}
+
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications", len(processedApps))
+	log.Info().Str("branch", branch.Name).Msgf("💾 Writing resources to: '%s/<app_name>'", destinationFolder)
 
 	return nil
 }

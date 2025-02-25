@@ -2,11 +2,12 @@ package parsing
 
 import (
 	"bufio"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"gopkg.in/yaml.v3"
@@ -14,7 +15,7 @@ import (
 
 // GetYamlFiles returns all yaml files in the given directory that match the regex
 func GetYamlFiles(directory string, regex *string) []string {
-	log.Printf("🤖 Fetching all files in dir: %s", directory)
+	log.Debug().Msgf("Fetching all files in dir: %s", directory)
 
 	var yamlFiles []string
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
@@ -50,15 +51,15 @@ func GetYamlFiles(directory string, regex *string) []string {
 	})
 
 	if err != nil {
-		log.Printf("⚠️ Error walking directory: %v", err)
+		log.Error().Err(err).Msg("⚠️ Error reading directory")
 		return []string{}
 	}
 
 	if regex != nil {
-		log.Printf("🤖 Found %d yaml files in dir '%s' matching regex: %s",
+		log.Debug().Msgf("Found %d yaml files in dir '%s' matching regex: %s",
 			len(yamlFiles), directory, *regex)
 	} else {
-		log.Printf("🤖 Found %d yaml files in dir '%s'",
+		log.Debug().Msgf("Found %d yaml files in dir '%s'",
 			len(yamlFiles), directory)
 	}
 
@@ -70,12 +71,12 @@ func ParseYaml(directory string, files []string) []types.K8sResource {
 	var resources []types.K8sResource
 
 	for _, file := range files {
-		log.Printf("In dir '%s' found yaml file: %s", directory, file)
+		log.Debug().Msgf("In dir '%s' found yaml file: %s", directory, file)
 
 		// Open and read file
 		f, err := os.Open(filepath.Join(directory, file))
 		if err != nil {
-			log.Printf("⚠️ Failed to open file '%s': %v", file, err)
+			log.Warn().Err(err).Msgf("⚠️ Failed to open file '%s'", file)
 			continue
 		}
 		defer f.Close()
@@ -112,7 +113,7 @@ func processYamlChunk(filename, chunk string, resources *[]types.K8sResource) {
 	var yamlData yaml.Node
 	err := yaml.Unmarshal([]byte(chunk), &yamlData)
 	if err != nil {
-		log.Printf("⚠️ Failed to parse YAML in file '%s': %v", filename, err)
+		log.Debug().Err(err).Msgf("⚠️ Failed to parse YAML in file '%s'", filename)
 		return
 	}
 

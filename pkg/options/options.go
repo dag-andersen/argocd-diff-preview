@@ -3,9 +3,10 @@ package options
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 )
@@ -99,7 +100,7 @@ func (o *Options) ParseSelectors() []types.Selector {
 		for _, s := range strings.Split(o.Selector, ",") {
 			selector, err := types.FromString(strings.TrimSpace(s))
 			if err != nil {
-				log.Fatalf("Invalid selector format: %v", err)
+				log.Fatal().Err(err).Msg("Invalid selector format")
 			}
 			selectors = append(selectors, *selector)
 		}
@@ -135,43 +136,43 @@ func (o *Options) ParseRedirectRevisions() []string {
 
 // LogOptions logs all the options
 func (o *Options) LogOptions() {
-	log.Println("✨ Running with:")
-	log.Printf("✨ - local-cluster-tool: %s", o.ClusterType)
-	log.Printf("✨ - cluster-name: %s", o.ClusterName)
-	log.Printf("✨ - base-branch: %s", o.BaseBranch)
-	log.Printf("✨ - target-branch: %s", o.TargetBranch)
-	log.Printf("✨ - secrets-folder: %s", o.SecretsFolder)
-	log.Printf("✨ - output-folder: %s", o.OutputFolder)
-	log.Printf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
-	log.Printf("✨ - repo: %s", o.Repo)
-	log.Printf("✨ - timeout: %d seconds", o.Timeout)
+	log.Info().Msg("✨ Running with:")
+	log.Info().Msgf("✨ - local-cluster-tool: %s", o.ClusterType)
+	log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
+	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
+	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
+	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
+	log.Info().Msgf("✨ - output-folder: %s", o.OutputFolder)
+	log.Info().Msgf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
+	log.Info().Msgf("✨ - repo: %s", o.Repo)
+	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
 
 	if o.KeepClusterAlive {
-		log.Println("✨ - keep-cluster-alive: true")
+		log.Info().Msg("✨ - keep-cluster-alive: true")
 	}
 	if o.Debug {
-		log.Println("✨ - debug: true")
+		log.Info().Msg("✨ - debug: true")
 	}
 	if o.FileRegex != "" {
-		log.Printf("✨ - file-regex: %s", o.FileRegex)
+		log.Info().Msgf("✨ - file-regex: %s", o.FileRegex)
 	}
 	if o.DiffIgnore != "" {
-		log.Printf("✨ - diff-ignore: %s", o.DiffIgnore)
+		log.Info().Msgf("✨ - diff-ignore: %s", o.DiffIgnore)
 	}
 	if o.LineCount > 0 {
-		log.Printf("✨ - line-count: %d", o.LineCount)
+		log.Info().Msgf("✨ - line-count: %d", o.LineCount)
 	}
 	if o.ArgocdChartVersion != "" {
-		log.Printf("✨ - argocd-version: %s", o.ArgocdChartVersion)
+		log.Info().Msgf("✨ - argocd-version: %s", o.ArgocdChartVersion)
 	}
 	if o.MaxDiffLength > 0 {
-		log.Printf("✨ - max-diff-length: %d", o.MaxDiffLength)
+		log.Info().Msgf("✨ - max-diff-length: %d", o.MaxDiffLength)
 	}
 	if o.FilesChanged != "" {
-		log.Printf("✨ - files-changed: %s", o.FilesChanged)
+		log.Info().Msgf("✨ - files-changed: %s", o.FilesChanged)
 	}
 	if o.IgnoreInvalidWatchPattern {
-		log.Println("✨ Ignoring invalid watch patterns Regex on Applications")
+		log.Info().Msg("✨ Ignoring invalid watch patterns Regex on Applications")
 	}
 }
 

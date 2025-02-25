@@ -2,10 +2,11 @@ package parsing
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
@@ -57,7 +58,7 @@ func GetApplicationsForBranches(
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
 			if baseApp.Name == targetApp.Name && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
-				log.Printf("Skipping application '%s' because it has not changed", baseApp.Name)
+				log.Debug().Msgf("Skipping application '%s' because it has not changed", baseApp.Name)
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
 			}
@@ -80,28 +81,24 @@ func GetApplicationsForBranches(
 	baseApps = filterDuplicates(baseApps, duplicateYaml)
 	targetApps = filterDuplicates(targetApps, duplicateYaml)
 
-	log.Printf(
-		"🤖 Skipped %d Application[Sets] for branch: '%s' because they have not changed after patching",
+	log.Info().Str("branch", baseBranch.Name).Msgf(
+		"🤖 Skipped %d Application[Sets] because they have not changed after patching",
 		baseAppsBefore-len(baseApps),
-		baseBranch.Name,
 	)
 
-	log.Printf(
-		"🤖 Skipped %d Application[Sets] for branch: '%s' because they have not changed after patching",
+	log.Info().Str("branch", targetBranch.Name).Msgf(
+		"🤖 Skipped %d Application[Sets] because they have not changed after patching",
 		targetAppsBefore-len(targetApps),
-		targetBranch.Name,
 	)
 
-	log.Printf(
-		"🤖 Using the remaining %d Application[Sets] for branch: '%s'",
+	log.Info().Str("branch", baseBranch.Name).Msgf(
+		"🤖 Using the remaining %d Application[Sets]",
 		len(baseApps),
-		baseBranch.Name,
 	)
 
-	log.Printf(
-		"🤖 Using the remaining %d Application[Sets] for branch: '%s'",
+	log.Info().Str("branch", targetBranch.Name).Msgf(
+		"🤖 Using the remaining %d Application[Sets]",
 		len(targetApps),
-		targetBranch.Name,
 	)
 
 	return baseApps, targetApps, nil
@@ -118,11 +115,13 @@ func GetApplications(
 	ignoreInvalidWatchPattern bool,
 	redirectRevisions []string,
 ) ([]types.ArgoResource, error) {
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Fetching all files for branch %s", branch.Name)
+
 	yamlFiles := GetYamlFiles(branch.FolderName(), regex)
-	log.Printf("🤖 Found %d files", len(yamlFiles))
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
 	k8sResources := ParseYaml(branch.FolderName(), yamlFiles)
-	log.Printf("🤖 Found %d k8sResources", len(k8sResources))
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d k8sResources", len(k8sResources))
 
 	applications := FromResourceToApplication(
 		k8sResources,
@@ -130,6 +129,10 @@ func GetApplications(
 		filesChanged,
 		ignoreInvalidWatchPattern,
 	)
+
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d Application[Sets]", len(applications))
+
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching Application[Sets]...")
 
 	applications, err := PatchApplications(
 		argocdNamespace,
@@ -142,13 +145,7 @@ func GetApplications(
 		return nil, err
 	}
 
-	if len(applications) > 0 {
-		log.Printf(
-			"🤖 Processing %d Argo CD Application[Sets] for branch: %s",
-			len(applications),
-			branch.Name,
-		)
-	}
+	log.Debug().Str("branch", branch.Name).Msgf("Patched %d Application[Sets]", len(applications))
 
 	return applications, nil
 }
@@ -207,7 +204,7 @@ func FromResourceToApplication(
 		for _, s := range selector {
 			selectorStrs = append(selectorStrs, s.String())
 		}
-		log.Printf(
+		log.Info().Msgf(
 			"🤖 Will only run on Applications that match '%s' and watch these files: '%s'",
 			strings.Join(selectorStrs, ","),
 			strings.Join(filesChanged, "', '"),
@@ -217,12 +214,12 @@ func FromResourceToApplication(
 		for _, s := range selector {
 			selectorStrs = append(selectorStrs, s.String())
 		}
-		log.Printf(
+		log.Info().Msgf(
 			"🤖 Will only run on Applications that match '%s'",
 			strings.Join(selectorStrs, ","),
 		)
 	case len(filesChanged) > 0:
-		log.Printf(
+		log.Info().Msgf(
 			"🤖 Will only run on Applications that watch these files: '%s'",
 			strings.Join(filesChanged, "', '"),
 		)
@@ -240,16 +237,16 @@ func FromResourceToApplication(
 
 	// Log filtering results
 	if numberOfAppsBeforeFiltering != len(filteredApps) {
-		log.Printf(
+		log.Info().Msgf(
 			"🤖 Found %d Application[Sets] before filtering",
 			numberOfAppsBeforeFiltering,
 		)
-		log.Printf(
+		log.Info().Msgf(
 			"🤖 Found %d Application[Sets] after filtering",
 			len(filteredApps),
 		)
 	} else {
-		log.Printf(
+		log.Info().Msgf(
 			"🤖 Found %d Application[Sets]",
 			numberOfAppsBeforeFiltering,
 		)
@@ -272,37 +269,37 @@ func PatchApplication(
 	app := &application
 	err := app.SetNamespace(argocdNamespace)
 	if err != nil {
-		log.Printf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to set namespace: %w", err)
 	}
 
 	err = app.RemoveSyncPolicy()
 	if err != nil {
-		log.Printf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
 	}
 
 	err = app.SetProjectToDefault()
 	if err != nil {
-		log.Printf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to set project to default: %w", err)
 	}
 
 	err = app.PointDestinationToInCluster()
 	if err != nil {
-		log.Printf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
 	}
 
 	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
-		log.Printf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to redirect sources: %w", err)
 	}
 
 	err = app.RedirectGenerators(repo, branch.Name, redirectRevisions)
 	if err != nil {
-		log.Printf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to redirect generators: %w", err)
 	}
 
@@ -336,7 +333,46 @@ func PatchApplications(
 	return patchedApps, nil
 }
 
-// ConvertAppSetsToApps generates Applications from ApplicationSets
+func ConvertAppSetsToAppsInBothBranches(
+	argocd *argocd.ArgoCDInstallation,
+	baseApps []types.ArgoResource,
+	targetApps []types.ArgoResource,
+	baseBranch *types.Branch,
+	targetBranch *types.Branch,
+	repo string,
+	tempFolder string,
+	redirectRevisions []string,
+) ([]types.ArgoResource, []types.ArgoResource, error) {
+
+	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
+
+	baseApps, err := ConvertAppSetsToApps(
+		argocd,
+		baseApps,
+		baseBranch,
+		repo,
+		tempFolder,
+		redirectRevisions,
+	)
+	if err != nil {
+		log.Error().Msgf("Failed to generate base apps: %v", err)
+	}
+
+	targetApps, err = ConvertAppSetsToApps(
+		argocd,
+		targetApps,
+		targetBranch,
+		repo,
+		tempFolder,
+		redirectRevisions,
+	)
+	if err != nil {
+		log.Error().Msgf("Failed to generate target apps: %v", err)
+	}
+
+	return baseApps, targetApps, nil
+}
+
 func ConvertAppSetsToApps(
 	argocd *argocd.ArgoCDInstallation,
 	appSets []types.ArgoResource,
@@ -349,7 +385,7 @@ func ConvertAppSetsToApps(
 	appSetCounter := 0
 	generatedAppsCounter := 0
 
-	log.Printf("🤖 Generating Applications from ApplicationSets for branch: %s", branch.Name)
+	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
 
 	for _, appSet := range appSets {
 		// Skip non-ApplicationSets
@@ -370,12 +406,12 @@ func ConvertAppSetsToApps(
 		// Write patched ApplicationSet to file
 		yamlStr, err := appSet.AsString()
 		if err != nil {
-			log.Printf("❌ Failed to convert ApplicationSet to YAML: %v", err)
+			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to convert ApplicationSet to YAML")
 			continue
 		}
 
 		if err := os.WriteFile(randomFileName, []byte(yamlStr), 0644); err != nil {
-			log.Printf("❌ Failed to write ApplicationSet to file: %v", err)
+			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to write ApplicationSet to file")
 			continue
 		}
 		defer os.Remove(randomFileName)
@@ -383,7 +419,7 @@ func ConvertAppSetsToApps(
 		// Generate applications using argocd appset generate
 		output, err := argocd.AppsetGenerate(randomFileName)
 		if err != nil {
-			log.Printf("❌ Failed to generate applications from ApplicationSet %s: %v", appSet.Name, err)
+			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to generate applications from ApplicationSet %s", appSet.Name)
 			continue
 		}
 
@@ -404,7 +440,7 @@ func ConvertAppSetsToApps(
 		}
 
 		if len(yamlData) == 0 {
-			log.Printf("❌ No applications found in ApplicationSet %s", appSet.Name)
+			log.Error().Str("branch", branch.Name).Msgf("❌ No applications found in ApplicationSet %s", appSet.Name)
 			continue
 		}
 
@@ -435,7 +471,7 @@ func ConvertAppSetsToApps(
 				redirectRevisions,
 			)
 			if err != nil {
-				log.Printf("❌ Failed to patch application: %s", name.Value)
+				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to patch application: %s", name.Value)
 				continue
 			}
 
@@ -443,7 +479,7 @@ func ConvertAppSetsToApps(
 			appsNew = append(appsNew, *patchedApp)
 		}
 
-		log.Printf(
+		log.Debug().Str("branch", branch.Name).Msgf(
 			"Generated %d Applications from ApplicationSet in file: %s",
 			generatedAppsCounter,
 			appSet.FileName,
@@ -451,12 +487,12 @@ func ConvertAppSetsToApps(
 	}
 
 	if appSetCounter > 0 {
-		log.Printf(
+		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Generated %d applications from %d ApplicationSets for branch: %s",
 			generatedAppsCounter, appSetCounter, branch.Name,
 		)
 	} else {
-		log.Printf("🤖 No ApplicationSets found for branch: %s", branch.Name)
+		log.Info().Msgf("🤖 No ApplicationSets found for branch: %s", branch.Name)
 	}
 
 	return appsNew, nil

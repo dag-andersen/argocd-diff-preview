@@ -2,8 +2,9 @@ package types
 
 import (
 	"fmt"
-	"log"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 // Operator represents the comparison operator for selectors
@@ -68,29 +69,29 @@ func FromString(s string) (*Selector, error) {
 				Operator: Eq,
 			}
 		} else {
-			log.Printf("❌ Invalid label selector format: %s", s)
+			log.Error().Msgf("❌ Invalid label selector format: %s", s)
 			return nil, fmt.Errorf("invalid label selector format")
 		}
 	default:
-		log.Printf("❌ Invalid label selector format: %s", s)
+		log.Error().Msgf("❌ Invalid label selector format: %s", s)
 		return nil, fmt.Errorf("invalid label selector format")
 	}
 
 	// Validate selector
 	if selector.Key == "" || selector.Value == "" {
-		log.Printf("❌ Invalid label selector format: empty key or value: %s", s)
+		log.Error().Msgf("❌ Invalid label selector format: empty key or value: %s", s)
 		return nil, fmt.Errorf("invalid label selector format: empty key or value")
 	}
 
 	// Check for invalid characters in key
 	if strings.Contains(selector.Key, "!") || strings.Contains(selector.Key, "=") {
-		log.Printf("❌ Invalid label selector format: key contains invalid characters: %s", s)
+		log.Error().Msgf("❌ Invalid label selector format: key contains invalid characters: %s", s)
 		return nil, fmt.Errorf("invalid label selector format: key contains invalid characters")
 	}
 
 	// Check for invalid characters in value
 	if strings.Contains(selector.Value, "!") || strings.Contains(selector.Value, "=") {
-		log.Printf("❌ Invalid label selector format: value contains invalid characters: %s", s)
+		log.Error().Msgf("❌ Invalid label selector format: value contains invalid characters: %s", s)
 		return nil, fmt.Errorf("invalid label selector format: value contains invalid characters")
 	}
 

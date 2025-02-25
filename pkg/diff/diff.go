@@ -3,9 +3,10 @@ package diff
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
@@ -44,7 +45,7 @@ func GenerateDiff(
 		maxDiffMessageCharCount = 65536
 	}
 
-	log.Printf("🔮 Generating diff between %s and %s",
+	log.Info().Msgf("🔮 Generating diff between %s and %s",
 		baseBranch.Name, targetBranch.Name)
 
 	patternsToIgnore := ""
@@ -86,7 +87,7 @@ func GenerateDiff(
 	case remainingMaxChars > len(diffAsString):
 		diffTruncated = diffAsString // No need to truncate
 	case remainingMaxChars > len(warningMessage):
-		log.Printf("🚨 Diff is too long. Truncating message to %d characters",
+		log.Warn().Msgf("🚨 Diff is too long. Truncating message to %d characters",
 			maxDiffMessageCharCount)
 		lastDiffChar := remainingMaxChars - len(warningMessage)
 		diffTruncated = diffAsString[:lastDiffChar] + warningMessage
@@ -101,15 +102,15 @@ func GenerateDiff(
 		return fmt.Errorf("failed to write markdown: %w", err)
 	}
 
-	log.Printf("🙏 Please check the %s file for differences", markdownPath)
+	log.Info().Msgf("🙏 Please check the %s file for differences", markdownPath)
 	return nil
 }
 
 // Git diff command that gets the error output of a command
 func gitDiffOutputCommand(cmd string) (string, error) {
-	log.Printf("Getting summary diff with command: %s", cmd)
+	log.Debug().Msgf("Getting summary diff with command: %s", cmd)
 	command := exec.Command("sh", "-c", cmd)
-	log.Printf("Getting summary diff with command: %s", command.String())
+	log.Debug().Msgf("Getting summary diff with command: %s", command.String())
 	var stderr bytes.Buffer
 	var stdout bytes.Buffer
 	command.Stderr = &stderr
