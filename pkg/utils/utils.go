@@ -7,9 +7,30 @@ import (
 	"path/filepath"
 
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 )
+
+func YamlToString(input *yaml.Node) string {
+	bytes, err := yaml.Marshal(input)
+	if err != nil {
+		return ""
+	}
+	return string(bytes)
+}
+
+func YamlEqual(a, b *yaml.Node) bool {
+	aStr, err := yaml.Marshal(a)
+	if err != nil {
+		return false
+	}
+	bStr, err := yaml.Marshal(b)
+	if err != nil {
+		return false
+	}
+	return string(aStr) == string(bStr)
+}
 
 // RunCommand executes a command and returns its output
 func RunCommand(cmd string) (string, error) {

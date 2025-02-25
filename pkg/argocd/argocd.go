@@ -122,6 +122,22 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 		return fmt.Errorf("failed to login: %w", err)
 	}
 
+	if debug {
+		// Get ConfigMaps
+		output, err := utils.RunCommand("kubectl get configmap -n argocd-diff-preview -o yaml argocd-cmd-params-cm argocd-cm")
+		if err != nil {
+			log.Error().Err(err).Msg("❌ Failed to get ConfigMaps")
+			return fmt.Errorf("failed to get ConfigMaps: %w", err)
+		}
+		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", output)
+	}
+
+	// Add extra permissions to the default AppProject
+	if _, err := a.runArgocdCommand("proj", "add-source-namespace", "default", "*"); err != nil {
+		log.Error().Err(err).Msg("❌ Failed to add extra permissions to the default AppProject")
+		return fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
+	}
+
 	log.Info().Msgf("🦑 Argo CD installed successfully")
 
 	return nil
@@ -129,33 +145,47 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 
-	// check if the folder exists
-	if _, err := os.Stat(a.ConfigPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("values folder does not exist: %s", a.ConfigPath)
+	log.Debug().Msgf("📂 Files in folder '%s':", a.ConfigPath)
+
+	files, err := os.ReadDir(a.ConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read folder: %w", err)
 	}
 
-	values := fmt.Sprintf("%s/values.yaml", a.ConfigPath)
-	valuesOverride := fmt.Sprintf("%s/values-override.yaml", a.ConfigPath)
+	var foundValues bool
+	var foundValuesOverride bool
+
+	for _, file := range files {
+		log.Debug().Msgf("- 📄 %s", file.Name())
+
+		name := file.Name()
+		if name == "values.yaml" {
+			foundValues = true
+		}
+		if name == "values-override.yaml" {
+			foundValuesOverride = true
+		}
+	}
 
 	valuesFiles := []string{}
-	if _, err := os.Stat(values); err == nil {
-		valuesFiles = append(valuesFiles, values)
+	if foundValues {
+		valuesFiles = append(valuesFiles, fmt.Sprintf("%s/values.yaml", a.ConfigPath))
 	}
-	if _, err := os.Stat(valuesOverride); err == nil {
-		valuesFiles = append(valuesFiles, valuesOverride)
+	if foundValuesOverride {
+		valuesFiles = append(valuesFiles, fmt.Sprintf("%s/values-override.yaml", a.ConfigPath))
 	}
 
 	return valuesFiles, nil
 }
 
-func (a *ArgoCDInstallation) runArgocdCommand(args ...string) error {
+func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	cmd := exec.Command("argocd", args...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("argocd command failed: %s: %w", string(output), err)
+		return "", fmt.Errorf("argocd command failed: %s: %w", string(output), err)
 	}
-	return nil
+	return string(output), nil
 }
 
 func (a *ArgoCDInstallation) login() error {
@@ -170,13 +200,13 @@ func (a *ArgoCDInstallation) login() error {
 	time.Sleep(5 * time.Second)
 
 	// Login to ArgoCD
-	if err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password); err != nil {
+	if _, err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password); err != nil {
 		log.Error().Msgf("❌ Failed to login to argocd")
 		return fmt.Errorf("failed to login: %w", err)
 	}
 
 	// Verify login by listing apps
-	if err := a.runArgocdCommand("app", "list"); err != nil {
+	if _, err := a.runArgocdCommand("app", "list"); err != nil {
 		log.Error().Msgf("❌ Failed to list applications")
 		return fmt.Errorf("failed to list applications: %w", err)
 	}

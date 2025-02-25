@@ -60,7 +60,7 @@ func (a *ArgoResource) SetNamespace(namespace string) error {
 
 // SetProjectToDefault sets the project to "default"
 func (a *ArgoResource) SetProjectToDefault() error {
-	spec := a.getSpec()
+	spec := a.getAppSpec()
 	if spec == nil {
 		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
 	}
@@ -77,7 +77,7 @@ func (a *ArgoResource) SetProjectToDefault() error {
 
 // PointDestinationToInCluster updates the destination to point to the in-cluster service
 func (a *ArgoResource) PointDestinationToInCluster() error {
-	spec := a.getSpec()
+	spec := a.getAppSpec()
 	if spec == nil {
 		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
 	}
@@ -96,21 +96,18 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 // RemoveSyncPolicy removes the syncPolicy from the resource
 func (a *ArgoResource) RemoveSyncPolicy() error {
 	if a.Yaml == nil {
-		log.Warn().Msgf("Can't remove 'syncPolicy' because YAML is nil in file: %s",
-			a.FileName)
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("Can't remove 'syncPolicy' because YAML is nil")
 		return nil
 	}
 
 	if a.Yaml.Content == nil {
-		log.Warn().Msgf("Can't remove 'syncPolicy' because YAML content is nil in file: %s",
-			a.FileName)
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("Can't remove 'syncPolicy' because YAML content is nil")
 		return nil
 	}
 
 	spec := GetYamlValue(a.Yaml, []string{"spec"})
 	if spec == nil {
-		log.Warn().Msgf("Can't remove 'syncPolicy' because 'spec' key not found in file: %s",
-			a.FileName)
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("Can't remove 'syncPolicy' because 'spec' key not found")
 		return nil
 	}
 
@@ -120,9 +117,9 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 
 // RedirectSources updates the source/sources targetRevision to point to the specified branch
 func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) error {
-	spec := a.getSpec()
+	spec := a.getAppSpec()
 	if spec == nil {
-		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
+		log.Warn().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("⚠️ No 'spec' key found in Application: %s", a.Name)
 	}
 
 	// Handle single source
@@ -145,7 +142,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 		return nil
 	}
 
-	log.Debug().Msgf("no 'spec.source' or 'spec.sources' key found in Application: %s",
+	log.Debug().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("no 'spec.source' or 'spec.sources' key found in Application: %s",
 		a.Name)
 
 	return nil
@@ -155,16 +152,19 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions []string) error {
 	// Only process ApplicationSets
 	if a.Kind != ApplicationSet {
+		log.Debug().Str("file", a.FileName).Msgf("not an ApplicationSet: %s", a.Name)
 		return nil
 	}
 
-	spec := a.getSpec()
+	spec := a.getRootSpec()
 	if spec == nil {
-		log.Debug().Msgf("no 'spec' key found in ApplicationSet: %s", a.Name)
+		log.Warn().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("⚠️ No 'spec' key found in ApplicationSet: %s", a.Name)
+		return nil
 	}
 
 	generators := GetYamlValue(spec, []string{"generators"})
 	if generators == nil {
+		log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators' key found in ApplicationSet: %s", a.Name)
 		return nil
 	}
 
@@ -177,18 +177,21 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		// Look for git generator
 		gitGen := GetYamlValue(generator, []string{"git"})
 		if gitGen == nil {
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git' key found in ApplicationSet: %s", a.Name)
 			continue
 		}
 
 		// Check repoURL
 		repoURL := GetYamlValue(gitGen, []string{"repoURL"})
 		if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git.repoURL' key found in ApplicationSet: %s", a.Name)
 			continue
 		}
 
 		// Check targetRevision
 		targetRevision := GetYamlValue(gitGen, []string{"targetRevision"})
 		if targetRevision == nil {
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git.targetRevision' key found in ApplicationSet: %s", a.Name)
 			continue
 		}
 
@@ -196,7 +199,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRevision.Value)
 		if shouldRedirect {
 			setYamlValue(gitGen, []string{"targetRevision"}, branch)
-			log.Debug().Str("file", a.FileName).Msgf(
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf(
 				"Patched git generators in ApplicationSet: %s",
 				a.Name,
 			)
@@ -282,7 +285,7 @@ func (a *ArgoResource) Filter(
 
 // Helper functions
 
-func (a *ArgoResource) getSpec() *yaml.Node {
+func (a *ArgoResource) getAppSpec() *yaml.Node {
 	switch a.Kind {
 	case Application:
 		return GetYamlValue(a.Yaml, []string{"spec"})
@@ -293,22 +296,26 @@ func (a *ArgoResource) getSpec() *yaml.Node {
 	}
 }
 
+func (a *ArgoResource) getRootSpec() *yaml.Node {
+	return GetYamlValue(a.Yaml, []string{"spec"})
+}
+
 func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, redirectRevisions []string) error {
 
 	if GetYamlValue(source, []string{"chart"}) != nil {
-		log.Debug().Str("file", a.FileName).Msg("Found helm chart")
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found helm chart")
 		return nil
 	}
 
 	repoURL := GetYamlValue(source, []string{"repoURL"})
 	if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
-		log.Debug().Str("file", a.FileName).Msg("Found no 'repoURL' under spec.source")
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'repoURL' under spec.source")
 		return nil
 	}
 
 	targetRev := GetYamlValue(source, []string{"targetRevision"})
 	if targetRev == nil {
-		log.Debug().Str("file", a.FileName).Msg("Found no 'targetRevision' under spec.source")
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'targetRevision' under spec.source")
 		targetRev = &yaml.Node{Value: "HEAD"}
 		setYamlValue(source, []string{"targetRevision"}, "HEAD")
 	}
@@ -317,7 +324,7 @@ func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, re
 		contains(redirectRevisions, targetRev.Value)
 
 	if shouldRedirect {
-		log.Debug().Str("file", a.FileName).Msgf("Redirecting targetRevision from %s to %s", targetRev.Value, branch)
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Redirecting targetRevision from %s to %s", targetRev.Value, branch)
 		setYamlValue(source, []string{"targetRevision"}, branch)
 	}
 

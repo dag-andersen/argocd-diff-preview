@@ -108,9 +108,8 @@ func GenerateDiff(
 
 // Git diff command that gets the error output of a command
 func gitDiffOutputCommand(cmd string) (string, error) {
-	log.Debug().Msgf("Getting summary diff with command: %s", cmd)
+	log.Debug().Msgf("Getting diff with command: %s", cmd)
 	command := exec.Command("sh", "-c", cmd)
-	log.Debug().Msgf("Getting summary diff with command: %s", command.String())
 	var stderr bytes.Buffer
 	var stdout bytes.Buffer
 	command.Stderr = &stderr

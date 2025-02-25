@@ -10,6 +10,7 @@ import (
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -57,7 +58,7 @@ func GetApplicationsForBranches(
 	var duplicateYaml []*yaml.Node
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
-			if baseApp.Name == targetApp.Name && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
+			if baseApp.Name == targetApp.Name && utils.YamlEqual(baseApp.Yaml, targetApp.Yaml) {
 				log.Debug().Msgf("Skipping application '%s' because it has not changed", baseApp.Name)
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
@@ -132,7 +133,7 @@ func GetApplications(
 
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d Application[Sets]", len(applications))
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching Application[Sets]...")
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching Application[Sets]")
 
 	applications, err := PatchApplications(
 		argocdNamespace,
@@ -152,24 +153,12 @@ func GetApplications(
 
 // Helper functions
 
-func yamlEqual(a, b *yaml.Node) bool {
-	aStr, err := yaml.Marshal(a)
-	if err != nil {
-		return false
-	}
-	bStr, err := yaml.Marshal(b)
-	if err != nil {
-		return false
-	}
-	return string(aStr) == string(bStr)
-}
-
 func filterDuplicates(apps []types.ArgoResource, duplicates []*yaml.Node) []types.ArgoResource {
 	var filtered []types.ArgoResource
 	for _, app := range apps {
 		isDuplicate := false
 		for _, dup := range duplicates {
-			if yamlEqual(app.Yaml, dup) {
+			if utils.YamlEqual(app.Yaml, dup) {
 				isDuplicate = true
 				break
 			}
@@ -395,6 +384,7 @@ func ConvertAppSetsToApps(
 		}
 
 		appSetCounter++
+		localGeneratedAppsCounter := 0
 
 		// Generate random filename for the patched ApplicationSet
 		randomFileName := fmt.Sprintf("%s/%s-%d.yaml",
@@ -428,15 +418,21 @@ func ConvertAppSetsToApps(
 
 		var yamlData []yaml.Node
 		if isList {
+			log.Debug().Str("file", appSet.FileName).Msgf("is list")
 			var yamlOutput []yaml.Node
-			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err == nil {
-				yamlData = yamlOutput
+			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
+				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
+				continue
 			}
+			yamlData = yamlOutput
 		} else {
+			log.Debug().Str("file", appSet.FileName).Msgf("is not list")
 			var yamlOutput yaml.Node
-			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err == nil {
-				yamlData = []yaml.Node{yamlOutput}
+			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
+				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
+				continue
 			}
+			yamlData = []yaml.Node{yamlOutput}
 		}
 
 		if len(yamlData) == 0 {
@@ -448,11 +444,15 @@ func ConvertAppSetsToApps(
 		for _, doc := range yamlData {
 			kind := types.GetYamlValue(&doc, []string{"kind"})
 			if kind == nil || kind.Value != "Application" {
+				log.Error().
+					Str("file", appSet.FileName).
+					Msg("❌ ApplicationSet contains non-Application resources")
 				continue
 			}
 
 			name := types.GetYamlValue(&doc, []string{"metadata", "name"})
 			if name == nil {
+				log.Error().Str("file", appSet.FileName).Msg("❌ Generated Application missing name")
 				continue
 			}
 
@@ -475,14 +475,14 @@ func ConvertAppSetsToApps(
 				continue
 			}
 
+			localGeneratedAppsCounter++
 			generatedAppsCounter++
 			appsNew = append(appsNew, *patchedApp)
 		}
 
-		log.Debug().Str("branch", branch.Name).Msgf(
-			"Generated %d Applications from ApplicationSet in file: %s",
-			generatedAppsCounter,
-			appSet.FileName,
+		log.Debug().Str("branch", branch.Name).Str("file", appSet.FileName).Str("appSet", appSet.Name).Msgf(
+			"Generated %d Applications from ApplicationSet",
+			localGeneratedAppsCounter,
 		)
 	}
 
