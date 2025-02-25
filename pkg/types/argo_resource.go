@@ -337,6 +337,13 @@ func GetYamlValue(node *yaml.Node, path []string) *yaml.Node {
 		return node
 	}
 
+	if node.Kind == yaml.DocumentNode {
+		if len(node.Content) > 0 {
+			return GetYamlValue(node.Content[0], path)
+		}
+		return nil
+	}
+
 	if node.Kind != yaml.MappingNode {
 		return nil
 	}
