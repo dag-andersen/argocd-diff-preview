@@ -2,9 +2,10 @@ package kind
 
 import (
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
 )
@@ -19,11 +20,11 @@ func IsInstalled() bool {
 func CreateCluster(clusterName string) error {
 	// Check if docker is running
 	if _, err := runCommand("docker", "ps"); err != nil {
-		log.Printf("❌ Docker is not running")
+		log.Error().Msg("❌ Docker is not running")
 		return fmt.Errorf("docker is not running: %w", err)
 	}
 
-	log.Printf("🚀 Creating cluster...")
+	log.Info().Msg("🚀 Creating cluster...")
 
 	// Delete existing cluster if it exists
 	if _, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
@@ -32,11 +33,11 @@ func CreateCluster(clusterName string) error {
 
 	// Create new cluster
 	if _, err := runCommand("kind", "create", "cluster", "--name", clusterName); err != nil {
-		log.Printf("❌ Failed to create cluster")
+		log.Error().Msg("❌ Failed to create cluster")
 		return fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	log.Printf("🚀 Cluster created successfully")
+	log.Info().Msg("🚀 Cluster created successfully")
 	return nil
 }
 
@@ -54,25 +55,25 @@ func ClusterExists(clusterName string) bool {
 		}
 	}
 
-	log.Printf("❌ Cluster '%s' not found in: %s", clusterName, output)
+	log.Error().Msgf("❌ Cluster '%s' not found in: %s", clusterName, output)
 	return false
 }
 
 // DeleteCluster deletes the kind cluster with the given name
 func DeleteCluster(clusterName string, wait bool) {
-	log.Printf("💥 Deleting cluster...")
+	log.Info().Msg("💥 Deleting cluster...")
 
 	if wait {
 		output, err := runCommand("kind", "delete", "cluster", "--name", clusterName)
 		if err != nil {
-			log.Printf("❌ Failed to delete cluster: %v", err)
+			log.Error().Msgf("❌ Failed to delete cluster: %v", err)
 			return
 		}
-		log.Printf("💥 Cluster deleted successfully: %s", output)
+		log.Info().Msgf("💥 Cluster deleted successfully: %s", output)
 	} else {
 		cmd := exec.Command("kind", "delete", "cluster", "--name", clusterName)
 		if err := cmd.Start(); err != nil {
-			log.Printf("❌ Failed to start cluster deletion: %v", err)
+			log.Error().Msgf("❌ Failed to start cluster deletion: %v", err)
 		}
 	}
 }

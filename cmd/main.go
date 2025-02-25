@@ -1,8 +1,8 @@
 package main
 
 import (
-	"log"
 	"os"
+	"time"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
@@ -14,6 +14,8 @@ import (
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/parsing"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -36,28 +38,38 @@ func getClusterProvider(clusterType, clusterName string) cluster.Provider {
 			provider = minikube.New()
 			clusterType = "minikube"
 		} else {
-			log.Fatal("No local cluster tool found. Please install kind or minikube")
+			log.Error().Msg("No local cluster tool found. Please install kind or minikube")
 		}
 	default:
-		log.Fatalf("Unsupported cluster type: %s", clusterType)
+		log.Error().Msgf("Unsupported cluster type: %s", clusterType)
 	}
 
 	if !provider.IsInstalled() {
-		log.Fatalf("%s is not installed", clusterType)
+		log.Error().Msgf("%s is not installed", clusterType)
 	}
 
 	return provider
 }
 
 func main() {
+	startTime := time.Now()
+	defer func() {
+		duration := time.Since(startTime)
+		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Millisecond))
+	}()
 
 	// Parse input options
 	opts := options.Parse()
-	opts.LogOptions()
 
+	// Configure logging based on debug mode
 	if opts.Debug {
-		log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	} else {
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
 	}
+
+	opts.LogOptions()
 
 	regex := opts.ParseRegex()
 	selectors := opts.ParseSelectors()
@@ -81,73 +93,61 @@ func main() {
 		redirectRevisions,
 	)
 	if err != nil {
-		log.Fatalf("Failed to get applications: %v", err)
+		log.Error().Msgf("Failed to get applications: %v", err)
 	}
 
 	foundBaseApps := len(baseApps) > 0
 	foundTargetApps := len(targetApps) > 0
 
 	if !foundBaseApps && !foundTargetApps {
-		log.Println("No applications found in either branch")
+		log.Error().Msg("No applications found in either branch")
 		os.Exit(0)
 	}
 
 	// Create cluster and install Argo CD
 	provider := getClusterProvider(opts.ClusterType, opts.ClusterName)
 	if err := provider.CreateCluster(); err != nil {
-		log.Fatalf("Failed to create cluster: %v", err)
+		log.Error().Msgf("Failed to create cluster: %v", err)
 	}
 
 	// Install Argo CD
 	argocd := argocd.New(opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
 	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
-		log.Fatalf("Failed to install Argo CD: %v", err)
+		log.Error().Msgf("Failed to install Argo CD: %v", err)
 	}
 
 	// Generate applications from ApplicationSets
 
 	tempFolder := "temp"
 	if err := os.MkdirAll(tempFolder, dirMode); err != nil {
-		log.Fatalf("Failed to create temp folder: %v", err)
+		log.Error().Msgf("Failed to create temp folder: %v", err)
 	}
 
-	// Base branch
-	baseApps, err = parsing.ConvertAppSetsToApps(
+	baseApps, targetApps, err = parsing.ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		baseApps,
-		baseBranch,
-		opts.Repo,
-		tempFolder,
-		redirectRevisions,
-	)
-	if err != nil {
-		log.Fatalf("Failed to generate base apps: %v", err)
-	}
-
-	// Target branch
-	targetApps, err = parsing.ConvertAppSetsToApps(
-		argocd,
 		targetApps,
+		baseBranch,
 		targetBranch,
 		opts.Repo,
 		tempFolder,
 		redirectRevisions,
 	)
 	if err != nil {
-		log.Fatalf("Failed to generate target apps: %v", err)
+		log.Error().Msgf("Failed to generate base apps: %v", err)
 	}
 
 	// Write applications to files
 	if err := utils.WriteApplications(baseApps, baseBranch, tempFolder); err != nil {
-		log.Fatalf("Failed to write base apps: %v", err)
+		log.Error().Msgf("Failed to write base apps: %v", err)
 	}
 	if err := utils.WriteApplications(targetApps, targetBranch, tempFolder); err != nil {
-		log.Fatalf("Failed to write target apps: %v", err)
+		log.Error().Msgf("Failed to write target apps: %v", err)
 	}
 
 	// Extract resources from the cluster based on each branch
 	if err := extract.GetResourcesFromBothBranches(argocd, baseBranch, targetBranch, opts.Timeout, tempFolder, opts.OutputFolder); err != nil {
-		log.Fatalf("Failed to get resources: %v", err)
+		log.Error().Msgf("Failed to get resources: %v", err)
 	}
 
 	// Generate diff between base and target branches
@@ -159,7 +159,7 @@ func main() {
 		opts.LineCount,
 		opts.MaxDiffLength,
 	); err != nil {
-		log.Fatalf("Failed to generate diff: %v", err)
+		log.Error().Msgf("Failed to generate diff: %v", err)
 	}
 
 	if !opts.KeepClusterAlive {

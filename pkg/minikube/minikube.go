@@ -2,8 +2,9 @@ package minikube
 
 import (
 	"fmt"
-	"log"
 	"os/exec"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
 )
@@ -18,11 +19,11 @@ func IsInstalled() bool {
 func CreateCluster() error {
 	// Check if docker is running
 	if _, err := runCommand("docker", "ps"); err != nil {
-		log.Printf("❌ Docker is not running")
+		log.Error().Msg("❌ Docker is not running")
 		return fmt.Errorf("docker is not running: %w", err)
 	}
 
-	log.Printf("🚀 Creating cluster...")
+	log.Info().Msg("🚀 Creating cluster...")
 
 	// Delete existing cluster if it exists
 	if _, err := runCommand("minikube", "delete"); err != nil {
@@ -31,11 +32,11 @@ func CreateCluster() error {
 
 	// Create new cluster
 	if _, err := runCommand("minikube", "start"); err != nil {
-		log.Printf("❌ Failed to create cluster")
+		log.Error().Msg("❌ Failed to create cluster")
 		return fmt.Errorf("failed to create cluster: %w", err)
 	}
 
-	log.Printf("🚀 Cluster created successfully")
+	log.Info().Msg("🚀 Cluster created successfully")
 	return nil
 }
 
@@ -47,19 +48,19 @@ func ClusterExists() bool {
 
 // DeleteCluster deletes the minikube cluster
 func DeleteCluster(wait bool) {
-	log.Printf("💥 Deleting cluster...")
+	log.Info().Msg("💥 Deleting cluster...")
 
 	if wait {
 		output, err := runCommand("minikube", "delete")
 		if err != nil {
-			log.Printf("❌ Failed to delete cluster: %v", err)
+			log.Error().Msgf("❌ Failed to delete cluster: %v", err)
 			return
 		}
-		log.Printf("💥 Cluster deleted successfully: %s", output)
+		log.Info().Msgf("💥 Cluster deleted successfully: %s", output)
 	} else {
 		cmd := exec.Command("minikube", "delete")
 		if err := cmd.Start(); err != nil {
-			log.Printf("❌ Failed to start cluster deletion: %v", err)
+			log.Error().Msgf("❌ Failed to start cluster deletion: %v", err)
 		}
 	}
 }

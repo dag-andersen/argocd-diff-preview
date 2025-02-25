@@ -2,9 +2,10 @@ package types
 
 import (
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 
 	"gopkg.in/yaml.v3"
 )
@@ -61,12 +62,12 @@ func (a *ArgoResource) SetNamespace(namespace string) error {
 func (a *ArgoResource) SetProjectToDefault() error {
 	spec := a.getSpec()
 	if spec == nil {
-		return fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
+		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
 	}
 
 	project := GetYamlValue(spec, []string{"project"})
 	if project == nil {
-		return fmt.Errorf("no 'spec.project' key found in Application: %s (file: %s)",
+		log.Debug().Msgf("no 'spec.project' key found in Application: %s (file: %s)",
 			a.Name, a.FileName)
 	}
 
@@ -78,12 +79,12 @@ func (a *ArgoResource) SetProjectToDefault() error {
 func (a *ArgoResource) PointDestinationToInCluster() error {
 	spec := a.getSpec()
 	if spec == nil {
-		return fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
+		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
 	}
 
 	dest := GetYamlValue(spec, []string{"destination"})
 	if dest == nil {
-		return fmt.Errorf("no 'spec.destination' key found in Application: %s (file: %s)",
+		log.Debug().Msgf("no 'spec.destination' key found in Application: %s (file: %s)",
 			a.Name, a.FileName)
 	}
 
@@ -95,20 +96,20 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 // RemoveSyncPolicy removes the syncPolicy from the resource
 func (a *ArgoResource) RemoveSyncPolicy() error {
 	if a.Yaml == nil {
-		log.Printf("Can't remove 'syncPolicy' because YAML is nil in file: %s",
+		log.Warn().Msgf("Can't remove 'syncPolicy' because YAML is nil in file: %s",
 			a.FileName)
 		return nil
 	}
 
 	if a.Yaml.Content == nil {
-		log.Printf("Can't remove 'syncPolicy' because YAML content is nil in file: %s",
+		log.Warn().Msgf("Can't remove 'syncPolicy' because YAML content is nil in file: %s",
 			a.FileName)
 		return nil
 	}
 
 	spec := GetYamlValue(a.Yaml, []string{"spec"})
 	if spec == nil {
-		log.Printf("Can't remove 'syncPolicy' because 'spec' key not found in file: %s",
+		log.Warn().Msgf("Can't remove 'syncPolicy' because 'spec' key not found in file: %s",
 			a.FileName)
 		return nil
 	}
@@ -121,7 +122,7 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) error {
 	spec := a.getSpec()
 	if spec == nil {
-		return fmt.Errorf("no 'spec' key found in Application: %s", a.Name)
+		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
 	}
 
 	// Handle single source
@@ -144,8 +145,10 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 		return nil
 	}
 
-	return fmt.Errorf("no 'spec.source' or 'spec.sources' key found in Application: %s",
+	log.Debug().Msgf("no 'spec.source' or 'spec.sources' key found in Application: %s",
 		a.Name)
+
+	return nil
 }
 
 // RedirectGenerators updates the git generator targetRevision to point to the specified branch
@@ -157,7 +160,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 
 	spec := a.getSpec()
 	if spec == nil {
-		return fmt.Errorf("no 'spec' key found in ApplicationSet: %s", a.Name)
+		log.Debug().Msgf("no 'spec' key found in ApplicationSet: %s", a.Name)
 	}
 
 	generators := GetYamlValue(spec, []string{"generators"})
@@ -193,10 +196,9 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRevision.Value)
 		if shouldRedirect {
 			setYamlValue(gitGen, []string{"targetRevision"}, branch)
-			log.Printf(
-				"Patched git generators in ApplicationSet: %s in file: %s",
+			log.Debug().Str("file", a.FileName).Msgf(
+				"Patched git generators in ApplicationSet: %s",
 				a.Name,
-				a.FileName,
 			)
 		}
 	}
@@ -260,10 +262,10 @@ func (a *ArgoResource) Filter(
 		regex, err := regexp.Compile(pattern)
 		if err != nil {
 			if !ignoreInvalidWatchPattern {
-				log.Printf("⚠️ Invalid watch pattern '%s' in file: %s", pattern, a.FileName)
+				log.Warn().Msgf("⚠️ Invalid watch pattern '%s' in file: %s", pattern, a.FileName)
 				return nil
 			}
-			log.Printf("⚠️ Ignoring invalid watch pattern '%s' in file: %s", pattern, a.FileName)
+			log.Warn().Msgf("⚠️ Ignoring invalid watch pattern '%s' in file: %s", pattern, a.FileName)
 			return a
 		}
 
@@ -294,19 +296,19 @@ func (a *ArgoResource) getSpec() *yaml.Node {
 func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, redirectRevisions []string) error {
 
 	if GetYamlValue(source, []string{"chart"}) != nil {
-		log.Printf("Found helm chart in file: %s", a.FileName)
+		log.Debug().Str("file", a.FileName).Msg("Found helm chart")
 		return nil
 	}
 
 	repoURL := GetYamlValue(source, []string{"repoURL"})
 	if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
-		log.Printf("Found no 'repoURL' under spec.source in file: %s", a.FileName)
+		log.Debug().Str("file", a.FileName).Msg("Found no 'repoURL' under spec.source")
 		return nil
 	}
 
 	targetRev := GetYamlValue(source, []string{"targetRevision"})
 	if targetRev == nil {
-		log.Printf("Found no 'targetRevision' under spec.source in file: %s", a.FileName)
+		log.Debug().Str("file", a.FileName).Msg("Found no 'targetRevision' under spec.source")
 		targetRev = &yaml.Node{Value: "HEAD"}
 		setYamlValue(source, []string{"targetRevision"}, "HEAD")
 	}
@@ -315,7 +317,7 @@ func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, re
 		contains(redirectRevisions, targetRev.Value)
 
 	if shouldRedirect {
-		log.Printf("Redirecting targetRevision from %s to %s in file: %s", targetRev.Value, branch, a.FileName)
+		log.Debug().Str("file", a.FileName).Msgf("Redirecting targetRevision from %s to %s", targetRev.Value, branch)
 		setYamlValue(source, []string{"targetRevision"}, branch)
 	}
 
@@ -345,12 +347,12 @@ func GetYamlValue(node *yaml.Node, path []string) *yaml.Node {
 
 func setYamlValue(node *yaml.Node, path []string, value string) {
 	if node == nil || len(path) == 0 {
-		log.Printf("Can't set value because node is nil or path is empty")
+		log.Debug().Msgf("Can't set value because node is nil or path is empty")
 		return
 	}
 
 	if node.Kind != yaml.MappingNode {
-		log.Printf("Can't set value because node is not a mapping node")
+		log.Debug().Msgf("Can't set value because node is not a mapping node")
 		return
 	}
 
@@ -433,13 +435,13 @@ func FromK8sResource(resource *K8sResource) *ArgoResource {
 	// Get the kind
 
 	if resource.Yaml.Content == nil {
-		log.Printf("⚠️ No content found in file: %s", resource.FileName)
+		log.Debug().Str("file", resource.FileName).Msg("No content found in file")
 		return nil
 	}
 
 	kind := GetYamlValue(resource.Yaml.Content[0], []string{"kind"})
 	if kind == nil {
-		log.Printf("⚠️ No 'kind' field found in file: %s", resource.FileName)
+		log.Debug().Str("file", resource.FileName).Msg("No 'kind' field found in file")
 		return nil
 	}
 
@@ -456,7 +458,7 @@ func FromK8sResource(resource *K8sResource) *ArgoResource {
 
 	name := GetYamlValue(resource.Yaml.Content[0], []string{"metadata", "name"})
 	if name == nil {
-		log.Printf("⚠️ No 'metadata.name' field found in file: %s", resource.FileName)
+		log.Debug().Str("file", resource.FileName).Msg("No 'metadata.name' field found in file")
 		return nil
 	}
 
@@ -473,7 +475,7 @@ func ApplicationsToString(apps []ArgoResource) string {
 	for _, app := range apps {
 		yamlStr, err := app.AsString()
 		if err != nil {
-			log.Printf("Failed to convert app %s to YAML: %v", app.Name, err)
+			log.Debug().Err(err).Str("file", app.FileName).Msgf("Failed to convert app %s to YAML", app.Name)
 			continue
 		}
 		// add a comment with the name of the file

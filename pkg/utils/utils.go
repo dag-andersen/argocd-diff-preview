@@ -2,10 +2,11 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 )
@@ -36,7 +37,7 @@ func WriteApplications(
 	folder string,
 ) error {
 	filePath := fmt.Sprintf("%s/%s.yaml", folder, branch.FolderName())
-	log.Printf("💾 Writing %d Applications from '%s' to ./%s",
+	log.Info().Msgf("💾 Writing %d Applications from '%s' to ./%s",
 		len(apps), branch.Name, filePath)
 
 	yaml := types.ApplicationsToString(apps)

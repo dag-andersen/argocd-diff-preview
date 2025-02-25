@@ -3,13 +3,14 @@ package argocd
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
+	"gopkg.in/yaml.v3"
 )
 
 type ArgoCDInstallation struct {
@@ -30,27 +31,31 @@ func New(namespace string, version string, configPath string) *ArgoCDInstallatio
 }
 
 func (a *ArgoCDInstallation) createNamespace() error {
-	log.Printf("🦑 Creating namespace: %s", a.Namespace)
+	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
 	// Check if namespace exists
 	cmd := fmt.Sprintf("kubectl get namespace %s", a.Namespace)
 	if err := runCommand("sh", "-c", cmd); err == nil {
-		log.Printf("✨ Namespace %s already exists", a.Namespace)
+		log.Debug().Msgf("Namespace %s already exists", a.Namespace)
 		return nil
 	}
 
 	// Create namespace
 	if err := runCommand("kubectl", "create", "namespace", a.Namespace); err != nil {
-		log.Printf("❌ Failed to create namespace %s", a.Namespace)
+		log.Error().Msgf("❌ Failed to create namespace %s", a.Namespace)
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	log.Printf("✨ Created namespace: %s", a.Namespace)
+	log.Debug().Msgf("Created namespace: %s", a.Namespace)
 	return nil
 }
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
-	log.Printf("🦑 Installing Argo CD Helm Chart version: '%s'", a.Version)
+	if a.Version != "" {
+		log.Info().Msgf("🦑 Installing Argo CD Helm Chart version: '%s'", a.Version)
+	} else {
+		log.Info().Msg("🦑 Installing Argo CD Helm Chart version: 'latest'")
+	}
 
 	// Create namespace if it doesn't exist
 	if err := a.createNamespace(); err != nil {
@@ -58,25 +63,25 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	}
 
 	// Apply secrets before installing ArgoCD
-	if err := a.applySecrets(secretsFolder); err != nil {
+	if err := utils.ApplySecretsFromFolder(secretsFolder); err != nil {
 		return fmt.Errorf("failed to apply secrets: %w", err)
 	}
 
 	// Check for values files
 	valuesFiles, err := a.findValuesFiles()
 	if err != nil {
-		log.Printf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with default configuration", a.ConfigPath)
+		log.Info().Msgf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with default configuration", a.ConfigPath)
 	}
 
 	// Add argo repo to helm
 	if err := runCommand("helm", "repo", "add", "argo", "https://argoproj.github.io/argo-helm"); err != nil {
-		log.Printf("❌ Failed to add argo repo")
+		log.Error().Msgf("❌ Failed to add argo repo")
 		return fmt.Errorf("failed to add argo repo: %w", err)
 	}
 
 	// Update helm repos
 	if err := runCommand("helm", "repo", "update"); err != nil {
-		log.Printf("❌ Failed to update helm repo")
+		log.Error().Msgf("❌ Failed to update helm repo")
 		return fmt.Errorf("failed to update helm repo: %w", err)
 	}
 
@@ -94,28 +99,30 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 	// Install ArgoCD
 	if err := runCommand("helm", args...); err != nil {
-		log.Printf("❌ Failed to install Argo CD")
+		log.Error().Msgf("❌ Failed to install Argo CD")
 		return fmt.Errorf("failed to install argo cd: %w", err)
 	}
 
 	// Wait for argocd-server to be ready
-	log.Printf("🦑 Waiting for Argo CD to start...")
+	log.Info().Msgf("🦑 Waiting for Argo CD to start...")
 	if err := runCommand("kubectl", "wait", "--for=condition=available",
 		"deployment/argocd-server", "-n", a.Namespace, "--timeout=300s"); err != nil {
-		log.Printf("❌ Failed to wait for argocd-server")
+		log.Error().Msgf("❌ Failed to wait for argocd-server")
 		return fmt.Errorf("failed to wait for argocd-server: %w", err)
 	}
-	log.Printf("🦑 Argo CD is now available")
+	log.Info().Msg("🦑 Argo CD is now available")
 
 	// Get installed versions
 	if err := a.logInstalledVersions(); err != nil {
-		log.Printf("❌ Failed to get installed versions: %v", err)
+		log.Error().Msgf("❌ Failed to get installed versions: %v", err)
 	}
 
 	// Login to ArgoCD
 	if err := a.login(); err != nil {
 		return fmt.Errorf("failed to login: %w", err)
 	}
+
+	log.Info().Msgf("🦑 Argo CD installed successfully")
 
 	return nil
 }
@@ -152,7 +159,7 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) error {
 }
 
 func (a *ArgoCDInstallation) login() error {
-	log.Printf("🦑 Logging in to Argo CD through CLI...")
+	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
 	// Get initial admin password
 	password, err := a.getInitialPassword()
@@ -164,13 +171,13 @@ func (a *ArgoCDInstallation) login() error {
 
 	// Login to ArgoCD
 	if err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password); err != nil {
-		log.Printf("❌ Failed to login to argocd")
+		log.Error().Msgf("❌ Failed to login to argocd")
 		return fmt.Errorf("failed to login: %w", err)
 	}
 
 	// Verify login by listing apps
 	if err := a.runArgocdCommand("app", "list"); err != nil {
-		log.Printf("❌ Failed to list applications")
+		log.Error().Msgf("❌ Failed to list applications")
 		return fmt.Errorf("failed to list applications: %w", err)
 	}
 
@@ -192,7 +199,7 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 		if retries == 4 {
 			return "", fmt.Errorf("failed to get secret %s: %w", secretName, err)
 		}
-		log.Printf("⏳ Retrying to get secret %s", secretName)
+		log.Info().Msgf("⏳ Retrying to get secret %s", secretName)
 		time.Sleep(2 * time.Second)
 	}
 
@@ -205,14 +212,29 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 }
 
 func (a *ArgoCDInstallation) logInstalledVersions() error {
-	_, err := exec.Command("helm", "list", "-A", "-o", "yaml").Output()
+	output, err := exec.Command("helm", "list", "-A", "-o", "yaml").Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list helm charts: %w", err)
 	}
 
-	// Parse YAML and log versions
-	// TODO: Implement YAML parsing similar to Rust version
-	log.Printf("🦑 Helm release created successfully")
+	var helmList []map[string]interface{}
+	if err := yaml.Unmarshal(output, &helmList); err != nil {
+		return fmt.Errorf("failed to parse helm list output: %w", err)
+	}
+
+	if len(helmList) > 0 {
+		chartVersion := helmList[0]["chart"]
+		appVersion := helmList[0]["app_version"]
+		if chartVersion != nil && appVersion != nil {
+			log.Info().Msgf("🦑 Installed Chart version: '%v' and App version: '%v'",
+				chartVersion, appVersion)
+		} else {
+			log.Error().Msgf("❌ Failed to get chart version")
+		}
+	} else {
+		log.Error().Msgf("❌ Failed to get chart version")
+	}
+
 	return nil
 }
 
@@ -259,41 +281,6 @@ func (a *ArgoCDInstallation) RefreshApp(appName string) error {
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to refresh app: %w", err)
-	}
-
-	return nil
-}
-
-func (a *ArgoCDInstallation) applySecrets(secretsFolder string) error {
-	// Check if folder exists
-	if _, err := os.Stat(secretsFolder); os.IsNotExist(err) {
-		log.Printf("🤷 No secrets folder found at %s", secretsFolder)
-		return nil
-	}
-
-	// Apply all yaml files in the secrets folder
-	files, err := os.ReadDir(secretsFolder)
-	if err != nil {
-		return fmt.Errorf("failed to read secrets folder: %w", err)
-	}
-
-	secretCount := 0
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-
-		if err := utils.KubectlApply(filepath.Join(secretsFolder, file.Name())); err != nil {
-			return fmt.Errorf("failed to apply secret %s: %w", file.Name(), err)
-		}
-
-		secretCount++
-	}
-
-	if secretCount > 0 {
-		log.Printf("🤫 Applied %d secrets", secretCount)
-	} else {
-		log.Printf("🤷 No secrets found in %s", secretsFolder)
 	}
 
 	return nil
