@@ -134,20 +134,20 @@ func main() {
 		redirectRevisions,
 	)
 	if err != nil {
-		log.Error().Msgf("Failed to generate base apps: %v", err)
+		log.Fatal().Msgf("Failed to generate base apps: %v", err)
 	}
 
 	// Write applications to files
 	if err := utils.WriteApplications(baseApps, baseBranch, tempFolder); err != nil {
-		log.Error().Msgf("Failed to write base apps: %v", err)
+		log.Fatal().Msgf("Failed to write base apps: %v", err)
 	}
 	if err := utils.WriteApplications(targetApps, targetBranch, tempFolder); err != nil {
-		log.Error().Msgf("Failed to write target apps: %v", err)
+		log.Fatal().Msgf("Failed to write target apps: %v", err)
 	}
 
 	// Extract resources from the cluster based on each branch
 	if err := extract.GetResourcesFromBothBranches(argocd, baseBranch, targetBranch, opts.Timeout, tempFolder, opts.OutputFolder); err != nil {
-		log.Error().Msgf("Failed to get resources: %v", err)
+		log.Fatal().Msgf("Failed to get resources: %v", err)
 	}
 
 	// Generate diff between base and target branches
@@ -159,7 +159,7 @@ func main() {
 		opts.LineCount,
 		opts.MaxDiffLength,
 	); err != nil {
-		log.Error().Msgf("Failed to generate diff: %v", err)
+		log.Fatal().Msgf("Failed to generate diff: %v", err)
 	}
 
 	if !opts.KeepClusterAlive {

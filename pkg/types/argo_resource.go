@@ -152,7 +152,6 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions []string) error {
 	// Only process ApplicationSets
 	if a.Kind != ApplicationSet {
-		log.Debug().Str("file", a.FileName).Msgf("not an ApplicationSet: %s", a.Name)
 		return nil
 	}
 
@@ -362,6 +361,13 @@ func GetYamlValue(node *yaml.Node, path []string) *yaml.Node {
 func setYamlValue(node *yaml.Node, path []string, value string) {
 	if node == nil || len(path) == 0 {
 		log.Debug().Msgf("Can't set value because node is nil or path is empty")
+		return
+	}
+
+	if node.Kind == yaml.DocumentNode {
+		if len(node.Content) > 0 {
+			setYamlValue(node.Content[0], path, value)
+		}
 		return
 	}
 
