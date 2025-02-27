@@ -11,6 +11,7 @@ import (
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
+	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -58,7 +59,7 @@ func GetApplicationsForBranches(
 	var duplicateYaml []*yaml.Node
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
-			if baseApp.Name == targetApp.Name && utils.YamlEqual(baseApp.Yaml, targetApp.Yaml) {
+			if baseApp.Name == targetApp.Name && yamlutil.YamlEqual(baseApp.Yaml, targetApp.Yaml) {
 				log.Debug().Msgf("Skipping application '%s' because it has not changed", baseApp.Name)
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
@@ -158,7 +159,7 @@ func filterDuplicates(apps []types.ArgoResource, duplicates []*yaml.Node) []type
 	for _, app := range apps {
 		isDuplicate := false
 		for _, dup := range duplicates {
-			if utils.YamlEqual(app.Yaml, dup) {
+			if yamlutil.YamlEqual(app.Yaml, dup) {
 				isDuplicate = true
 				break
 			}
@@ -335,6 +336,9 @@ func ConvertAppSetsToAppsInBothBranches(
 
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
 
+	baseApps = utils.UniqueNames(baseApps, baseBranch)
+	targetApps = utils.UniqueNames(targetApps, targetBranch)
+
 	baseApps, err := ConvertAppSetsToApps(
 		argocd,
 		baseApps,
@@ -358,6 +362,9 @@ func ConvertAppSetsToAppsInBothBranches(
 	if err != nil {
 		log.Error().Msgf("Failed to generate target apps: %v", err)
 	}
+
+	baseApps = utils.UniqueNames(baseApps, baseBranch)
+	targetApps = utils.UniqueNames(targetApps, targetBranch)
 
 	return baseApps, targetApps, nil
 }
@@ -446,7 +453,7 @@ func ConvertAppSetsToApps(
 
 		// Convert each document to ArgoResource
 		for _, doc := range yamlData {
-			kind := types.GetYamlValue(&doc, []string{"kind"})
+			kind := yamlutil.GetYamlValue(&doc, []string{"kind"})
 			if kind == nil {
 				log.Error().
 					Str("file", appSet.FileName).
@@ -460,14 +467,17 @@ func ConvertAppSetsToApps(
 				continue
 			}
 
-			name := types.GetYamlValue(&doc, []string{"metadata", "name"})
+			name := yamlutil.GetYamlValue(&doc, []string{"metadata", "name"})
 			if name == nil {
 				log.Error().Str("file", appSet.FileName).Msg("❌ Generated Application missing name")
 				continue
 			}
 
+			// Create a deep copy of the YAML node to avoid reference issues
+			docCopy := yamlutil.DeepCopyYaml(&doc)
+
 			app := types.ArgoResource{
-				Yaml:     &doc,
+				Yaml:     docCopy,
 				Kind:     types.Application,
 				Name:     name.Value,
 				FileName: appSet.FileName,
@@ -495,6 +505,9 @@ func ConvertAppSetsToApps(
 			localGeneratedAppsCounter,
 		)
 	}
+
+	// After all apps are processed, ensure unique names
+	appsNew = utils.UniqueNames(appsNew, branch)
 
 	if appSetCounter > 0 {
 		log.Info().Str("branch", branch.Name).Msgf(

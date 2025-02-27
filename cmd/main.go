@@ -109,7 +109,7 @@ func main() {
 	// Install Argo CD
 	argocd := argocd.New(opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
 	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
-		log.Error().Msgf("Failed to install Argo CD: %v", err)
+		log.Fatal().Msgf("Failed to install Argo CD: %v", err)
 	}
 
 	tempFolder := "temp"

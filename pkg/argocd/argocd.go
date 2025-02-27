@@ -63,7 +63,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	}
 
 	// Apply secrets before installing ArgoCD
-	if err := utils.ApplySecretsFromFolder(secretsFolder); err != nil {
+	if err := utils.ApplySecretsFromFolder(secretsFolder, a.Namespace); err != nil {
 		return fmt.Errorf("failed to apply secrets: %w", err)
 	}
 

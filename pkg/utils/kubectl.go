@@ -12,21 +12,21 @@ import (
 )
 
 // KubectlApply applies a Kubernetes manifest file using kubectl
-func KubectlApply(path string) error {
+func KubectlApply(path string, extraArgs ...string) error {
 	log.Debug().Str("path", path).Msg("Applying manifest")
 
 	// Try to apply the manifest multiple times in case of temporary failures
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
-		cmd := exec.Command("kubectl", "apply", "-f", path)
-		_, err := cmd.CombinedOutput()
+		cmd := exec.Command("kubectl", append([]string{"apply", "-f", path}, extraArgs...)...)
+		output, err := cmd.CombinedOutput()
 
 		if err == nil {
 			log.Debug().Str("path", path).Msg("Successfully applied manifest")
 			return nil
 		}
 
-		log.Warn().Err(err).Str("path", path).Msgf("⚠️ Failed to apply manifest (attempt %d/%d)", i+1, maxRetries)
+		log.Warn().Err(err).Str("path", path).Str("output", string(output)).Msgf("⚠️ Failed to apply manifest (attempt %d/%d)", i+1, maxRetries)
 
 		if i < maxRetries-1 {
 			time.Sleep(2 * time.Second)
@@ -88,7 +88,7 @@ func DeleteApplications() error {
 }
 
 // ApplySecretsFromFolder applies all secrets from a folder using kubectl
-func ApplySecretsFromFolder(secretsFolder string) error {
+func ApplySecretsFromFolder(secretsFolder string, namespace string) error {
 	// Check if folder exists
 	if _, err := os.Stat(secretsFolder); os.IsNotExist(err) {
 		log.Info().Msgf("🤷 No secrets folder found at %s", secretsFolder)
@@ -107,7 +107,7 @@ func ApplySecretsFromFolder(secretsFolder string) error {
 			continue
 		}
 
-		if err := KubectlApply(filepath.Join(secretsFolder, file.Name())); err != nil {
+		if err := KubectlApply(filepath.Join(secretsFolder, file.Name()), "-n", namespace); err != nil {
 			return fmt.Errorf("failed to apply secret %s: %w", file.Name(), err)
 		}
 		secretCount++
