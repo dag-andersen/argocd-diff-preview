@@ -12,6 +12,10 @@ import (
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 )
 
+const (
+	dirMode = os.ModePerm // 0755 - read/write/execute for owner, read/execute for group and others
+)
+
 func YamlToString(input *yaml.Node) string {
 	bytes, err := yaml.Marshal(input)
 	if err != nil {
@@ -49,6 +53,14 @@ func WriteFile(path string, content string) error {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 	return os.WriteFile(path, []byte(content), 0644)
+}
+
+// Create folder (clear its content if it exists)
+func CreateFolder(path string) error {
+	if err := os.RemoveAll(path); err != nil {
+		return fmt.Errorf("failed to delete folder: %v", err)
+	}
+	return os.MkdirAll(path, dirMode)
 }
 
 // WriteApplications writes applications to YAML files in the specified folder
