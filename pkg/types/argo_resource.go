@@ -191,17 +191,17 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		}
 
 		// Check targetRevision
-		revision := yamlutil.GetYamlValue(gitGen, []string{"revision"})
-		if revision == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git.revision' key found in ApplicationSet: %s", index, a.Name)
+		targetRevision := yamlutil.GetYamlValue(gitGen, []string{"targetRevision"})
+		if targetRevision == nil {
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git.targetRevision' key found in ApplicationSet: %s", a.Name)
 			continue
 		}
 
 		// Check if we should redirect this revision
 		shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, revision.Value)
 		if shouldRedirect {
-			yamlutil.SetYamlValue(gitGen, []string{"revision"}, branch)
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf(
+			yamlutil.SetYamlValue(gitGen, []string{"targetRevision"}, branch)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf(
 				"Patched git generators in ApplicationSet: %s",
 				a.Name,
 			)
@@ -246,9 +246,6 @@ func (a *ArgoResource) Filter(
 
 	// Check files changed
 	if len(filesChanged) > 0 {
-
-		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking files changed: %v", filesChanged)
-
 		metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
 		if metadata == nil {
 			return nil

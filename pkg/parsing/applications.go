@@ -480,10 +480,25 @@ func ConvertAppSetsToApps(
 			}
 
 			// Create a deep copy of the YAML node to avoid reference issues
-			docCopy := yamlutil.DeepCopyYaml(&doc)
+			docCopy := doc
+			if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 {
+				// If it's a document node, we need to copy its content
+				docBytes, err := yaml.Marshal(&doc)
+				if err != nil {
+					log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to marshal YAML for application: %s", name.Value)
+					continue
+				}
+
+				var newDoc yaml.Node
+				if err := yaml.Unmarshal(docBytes, &newDoc); err != nil {
+					log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to unmarshal YAML for application: %s", name.Value)
+					continue
+				}
+				docCopy = newDoc
+			}
 
 			app := types.ArgoResource{
-				Yaml:     docCopy,
+				Yaml:     &docCopy,
 				Kind:     types.Application,
 				Name:     name.Value,
 				FileName: appSet.FileName,

@@ -177,22 +177,3 @@ func YamlEqual(a, b *yaml.Node) bool {
 	}
 	return string(aStr) == string(bStr)
 }
-
-// DeepCopyYaml creates a deep copy of YAML
-func DeepCopyYaml(node *yaml.Node) *yaml.Node {
-	if node == nil {
-		return nil
-	}
-
-	bytes, err := yaml.Marshal(node)
-	if err != nil {
-		return nil
-	}
-
-	var newNode yaml.Node
-	if err := yaml.Unmarshal(bytes, &newNode); err != nil {
-		return nil
-	}
-
-	return &newNode
-}
