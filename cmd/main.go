@@ -18,11 +18,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	dirMode  = os.ModePerm // 0755 - read/write/execute for owner, read/execute for group and others
-	fileMode = 0644        // 0644 - read/write for owner, read-only for group and others
-)
-
 func getClusterProvider(clusterType, clusterName string) cluster.Provider {
 	var provider cluster.Provider
 	switch clusterType {
@@ -101,7 +96,7 @@ func main() {
 	foundTargetApps := len(targetApps) > 0
 
 	if !foundBaseApps && !foundTargetApps {
-		log.Error().Msg("No applications found in either branch")
+		log.Info().Msg("Found no applications to process in either branch")
 		os.Exit(0)
 	}
 
@@ -118,7 +113,7 @@ func main() {
 	}
 
 	tempFolder := "temp"
-	if err := os.MkdirAll(tempFolder, dirMode); err != nil {
+	if err := utils.CreateFolder(tempFolder); err != nil {
 		log.Error().Msgf("Failed to create temp folder: %v", err)
 	}
 
@@ -135,6 +130,10 @@ func main() {
 	)
 	if err != nil {
 		log.Fatal().Msgf("Failed to generate base apps: %v", err)
+	}
+
+	if err := utils.CreateFolder(opts.OutputFolder); err != nil {
+		log.Error().Msgf("Failed to create output folder: %v", err)
 	}
 
 	// Write applications to files
