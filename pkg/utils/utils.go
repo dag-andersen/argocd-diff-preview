@@ -6,35 +6,14 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
-
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
+	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
+	"github.com/rs/zerolog/log"
 )
 
 const (
 	dirMode = os.ModePerm // 0755 - read/write/execute for owner, read/execute for group and others
 )
-
-func YamlToString(input *yaml.Node) string {
-	bytes, err := yaml.Marshal(input)
-	if err != nil {
-		return ""
-	}
-	return string(bytes)
-}
-
-func YamlEqual(a, b *yaml.Node) bool {
-	aStr, err := yaml.Marshal(a)
-	if err != nil {
-		return false
-	}
-	bStr, err := yaml.Marshal(b)
-	if err != nil {
-		return false
-	}
-	return string(aStr) == string(bStr)
-}
 
 // RunCommand executes a command and returns its output
 func RunCommand(cmd string) (string, error) {
@@ -79,4 +58,99 @@ func WriteApplications(
 	}
 
 	return nil
+}
+
+// UniqueNames ensures all applications have unique names by adding suffixes to duplicates
+func UniqueNames(apps []types.ArgoResource, branch *types.Branch) []types.ArgoResource {
+	// Group applications by name
+	duplicateNames := make(map[string][]types.ArgoResource)
+	for _, app := range apps {
+		duplicateNames[app.Name] = append(duplicateNames[app.Name], app)
+	}
+
+	var newApps []types.ArgoResource
+	duplicateCounter := 0
+
+	// Process each group of applications
+	for name, appsWithSameName := range duplicateNames {
+		if len(appsWithSameName) > 1 {
+			duplicateCounter++
+			log.Debug().
+				Str("branch", branch.Name).
+				Msgf("Found %d duplicate applications with same name: %s", len(appsWithSameName), name)
+
+			// Sort apps by their YAML representation for consistent ordering
+			sortedApps := make([]types.ArgoResource, len(appsWithSameName))
+			copy(sortedApps, appsWithSameName)
+
+			// Sort by YAML string representation
+			for i := 0; i < len(sortedApps); i++ {
+				for j := i + 1; j < len(sortedApps); j++ {
+					yamlI, _ := sortedApps[i].AsString()
+					yamlJ, _ := sortedApps[j].AsString()
+					if yamlI > yamlJ {
+						sortedApps[i], sortedApps[j] = sortedApps[j], sortedApps[i]
+					}
+				}
+			}
+
+			// Rename each app with a suffix
+			for i, app := range sortedApps {
+				newName := fmt.Sprintf("%s-%d", name, i+1)
+
+				// Create a copy of the app
+				newApp := app
+				newApp.Name = newName
+
+				// Update the name in the YAML
+				yamlutil.SetYamlValue(newApp.Yaml, []string{"metadata", "name"}, newName)
+				log.Debug().Str("branch", branch.Name).Msgf("updated name in yaml: %s", newName)
+
+				newApps = append(newApps, newApp)
+			}
+		} else {
+			// No duplicates, keep as is
+			newApps = append(newApps, appsWithSameName[0])
+		}
+	}
+
+	if duplicateCounter > 0 {
+		log.Info().
+			Str("branch", branch.Name).
+			Msgf("🔍 Found %d duplicate application names. Suffixing with -1, -2, -3, etc.", duplicateCounter)
+		log.Info().Str("branch", branch.Name).Msgf("🤖 Applications after unique names: %v", len(newApps))
+	}
+
+	sanityCheckFailed := false
+
+	// sanity check. Check that all names are unique
+	log.Debug().Str("branch", branch.Name).Msgf("sanity checking unique names 1")
+	names := make(map[string]bool)
+	for _, app := range newApps {
+		if names[app.Name] {
+			log.Error().Str("branch", branch.Name).Msgf("Duplicate application name: %s", app.Name)
+			sanityCheckFailed = true
+		}
+		names[app.Name] = true
+	}
+	log.Debug().Str("branch", branch.Name).Msgf("sanity checking passed 1")
+
+	// sanity check by checking the yaml
+	log.Debug().Str("branch", branch.Name).Msgf("sanity checking unique names 2")
+	namesInYaml := make(map[string]bool)
+	for _, app := range newApps {
+		name := yamlutil.GetYamlValue(app.Yaml, []string{"metadata", "name"}).Value
+		if namesInYaml[name] {
+			log.Error().Str("branch", branch.Name).Msgf("Duplicate application name in yaml: %s", name)
+			sanityCheckFailed = true
+		}
+		namesInYaml[name] = true
+	}
+
+	log.Debug().Str("branch", branch.Name).Msgf("sanity checking passed 2")
+	if sanityCheckFailed {
+		log.Error().Str("branch", branch.Name).Msgf("Sanity check failed")
+		os.Exit(1)
+	}
+	return newApps
 }
