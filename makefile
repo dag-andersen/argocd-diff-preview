@@ -15,20 +15,21 @@ docker-build:
 	docker build . -f $(docker_file) -t image
 
 run-with-cargo: pull-repository
-	cargo run -- -b "$(base_branch)" \
-		-t "$(target_branch)" \
-		--repo $(github_org)/$(gitops_repo) \
+	cargo run -- \
+		--base-branch="$(base_branch)" \
+		--target-branch="$(target_branch)" \
+		--repo="$(github_org)/$(gitops_repo)" \
 		--debug \
 		--keep-cluster-alive \
-		-r "$(regex)" \
-		--diff-ignore "$(diff_ignore)" \
+		--file-regex="$(regex)" \
+		--diff-ignore="$(diff_ignore)" \
 		--timeout $(timeout) \
 		-l "$(selector)" \
 		--argocd-namespace "$(argocd_namespace)" \
 		--files-changed="$(files_changed)" \
 		--redirect-target-revisions="HEAD"
 
-run-with-go:
+run-with-go: pull-repository
 	go run cmd/main.go \
 		--base-branch="$(base_branch)" \
 		--target-branch="$(target_branch)" \
@@ -60,7 +61,8 @@ run-with-docker: pull-repository docker-build
 		-e TIMEOUT=$(timeout) \
 		-e SELECTOR="$(selector)" \
 		-e FILES_CHANGED="$(files_changed)" \
-		image
+		image \
+		--argocd-namespace="$(argocd_namespace)"
 
 mkdocs:
 	python3 -m venv venv \
