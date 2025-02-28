@@ -13,6 +13,7 @@ use std::{error::Error, io::Write};
 use structopt::StructOpt;
 use utils::{
     check_if_folder_exists, create_folder_if_not_exists, delete_folder, run_simple_command,
+    validate_repository,
 };
 mod argo_resource;
 mod argocd;
@@ -66,7 +67,7 @@ struct Opt {
     #[structopt(short, long, env)]
     target_branch: String,
 
-    /// Git Repository. Format: OWNER/REPO
+    /// Git Repository - Example: OWNER/REPO
     #[structopt(long = "repo", env)]
     repo: String,
 
@@ -207,11 +208,9 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     let cluster_tool = &opt.local_cluster_tool;
 
-    let repo_regex = Regex::new(r"^[a-zA-Z0-9\.\{\}_-]+/[a-zA-Z0-9\.\{\}_-]+$")?;
-    if !repo_regex.is_match(repo) {
-        error!("❌ Invalid repository format. Please use OWNER/REPO");
-        return Err("Invalid repository format".into());
-    }
+    validate_repository(repo).inspect_err(|e| {
+        error!("❌ {}", e);
+    })?;
 
     info!("✨ Running with:");
     info!("✨ - local-cluster-tool: {:?}", cluster_tool);

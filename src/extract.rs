@@ -1,6 +1,6 @@
 use crate::argocd::ArgoCDInstallation;
 use crate::error::CommandError;
-use crate::utils::{self, run_simple_command, spawn_command, write_to_file};
+use crate::utils::{self, run_simple_command, write_to_file};
 use crate::{apply_manifest, Branch};
 use log::{debug, error, info};
 use serde_yaml::Value;
