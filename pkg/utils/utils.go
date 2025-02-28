@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
@@ -27,11 +28,23 @@ func RunCommand(cmd string) (string, error) {
 
 // WriteFile writes content to a file
 func WriteFile(path string, content string) error {
+	// Ensure content ends with a newline
+	if len(content) > 0 && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+
+	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %v", err)
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+
+	// Write file
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", path, err)
+	}
+
+	return nil
 }
 
 // Create folder (clear its content if it exists)

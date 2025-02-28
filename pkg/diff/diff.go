@@ -54,9 +54,9 @@ func GenerateDiff(
 	}
 
 	// Get summary diff
-	summaryDiffCmd := fmt.Sprintf("git --no-pager diff --compact-summary --no-index %s %s/%s %s/%s",
-		patternsToIgnore, outputFolder, baseBranch.Type(), outputFolder, targetBranch.Type())
-	summaryOutput, err := gitDiffOutputCommand(summaryDiffCmd)
+	summaryDiffCmd := fmt.Sprintf("git --no-pager diff --compact-summary --no-index %s %s %s",
+		patternsToIgnore, baseBranch.Type(), targetBranch.Type())
+	summaryOutput, err := gitDiffOutputCommand(outputFolder, summaryDiffCmd)
 	if err != nil {
 		return fmt.Errorf("failed to get summary diff: %w", err)
 	}
@@ -68,9 +68,9 @@ func GenerateDiff(
 		lineCount = 10
 	}
 
-	diffCmd := fmt.Sprintf("git --no-pager diff --no-prefix -U%d --no-index %s %s/%s %s/%s",
-		lineCount, patternsToIgnore, outputFolder, baseBranch.Type(), outputFolder, targetBranch.Type())
-	diffOutput, err := gitDiffOutputCommand(diffCmd)
+	diffCmd := fmt.Sprintf("git --no-pager diff --no-prefix -U%d --no-index %s %s %s",
+		lineCount, patternsToIgnore, baseBranch.Type(), targetBranch.Type())
+	diffOutput, err := gitDiffOutputCommand(outputFolder, diffCmd)
 	if err != nil {
 		return fmt.Errorf("failed to get detailed diff: %w", err)
 	}
@@ -96,7 +96,7 @@ func GenerateDiff(
 	}
 
 	// Generate and write markdown
-	markdown := printDiff(summaryAsString, diffTruncated)
+	markdown := printDiff(summaryAsString, strings.TrimSpace(diffTruncated))
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
 		return fmt.Errorf("failed to write markdown: %w", err)
@@ -107,9 +107,10 @@ func GenerateDiff(
 }
 
 // Git diff command that gets the error output of a command
-func gitDiffOutputCommand(cmd string) (string, error) {
+func gitDiffOutputCommand(fromFolder string, cmd string) (string, error) {
 	log.Debug().Msgf("Getting diff with command: %s", cmd)
 	command := exec.Command("sh", "-c", cmd)
+	command.Dir = fromFolder
 	var stderr bytes.Buffer
 	var stdout bytes.Buffer
 	command.Stderr = &stderr
@@ -134,7 +135,7 @@ func markdownTemplateLength() int {
 func printDiff(summary, diff string) string {
 	return strings.TrimSpace(strings.ReplaceAll(
 		strings.ReplaceAll(markdownTemplate, "%summary%", summary),
-		"%diff%", diff))
+		"%diff%", diff)) + "\n"
 }
 
 func parseDiffOutput(output string) string {
