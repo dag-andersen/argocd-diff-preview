@@ -25,6 +25,7 @@ var errorMessages = []string{
 	"Unknown desc = Unable to resolve",
 	"is not a valid chart repository or cannot be reached",
 	"Unknown desc = repository not found",
+	"to a commit SHA",
 }
 
 var timeoutMessages = []string{
@@ -157,11 +158,11 @@ func extractResourcesFromCluster(
 						if containsAny(msg, errorMessages) {
 							failedApps[name] = msg
 						} else if containsAny(msg, timeoutMessages) {
-							log.Info().Msgf("Application: %s timed out with error: %s", name, msg)
+							log.Warn().Msgf("Application: %s timed out with error: %s", name, msg)
 							timedOutApps = append(timedOutApps, name)
 							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
 						} else {
-							log.Info().Msgf("Application: %s failed with error: %s", name, msg)
+							log.Error().Msgf("Application: %s failed with error: %s", name, msg)
 							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
 						}
 					}
