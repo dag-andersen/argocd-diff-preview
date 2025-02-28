@@ -29,7 +29,7 @@ run-with-cargo: pull-repository
 		--files-changed="$(files_changed)" \
 		--redirect-target-revisions="HEAD"
 
-run-with-go:
+run-with-go: pull-repository
 	go run cmd/main.go \
 		--base-branch="$(base_branch)" \
 		--target-branch="$(target_branch)" \
