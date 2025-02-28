@@ -70,7 +70,7 @@ OPTIONS:
                 [env: OUTPUT_FOLDER=]  [default: ./output]
 
         --repo <repo>
-                Git Repository. Format: OWNER/REPO
+                Git Repository - Example: OWNER/REPO
                 [env: REPO=]
 
     -s, --secrets-folder <secrets-folder>

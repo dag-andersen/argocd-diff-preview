@@ -70,3 +70,6 @@ mkdocs:
 	&& pip3 install mkdocs-material \
 	&& open http://localhost:8000 \
 	&& mkdocs serve
+
+run-test-all:
+	cd tests && $(MAKE) run-test-all

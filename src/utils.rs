@@ -1,4 +1,5 @@
 use log::debug;
+use regex::Regex;
 use std::error::Error;
 use std::io::Write;
 use std::path::PathBuf;
@@ -117,4 +118,64 @@ pub fn write_to_file(file_name: &str, content: &str) -> Result<(), Box<dyn Error
 pub async fn sleep(seconds: u64) {
     debug!("Sleeping for {} seconds", seconds);
     tokio::time::sleep(tokio::time::Duration::from_secs(seconds)).await;
+}
+
+pub fn validate_repository(repo: &str) -> Result<(), Box<dyn Error>> {
+    let regex = r"^[a-zA-Z0-9\.\{\}_-]+(?:/[a-zA-Z0-9\.\{\}_-]+)+$";
+    let repo_regex = Regex::new(regex)?;
+    if !repo_regex.is_match(repo) {
+        return Err(format!("Invalid repository format. Please use OWNER/REPO or something that matches the regex: {}", regex).into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_repository_valid() {
+        let valid_repos = vec![
+            "owner/repo",
+            "owner-name/repo-name",
+            "owner_name/repo_name",
+            "owner.name/repo.name",
+            "owner123/repo456",
+            "123owner/456repo",
+            "owner{name}/repo{name}",
+            "owner/repo/more-layers",
+            "owner/repo/more-layers/2",
+        ];
+
+        for repo in valid_repos {
+            assert!(
+                validate_repository(repo).is_ok(),
+                "Repository '{}' should be valid",
+                repo
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_repository_invalid() {
+        let invalid_repos = vec![
+            "",
+            "owner",
+            "owner/",
+            "/repo",
+            "owner/repo/extra",
+            "owner repo",
+            "owner@repo",
+            "owner#repo",
+            "owner$/repo",
+        ];
+
+        for repo in invalid_repos {
+            assert!(
+                validate_repository(repo).is_err(),
+                "Repository '{}' should be invalid",
+                repo
+            );
+        }
+    }
 }
