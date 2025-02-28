@@ -13,14 +13,35 @@ pull-target:
 	@rm -rf target-branch || true && mkdir -p target-branch
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
-run-single-test: pull-base
-	$(MAKE) pull-target target_branch=$(target_branch)
+run-single-test: pull-base pull-target
 	cargo run -- -b "$(base_branch)" \
 		-t "$(target_branch)" \
 		--repo $(github_org)/$(gitops_repo)
 	diff ./output/diff.md ./$(target_branch)/output.md
 
+docker-build:
+	docker build -f $(docker_file) -t argocd-diff-preview ..
+
+run-single-test-docker: pull-base pull-target
+	docker run --network=host \
+		-v ~/.kube:/root/.kube \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v $(PWD)/base-branch:/base-branch \
+		-v $(PWD)/target-branch:/target-branch \
+		-v $(PWD)/output:/output \
+		-v $(PWD)/secrets:/secrets \
+		-e BASE_BRANCH=$(base_branch) \
+		-e TARGET_BRANCH=$(target_branch) \
+		-e REPO=$(github_org)/$(gitops_repo) \
+		argocd-diff-preview \
+		--argocd-namespace "$(argocd_namespace)"
+
 run-test-all:
 	$(MAKE) run-single-test target_branch=tool-test-branch-1 base_branch=tool-test-branch-1-og
 	$(MAKE) run-single-test target_branch=tool-test-branch-2 base_branch=tool-test-branch-2-og
 	$(MAKE) run-single-test target_branch=tool-test-branch-3 base_branch=tool-test-branch-3-og
+
+run-test-all-docker: docker-build
+	$(MAKE) run-single-test-docker target_branch=tool-test-branch-1 base_branch=tool-test-branch-1-og
+	$(MAKE) run-single-test-docker target_branch=tool-test-branch-2 base_branch=tool-test-branch-2-og
+	$(MAKE) run-single-test-docker target_branch=tool-test-branch-3 base_branch=tool-test-branch-3-og

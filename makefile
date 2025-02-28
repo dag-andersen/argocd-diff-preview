@@ -56,3 +56,6 @@ mkdocs:
 
 run-test-all:
 	cd tests && $(MAKE) run-test-all
+
+run-test-all-docker:
+	cd tests && $(MAKE) run-test-all-docker
