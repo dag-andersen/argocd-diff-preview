@@ -127,6 +127,7 @@ func main() {
 		opts.Repo,
 		tempFolder,
 		redirectRevisions,
+		opts.Debug,
 	)
 	if err != nil {
 		log.Fatal().Msgf("Failed to generate base apps: %v", err)

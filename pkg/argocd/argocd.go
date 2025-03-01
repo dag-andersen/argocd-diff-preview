@@ -124,7 +124,8 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 	if debug {
 		// Get ConfigMaps
-		output, err := utils.RunCommand("kubectl get configmap -n argocd-diff-preview -o yaml argocd-cmd-params-cm argocd-cm")
+		cmd := fmt.Sprintf("kubectl get configmap -n %s -o yaml argocd-cmd-params-cm argocd-cm", a.Namespace)
+		output, err := utils.RunCommand(cmd)
 		if err != nil {
 			log.Error().Err(err).Msg("❌ Failed to get ConfigMaps")
 			return fmt.Errorf("failed to get ConfigMaps: %w", err)

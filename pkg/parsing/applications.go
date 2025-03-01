@@ -332,6 +332,7 @@ func ConvertAppSetsToAppsInBothBranches(
 	repo string,
 	tempFolder string,
 	redirectRevisions []string,
+	debug bool,
 ) ([]types.ArgoResource, []types.ArgoResource, error) {
 
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
@@ -346,6 +347,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		repo,
 		tempFolder,
 		redirectRevisions,
+		debug,
 	)
 	if err != nil {
 		log.Error().Msgf("Failed to generate base apps: %v", err)
@@ -358,6 +360,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		repo,
 		tempFolder,
 		redirectRevisions,
+		debug,
 	)
 	if err != nil {
 		log.Error().Msgf("Failed to generate target apps: %v", err)
@@ -376,6 +379,7 @@ func ConvertAppSetsToApps(
 	repo string,
 	tempFolder string,
 	redirectRevisions []string,
+	debug bool,
 ) ([]types.ArgoResource, error) {
 	var appsNew []types.ArgoResource
 	appSetCounter := 0
@@ -411,7 +415,9 @@ func ConvertAppSetsToApps(
 			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to write ApplicationSet to file")
 			continue
 		}
-		defer os.Remove(randomFileName)
+		if !debug {
+			defer os.Remove(randomFileName)
+		}
 
 		// Generate applications using argocd appset generate
 		output, err := argocd.AppsetGenerate(randomFileName)

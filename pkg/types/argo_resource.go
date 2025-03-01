@@ -169,7 +169,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 	}
 
 	// Process each generator
-	for _, generator := range generators.Content {
+	for index, generator := range generators.Content {
 		if generator.Kind != yaml.MappingNode {
 			continue
 		}
