@@ -97,6 +97,16 @@ func main() {
 
 	if !foundBaseApps && !foundTargetApps {
 		log.Info().Msg("Found no applications to process in either branch")
+
+		// Write a message to the output file when no applications are found
+		if err := utils.CreateFolder(opts.OutputFolder); err != nil {
+			log.Error().Msgf("Failed to create output folder: %v", err)
+		}
+
+		if err := diff.WriteNoAppsFoundMessage(opts.OutputFolder, selectors, filesChanged); err != nil {
+			log.Error().Msgf("Failed to write no apps found message: %v", err)
+		}
+
 		os.Exit(0)
 	}
 

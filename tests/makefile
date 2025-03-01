@@ -1,7 +1,7 @@
 gitops_repo ?= argocd-diff-preview
 github_org ?= dag-andersen
 base_branch := main
-docker_file := Dockerfile
+docker_file := go.Dockerfile
 argocd_namespace := argocd
 timeout := 90
 

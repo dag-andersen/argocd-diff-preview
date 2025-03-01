@@ -164,9 +164,11 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 
 	generators := yamlutil.GetYamlValue(spec, []string{"generators"})
 	if generators == nil {
-		log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators' key found in ApplicationSet: %s", a.Name)
+		log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators' key found in ApplicationSet: %s", a.Name)
 		return nil
 	}
+
+	log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("found %d generators in ApplicationSet: %s", len(generators.Content), a.Name)
 
 	// Process each generator
 	for index, generator := range generators.Content {
@@ -177,29 +179,29 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 		// Look for git generator
 		gitGen := yamlutil.GetYamlValue(generator, []string{"git"})
 		if gitGen == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git' key found in ApplicationSet: %s", a.Name)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git' key found in ApplicationSet: %s", index, a.Name)
 			continue
 		}
 
 		// Check repoURL
 		repoURL := yamlutil.GetYamlValue(gitGen, []string{"repoURL"})
 		if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git.repoURL' key found in ApplicationSet: %s", a.Name)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git.repoURL' key found in ApplicationSet: %s", index, a.Name)
 			continue
 		}
 
 		// Check targetRevision
-		targetRevision := yamlutil.GetYamlValue(gitGen, []string{"targetRevision"})
-		if targetRevision == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("no 'spec.generators.git.targetRevision' key found in ApplicationSet: %s", a.Name)
+		revision := yamlutil.GetYamlValue(gitGen, []string{"revision"})
+		if revision == nil {
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git.revision' key found in ApplicationSet: %s", index, a.Name)
 			continue
 		}
 
 		// Check if we should redirect this revision
-		shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRevision.Value)
+		shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, revision.Value)
 		if shouldRedirect {
-			yamlutil.SetYamlValue(gitGen, []string{"targetRevision"}, branch)
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf(
+			yamlutil.SetYamlValue(gitGen, []string{"revision"}, branch)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf(
 				"Patched git generators in ApplicationSet: %s",
 				a.Name,
 			)
@@ -208,6 +210,8 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 
 	return nil
 }
+
+// TODO: should ignoreInvalidWatchPattern throw error or return nil?
 
 // Filter checks if the application matches the given selectors and watches the given files
 func (a *ArgoResource) Filter(
@@ -242,6 +246,9 @@ func (a *ArgoResource) Filter(
 
 	// Check files changed
 	if len(filesChanged) > 0 {
+
+		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking files changed: %v", filesChanged)
+
 		metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
 		if metadata == nil {
 			return nil
@@ -254,29 +261,49 @@ func (a *ArgoResource) Filter(
 
 		watchPattern := yamlutil.GetYamlValue(annotations, []string{AnnotationWatchPattern})
 		if watchPattern == nil {
+			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern annotation found. Skipping")
 			return nil
 		}
 
-		pattern := watchPattern.Value
-		if pattern == "" {
+		patternList := strings.TrimSpace(watchPattern.Value)
+		if patternList == "" {
+			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern value found. Skipping")
 			return nil
 		}
 
-		regex, err := regexp.Compile(pattern)
-		if err != nil {
-			if !ignoreInvalidWatchPattern {
-				log.Warn().Msgf("⚠️ Invalid watch pattern '%s' in file: %s", pattern, a.FileName)
-				return nil
+		patterns := strings.Split(patternList, ",")
+
+		for _, pattern := range patterns {
+			pattern = strings.TrimSpace(pattern)
+
+			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking watch pattern: %s", pattern)
+
+			if pattern == "" {
+				log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("empty watch pattern found. Continuing")
+				continue
 			}
-			log.Warn().Msgf("⚠️ Ignoring invalid watch pattern '%s' in file: %s", pattern, a.FileName)
-			return a
-		}
 
-		for _, file := range filesChanged {
-			if regex.MatchString(file) {
+			regex, err := regexp.Compile(pattern)
+			if err != nil {
+				if !ignoreInvalidWatchPattern {
+					log.Warn().Msgf("⚠️ Invalid watch pattern '%s' in file: %s", pattern, a.FileName)
+					return nil
+				}
+				log.Warn().Msgf("⚠️ Ignoring invalid watch pattern '%s' in file: %s", pattern, a.FileName)
 				return a
 			}
+
+			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("watch pattern '%s' is valid. Checking files changed", pattern)
+
+			for _, file := range filesChanged {
+				if regex.MatchString(file) {
+					log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("file '%s' matches watch pattern. Returning application", file)
+					return a
+				}
+			}
 		}
+
+		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no files changed match watch pattern. Skipping")
 		return nil
 	}
 

@@ -119,11 +119,11 @@ func gitDiffOutputCommand(fromFolder string, cmd string) (string, error) {
 	if err != nil && strings.TrimSpace(stderr.String()) != "" {
 		return "", fmt.Errorf("command failed: %s", stderr.String())
 	}
-	s := strings.TrimSpace(stdout.String())
-	if s == "" {
+	stdoutString := stdout.String()
+	if strings.TrimSpace(stdoutString) == "" {
 		return "No changes found", nil
 	}
-	return s, nil
+	return strings.TrimRight(stdoutString, "\n"), nil
 }
 
 func markdownTemplateLength() int {
