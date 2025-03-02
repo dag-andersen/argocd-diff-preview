@@ -7,6 +7,9 @@ import (
 	"github.com/caarlos0/env/v11"
 	"github.com/rs/zerolog/log"
 
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/kind"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/minikube"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 )
 
@@ -129,6 +132,35 @@ func (o *Options) ParseRedirectRevisions() []string {
 		return nil
 	}
 	return strings.Split(o.RedirectTargetRevisions, ",")
+}
+
+// ParseClusterType parses the cluster type and returns the appropriate cluster provider
+func (o *Options) ParseClusterType() cluster.Provider {
+	var provider cluster.Provider
+	switch o.ClusterType {
+	case "kind":
+		provider = kind.New(o.ClusterName)
+	case "minikube":
+		provider = minikube.New()
+	case "auto":
+		if kind.IsInstalled() {
+			provider = kind.New(o.ClusterName)
+			log.Debug().Msg("Using kind as cluster provider")
+		} else if minikube.IsInstalled() {
+			provider = minikube.New()
+			log.Debug().Msg("Using minikube as cluster provider")
+		} else {
+			log.Error().Msg("No local cluster tool found. Please install kind or minikube")
+		}
+	default:
+		log.Error().Msgf("Unsupported cluster type: %s", o.ClusterType)
+	}
+
+	if !provider.IsInstalled() {
+		log.Error().Msgf("%s is not installed", o.ClusterType)
+	}
+
+	return provider
 }
 
 // LogOptions logs all the options

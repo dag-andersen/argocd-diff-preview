@@ -5,11 +5,8 @@ import (
 	"time"
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/diff"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/extract"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/kind"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/minikube"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/options"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/parsing"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
@@ -17,34 +14,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
-
-func getClusterProvider(clusterType, clusterName string) cluster.Provider {
-	var provider cluster.Provider
-	switch clusterType {
-	case "kind":
-		provider = kind.New(clusterName)
-	case "minikube":
-		provider = minikube.New()
-	case "auto":
-		if kind.IsInstalled() {
-			provider = kind.New(clusterName)
-			clusterType = "kind"
-		} else if minikube.IsInstalled() {
-			provider = minikube.New()
-			clusterType = "minikube"
-		} else {
-			log.Error().Msg("No local cluster tool found. Please install kind or minikube")
-		}
-	default:
-		log.Error().Msgf("Unsupported cluster type: %s", clusterType)
-	}
-
-	if !provider.IsInstalled() {
-		log.Error().Msgf("%s is not installed", clusterType)
-	}
-
-	return provider
-}
 
 func main() {
 	startTime := time.Now()
@@ -71,6 +40,7 @@ func main() {
 	selectors := opts.ParseSelectors()
 	filesChanged := opts.ParseFilesChanged()
 	redirectRevisions := opts.ParseRedirectRevisions()
+	clusterProvider := opts.ParseClusterType()
 
 	// Create branches
 	baseBranch := types.NewBranch(opts.BaseBranch, types.Base)
@@ -111,8 +81,7 @@ func main() {
 	}
 
 	// Create cluster and install Argo CD
-	provider := getClusterProvider(opts.ClusterType, opts.ClusterName)
-	if err := provider.CreateCluster(); err != nil {
+	if err := clusterProvider.CreateCluster(); err != nil {
 		log.Error().Msgf("Failed to create cluster: %v", err)
 	}
 
@@ -173,6 +142,6 @@ func main() {
 	}
 
 	if !opts.KeepClusterAlive {
-		provider.DeleteCluster(true)
+		clusterProvider.DeleteCluster(true)
 	}
 }
