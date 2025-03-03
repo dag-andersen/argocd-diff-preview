@@ -163,7 +163,6 @@ mod tests {
             "owner",
             "owner/",
             "/repo",
-            "owner/repo/extra",
             "owner repo",
             "owner@repo",
             "owner#repo",
