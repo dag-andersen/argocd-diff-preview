@@ -15,13 +15,14 @@ docker-build:
 	docker build . -f $(docker_file) -t image
 
 run-with-cargo: pull-repository
-	cargo run -- -b "$(base_branch)" \
-		-t "$(target_branch)" \
-		--repo $(github_org)/$(gitops_repo) \
+	cargo run -- \
+		--base-branch="$(base_branch)" \
+		--target-branch="$(target_branch)" \
+		--repo="$(github_org)/$(gitops_repo)" \
 		--debug \
 		--keep-cluster-alive \
-		-r "$(regex)" \
-		--diff-ignore "$(diff_ignore)" \
+		--file-regex="$(regex)" \
+		--diff-ignore="$(diff_ignore)" \
 		--timeout $(timeout) \
 		-l "$(selector)" \
 		--argocd-namespace "$(argocd_namespace)" \
@@ -45,7 +46,8 @@ run-with-docker: pull-repository docker-build
 		-e TIMEOUT=$(timeout) \
 		-e SELECTOR="$(selector)" \
 		-e FILES_CHANGED="$(files_changed)" \
-		image
+		image \
+		--argocd-namespace="$(argocd_namespace)"
 
 mkdocs:
 	python3 -m venv venv \
@@ -53,3 +55,33 @@ mkdocs:
 	&& pip3 install mkdocs-material \
 	&& open http://localhost:8000 \
 	&& mkdocs serve
+
+run-test-all-cargo:
+	cd tests && $(MAKE) run-test-all-cargo
+
+run-test-all-docker:
+	cd tests && $(MAKE) run-test-all-docker
+
+## How to run the tool locally
+
+### Run with Cargo:
+# Verify it if builds correctly:
+# make run-with-cargo target_branch=helm-example-3
+
+# Run on your own fork of the repository:
+# make run-with-cargo target_branch=<your-test-branch> github_org=<your-username>
+
+### Run with Docker:
+# Verify it if builds correctly:
+# make run-with-docker target_branch=helm-example-3
+
+# Run with Docker on your own fork of the repository:
+# make run-with-docker target_branch=<your-test-branch> github_org=<your-username>
+
+## Run Integration Tests
+
+# Run with Cargo:
+# make run-test-all-cargo
+
+# Run with Docker:
+# make run-test-all-docker
