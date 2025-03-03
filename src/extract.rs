@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::{collections::BTreeMap, error::Error};
 
-static ERROR_MESSAGES: [&str; 10] = [
+static ERROR_MESSAGES: [&str; 11] = [
     "helm template .",
     "authentication required",
     "authentication failed",
@@ -19,9 +19,10 @@ static ERROR_MESSAGES: [&str; 10] = [
     "Unknown desc = Unable to resolve",
     "is not a valid chart repository or cannot be reached",
     "Unknown desc = repository not found",
+    "InvalidSpecError: Namespace for"
 ];
 
-static TIMEOUT_MESSAGES: [&str; 7] = [
+static TIMEOUT_MESSAGES: [&str; 8] = [
     "Client.Timeout",
     "failed to get git client for repo",
     "rpc error: code = Unknown desc = Get \"https",
@@ -29,6 +30,7 @@ static TIMEOUT_MESSAGES: [&str; 7] = [
     "Could not resolve host: github.com",
     ":8081: connect: connection refused",
     "Temporary failure in name resolution", // Attempt at fixing: https://github.com/dag-andersen/argocd-diff-preview/issues/44
+    "info/refs?service=git-upload-pack"
 ];
 
 pub async fn get_resources(
