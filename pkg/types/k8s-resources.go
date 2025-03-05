@@ -1,4 +1,4 @@
-package parsing
+package types
 
 import (
 	"bufio"
@@ -8,12 +8,16 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"gopkg.in/yaml.v3"
 )
 
-// GetYamlFiles returns all yaml files in the given directory that match the regex
+// K8sResource represents a Kubernetes resource from a YAML file
+type K8sResource struct {
+	FileName string
+	Yaml     yaml.Node
+}
+
+// GetYamlFiles gets all YAML files in a directory
 func GetYamlFiles(directory string, regex *string) []string {
 	log.Debug().Msgf("Fetching all files in dir: %s", directory)
 
@@ -66,15 +70,15 @@ func GetYamlFiles(directory string, regex *string) []string {
 	return yamlFiles
 }
 
-// ParseYaml parses yaml files and returns a slice of K8sResource
-func ParseYaml(directory string, files []string) []types.K8sResource {
-	var resources []types.K8sResource
+// ParseYaml parses YAML files into K8sResources
+func ParseYaml(dir string, files []string) []K8sResource {
+	var resources []K8sResource
 
 	for _, file := range files {
-		log.Debug().Msgf("In dir '%s' found yaml file: %s", directory, file)
+		log.Debug().Msgf("In dir '%s' found yaml file: %s", dir, file)
 
 		// Open and read file
-		f, err := os.Open(filepath.Join(directory, file))
+		f, err := os.Open(filepath.Join(dir, file))
 		if err != nil {
 			log.Warn().Err(err).Msgf("⚠️ Failed to open file '%s'", file)
 			continue
@@ -109,7 +113,7 @@ func ParseYaml(directory string, files []string) []types.K8sResource {
 	return resources
 }
 
-func processYamlChunk(filename, chunk string, resources *[]types.K8sResource) {
+func processYamlChunk(filename, chunk string, resources *[]K8sResource) {
 	var yamlData yaml.Node
 	err := yaml.Unmarshal([]byte(chunk), &yamlData)
 	if err != nil {
@@ -117,7 +121,7 @@ func processYamlChunk(filename, chunk string, resources *[]types.K8sResource) {
 		return
 	}
 
-	*resources = append(*resources, types.K8sResource{
+	*resources = append(*resources, K8sResource{
 		FileName: filename,
 		Yaml:     yamlData,
 	})

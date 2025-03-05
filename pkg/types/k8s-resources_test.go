@@ -1,9 +1,8 @@
-package parsing
+package types
 
 import (
 	"testing"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -13,7 +12,7 @@ func TestProcessYamlChunk(t *testing.T) {
 		name     string
 		filename string
 		chunk    string
-		want     []types.K8sResource
+		want     []K8sResource
 		wantLog  string
 	}{
 		{
@@ -27,7 +26,7 @@ spec:
   destination:
     namespace: default
     server: https://kubernetes.default.svc`,
-			want: []types.K8sResource{
+			want: []K8sResource{
 				{
 					FileName: "test.yaml",
 					Yaml: func() yaml.Node {
@@ -56,7 +55,7 @@ spec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var resources []types.K8sResource
+			var resources []K8sResource
 			processYamlChunk(tt.filename, tt.chunk, &resources)
 
 			if tt.want == nil {

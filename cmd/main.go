@@ -4,11 +4,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argoapplicaiton"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/diff"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/extract"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/options"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/parsing"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog"
@@ -47,7 +47,7 @@ func main() {
 	targetBranch := types.NewBranch(opts.TargetBranch, types.Target)
 
 	// Get applications for both branches
-	baseApps, targetApps, err := parsing.GetApplicationsForBranches(
+	baseApps, targetApps, err := argoapplicaiton.GetApplicationsForBranches(
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
@@ -97,7 +97,7 @@ func main() {
 	}
 
 	// Generate applications from ApplicationSets
-	baseApps, targetApps, err = parsing.ConvertAppSetsToAppsInBothBranches(
+	baseApps, targetApps, err = argoapplicaiton.ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		baseApps,
 		targetApps,
@@ -117,10 +117,10 @@ func main() {
 	}
 
 	// Write applications to files
-	if err := utils.WriteApplications(baseApps, baseBranch, tempFolder); err != nil {
+	if err := argoapplicaiton.WriteApplications(baseApps, baseBranch, tempFolder); err != nil {
 		log.Fatal().Msgf("Failed to write base apps: %v", err)
 	}
-	if err := utils.WriteApplications(targetApps, targetBranch, tempFolder); err != nil {
+	if err := argoapplicaiton.WriteApplications(targetApps, targetBranch, tempFolder); err != nil {
 		log.Fatal().Msgf("Failed to write target apps: %v", err)
 	}
 

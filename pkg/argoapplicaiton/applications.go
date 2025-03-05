@@ -1,4 +1,4 @@
-package parsing
+package argoapplicaiton
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
 	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
 	"gopkg.in/yaml.v3"
 )
@@ -26,7 +25,7 @@ func GetApplicationsForBranches(
 	repo string,
 	ignoreInvalidWatchPattern bool,
 	redirectRevisions []string,
-) ([]types.ArgoResource, []types.ArgoResource, error) {
+) ([]ArgoResource, []ArgoResource, error) {
 	baseApps, err := GetApplications(
 		argocdNamespace,
 		baseBranch,
@@ -116,13 +115,13 @@ func GetApplications(
 	repo string,
 	ignoreInvalidWatchPattern bool,
 	redirectRevisions []string,
-) ([]types.ArgoResource, error) {
+) ([]ArgoResource, error) {
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Fetching all files for branch %s", branch.Name)
 
-	yamlFiles := GetYamlFiles(branch.FolderName(), regex)
+	yamlFiles := types.GetYamlFiles(branch.FolderName(), regex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
-	k8sResources := ParseYaml(branch.FolderName(), yamlFiles)
+	k8sResources := types.ParseYaml(branch.FolderName(), yamlFiles)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d k8sResources", len(k8sResources))
 
 	applications := FromResourceToApplication(
@@ -154,8 +153,8 @@ func GetApplications(
 
 // Helper functions
 
-func filterDuplicates(apps []types.ArgoResource, duplicates []*yaml.Node) []types.ArgoResource {
-	var filtered []types.ArgoResource
+func filterDuplicates(apps []ArgoResource, duplicates []*yaml.Node) []ArgoResource {
+	var filtered []ArgoResource
 	for _, app := range apps {
 		isDuplicate := false
 		for _, dup := range duplicates {
@@ -177,12 +176,12 @@ func FromResourceToApplication(
 	selector []types.Selector,
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
-) []types.ArgoResource {
-	var apps []types.ArgoResource
+) []ArgoResource {
+	var apps []ArgoResource
 
 	// Convert K8sResources to ArgoResources
 	for _, r := range k8sResources {
-		if app := types.FromK8sResource(&r); app != nil {
+		if app := FromK8sResource(&r); app != nil {
 			apps = append(apps, *app)
 		}
 	}
@@ -218,7 +217,7 @@ func FromResourceToApplication(
 	numberOfAppsBeforeFiltering := len(apps)
 
 	// Filter applications
-	var filteredApps []types.ArgoResource
+	var filteredApps []ArgoResource
 	for _, app := range apps {
 		if filtered := app.Filter(selector, filesChanged, ignoreInvalidWatchPattern); filtered != nil {
 			filteredApps = append(filteredApps, *filtered)
@@ -248,11 +247,11 @@ func FromResourceToApplication(
 // PatchApplication patches a single ArgoResource
 func PatchApplication(
 	argocdNamespace string,
-	application types.ArgoResource,
+	application ArgoResource,
 	branch *types.Branch,
 	repo string,
 	redirectRevisions []string,
-) (*types.ArgoResource, error) {
+) (*ArgoResource, error) {
 	appName := application.Name
 
 	// Chain the modifications
@@ -299,12 +298,12 @@ func PatchApplication(
 // PatchApplications patches a slice of ArgoResources
 func PatchApplications(
 	argocdNamespace string,
-	applications []types.ArgoResource,
+	applications []ArgoResource,
 	branch *types.Branch,
 	repo string,
 	redirectRevisions []string,
-) ([]types.ArgoResource, error) {
-	var patchedApps []types.ArgoResource
+) ([]ArgoResource, error) {
+	var patchedApps []ArgoResource
 
 	for _, app := range applications {
 		patchedApp, err := PatchApplication(
@@ -325,20 +324,20 @@ func PatchApplications(
 
 func ConvertAppSetsToAppsInBothBranches(
 	argocd *argocd.ArgoCDInstallation,
-	baseApps []types.ArgoResource,
-	targetApps []types.ArgoResource,
+	baseApps []ArgoResource,
+	targetApps []ArgoResource,
 	baseBranch *types.Branch,
 	targetBranch *types.Branch,
 	repo string,
 	tempFolder string,
 	redirectRevisions []string,
 	debug bool,
-) ([]types.ArgoResource, []types.ArgoResource, error) {
+) ([]ArgoResource, []ArgoResource, error) {
 
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
 
-	baseApps = utils.UniqueNames(baseApps, baseBranch)
-	targetApps = utils.UniqueNames(targetApps, targetBranch)
+	baseApps = UniqueNames(baseApps, baseBranch)
+	targetApps = UniqueNames(targetApps, targetBranch)
 
 	baseApps, err := ConvertAppSetsToApps(
 		argocd,
@@ -366,22 +365,22 @@ func ConvertAppSetsToAppsInBothBranches(
 		log.Error().Msgf("Failed to generate target apps: %v", err)
 	}
 
-	baseApps = utils.UniqueNames(baseApps, baseBranch)
-	targetApps = utils.UniqueNames(targetApps, targetBranch)
+	baseApps = UniqueNames(baseApps, baseBranch)
+	targetApps = UniqueNames(targetApps, targetBranch)
 
 	return baseApps, targetApps, nil
 }
 
 func ConvertAppSetsToApps(
 	argocd *argocd.ArgoCDInstallation,
-	appSets []types.ArgoResource,
+	appSets []ArgoResource,
 	branch *types.Branch,
 	repo string,
 	tempFolder string,
 	redirectRevisions []string,
 	debug bool,
-) ([]types.ArgoResource, error) {
-	var appsNew []types.ArgoResource
+) ([]ArgoResource, error) {
+	var appsNew []ArgoResource
 	appSetCounter := 0
 	generatedAppsCounter := 0
 
@@ -389,7 +388,7 @@ func ConvertAppSetsToApps(
 
 	for _, appSet := range appSets {
 		// Skip non-ApplicationSets
-		if appSet.Kind != types.ApplicationSet {
+		if appSet.Kind != ApplicationSet {
 			appsNew = append(appsNew, appSet)
 			continue
 		}
@@ -482,9 +481,9 @@ func ConvertAppSetsToApps(
 			// Create a deep copy of the YAML node to avoid reference issues
 			docCopy := yamlutil.DeepCopyYaml(&doc)
 
-			app := types.ArgoResource{
+			app := ArgoResource{
 				Yaml:     docCopy,
-				Kind:     types.Application,
+				Kind:     Application,
 				Name:     name.Value,
 				FileName: appSet.FileName,
 			}
@@ -513,7 +512,7 @@ func ConvertAppSetsToApps(
 	}
 
 	// After all apps are processed, ensure unique names
-	appsNew = utils.UniqueNames(appsNew, branch)
+	appsNew = UniqueNames(appsNew, branch)
 
 	if appSetCounter > 0 {
 		log.Info().Str("branch", branch.Name).Msgf(

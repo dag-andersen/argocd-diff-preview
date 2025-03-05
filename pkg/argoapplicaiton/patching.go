@@ -1,40 +1,15 @@
-package types
+package argoapplicaiton
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
+	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
 	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
-
 	"gopkg.in/yaml.v3"
 )
-
-const (
-	AnnotationWatchPattern = "argocd-diff-preview/watch-pattern"
-	AnnotationIgnore       = "argocd-diff-preview/ignore"
-)
-
-// ApplicationKind represents the type of Argo CD application
-type ApplicationKind int
-
-const (
-	Application ApplicationKind = iota
-	ApplicationSet
-)
-
-// String returns the string representation of ApplicationKind
-func (k ApplicationKind) String() string {
-	switch k {
-	case Application:
-		return "Application"
-	case ApplicationSet:
-		return "ApplicationSet"
-	default:
-		return "Unknown"
-	}
-}
 
 // ArgoResource represents an Argo CD Application or ApplicationSet
 type ArgoResource struct {
@@ -211,124 +186,8 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 	return nil
 }
 
-// TODO: should ignoreInvalidWatchPattern throw error or return nil?
-
-// Filter checks if the application matches the given selectors and watches the given files
-func (a *ArgoResource) Filter(
-	selectors []Selector,
-	filesChanged []string,
-	ignoreInvalidWatchPattern bool,
-) *ArgoResource {
-	// Check selectors
-	if len(selectors) > 0 {
-		metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
-		if metadata == nil {
-			return nil
-		}
-
-		labels := yamlutil.GetYamlValue(metadata, []string{"labels"})
-		if labels == nil {
-			return nil
-		}
-
-		for _, selector := range selectors {
-			labelValue := yamlutil.GetYamlValue(labels, []string{selector.Key})
-			if labelValue == nil {
-				return nil
-			}
-
-			matches := labelValue.Value == selector.Value
-			if (selector.Operator == Eq && !matches) || (selector.Operator == Ne && matches) {
-				return nil
-			}
-		}
-	}
-
-	// Check files changed
-	if len(filesChanged) > 0 {
-
-		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking files changed: %v", filesChanged)
-
-		metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
-		if metadata == nil {
-			return nil
-		}
-
-		annotations := yamlutil.GetYamlValue(metadata, []string{"annotations"})
-		if annotations == nil {
-			return nil
-		}
-
-		watchPattern := yamlutil.GetYamlValue(annotations, []string{AnnotationWatchPattern})
-		if watchPattern == nil {
-			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern annotation found. Skipping")
-			return nil
-		}
-
-		patternList := strings.TrimSpace(watchPattern.Value)
-		if patternList == "" {
-			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern value found. Skipping")
-			return nil
-		}
-
-		patterns := strings.Split(patternList, ",")
-
-		for _, pattern := range patterns {
-			pattern = strings.TrimSpace(pattern)
-
-			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking watch pattern: %s", pattern)
-
-			if pattern == "" {
-				log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("empty watch pattern found. Continuing")
-				continue
-			}
-
-			regex, err := regexp.Compile(pattern)
-			if err != nil {
-				if !ignoreInvalidWatchPattern {
-					log.Warn().Msgf("⚠️ Invalid watch pattern '%s' in file: %s", pattern, a.FileName)
-					return nil
-				}
-				log.Warn().Msgf("⚠️ Ignoring invalid watch pattern '%s' in file: %s", pattern, a.FileName)
-				return a
-			}
-
-			log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("watch pattern '%s' is valid. Checking files changed", pattern)
-
-			for _, file := range filesChanged {
-				if regex.MatchString(file) {
-					log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("file '%s' matches watch pattern. Returning application", file)
-					return a
-				}
-			}
-		}
-
-		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no files changed match watch pattern. Skipping")
-		return nil
-	}
-
-	return a
-}
-
 // Helper functions
-
-func (a *ArgoResource) getAppSpec() *yaml.Node {
-	switch a.Kind {
-	case Application:
-		return yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
-	case ApplicationSet:
-		return yamlutil.GetYamlValue(a.Yaml, []string{"spec", "template", "spec"})
-	default:
-		return nil
-	}
-}
-
-func (a *ArgoResource) getRootSpec() *yaml.Node {
-	return yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
-}
-
 func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, redirectRevisions []string) error {
-
 	if yamlutil.GetYamlValue(source, []string{"chart"}) != nil {
 		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found helm chart")
 		return nil
@@ -358,6 +217,22 @@ func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, re
 	return nil
 }
 
+// Helper functions for YAML manipulation
+func (a *ArgoResource) getAppSpec() *yaml.Node {
+	switch a.Kind {
+	case Application:
+		return yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
+	case ApplicationSet:
+		return yamlutil.GetYamlValue(a.Yaml, []string{"spec", "template", "spec"})
+	default:
+		return nil
+	}
+}
+
+func (a *ArgoResource) getRootSpec() *yaml.Node {
+	return yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
+}
+
 func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
@@ -371,58 +246,20 @@ func contains(slice []string, str string) bool {
 	return false
 }
 
-// FromK8sResource creates an ArgoResource from a K8sResource
-func FromK8sResource(resource *K8sResource) *ArgoResource {
-	// Get the kind
+// WriteApplications writes applications to YAML files in the specified folder
+func WriteApplications(
+	apps []ArgoResource,
+	branch *types.Branch,
+	folder string,
+) error {
+	filePath := fmt.Sprintf("%s/%s.yaml", folder, branch.FolderName())
+	log.Info().Msgf("💾 Writing %d Applications from '%s' to ./%s",
+		len(apps), branch.Name, filePath)
 
-	if resource.Yaml.Content == nil {
-		log.Debug().Str("file", resource.FileName).Msg("No content found in file")
-		return nil
+	yaml := ApplicationsToString(apps)
+	if err := utils.WriteFile(filePath, yaml); err != nil {
+		return fmt.Errorf("failed to write %s apps: %w", branch.Type(), err)
 	}
 
-	kind := yamlutil.GetYamlValue(resource.Yaml.Content[0], []string{"kind"})
-	if kind == nil {
-		log.Debug().Str("file", resource.FileName).Msg("No 'kind' field found in file")
-		return nil
-	}
-
-	// Check if it's an Argo CD resource
-	var appKind ApplicationKind
-	switch kind.Value {
-	case "Application":
-		appKind = Application
-	case "ApplicationSet":
-		appKind = ApplicationSet
-	default:
-		return nil
-	}
-
-	name := yamlutil.GetYamlValue(resource.Yaml.Content[0], []string{"metadata", "name"})
-	if name == nil {
-		log.Debug().Str("file", resource.FileName).Msg("No 'metadata.name' field found in file")
-		return nil
-	}
-
-	return &ArgoResource{
-		Yaml:     resource.Yaml.Content[0],
-		Kind:     appKind,
-		Name:     name.Value,
-		FileName: resource.FileName,
-	}
-}
-
-func ApplicationsToString(apps []ArgoResource) string {
-	var yamlStrings []string
-	for _, app := range apps {
-		yamlStr, err := app.AsString()
-		if err != nil {
-			log.Debug().Err(err).Str("file", app.FileName).Msgf("Failed to convert app %s to YAML", app.Name)
-			continue
-		}
-		// add a comment with the name of the file
-		yamlStr = fmt.Sprintf("# File: %s\n%s", app.FileName, yamlStr)
-
-		yamlStrings = append(yamlStrings, yamlStr)
-	}
-	return strings.Join(yamlStrings, "---\n")
+	return nil
 }
