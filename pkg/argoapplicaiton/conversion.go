@@ -17,7 +17,13 @@ func FromK8sResource(resource *types.K8sResource) *ArgoResource {
 		return nil
 	}
 
-	kind := yamlutil.GetYamlValue(resource.Yaml.Content[0], []string{"kind"})
+	// Get the root node - either the first document or the root itself
+	rootNode := &resource.Yaml
+	if len(resource.Yaml.Content) > 0 {
+		rootNode = resource.Yaml.Content[0]
+	}
+
+	kind := yamlutil.GetYamlValue(rootNode, []string{"kind"})
 	if kind == nil {
 		log.Debug().Str("file", resource.FileName).Msg("No 'kind' field found in file")
 		return nil
@@ -34,14 +40,14 @@ func FromK8sResource(resource *types.K8sResource) *ArgoResource {
 		return nil
 	}
 
-	name := yamlutil.GetYamlValue(resource.Yaml.Content[0], []string{"metadata", "name"})
+	name := yamlutil.GetYamlValue(rootNode, []string{"metadata", "name"})
 	if name == nil {
 		log.Debug().Str("file", resource.FileName).Msg("No 'metadata.name' field found in file")
 		return nil
 	}
 
 	return &ArgoResource{
-		Yaml:     resource.Yaml.Content[0],
+		Yaml:     rootNode,
 		Kind:     ApplicationKind(appKind),
 		Name:     name.Value,
 		FileName: resource.FileName,

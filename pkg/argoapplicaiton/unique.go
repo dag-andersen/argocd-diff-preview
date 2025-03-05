@@ -29,23 +29,13 @@ func UniqueNames(apps []ArgoResource, branch *types.Branch) []ArgoResource {
 				Str("branch", branch.Name).
 				Msgf("Found %d duplicate applications with same name: %s", len(appsWithSameName), name)
 
-			// Sort apps by their YAML representation for consistent ordering
-			sortedApps := make([]ArgoResource, len(appsWithSameName))
-			copy(sortedApps, appsWithSameName)
-
-			// Sort by YAML string representation
-			for i := 0; i < len(sortedApps); i++ {
-				for j := i + 1; j < len(sortedApps); j++ {
-					yamlI, _ := sortedApps[i].AsString()
-					yamlJ, _ := sortedApps[j].AsString()
-					if yamlI > yamlJ {
-						sortedApps[i], sortedApps[j] = sortedApps[j], sortedApps[i]
-					}
-				}
-			}
+			// // Sort apps by filename for stable ordering
+			// sort.Slice(appsWithSameName, func(i, j int) bool {
+			// 	return appsWithSameName[i].FileName < appsWithSameName[j].FileName
+			// })
 
 			// Rename each app with a suffix
-			for i, app := range sortedApps {
+			for i, app := range appsWithSameName {
 				newName := fmt.Sprintf("%s-%d", name, i+1)
 
 				// Create a copy of the app
