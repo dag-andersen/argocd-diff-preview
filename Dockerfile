@@ -35,6 +35,9 @@ RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/
 RUN install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd
 RUN rm argocd-linux-${TARGETARCH}
 
+# run test
+RUN cargo test
+
 # build for release
 RUN rm ./target/release/deps/argocd_diff_preview-*
 RUN cargo build --release
