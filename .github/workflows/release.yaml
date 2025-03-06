@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*.*.*"
+      - "!v*.*.*-pre-release"
+
 env:
   CRATE_NAME: argocd-diff-preview
   GITHUB_TOKEN: ${{ github.token }}

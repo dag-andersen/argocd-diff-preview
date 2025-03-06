@@ -1,10 +1,9 @@
-name: Build and Push Docker Images
+name: Build and Push Pre-release Docker Images
 
 on:
   push:
     tags:
-      - "v*.*.*"
-      - "!v*.*.*-pre-release"
+      - "v*.*.*-pre-release"
 
 jobs:
   build:
@@ -16,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches and tags
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -26,14 +27,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: |
+          # Extract version from tag (e.g., v1.2.3-pre-release -> 1.2.3)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${VERSION%-pre-release}
+          # Get short SHA
+          SHA=$(git rev-parse --short HEAD)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "SHA=${SHA}" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/${{ matrix.platform }}
-          tags: dagandersen/argocd-diff-preview:${{ env.RELEASE_VERSION }}-${{ matrix.platform }}
+          tags: dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-${{ matrix.platform }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -43,6 +51,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for all branches and tags
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -53,14 +63,17 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: |
+          # Extract version from tag (e.g., v1.2.3-pre-release -> 1.2.3)
+          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${VERSION%-pre-release}
+          # Get short SHA
+          SHA=$(git rev-parse --short HEAD)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "SHA=${SHA}" >> $GITHUB_ENV
       - name: create manifest
         run: |
           docker buildx imagetools create -t \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION} \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64
-          docker buildx imagetools create -t \
-            dagandersen/argocd-diff-preview:latest \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64
+            dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }} \
+            dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-amd64 \
+            dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-arm64 
