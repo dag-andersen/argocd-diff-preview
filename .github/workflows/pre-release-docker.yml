@@ -1,4 +1,4 @@
-name: Build and Push Pre-release Docker Images
+name: Pre-release Docker Images
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
       - name: Set env
         run: |
           # Extract version from tag (e.g., v1.2.3-pre-release -> 1.2.3)
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION%-pre-release}
           # Get short SHA
           SHA=$(git rev-parse --short HEAD)
@@ -65,7 +65,7 @@ jobs:
       - name: Set env
         run: |
           # Extract version from tag (e.g., v1.2.3-pre-release -> 1.2.3)
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${GITHUB_REF#refs/tags/}
           VERSION=${VERSION%-pre-release}
           # Get short SHA
           SHA=$(git rev-parse --short HEAD)
