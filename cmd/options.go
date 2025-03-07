@@ -78,11 +78,11 @@ and generates a diff of the resources that would be applied.`,
 			// Check required options
 			errors := opts.CheckRequired()
 			if len(errors) > 0 {
-				var errorMsg = "Error parsing command line flags: "
+				var errorMsg = ""
 				for _, err := range errors {
 					errorMsg += fmt.Sprintf("'%s', ", err)
 				}
-				return fmt.Errorf(errorMsg)
+				return fmt.Errorf("error parsing command line flags: %s", errorMsg)
 			}
 
 			// Configure logging based on debug mode
