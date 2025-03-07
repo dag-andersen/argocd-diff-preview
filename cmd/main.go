@@ -34,13 +34,19 @@ func main() {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
 	}
 
-	opts.LogOptions()
-
 	regex := opts.ParseRegex()
-	selectors := opts.ParseSelectors()
+	selectors, err := opts.ParseSelectors()
+	if err != nil {
+		log.Fatal().Msgf("Failed to parse selectors: %v", err)
+	}
 	filesChanged := opts.ParseFilesChanged()
 	redirectRevisions := opts.ParseRedirectRevisions()
-	clusterProvider := opts.ParseClusterType()
+	clusterProvider, err := opts.ParseClusterType()
+	if err != nil {
+		log.Fatal().Msgf("Failed to parse cluster type: %v", err)
+	}
+
+	opts.LogOptions()
 
 	// Create branches
 	baseBranch := types.NewBranch(opts.BaseBranch, types.Base)

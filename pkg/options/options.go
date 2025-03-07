@@ -2,6 +2,7 @@ package options
 
 import (
 	"flag"
+	"fmt"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
@@ -94,18 +95,18 @@ func Parse() *Options {
 }
 
 // ParseSelectors parses the selector string into a slice of Selectors
-func (o *Options) ParseSelectors() []types.Selector {
+func (o *Options) ParseSelectors() ([]types.Selector, error) {
 	var selectors []types.Selector
 	if o.Selector != "" {
 		for _, s := range strings.Split(o.Selector, ",") {
 			selector, err := types.FromString(strings.TrimSpace(s))
 			if err != nil {
-				log.Fatal().Err(err).Msg("Invalid selector format")
+				return nil, err
 			}
 			selectors = append(selectors, *selector)
 		}
 	}
-	return selectors
+	return selectors, nil
 }
 
 // ParseFilesChanged parses the files-changed string into a slice of strings
@@ -135,7 +136,7 @@ func (o *Options) ParseRedirectRevisions() []string {
 }
 
 // ParseClusterType parses the cluster type and returns the appropriate cluster provider
-func (o *Options) ParseClusterType() cluster.Provider {
+func (o *Options) ParseClusterType() (cluster.Provider, error) {
 	var provider cluster.Provider
 	switch o.ClusterType {
 	case "kind":
@@ -150,17 +151,17 @@ func (o *Options) ParseClusterType() cluster.Provider {
 			provider = minikube.New()
 			log.Debug().Msg("Using minikube as cluster provider")
 		} else {
-			log.Error().Msg("No local cluster tool found. Please install kind or minikube")
+			return nil, fmt.Errorf("no local cluster tool found. Please install kind or minikube")
 		}
 	default:
-		log.Error().Msgf("Unsupported cluster type: %s", o.ClusterType)
+		return nil, fmt.Errorf("unsupported cluster type: %s", o.ClusterType)
 	}
 
 	if !provider.IsInstalled() {
-		log.Error().Msgf("%s is not installed", o.ClusterType)
+		return nil, fmt.Errorf("%s is not installed", o.ClusterType)
 	}
 
-	return provider
+	return provider, nil
 }
 
 // LogOptions logs all the options
