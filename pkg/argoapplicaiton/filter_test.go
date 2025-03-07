@@ -3,7 +3,7 @@ package argoapplicaiton
 import (
 	"testing"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )

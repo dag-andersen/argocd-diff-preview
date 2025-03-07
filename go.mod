@@ -1,4 +1,4 @@
-module github.com/argocd-diff-preview/argocd-diff-preview
+module github.com/dag-andersen/argocd-diff-preview
 
 go 1.21
 

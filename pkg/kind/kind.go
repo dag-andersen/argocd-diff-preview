@@ -7,7 +7,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
 )
 
 func (k *Kind) GetName() string {

@@ -4,12 +4,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argoapplicaiton"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/diff"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/extract"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplicaiton"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/diff"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 )
 

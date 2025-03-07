@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 
 	"gopkg.in/yaml.v3"

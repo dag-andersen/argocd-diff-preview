@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
-	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )

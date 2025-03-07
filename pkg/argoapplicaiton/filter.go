@@ -4,8 +4,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
-	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
 )
 

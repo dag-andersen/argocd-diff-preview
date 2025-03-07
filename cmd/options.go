@@ -12,10 +12,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/kind"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/minikube"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
 )
 
 type Options struct {

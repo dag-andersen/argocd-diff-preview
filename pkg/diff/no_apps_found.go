@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
 // Constants for markdown template

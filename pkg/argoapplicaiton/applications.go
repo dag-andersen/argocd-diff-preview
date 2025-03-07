@@ -8,9 +8,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
-	yamlutil "github.com/argocd-diff-preview/argocd-diff-preview/pkg/yaml"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"gopkg.in/yaml.v3"
 )
 
