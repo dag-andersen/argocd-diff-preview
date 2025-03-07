@@ -3,6 +3,7 @@ package options
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
@@ -91,7 +92,33 @@ func Parse() *Options {
 	flag.StringVar(&opts.RedirectTargetRevisions, "redirect-target-revisions", opts.RedirectTargetRevisions, "List of target revisions to redirect")
 
 	flag.Parse()
+
+	errors := opts.CheckRequired()
+	if len(errors) > 0 {
+		var errorMsg = "Error parsing command line flags: "
+		for _, err := range errors {
+			errorMsg += fmt.Sprintf("'%s', ", err)
+		}
+		log.Error().Msgf(errorMsg)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	return opts
+}
+
+func (o *Options) CheckRequired() []string {
+	var errors []string
+	if o.BaseBranch == "" {
+		errors = append(errors, "base-branch")
+	}
+	if o.TargetBranch == "" {
+		errors = append(errors, "target-branch")
+	}
+	if o.Repo == "" {
+		errors = append(errors, "repo")
+	}
+	return errors
 }
 
 // ParseSelectors parses the selector string into a slice of Selectors
