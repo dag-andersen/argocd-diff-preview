@@ -8,10 +8,8 @@ import (
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/argocd"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/diff"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/extract"
-	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/options"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/types"
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/utils"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,31 +20,15 @@ func main() {
 		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Millisecond))
 	}()
 
-	// Parse input options
-	opts := options.Parse()
+	// Parse input options - this will also set up logging and parse all options
+	opts := Parse()
 
-	// Configure logging based on debug mode
-	if opts.Debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC850})
-	} else {
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
-	}
-
-	regex := opts.ParseRegex()
-	selectors, err := opts.ParseSelectors()
-	if err != nil {
-		log.Fatal().Msgf("Failed to parse selectors: %v", err)
-	}
-	filesChanged := opts.ParseFilesChanged()
-	redirectRevisions := opts.ParseRedirectRevisions()
-	clusterProvider, err := opts.ParseClusterType()
-	if err != nil {
-		log.Fatal().Msgf("Failed to parse cluster type: %v", err)
-	}
-
-	opts.LogOptions()
+	// Get the parsed values from the options
+	regex := opts.GetRegex()
+	selectors := opts.GetSelectors()
+	filesChanged := opts.GetFilesChanged()
+	redirectRevisions := opts.GetRedirectRevisions()
+	clusterProvider := opts.GetClusterProvider()
 
 	// Create branches
 	baseBranch := types.NewBranch(opts.BaseBranch, types.Base)

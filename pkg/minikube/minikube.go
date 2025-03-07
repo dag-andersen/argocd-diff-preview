@@ -9,6 +9,10 @@ import (
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
 )
 
+func (m *Minikube) GetName() string {
+	return "minikube"
+}
+
 // IsInstalled checks if minikube is installed on the system
 func IsInstalled() bool {
 	_, err := exec.LookPath("minikube")

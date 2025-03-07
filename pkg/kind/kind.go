@@ -10,6 +10,10 @@ import (
 	"github.com/argocd-diff-preview/argocd-diff-preview/pkg/cluster"
 )
 
+func (k *Kind) GetName() string {
+	return "kind"
+}
+
 // IsInstalled checks if kind is installed on the system
 func IsInstalled() bool {
 	_, err := exec.LookPath("kind")
