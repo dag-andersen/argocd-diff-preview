@@ -20,8 +20,20 @@ func main() {
 		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Millisecond))
 	}()
 
-	// Parse input options - this will also set up logging and parse all options
 	opts := Parse()
+
+	if err := run(opts); err != nil {
+		log.Error().Msgf("❌ %v", err)
+		if !opts.Debug {
+			log.Info().Msg("🕵️ Run with '--debug' for more details")
+		} else {
+			log.Info().Msg("🐛 If you believe this error is caused by a bug, please open an issue on GitHub")
+		}
+		os.Exit(1)
+	}
+}
+
+func run(opts *Options) error {
 
 	// Get the parsed values from the options
 	regex := opts.GetRegex()
@@ -47,7 +59,8 @@ func main() {
 		redirectRevisions,
 	)
 	if err != nil {
-		log.Error().Msgf("Failed to get applications: %v", err)
+		log.Error().Msgf("❌ Failed to get applications")
+		return err
 	}
 
 	foundBaseApps := len(baseApps) > 0
@@ -58,30 +71,42 @@ func main() {
 
 		// Write a message to the output file when no applications are found
 		if err := utils.CreateFolder(opts.OutputFolder); err != nil {
-			log.Error().Msgf("Failed to create output folder: %v", err)
+			log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
+			return err
 		}
 
 		if err := diff.WriteNoAppsFoundMessage(opts.OutputFolder, selectors, filesChanged); err != nil {
-			log.Error().Msgf("Failed to write no apps found message: %v", err)
+			log.Error().Msgf("❌ Failed to write no apps found message")
+			return err
 		}
 
-		os.Exit(0)
+		return nil
 	}
 
 	// Create cluster and install Argo CD
 	if err := clusterProvider.CreateCluster(); err != nil {
-		log.Error().Msgf("Failed to create cluster: %v", err)
+		log.Error().Msgf("❌ Failed to create cluster")
+		return err
 	}
+	defer func() {
+		if !opts.KeepClusterAlive {
+			clusterProvider.DeleteCluster(true)
+		} else {
+			log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+		}
+	}()
 
 	// Install Argo CD
 	argocd := argocd.New(opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
 	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
-		log.Fatal().Msgf("Failed to install Argo CD: %v", err)
+		log.Error().Msgf("❌ Failed to install Argo CD")
+		return err
 	}
 
 	tempFolder := "temp"
 	if err := utils.CreateFolder(tempFolder); err != nil {
-		log.Error().Msgf("Failed to create temp folder: %v", err)
+		log.Error().Msgf("❌ Failed to create temp folder: %s", tempFolder)
+		return err
 	}
 
 	// Generate applications from ApplicationSets
@@ -97,24 +122,29 @@ func main() {
 		opts.Debug,
 	)
 	if err != nil {
-		log.Fatal().Msgf("Failed to generate base apps: %v", err)
+		log.Error().Msgf("❌ Failed to generate apps from ApplicationSets")
+		return err
 	}
 
 	if err := utils.CreateFolder(opts.OutputFolder); err != nil {
-		log.Error().Msgf("Failed to create output folder: %v", err)
+		log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
+		return err
 	}
 
 	// Write applications to files
 	if err := argoapplicaiton.WriteApplications(baseApps, baseBranch, tempFolder); err != nil {
-		log.Fatal().Msgf("Failed to write base apps: %v", err)
+		log.Error().Msg("❌ Failed to write base apps")
+		return err
 	}
 	if err := argoapplicaiton.WriteApplications(targetApps, targetBranch, tempFolder); err != nil {
-		log.Fatal().Msgf("Failed to write target apps: %v", err)
+		log.Error().Msg("❌ Failed to write target apps")
+		return err
 	}
 
 	// Extract resources from the cluster based on each branch
 	if err := extract.GetResourcesFromBothBranches(argocd, baseBranch, targetBranch, opts.Timeout, tempFolder, opts.OutputFolder); err != nil {
-		log.Fatal().Msgf("Failed to get resources: %v", err)
+		log.Error().Msg("❌ Failed to extract resources")
+		return err
 	}
 
 	// Generate diff between base and target branches
@@ -126,10 +156,9 @@ func main() {
 		opts.LineCount,
 		opts.MaxDiffLength,
 	); err != nil {
-		log.Fatal().Msgf("Failed to generate diff: %v", err)
+		log.Error().Msg("❌ Failed to generate diff")
+		return err
 	}
 
-	if !opts.KeepClusterAlive {
-		clusterProvider.DeleteCluster(true)
-	}
+	return nil
 }

@@ -30,7 +30,7 @@ run-with-cargo: pull-repository
 		--redirect-target-revisions="HEAD"
 
 run-with-go: pull-repository
-	go run cmd/main.go \
+	go run ./cmd \
 		--base-branch="$(base_branch)" \
 		--target-branch="$(target_branch)" \
 		--repo="$(github_org)/$(gitops_repo)" \
