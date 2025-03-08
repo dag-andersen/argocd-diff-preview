@@ -4,6 +4,12 @@ base_branch := main
 docker_file := Dockerfile
 argocd_namespace := argocd-diff-preview
 timeout := 120
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+go-build:
+	go build -ldflags="-X 'main.Version=$(VERSION)' -X 'main.Commit=$(COMMIT)' -X 'main.BuildDate=$(BUILD_DATE)'" -o bin/argocd-diff-preview ./cmd
 
 pull-repository:
 	@rm -rf base-branch || true && mkdir -p base-branch
@@ -12,7 +18,7 @@ pull-repository:
 	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
 docker-build:
-	docker build . -f $(docker_file) -t image
+	docker build . -f $(docker_file) -t image --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg BUILD_DATE=$(BUILD_DATE)
 
 run-with-cargo: pull-repository
 	cargo run -- \

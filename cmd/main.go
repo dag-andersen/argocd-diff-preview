@@ -15,12 +15,16 @@ import (
 
 func main() {
 	startTime := time.Now()
+
+	opts := Parse()
+	if opts == nil {
+		return
+	}
+
 	defer func() {
 		duration := time.Since(startTime)
 		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Millisecond))
 	}()
-
-	opts := Parse()
 
 	if err := run(opts); err != nil {
 		log.Error().Msgf("❌ %v", err)

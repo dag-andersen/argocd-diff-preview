@@ -18,6 +18,15 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
 )
 
+var (
+	// Version is the current version of the tool
+	Version = "0.1.0"
+	// Commit is the git commit hash
+	Commit = "unknown"
+	// BuildDate is the date the binary was built
+	BuildDate = "unknown"
+)
+
 type Options struct {
 	Debug                     bool   `mapstructure:"debug"`
 	Timeout                   uint64 `mapstructure:"timeout"`
@@ -59,6 +68,7 @@ func Parse() *Options {
 		Long: `argocd-diff-preview is a tool that helps you preview changes in Argo CD applications
 between two branches. It creates a local Kubernetes cluster, installs Argo CD,
 and generates a diff of the resources that would be applied.`,
+		Version: fmt.Sprintf("%s (commit: %s, built: %s)", Version, Commit, BuildDate),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip validation if we're just showing help
 			if cmd.Flags().Changed("help") {
@@ -187,6 +197,14 @@ and generates a diff of the resources that would be applied.`,
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma or space separated)")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
+
+	// Check if version flag was specified directly
+	for _, arg := range os.Args[1:] {
+		if arg == "--version" || arg == "-v" {
+			fmt.Println(rootCmd.Version)
+			os.Exit(0)
+		}
+	}
 
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {

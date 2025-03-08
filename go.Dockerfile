@@ -1,6 +1,10 @@
 # Build stage
 FROM golang:1-bookworm AS build
 
+# Build arguments for version information
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 # https://docs.docker.com/reference/dockerfile/#automatic-platform-args-in-the-global-scope
 ARG TARGETARCH
@@ -19,7 +23,7 @@ COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o argocd-diff-preview ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" -o argocd-diff-preview ./cmd
 
 # install kind
 RUN apt-get update && apt-get install -y curl
