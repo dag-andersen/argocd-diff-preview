@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -229,4 +230,32 @@ func ApplySecretsFromFolder(secretsFolder string, namespace string) error {
 	}
 
 	return nil
+}
+
+// KubectlApplyFromString applies a Kubernetes manifest from a string using kubectl
+func KubectlApplyFromString(manifest string, extraArgs ...string) error {
+	log.Debug().Msg("Applying manifest from string")
+
+	// Try to apply the manifest multiple times in case of temporary failures
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		cmd := exec.Command("kubectl", append([]string{"apply", "-f", "-"}, extraArgs...)...)
+
+		// Set stdin to the manifest string
+		cmd.Stdin = bytes.NewBufferString(manifest)
+		output, err := cmd.CombinedOutput()
+
+		if err == nil {
+			log.Debug().Msg("Successfully applied manifest from string")
+			return nil
+		}
+
+		log.Warn().Err(err).Str("output", string(output)).Msgf("⚠️ Failed to apply manifest from string (attempt %d/%d)", i+1, maxRetries)
+
+		if i < maxRetries-1 {
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return fmt.Errorf("failed to apply manifest from string after %d attempts", maxRetries)
 }
