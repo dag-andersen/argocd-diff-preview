@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 // KubectlApply applies a Kubernetes manifest file using kubectl
@@ -51,9 +52,118 @@ func DeleteManifest(filePath string) error {
 	return nil
 }
 
+// RemoveObstructiveFinalizers removes finalizers from applications that would prevent deletion
+func RemoveObstructiveFinalizers() error {
+	log.Info().Msg("🔧 Checking for obstructive finalizers")
+
+	// List of finalizers that prevent deletion of applications
+	finalizers := []string{
+		"post-delete-finalizer.argocd.argoproj.io",
+		"post-delete-finalizer.argoproj.io/cleanup",
+	}
+
+	// Get all applications as YAML
+	cmd := exec.Command("kubectl", "get", "applications", "-A", "-oyaml")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get applications: %v - %s", err, string(output))
+	}
+
+	// Parse YAML
+	var result map[string]interface{}
+	if err := yaml.Unmarshal(output, &result); err != nil {
+		return fmt.Errorf("failed to parse YAML: %v", err)
+	}
+
+	// Get items
+	items, ok := result["items"].([]interface{})
+	if !ok || len(items) == 0 {
+		// No applications found or items not in expected format
+		return nil
+	}
+
+	removedCount := 0
+	for _, item := range items {
+		app, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		metadata, ok := app["metadata"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, ok1 := metadata["name"].(string)
+		namespace, ok2 := metadata["namespace"].(string)
+		if !ok1 || !ok2 {
+			continue
+		}
+
+		appFinalizers, ok := metadata["finalizers"].([]interface{})
+		if !ok {
+			continue
+		}
+
+		// Check if application has any obstructive finalizers
+		hasObstructiveFinalizer := false
+		for _, f := range appFinalizers {
+			finalizerStr, ok := f.(string)
+			if !ok {
+				continue
+			}
+
+			for _, obstructive := range finalizers {
+				if finalizerStr == obstructive {
+					hasObstructiveFinalizer = true
+					break
+				}
+			}
+
+			if hasObstructiveFinalizer {
+				break
+			}
+		}
+
+		if hasObstructiveFinalizer {
+			log.Debug().Str("application", name).Str("namespace", namespace).Msg("Removing finalizers")
+
+			// Create patch command to remove finalizers
+			patchCmd := exec.Command(
+				"kubectl",
+				"patch",
+				"application.argoproj.io",
+				name,
+				"--type", "merge",
+				"--patch", `{"metadata":{"finalizers":null}}`,
+				"-n", namespace,
+			)
+
+			patchOutput, err := patchCmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("failed to remove finalizers from Application %s: %v - %s",
+					name, err, string(patchOutput))
+			}
+
+			removedCount++
+		}
+	}
+
+	if removedCount > 0 {
+		log.Info().Msgf("🔧 Removed finalizers from %d applications", removedCount)
+	}
+
+	return nil
+}
+
 // DeleteApplications deletes all Argo CD applications
 func DeleteApplications() error {
 	log.Info().Msg("🧼 Removing applications")
+
+	// First remove any obstructive finalizers
+	if err := RemoveObstructiveFinalizers(); err != nil {
+		log.Warn().Err(err).Msg("⚠️ Failed to remove finalizers, continuing with deletion anyway")
+	}
 
 	verifyNoApps := func() bool {
 		cmd := exec.Command("kubectl", "get", "applications", "-A", "--no-headers")
