@@ -1,7 +1,7 @@
 gitops_repo ?= argocd-diff-preview
 github_org ?= dag-andersen
 base_branch := main
-docker_file := Dockerfile
+docker_file := go.Dockerfile
 argocd_namespace := argocd-diff-preview
 timeout := 120
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -68,6 +68,7 @@ run-with-docker: pull-repository docker-build
 		-e SELECTOR="$(selector)" \
 		-e FILES_CHANGED="$(files_changed)" \
 		image \
+		--version \
 		--argocd-namespace="$(argocd_namespace)"
 
 mkdocs:
