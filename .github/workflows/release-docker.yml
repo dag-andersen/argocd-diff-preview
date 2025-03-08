@@ -26,14 +26,25 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          SHA=$(git rev-parse --short HEAD)
+          echo "SHA=${SHA}" >> $GITHUB_ENV
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile
           push: true
           platforms: linux/${{ matrix.platform }}
-          tags: dagandersen/argocd-diff-preview:${{ env.RELEASE_VERSION }}-${{ matrix.platform }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            COMMIT=${{ env.SHA }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+          tags: dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ matrix.platform }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -53,14 +64,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+        run: echo "VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - name: create manifest
         run: |
           docker buildx imagetools create -t \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION} \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64
+            dagandersen/argocd-diff-preview:${VERSION} \
+            dagandersen/argocd-diff-preview:${VERSION}-amd64 \
+            dagandersen/argocd-diff-preview:${VERSION}-arm64
           docker buildx imagetools create -t \
             dagandersen/argocd-diff-preview:latest \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-amd64 \
-            dagandersen/argocd-diff-preview:${RELEASE_VERSION}-arm64
+            dagandersen/argocd-diff-preview:${VERSION}-amd64 \
+            dagandersen/argocd-diff-preview:${VERSION}-arm64

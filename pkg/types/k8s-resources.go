@@ -1,0 +1,128 @@
+package types
+
+import (
+	"bufio"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
+)
+
+// K8sResource represents a Kubernetes resource from a YAML file
+type K8sResource struct {
+	FileName string
+	Yaml     yaml.Node
+}
+
+// GetYamlFiles gets all YAML files in a directory
+func GetYamlFiles(directory string, regex *string) []string {
+	log.Debug().Msgf("Fetching all files in dir: %s", directory)
+
+	var yamlFiles []string
+	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// Check if file has .yaml or .yml extension
+		ext := filepath.Ext(path)
+		if ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+
+		// Convert path to relative path
+		relPath, err := filepath.Rel(directory, path)
+		if err != nil {
+			return err
+		}
+
+		// Check regex if provided
+		if regex != nil {
+			matched, err := regexp.MatchString(*regex, relPath)
+			if err != nil || !matched {
+				return nil
+			}
+		}
+
+		yamlFiles = append(yamlFiles, relPath)
+		return nil
+	})
+
+	if err != nil {
+		log.Error().Err(err).Msg("⚠️ Error reading directory")
+		return []string{}
+	}
+
+	if regex != nil {
+		log.Debug().Msgf("Found %d yaml files in dir '%s' matching regex: %s",
+			len(yamlFiles), directory, *regex)
+	} else {
+		log.Debug().Msgf("Found %d yaml files in dir '%s'",
+			len(yamlFiles), directory)
+	}
+
+	return yamlFiles
+}
+
+// ParseYaml parses YAML files into K8sResources
+func ParseYaml(dir string, files []string) []K8sResource {
+	var resources []K8sResource
+
+	for _, file := range files {
+		log.Debug().Msgf("In dir '%s' found yaml file: %s", dir, file)
+
+		// Open and read file
+		f, err := os.Open(filepath.Join(dir, file))
+		if err != nil {
+			log.Warn().Err(err).Msgf("⚠️ Failed to open file '%s'", file)
+			continue
+		}
+		defer f.Close()
+
+		// Read file line by line and split on "---"
+		var currentChunk strings.Builder
+		scanner := bufio.NewScanner(f)
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			if line == "---" {
+				// Process the current chunk if it's not empty
+				if currentChunk.Len() > 0 {
+					processYamlChunk(file, currentChunk.String(), &resources)
+				}
+				currentChunk.Reset()
+			} else {
+				currentChunk.WriteString(line)
+				currentChunk.WriteString("\n")
+			}
+		}
+
+		// Process the last chunk
+		if currentChunk.Len() > 0 {
+			processYamlChunk(file, currentChunk.String(), &resources)
+		}
+	}
+
+	return resources
+}
+
+func processYamlChunk(filename, chunk string, resources *[]K8sResource) {
+	var yamlData yaml.Node
+	err := yaml.Unmarshal([]byte(chunk), &yamlData)
+	if err != nil {
+		log.Debug().Err(err).Msgf("⚠️ Failed to parse YAML in file '%s'", filename)
+		return
+	}
+
+	*resources = append(*resources, K8sResource{
+		FileName: filename,
+		Yaml:     yamlData,
+	})
+}
