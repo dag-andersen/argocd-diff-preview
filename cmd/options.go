@@ -20,7 +20,7 @@ import (
 
 var (
 	// Version is the current version of the tool
-	Version = "0.1.0"
+	Version = "unknown"
 	// Commit is the git commit hash
 	Commit = "unknown"
 	// BuildDate is the date the binary was built
@@ -306,7 +306,11 @@ func (o *Options) ParseClusterType() (cluster.Provider, error) {
 
 // LogOptions logs all the options
 func (o *Options) LogOptions() {
-	log.Info().Msg("✨ Running with:")
+	if Version != "unknown" || BuildDate != "unknown" {
+		log.Info().Msgf("✨ Running %s (%s) with:", Version, BuildDate)
+	} else {
+		log.Info().Msg("✨ Running with:")
+	}
 	log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
 	log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)

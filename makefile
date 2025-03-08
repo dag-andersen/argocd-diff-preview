@@ -35,8 +35,8 @@ run-with-cargo: pull-repository
 		--files-changed="$(files_changed)" \
 		--redirect-target-revisions="HEAD"
 
-run-with-go: pull-repository
-	go run ./cmd \
+run-with-go: go-build pull-repository
+	./bin/argocd-diff-preview \
 		--base-branch="$(base_branch)" \
 		--target-branch="$(target_branch)" \
 		--repo="$(github_org)/$(gitops_repo)" \
