@@ -131,9 +131,11 @@ func GetApplications(
 		ignoreInvalidWatchPattern,
 	)
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d Application[Sets]", len(applications))
+	if len(applications) == 0 {
+		return []ArgoResource{}, nil
+	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching Application[Sets]")
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(applications))
 
 	applications, err := PatchApplications(
 		argocdNamespace,

@@ -71,7 +71,7 @@ func run(opts *Options) error {
 	foundTargetApps := len(targetApps) > 0
 
 	if !foundBaseApps && !foundTargetApps {
-		log.Info().Msg("Found no applications to process in either branch")
+		log.Info().Msg("👀 Found no applications to process in either branch")
 
 		// Write a message to the output file when no applications are found
 		if err := utils.CreateFolder(opts.OutputFolder); err != nil {
