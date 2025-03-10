@@ -4,6 +4,7 @@ base_branch := main
 docker_file := Dockerfile
 argocd_namespace := argocd
 timeout := 90
+line_count := 10
 
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
@@ -21,6 +22,7 @@ run-single-test-go: pull-base pull-target
 		--argocd-namespace "$(argocd_namespace)" \
 		--files-changed="$(files_changed)" \
 		--selector="$(selector)" \
+		--file-regex="$(file_regex)" \
 		--diff-ignore="$(diff_ignore)" \
 		--line-count="$(line_count)" \
 		--timeout=$(timeout)
@@ -40,6 +42,7 @@ run-single-test-docker: pull-base pull-target
 		-v $(PWD)/temp:/temp \
 		-e BASE_BRANCH=$(base_branch) \
 		-e TARGET_BRANCH=$(target_branch) \
+		-e FILE_REGEX=$(file_regex) \
 		-e DIFF_IGNORE=$(diff_ignore) \
 		-e LINE_COUNT=$(line_count) \
 		-e REPO=$(github_org)/$(gitops_repo) \
@@ -62,6 +65,8 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="something/else.yaml" suffix="-2"
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=my-team" suffix="-3"
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=other-team" suffix="-4"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex=".*labels\.yaml" suffix="-5"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex="this-does-not-exist\.yaml" suffix="-6"
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker
