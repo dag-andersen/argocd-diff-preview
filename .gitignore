@@ -1,6 +1,5 @@
 .DS_Store
 target/
-argocd/
 secrets/
 output/
 .vscode/
@@ -9,3 +8,4 @@ venv/
 base-branch/
 target-branch/
 temp/
+bin/

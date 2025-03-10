@@ -1,27 +1,36 @@
-FROM rust:1-slim-buster AS build
+# Build stage
+FROM golang:1-bookworm AS build
+
+# Build arguments for version information
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 # https://docs.docker.com/reference/dockerfile/#automatic-platform-args-in-the-global-scope
 ARG TARGETARCH
 
 # create a new empty shell project
-RUN USER=root cargo new --bin argocd-diff-preview
 WORKDIR /argocd-diff-preview
 
-# copy over your manifests
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./Cargo.toml ./Cargo.toml
+# Copy go mod and sum files
+COPY go.mod go.sum ./
 
-# this build step will cache your dependencies
-RUN cargo build --release
-RUN rm src/*.rs
+# Download dependencies
+RUN go mod download
 
-# copy your source tree
-COPY ./src ./src
+# Copy source code - only what's needed
+COPY cmd/ ./cmd/
+COPY pkg/ ./pkg/
+
+# Build the application with version information
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" \
+    -o argocd-diff-preview ./cmd
 
 # install kind
 RUN apt-get update && apt-get install -y curl
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.26.0/kind-linux-${TARGETARCH}
-RUN chmod +x ./kind
+RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.26.0/kind-linux-${TARGETARCH} && \
+    chmod +x ./kind
 
 # install helm
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
@@ -31,16 +40,9 @@ RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s
     && chmod +x ./kubectl
 
 # Install Argo CD
-RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH}
-RUN install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd
-RUN rm argocd-linux-${TARGETARCH}
-
-# run test
-RUN cargo test
-
-# build for release
-RUN rm ./target/release/deps/argocd_diff_preview-*
-RUN cargo build --release
+RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
+    install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
+    rm argocd-linux-${TARGETARCH}
 
 # our final base
 FROM debian:bookworm-slim
@@ -51,7 +53,7 @@ COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
 COPY --from=build /argocd-diff-preview/kubectl /usr/local/bin/kubectl
 COPY --from=build /usr/local/bin/helm /usr/local/bin/helm
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
-COPY --from=build /argocd-diff-preview/target/release/argocd-diff-preview .
+COPY --from=build /argocd-diff-preview/argocd-diff-preview .
 
 RUN apt-get update && \
     apt-get install -y git && \
