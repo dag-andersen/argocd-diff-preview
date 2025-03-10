@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -46,7 +48,11 @@ func WriteFile(path string, content string) error {
 // Create folder (clear its content if it exists)
 func CreateFolder(path string) error {
 	if err := os.RemoveAll(path); err != nil {
-		return fmt.Errorf("failed to delete folder: %v", err)
+		log.Debug().Msgf("❌ Failed to delete folder: %s", err)
 	}
-	return os.MkdirAll(path, dirMode)
+	err := os.MkdirAll(path, dirMode)
+	if err != nil {
+		log.Debug().Msgf("❌ Failed to create folder: %s", err)
+	}
+	return err
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
@@ -67,40 +68,9 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 		return fmt.Errorf("failed to apply secrets: %w", err)
 	}
 
-	// Check for values files
-	valuesFiles, err := a.findValuesFiles()
-	if err != nil {
-		log.Info().Msgf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with default configuration", a.ConfigPath)
-	}
-
-	// Add argo repo to helm
-	if err := runCommand("helm", "repo", "add", "argo", "https://argoproj.github.io/argo-helm"); err != nil {
-		log.Error().Msgf("❌ Failed to add argo repo")
-		return fmt.Errorf("failed to add argo repo: %w", err)
-	}
-
-	// Update helm repos
-	if err := runCommand("helm", "repo", "update"); err != nil {
-		log.Error().Msgf("❌ Failed to update helm repo")
-		return fmt.Errorf("failed to update helm repo: %w", err)
-	}
-
-	// Construct helm install command
-	args := []string{
-		"install", "argocd", "argo/argo-cd",
-		"-n", a.Namespace,
-	}
-	for _, valuesFile := range valuesFiles {
-		args = append(args, "-f", valuesFile)
-	}
-	if a.Version != "" {
-		args = append(args, "--version", a.Version)
-	}
-
-	// Install ArgoCD
-	if err := runCommand("helm", args...); err != nil {
-		log.Error().Msgf("❌ Failed to install Argo CD")
-		return fmt.Errorf("failed to install argo cd: %w", err)
+	// Install ArgoCD using Helm
+	if err := a.installWithHelm(); err != nil {
+		return err
 	}
 
 	// Wait for argocd-server to be ready
@@ -140,6 +110,47 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	}
 
 	log.Info().Msgf("🦑 Argo CD installed successfully")
+
+	return nil
+}
+
+// installWithHelm installs ArgoCD using Helm
+func (a *ArgoCDInstallation) installWithHelm() error {
+	// Check for values files
+	valuesFiles, err := a.findValuesFiles()
+	if err != nil {
+		log.Info().Msgf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with default configuration", a.ConfigPath)
+	}
+
+	// Add argo repo to helm
+	if err := runCommand("helm", "repo", "add", "argo", "https://argoproj.github.io/argo-helm"); err != nil {
+		log.Error().Msgf("❌ Failed to add argo repo")
+		return fmt.Errorf("failed to add argo repo: %w", err)
+	}
+
+	// Update helm repos
+	if err := runCommand("helm", "repo", "update"); err != nil {
+		log.Error().Msgf("❌ Failed to update helm repo")
+		return fmt.Errorf("failed to update helm repo: %w", err)
+	}
+
+	// Construct helm install command
+	args := []string{
+		"install", "argocd", "argo/argo-cd",
+		"-n", a.Namespace,
+	}
+	for _, valuesFile := range valuesFiles {
+		args = append(args, "-f", valuesFile)
+	}
+	if a.Version != "" {
+		args = append(args, "--version", a.Version)
+	}
+
+	// Install ArgoCD
+	if err := runCommand("helm", args...); err != nil {
+		log.Error().Msgf("❌ Failed to install Argo CD")
+		return fmt.Errorf("failed to install argo cd: %w", err)
+	}
 
 	return nil
 }
@@ -270,6 +281,7 @@ func (a *ArgoCDInstallation) logInstalledVersions() error {
 }
 
 func runCommand(name string, args ...string) error {
+	log.Debug().Msgf("Running command: %s %s", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {

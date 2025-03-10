@@ -19,7 +19,7 @@ func GetApplicationsForBranches(
 	argocdNamespace string,
 	baseBranch *types.Branch,
 	targetBranch *types.Branch,
-	regex *string,
+	fileRegex *string,
 	selector []types.Selector,
 	filesChanged []string,
 	repo string,
@@ -29,7 +29,7 @@ func GetApplicationsForBranches(
 	baseApps, err := GetApplications(
 		argocdNamespace,
 		baseBranch,
-		regex,
+		fileRegex,
 		selector,
 		filesChanged,
 		repo,
@@ -43,7 +43,7 @@ func GetApplicationsForBranches(
 	targetApps, err := GetApplications(
 		argocdNamespace,
 		targetBranch,
-		regex,
+		fileRegex,
 		selector,
 		filesChanged,
 		repo,
@@ -109,7 +109,7 @@ func GetApplicationsForBranches(
 func GetApplications(
 	argocdNamespace string,
 	branch *types.Branch,
-	regex *string,
+	fileRegex *string,
 	selector []types.Selector,
 	filesChanged []string,
 	repo string,
@@ -118,7 +118,7 @@ func GetApplications(
 ) ([]ArgoResource, error) {
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Fetching all files for branch %s", branch.Name)
 
-	yamlFiles := types.GetYamlFiles(branch.FolderName(), regex)
+	yamlFiles := types.GetYamlFiles(branch.FolderName(), fileRegex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
 	k8sResources := types.ParseYaml(branch.FolderName(), yamlFiles)

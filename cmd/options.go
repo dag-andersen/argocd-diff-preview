@@ -356,8 +356,8 @@ func (o *Options) LogOptions() {
 	}
 }
 
-// GetRegex returns the parsed regex
-func (o *Options) GetRegex() *string {
+// GetFileRegex returns the parsed regex
+func (o *Options) GetFileRegex() *string {
 	return o.parsedFileRegex
 }
 

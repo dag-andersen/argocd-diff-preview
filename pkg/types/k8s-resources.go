@@ -18,7 +18,7 @@ type K8sResource struct {
 }
 
 // GetYamlFiles gets all YAML files in a directory
-func GetYamlFiles(directory string, regex *string) []string {
+func GetYamlFiles(directory string, fileRegex *string) []string {
 	log.Debug().Msgf("Fetching all files in dir: %s", directory)
 
 	var yamlFiles []string
@@ -43,8 +43,8 @@ func GetYamlFiles(directory string, regex *string) []string {
 		}
 
 		// Check regex if provided
-		if regex != nil {
-			matched, err := regexp.MatchString(*regex, relPath)
+		if fileRegex != nil {
+			matched, err := regexp.MatchString(*fileRegex, relPath)
 			if err != nil || !matched {
 				return nil
 			}
@@ -59,9 +59,9 @@ func GetYamlFiles(directory string, regex *string) []string {
 		return []string{}
 	}
 
-	if regex != nil {
+	if fileRegex != nil {
 		log.Debug().Msgf("Found %d yaml files in dir '%s' matching regex: %s",
-			len(yamlFiles), directory, *regex)
+			len(yamlFiles), directory, *fileRegex)
 	} else {
 		log.Debug().Msgf("Found %d yaml files in dir '%s'",
 			len(yamlFiles), directory)

@@ -40,7 +40,7 @@ func main() {
 func run(opts *Options) error {
 
 	// Get the parsed values from the options
-	regex := opts.GetRegex()
+	fileRegex := opts.GetFileRegex()
 	selectors := opts.GetSelectors()
 	filesChanged := opts.GetFilesChanged()
 	redirectRevisions := opts.GetRedirectRevisions()
@@ -55,7 +55,7 @@ func run(opts *Options) error {
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
-		regex,
+		fileRegex,
 		selectors,
 		filesChanged,
 		opts.Repo,
