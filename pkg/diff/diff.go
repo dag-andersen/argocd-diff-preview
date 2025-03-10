@@ -50,7 +50,7 @@ func GenerateDiff(
 
 	patternsToIgnore := ""
 	if diffIgnore != nil && *diffIgnore != "" {
-		patternsToIgnore = fmt.Sprintf("--ignore-matching-lines %s", *diffIgnore)
+		patternsToIgnore = fmt.Sprintf("--ignore-matching-lines \"%s\"", *diffIgnore)
 	}
 
 	// Get summary diff
