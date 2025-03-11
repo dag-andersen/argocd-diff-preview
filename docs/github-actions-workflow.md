@@ -91,4 +91,26 @@ In the simple code examples above, we do not provide the cluster with any creden
           dagandersen/argocd-diff-preview:v0.0.35
 ```
 
+If your ArgoCD Applications use SSH to access the private repositories, then you need to configure the secret above using SSH as well.
+
+```yaml title=".github/workflows/generate-diff.yml" linenums="24"
+    - name: Prepare secrets
+      run: |
+        mkdir secrets
+        cat > secrets/secret.yaml << EOF
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: private-repo
+          namespace: argocd
+          labels:
+            argocd.argoproj.io/secret-type: repo-creds
+        stringData:
+          type: git
+          url: https://github.com/${{ github.repository }}
+          sshPrivateKey: |
+        $(echo "${{ secrets.REPO_ACCESS_SSH_PRIVATE_KEY }}" | sed 's/^/    /') ⬅️ Private SSH key with proper indentation
+        EOF
+```
+
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
