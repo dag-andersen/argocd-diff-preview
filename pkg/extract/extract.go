@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplicaiton"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
@@ -42,46 +43,275 @@ var timeoutMessages = []string{
 }
 
 // GetResourcesFromBothBranches extracts resources from both base and target branches
-// by applying their manifests to the cluster and capturing the resulting resources
+// by applying each application individually and capturing the resulting resources
 func GetResourcesFromBothBranches(
 	argocd *argocd.ArgoCDInstallation,
 	baseBranch *types.Branch,
 	targetBranch *types.Branch,
 	timeout uint64,
-	baseManifest string,
-	targetManifest string,
+	baseApps []argoapplicaiton.ArgoResource,
+	targetApps []argoapplicaiton.ArgoResource,
 	outputFolder string,
 ) error {
-	// Apply base manifest directly from string with kubectl
-	if err := utils.KubectlApplyFromString(baseManifest); err != nil {
-		return fmt.Errorf("failed to apply base apps: %w", err)
+	log.Info().Msg("🚀 Starting pipeline extraction process")
+
+	// Create destination folders
+	baseDestFolder := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
+	targetDestFolder := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
+	if err := utils.CreateFolder(baseDestFolder); err != nil {
+		return fmt.Errorf("failed to create base destination folder: %w", err)
+	}
+	if err := utils.CreateFolder(targetDestFolder); err != nil {
+		return fmt.Errorf("failed to create target destination folder: %w", err)
 	}
 
-	// sleep for 3 seconds
-	time.Sleep(3 * time.Second)
-
-	if err := extractResourcesFromCluster(argocd, baseBranch, timeout, outputFolder); err != nil {
-		return fmt.Errorf("failed to get resources: %w", err)
+	// Process base branch applications
+	log.Info().Msgf("🔍 Processing %d applications from base branch (%s)", len(baseApps), baseBranch.Name)
+	if err := processApplicationsPipeline(argocd, baseApps, baseDestFolder, timeout); err != nil {
+		return fmt.Errorf("failed to process base branch applications: %w", err)
 	}
 
-	// delete applications
-	if err := utils.DeleteApplications(); err != nil {
-		return fmt.Errorf("failed to delete applications: %w", err)
-	}
-
-	// apply target manifest
-	if err := utils.KubectlApplyFromString(targetManifest); err != nil {
-		return fmt.Errorf("failed to apply target apps: %w", err)
-	}
-
-	// sleep for 3 seconds
-	time.Sleep(3 * time.Second)
-
-	if err := extractResourcesFromCluster(argocd, targetBranch, timeout, outputFolder); err != nil {
-		return fmt.Errorf("failed to get resources: %w", err)
+	// Process target branch applications
+	log.Info().Msgf("🔍 Processing %d applications from target branch (%s)", len(targetApps), targetBranch.Name)
+	if err := processApplicationsPipeline(argocd, targetApps, targetDestFolder, timeout); err != nil {
+		return fmt.Errorf("failed to process target branch applications: %w", err)
 	}
 
 	return nil
+}
+
+// processApplicationsPipeline processes applications in a pipeline fashion:
+// For each application: apply → wait for sync → extract manifests → delete
+func processApplicationsPipeline(
+	argocd *argocd.ArgoCDInstallation,
+	apps []argoapplicaiton.ArgoResource,
+	destFolder string,
+	timeout uint64,
+) error {
+	// Create worker pool
+	const maxWorkers = 5
+	type workItem struct {
+		app argoapplicaiton.ArgoResource
+	}
+	type resultItem struct {
+		appName   string
+		manifests string
+		err       error
+	}
+
+	workChan := make(chan workItem, len(apps))
+	resultChan := make(chan resultItem, len(apps))
+
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	// Fill work channel with apps
+	for _, app := range apps {
+		workChan <- workItem{app: app}
+	}
+	close(workChan)
+
+	// Start worker goroutines
+	var wg sync.WaitGroup
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for work := range workChan {
+				// Process a single application
+				manifests, err := processSingleApplication(ctx, argocd, work.app)
+				resultChan <- resultItem{
+					appName:   work.app.Name,
+					manifests: manifests,
+					err:       err,
+				}
+			}
+		}()
+	}
+
+	// Wait for all workers to finish and close result channel
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Process results
+	successCount := 0
+	failedApps := make(map[string]string)
+
+	for result := range resultChan {
+		if result.err != nil {
+			failedApps[result.appName] = result.err.Error()
+			log.Warn().Str("app", result.appName).Err(result.err).Msg("❌ Failed to process application")
+			continue
+		}
+
+		// Write extracted manifests to file
+		outputPath := fmt.Sprintf("%s/%s", destFolder, result.appName)
+		if err := utils.WriteFile(outputPath, result.manifests); err != nil {
+			return fmt.Errorf("failed to write manifests for %s: %w", result.appName, err)
+		}
+
+		successCount++
+		log.Info().Str("app", result.appName).Msg("✅ Successfully processed application")
+	}
+
+	// Log summary
+	log.Info().Msgf("📊 Processed %d/%d applications successfully", successCount, len(apps))
+	if len(failedApps) > 0 {
+		log.Error().Msgf("❌ Failed to process %d applications", len(failedApps))
+		for app, errMsg := range failedApps {
+			log.Error().Str("app", app).Msgf("Error: %s", errMsg)
+		}
+		return fmt.Errorf("failed to process %d applications", len(failedApps))
+	}
+
+	return nil
+}
+
+// processSingleApplication processes a single application through the pipeline:
+// 1. Apply the application
+// 2. Wait for it to sync
+// 3. Extract the manifests
+// 4. Delete the application
+func processSingleApplication(
+	ctx context.Context,
+	argocd *argocd.ArgoCDInstallation,
+	app argoapplicaiton.ArgoResource,
+) (string, error) {
+	appName := app.Name
+	log.Debug().Str("app", appName).Msg("🔄 Starting pipeline for application")
+
+	// Convert the app to YAML string
+	appYaml, err := app.AsString()
+	if err != nil {
+		return "", fmt.Errorf("failed to convert app to YAML: %w", err)
+	}
+
+	// Apply the application
+	log.Debug().Str("app", appName).Msg("📄 Applying application")
+	if err := utils.KubectlApplyFromString(appYaml); err != nil {
+		return "", fmt.Errorf("failed to apply application: %w", err)
+	}
+
+	//sleep for 3 seconds
+	time.Sleep(3 * time.Second)
+
+	// Wait for the application to sync or fail
+	log.Debug().Str("app", appName).Msg("⏳ Waiting for application to sync")
+	for {
+		select {
+		case <-ctx.Done():
+			return "", fmt.Errorf("timeout waiting for application to sync")
+		default:
+			// Check application status
+			status, conditions, err := getApplicationStatus(appName, argocd.Namespace)
+			if err != nil {
+				log.Warn().Str("app", appName).Err(err).Msg("Failed to get application status, retrying...")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			// Check for errors in conditions
+			for _, condition := range conditions {
+				if isErrorCondition(condition.Type) {
+					msg := condition.Message
+					if containsAny(msg, errorMessages) {
+						// Application failed
+						// Delete the application before returning
+						_ = deleteApplication(appName, argocd.Namespace) // Best effort cleanup, ignore errors
+						return "", fmt.Errorf("application failed: %s", msg)
+					} else if containsAny(msg, timeoutMessages) {
+						// Application timed out, try refreshing
+						log.Info().Str("app", appName).Msg("🔄 Refreshing application due to timeout")
+						if err := argocd.RefreshApp(appName); err != nil {
+							log.Warn().Str("app", appName).Err(err).Msg("Failed to refresh application")
+						}
+					}
+				}
+			}
+
+			// Check if the application is synced or out of sync
+			if status == "Synced" || status == "OutOfSync" {
+				// Extract manifests
+				log.Debug().Str("app", appName).Msg("📋 Extracting manifests")
+				manifests, err := argocd.GetManifests(appName)
+				if err != nil {
+					// Clean up before returning
+					_ = deleteApplication(appName, argocd.Namespace) // Best effort cleanup
+					return "", fmt.Errorf("failed to extract manifests: %w", err)
+				}
+
+				// Delete the application
+				log.Debug().Str("app", appName).Msg("🗑️ Deleting application")
+				if err := deleteApplication(appName, argocd.Namespace); err != nil {
+					log.Warn().Str("app", appName).Err(err).Msg("Failed to delete application")
+					// Continue anyway, since we got the manifests
+				}
+
+				return manifests, nil
+			}
+
+			// Wait before checking again
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
+
+// getApplicationStatus returns the sync status and conditions of an application
+func getApplicationStatus(appName string, namespace string) (string, []struct {
+	Type    string `yaml:"type"`
+	Message string `yaml:"message"`
+}, error) {
+	// When getting a single resource by name, kubectl returns the resource directly
+	// not as a list with items
+	var appOutput struct {
+		Metadata struct {
+			Name string `yaml:"name"`
+		} `yaml:"metadata"`
+		Status struct {
+			Sync struct {
+				Status string `yaml:"status"`
+			} `yaml:"sync"`
+			Conditions []struct {
+				Type    string `yaml:"type"`
+				Message string `yaml:"message"`
+			} `yaml:"conditions"`
+		} `yaml:"status"`
+	}
+
+	cmd := fmt.Sprintf("kubectl get applications.argoproj.io %s -n %s -oyaml", appName, namespace)
+	output, err := utils.RunCommand(cmd)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get application status: %w", err)
+	}
+
+	log.Debug().Str("app", appName).Msgf("Application status command output received (length: %d bytes)", len(output))
+
+	if err := yaml.Unmarshal([]byte(output), &appOutput); err != nil {
+		// Log the output to help with debugging
+		log.Debug().Str("app", appName).Str("output", output).Msg("Failed to parse application output")
+		return "", nil, fmt.Errorf("failed to parse application status: %w", err)
+	}
+
+	// Verify the application actually exists
+	if appOutput.Metadata.Name == "" {
+		log.Debug().Str("app", appName).Str("output", output).Msg("Application not found in output")
+		return "", nil, fmt.Errorf("application not found or has no metadata")
+	}
+
+	status := appOutput.Status.Sync.Status
+	conditions := appOutput.Status.Conditions
+
+	return status, conditions, nil
+}
+
+// deleteApplication deletes an application
+func deleteApplication(appName string, namespace string) error {
+	cmd := fmt.Sprintf("kubectl delete applications.argoproj.io %s -n %s --cascade=foreground", appName, namespace)
+	_, err := utils.RunCommand(cmd)
+	return err
 }
 
 // Application represents an Argo CD application with its status
@@ -91,249 +321,6 @@ type Application struct {
 	Conditions []struct {
 		Type    string
 		Message string
-	}
-}
-
-// extractResourcesFromCluster extracts resources from Argo CD for a specific branch
-func extractResourcesFromCluster(
-	argocd *argocd.ArgoCDInstallation,
-	branch *types.Branch,
-	timeout uint64,
-	outputFolder string,
-) error {
-	log.Info().Msg("🤖 Getting resources from branch")
-
-	destinationFolder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-	defer cancel()
-
-	// Create channels for communication
-	appChan := make(chan Application)
-	resultChan := make(chan struct {
-		name      string
-		err       error
-		manifests string
-	})
-
-	// Start a goroutine to continuously fetch applications
-	go fetchApplications(ctx, appChan)
-
-	// Start worker pool to process applications
-	var wg sync.WaitGroup
-	const maxWorkers = 5 // Adjust based on your needs
-
-	for i := 0; i < maxWorkers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			processApplications(ctx, argocd, appChan, resultChan)
-		}()
-	}
-
-	// Close result channel when all workers are done
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	// Process results as they come in
-	processedApps := make(map[string]bool)
-	failedApps := make(map[string]string)
-
-	for result := range resultChan {
-		if result.err != nil {
-			failedApps[result.name] = result.err.Error()
-			continue
-		}
-
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", destinationFolder, result.name), result.manifests); err != nil {
-			return fmt.Errorf("failed to write manifests: %v", err)
-		}
-
-		processedApps[result.name] = true
-	}
-
-	// Check for timeout
-	select {
-	case <-ctx.Done():
-		if ctx.Err() == context.DeadlineExceeded {
-			log.Error().Msgf("❌ Timed out after %d seconds", timeout)
-			log.Info().Msgf("❌ Processed %d applications, but some applications still remain",
-				len(processedApps))
-			return fmt.Errorf("timed out")
-		}
-	default:
-		// Context not done, all good
-	}
-
-	// Handle errors
-	if len(failedApps) > 0 {
-		for name, msg := range failedApps {
-			log.Error().Msgf("❌ Failed to process application: %s with error: \n%s", name, msg)
-		}
-		return fmt.Errorf("failed to process applications")
-	}
-
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications", len(processedApps))
-	log.Info().Str("branch", branch.Name).Msgf("💾 Writing resources to: '%s/<app_name>'", destinationFolder)
-
-	return nil
-}
-
-// fetchApplications continuously fetches applications and sends them to the channel
-func fetchApplications(ctx context.Context, appChan chan<- Application) {
-	defer close(appChan)
-
-	processedApps := make(map[string]bool)
-
-	log.Debug().Msg("Fetching applications")
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			// Get all applications
-			var yamlOutput struct {
-				Items []struct {
-					Metadata struct {
-						Name string `yaml:"name"`
-					} `yaml:"metadata"`
-					Status struct {
-						Sync struct {
-							Status string `yaml:"status"`
-						} `yaml:"sync"`
-						Conditions []struct {
-							Type    string `yaml:"type"`
-							Message string `yaml:"message"`
-						} `yaml:"conditions"`
-					} `yaml:"status"`
-				} `yaml:"items"`
-			}
-
-			log.Debug().Msgf("Getting applications from cluster")
-
-			cmd := "kubectl get applications -A -oyaml"
-			output, err := utils.RunCommand(cmd)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to get applications")
-				time.Sleep(5 * time.Second)
-				continue
-			}
-
-			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Err(err).Msg("Failed to parse applications yaml")
-				time.Sleep(5 * time.Second)
-				continue
-			}
-
-			log.Debug().Msgf("Got %d applications from cluster", len(yamlOutput.Items))
-
-			// Send applications to channel
-			newAppsFound := false
-			for _, item := range yamlOutput.Items {
-				name := item.Metadata.Name
-				if processedApps[name] {
-					continue
-				}
-
-				newAppsFound = true
-				appChan <- Application{
-					Name:   name,
-					Status: item.Status.Sync.Status,
-					Conditions: []struct {
-						Type    string
-						Message string
-					}(item.Status.Conditions),
-				}
-				processedApps[name] = true
-			}
-
-			log.Debug().Msgf("Processed %d applications", len(processedApps))
-
-			// If no new apps and all apps processed, we're done
-			if !newAppsFound && len(yamlOutput.Items) == len(processedApps) {
-				log.Debug().Msg("No new applications found and all applications processed")
-				return
-			}
-
-			// Sleep before next poll
-			time.Sleep(2 * time.Second)
-		}
-	}
-}
-
-// processApplications processes applications from the channel
-func processApplications(
-	ctx context.Context,
-	argocd *argocd.ArgoCDInstallation,
-	appChan <-chan Application,
-	resultChan chan<- struct {
-		name      string
-		err       error
-		manifests string
-	},
-) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case app, ok := <-appChan:
-			if !ok {
-				return // Channel closed
-			}
-
-			// Process the application
-			switch app.Status {
-			case "OutOfSync", "Synced":
-				log.Debug().Msgf("Getting manifests for application: %s", app.Name)
-				manifests, err := argocd.GetManifests(app.Name)
-				resultChan <- struct {
-					name      string
-					err       error
-					manifests string
-				}{
-					name:      app.Name,
-					err:       err,
-					manifests: manifests,
-				}
-
-			case "Unknown":
-				var err error
-				for _, condition := range app.Conditions {
-					if isErrorCondition(condition.Type) {
-						msg := condition.Message
-						if containsAny(msg, errorMessages) {
-							err = fmt.Errorf("application error: %s", msg)
-						} else if containsAny(msg, timeoutMessages) {
-							log.Info().Msgf("Application: %s timed out with error: %s", app.Name, msg)
-							// Refresh the app and let it be picked up again
-							if refreshErr := argocd.RefreshApp(app.Name); refreshErr != nil {
-								log.Error().Err(refreshErr).Msgf("Failed to refresh application: %s", app.Name)
-							} else {
-								log.Info().Msgf("🔄 Refreshing application: %s", app.Name)
-							}
-							err = fmt.Errorf("application timeout: %s", msg)
-						} else {
-							err = fmt.Errorf("application unknown error: %s", msg)
-						}
-					}
-				}
-
-				if err != nil {
-					resultChan <- struct {
-						name      string
-						err       error
-						manifests string
-					}{
-						name:      app.Name,
-						err:       err,
-						manifests: "",
-					}
-				}
-			}
-		}
 	}
 }
 

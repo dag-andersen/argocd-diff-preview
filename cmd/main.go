@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -136,24 +135,8 @@ func run(opts *Options) error {
 		return err
 	}
 
-	// Generate application manifests as strings
-	baseManifest := argoapplicaiton.ApplicationsToString(baseApps)
-	targetManifest := argoapplicaiton.ApplicationsToString(targetApps)
-
-	// For debugging purposes, we can still write the manifests to files
-	if opts.Debug {
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", tempFolder, baseBranch.FolderName()), baseManifest); err != nil {
-			log.Error().Msg("❌ Failed to write base apps")
-			return err
-		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", tempFolder, targetBranch.FolderName()), targetManifest); err != nil {
-			log.Error().Msg("❌ Failed to write target apps")
-			return err
-		}
-	}
-
 	// Extract resources from the cluster based on each branch, passing the manifests directly
-	if err := extract.GetResourcesFromBothBranches(argocd, baseBranch, targetBranch, opts.Timeout, baseManifest, targetManifest, opts.OutputFolder); err != nil {
+	if err := extract.GetResourcesFromBothBranches(argocd, baseBranch, targetBranch, opts.Timeout, baseApps, targetApps, opts.OutputFolder); err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
 		return err
 	}
