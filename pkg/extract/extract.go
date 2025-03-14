@@ -67,14 +67,34 @@ func GetResourcesFromBothBranches(
 
 	// Process base branch applications
 	log.Info().Msgf("🔍 Processing %d applications from base branch (%s)", len(baseApps), baseBranch.Name)
-	if err := processApplicationsPipeline(argocd, baseApps, baseDestFolder, timeout); err != nil {
+	baseManifests, err := processApplicationsPipeline(argocd, baseApps, timeout)
+	if err != nil {
 		return fmt.Errorf("failed to process base branch applications: %w", err)
+	}
+
+	// Write base manifests to files
+	for appName, manifest := range baseManifests {
+		outputPath := fmt.Sprintf("%s/%s", baseDestFolder, appName)
+		if err := utils.WriteFile(outputPath, manifest); err != nil {
+			return fmt.Errorf("failed to write manifest for %s: %w", appName, err)
+		}
+		log.Info().Str("app", appName).Str("path", outputPath).Msg("✅ Wrote manifest to file")
 	}
 
 	// Process target branch applications
 	log.Info().Msgf("🔍 Processing %d applications from target branch (%s)", len(targetApps), targetBranch.Name)
-	if err := processApplicationsPipeline(argocd, targetApps, targetDestFolder, timeout); err != nil {
+	targetManifests, err := processApplicationsPipeline(argocd, targetApps, timeout)
+	if err != nil {
 		return fmt.Errorf("failed to process target branch applications: %w", err)
+	}
+
+	// Write target manifests to files
+	for appName, manifest := range targetManifests {
+		outputPath := fmt.Sprintf("%s/%s", targetDestFolder, appName)
+		if err := utils.WriteFile(outputPath, manifest); err != nil {
+			return fmt.Errorf("failed to write manifest for %s: %w", appName, err)
+		}
+		log.Info().Str("app", appName).Str("path", outputPath).Msg("✅ Wrote manifest to file")
 	}
 
 	return nil
@@ -82,12 +102,12 @@ func GetResourcesFromBothBranches(
 
 // processApplicationsPipeline processes applications in a pipeline fashion:
 // For each application: apply → wait for sync → extract manifests → delete
+// Returns a map of application names to their manifests
 func processApplicationsPipeline(
 	argocd *argocd.ArgoCDInstallation,
 	apps []argoapplicaiton.ArgoResource,
-	destFolder string,
 	timeout uint64,
-) error {
+) (map[string]string, error) {
 	// Create worker pool
 	const maxWorkers = 5
 	type workItem struct {
@@ -137,6 +157,7 @@ func processApplicationsPipeline(
 	}()
 
 	// Process results
+	manifests := make(map[string]string)
 	successCount := 0
 	failedApps := make(map[string]string)
 
@@ -147,12 +168,7 @@ func processApplicationsPipeline(
 			continue
 		}
 
-		// Write extracted manifests to file
-		outputPath := fmt.Sprintf("%s/%s", destFolder, result.appName)
-		if err := utils.WriteFile(outputPath, result.manifests); err != nil {
-			return fmt.Errorf("failed to write manifests for %s: %w", result.appName, err)
-		}
-
+		manifests[result.appName] = result.manifests
 		successCount++
 		log.Info().Str("app", result.appName).Msg("✅ Successfully processed application")
 	}
@@ -164,10 +180,10 @@ func processApplicationsPipeline(
 		for app, errMsg := range failedApps {
 			log.Error().Str("app", app).Msgf("Error: %s", errMsg)
 		}
-		return fmt.Errorf("failed to process %d applications", len(failedApps))
+		return manifests, fmt.Errorf("failed to process %d applications", len(failedApps))
 	}
 
-	return nil
+	return manifests, nil
 }
 
 // processSingleApplication processes a single application through the pipeline:
