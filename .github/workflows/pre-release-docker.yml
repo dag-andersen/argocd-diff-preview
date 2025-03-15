@@ -28,19 +28,23 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
         run: |
-          # Extract version from tag (e.g., v1.2.3-pre-release -> 1.2.3)
           VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION%-pre-release}
-          # Get short SHA
-          SHA=$(git rev-parse --short HEAD)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          SHA=$(git rev-parse --short HEAD)
           echo "SHA=${SHA}" >> $GITHUB_ENV
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_ENV
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile
           push: true
           platforms: linux/${{ matrix.platform }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            COMMIT=${{ env.SHA }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
           tags: dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-${{ matrix.platform }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -64,12 +68,9 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set env
         run: |
-          # Extract version from tag (e.g., v1.2.3-pre-release -> 1.2.3)
           VERSION=${GITHUB_REF#refs/tags/}
-          VERSION=${VERSION%-pre-release}
-          # Get short SHA
-          SHA=$(git rev-parse --short HEAD)
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          SHA=$(git rev-parse --short HEAD)
           echo "SHA=${SHA}" >> $GITHUB_ENV
       - name: create manifest
         run: |
