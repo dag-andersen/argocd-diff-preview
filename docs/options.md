@@ -1,96 +1,47 @@
 # Options
+
+This document describes all the available options for ArgoCD Diff Preview. Options can be provided via command-line flags or environment variables.
+
+## Usage
+
 ```
-USAGE:
-    argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-branch>
-
-FLAGS:
-    -d, --debug
-                Activate debug mode
-
-        --ignore-invalid-watch-pattern
-                Ignore invalid watch pattern Regex on Applications. If flag is unset
-                and an invalid Regex is found, the tool will exit with an error
-
-    -h, --help
-                Prints help information
-
-        --keep-cluster-alive
-                Keep cluster alive after the tool finishes
-
-    -V, --version
-                Prints version information
-
-OPTIONS:
-        --argocd-chart-version <version>
-                Argo CD Helm Chart version
-                [env: ARGOCD_CHART_VERSION=]
-
-        --argocd-namespace <argocd-namespace>
-                Namespace to use for Argo CD
-                [env: ARGOCD_NAMESPACE=]  [default: argocd]
-
-    -b, --base-branch <base-branch>
-                Base branch name
-                [env: BASE_BRANCH=]  [default: main]
-
-        --base-branch-folder <folder>
-                Base branch folder
-                [env: BASE_BRANCH_FOLDER=]  [default: base-branch]
-
-    -i, --diff-ignore <diff-ignore>
-                Ignore lines in diff. Example: use 'v[1,9]+.[1,9]+.[1,9]+'
-                for ignoring changes caused by version changes following semver
-                [env: DIFF_IGNORE=]
-
-    -r, --file-regex <file-regex>
-                Regex to filter files. Example: "/apps_.*\.yaml"
-                [env: FILE_REGEX=]
-
-        --files-changed <files-changed>
-                List of files changed between the two branches.
-                Input must be a comma or space separated list of strings.
-                When provided, only Applications watching these files will be rendered
-                [env: FILES_CHANGED=]
-
-    -c, --line-count <line-count>
-                Generate diffs with <n> lines above and below the highlighted
-                changes in the diff.
-                [env: LINE_COUNT=]  [Default: 10]
-
-        --local-cluster-tool <tool>
-                Local cluster tool. Options: kind, minikube
-                [env: LOCAL_CLUSTER_TOOL=] [default: auto]
-
-        --max-diff-length <length>
-                Max diff message character count.
-                [env: MAX_DIFF_LENGTH=]  [Default: 65536] (GitHub comment limit)
-
-    -o, --output-folder <output-folder>
-                Output folder where the diff will be saved
-                [env: OUTPUT_FOLDER=]  [default: ./output]
-
-        --repo <repo>
-                Git Repository - Example: OWNER/REPO
-                [env: REPO=]
-
-    -s, --secrets-folder <secrets-folder>
-                Secrets folder where the secrets are read from
-                [env: SECRETS_FOLDER=]  [default: ./secrets]
-
-    -l, --selector <selector>
-                Label selector to filter on.
-                Supports '=', '==', and '!='. (e.g. -l key1=value1,key2=value2)
-                [env: SELECTOR=]
-
-    -t, --target-branch <target-branch>
-                Target branch name
-                [env: TARGET_BRANCH=]
-
-        --target-branch-folder <folder>
-                Target branch folder
-                [env: TARGET_BRANCH_FOLDER=]  [default: target-branch]
-
-        --timeout <timeout>
-                Set timeout for waiting for Applications to become 'OutOfSync'
-                [env: TIMEOUT=]  [default: 180]
+argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-branch>
 ```
+
+## Required Options
+
+| Flag | Environment Variable | Description |
+|------|---------------------|-------------|
+| `--repo <repo>` | `REPO` | Git Repository in format OWNER/REPO (e.g., `dag-andersen/argocd-diff-preview`) |
+| `--target-branch <target-branch>`, `-t` | `TARGET_BRANCH` | Target branch name (the branch you want to compare with the base branch) |
+
+## Flags
+
+| Flag | Environment Variable | Default | Description |
+|------|---------------------|---------|-------------|
+| `--debug`, `-d` | `DEBUG` | `false` | Activate debug mode |
+| `--ignore-invalid-watch-pattern` | `IGNORE_INVALID_WATCH_PATTERN` | `false` | Ignore invalid watch pattern Regex on Applications |
+| `--keep-cluster-alive` | `KEEP_CLUSTER_ALIVE` | `false` | Keep cluster alive after the tool finishes |
+| `--help`, `-h` | - | - | Prints help information |
+| `--version`, `-V` | - | - | Prints version information |
+
+## Options
+
+| Option | Environment Variable | Default | Description |
+|--------|---------------------|---------|-------------|
+| `--argocd-chart-version <version>` | `ARGOCD_CHART_VERSION` | `latest` | Argo CD Helm Chart version |
+| `--argocd-namespace <namespace>` | `ARGOCD_NAMESPACE` | `argocd` | Namespace to use for Argo CD |
+| `--base-branch <branch>`, `-b` | `BASE_BRANCH` | `main` | Base branch name |
+| `--cluster <tool>` | `CLUSTER` | `auto` | Local cluster tool. Options: kind, minikube, auto |
+| `--cluster-name <name>` | `CLUSTER_NAME` | `argocd-diff-preview` | Cluster name (only for kind) |
+| `--diff-ignore <pattern>`, `-i` | `DIFF_IGNORE` | - | Ignore lines in diff. Example: `v[1,9]+.[1,9]+.[1,9]+` for ignoring version changes |
+| `--file-regex <regex>`, `-r` | `FILE_REGEX` | - | Regex to filter files. Example: `/apps_.*\.yaml` |
+| `--files-changed <files>` | `FILES_CHANGED` | - | List of files changed between branches (comma or space separated) |
+| `--line-count <count>`, `-c` | `LINE_COUNT` | `10` | Generate diffs with \<n\> lines of context |
+| `--log-format <format>` | `LOG_FORMAT` | `human` | Log format. Options: human, json |
+| `--max-diff-length <length>` | `MAX_DIFF_LENGTH` | `65536` | Max diff message character count |
+| `--output-folder <folder>`, `-o` | `OUTPUT_FOLDER` | `./output` | Output folder where the diff will be saved |
+| `--redirect-target-revisions <revs>` | `REDIRECT_TARGET_REVISIONS` | - | List of target revisions to redirect |
+| `--secrets-folder <folder>`, `-s` | `SECRETS_FOLDER` | `./secrets` | Secrets folder where the secrets are read from |
+| `--selector <selector>`, `-l` | `SELECTOR` | - | Label selector to filter on (e.g., `key1=value1,key2=value2`) |
+| `--timeout <seconds>` | `TIMEOUT` | `180` | Set timeout in seconds |
