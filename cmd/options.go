@@ -27,6 +27,20 @@ var (
 	BuildDate = "unknown"
 )
 
+// defaults
+var (
+	DefaultTimeout         = uint64(180)
+	DefaultLineCount       = uint(10)
+	DefaultBaseBranch      = "main"
+	DefaultOutputFolder    = "./output"
+	DefaultSecretsFolder   = "./secrets"
+	DefaultCluster         = "auto"
+	DefaultClusterName     = "argocd-diff-preview"
+	DefaultMaxDiffLength   = uint(65536)
+	DefaultArgocdNamespace = "argocd"
+	DefaultLogFormat       = "human"
+)
+
 type Options struct {
 	Debug                     bool   `mapstructure:"debug"`
 	Timeout                   uint64 `mapstructure:"timeout"`
@@ -48,6 +62,7 @@ type Options struct {
 	KeepClusterAlive          bool   `mapstructure:"keep-cluster-alive"`
 	ArgocdNamespace           string `mapstructure:"argocd-namespace"`
 	RedirectTargetRevisions   string `mapstructure:"redirect-target-revisions"`
+	LogFormat                 string `mapstructure:"log-format"`
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
@@ -98,10 +113,14 @@ and generates a diff of the resources that would be applied.`,
 			// Configure logging based on debug mode
 			if opts.Debug {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
-				log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC850})
+				if opts.LogFormat == "human" {
+					log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC850})
+				}
 			} else {
 				zerolog.SetGlobalLevel(zerolog.InfoLevel)
-				log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
+				if opts.LogFormat == "human" {
+					log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
+				}
 			}
 
 			// Parse all dependent options
@@ -154,45 +173,46 @@ and generates a diff of the resources that would be applied.`,
 	viper.AutomaticEnv()
 
 	// Configure default values in viper
-	viper.SetDefault("timeout", 180)
-	viper.SetDefault("line-count", 10)
-	viper.SetDefault("base-branch", "main")
-	viper.SetDefault("output-folder", "./output")
-	viper.SetDefault("secrets-folder", "./secrets")
-	viper.SetDefault("cluster", "auto")
-	viper.SetDefault("cluster-name", "argocd-diff-preview")
-	viper.SetDefault("max-diff-length", 65536)
-	viper.SetDefault("argocd-namespace", "argocd")
-
+	viper.SetDefault("timeout", DefaultTimeout)
+	viper.SetDefault("line-count", DefaultLineCount)
+	viper.SetDefault("base-branch", DefaultBaseBranch)
+	viper.SetDefault("output-folder", DefaultOutputFolder)
+	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
+	viper.SetDefault("cluster", DefaultCluster)
+	viper.SetDefault("cluster-name", DefaultClusterName)
+	viper.SetDefault("max-diff-length", DefaultMaxDiffLength)
+	viper.SetDefault("argocd-namespace", DefaultArgocdNamespace)
+	viper.SetDefault("log-format", DefaultLogFormat)
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
-	rootCmd.Flags().String("timeout", "180", "Set timeout in seconds")
+	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
+	rootCmd.Flags().String("timeout", fmt.Sprintf("%d", DefaultTimeout), "Set timeout in seconds")
 
 	// File and diff related
 	rootCmd.Flags().StringP("file-regex", "r", "", "Regex to filter files. Example: /apps_.*\\.yaml")
 	rootCmd.Flags().StringP("diff-ignore", "i", "", "Ignore lines in diff. Example: v[1,9]+.[1,9]+.[1,9]+ for ignoring version changes")
-	rootCmd.Flags().StringP("line-count", "c", "10", "Generate diffs with <n> lines of context")
+	rootCmd.Flags().StringP("line-count", "c", fmt.Sprintf("%d", DefaultLineCount), "Generate diffs with <n> lines of context")
 
 	// Argo CD related
 	rootCmd.Flags().String("argocd-chart-version", "", "Argo CD Helm Chart version")
-	rootCmd.Flags().String("argocd-namespace", "argocd", "Namespace to use for Argo CD")
+	rootCmd.Flags().String("argocd-namespace", DefaultArgocdNamespace, "Namespace to use for Argo CD")
 
 	// Git related
-	rootCmd.Flags().StringP("base-branch", "b", "main", "Base branch name")
+	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name")
 	rootCmd.Flags().String("repo", "", "Git Repository. Format: OWNER/REPO")
 
 	// Folders
-	rootCmd.Flags().StringP("output-folder", "o", "./output", "Output folder where the diff will be saved")
-	rootCmd.Flags().StringP("secrets-folder", "s", "./secrets", "Secrets folder where the secrets are read from")
+	rootCmd.Flags().StringP("output-folder", "o", DefaultOutputFolder, "Output folder where the diff will be saved")
+	rootCmd.Flags().StringP("secrets-folder", "s", DefaultSecretsFolder, "Secrets folder where the secrets are read from")
 
 	// Cluster related
-	rootCmd.Flags().String("cluster", "auto", "Local cluster tool. Options: kind, minikube, auto")
-	rootCmd.Flags().String("cluster-name", "argocd-diff-preview", "Cluster name (only for kind)")
+	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, auto")
+	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind)")
 	rootCmd.Flags().Bool("keep-cluster-alive", false, "Keep cluster alive after the tool finishes")
 
 	// Other options
-	rootCmd.Flags().String("max-diff-length", "65536", "Max diff message character count")
+	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma or space separated)")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
@@ -321,6 +341,9 @@ func (o *Options) LogOptions() {
 	log.Info().Msgf("✨ - repo: %s", o.Repo)
 	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
 
+	if o.LogFormat != DefaultLogFormat {
+		log.Info().Msgf("✨ - log-format: %s", o.LogFormat)
+	}
 	if o.KeepClusterAlive {
 		log.Info().Msgf("✨ - keep-cluster-alive: %t", o.KeepClusterAlive)
 	}
@@ -333,22 +356,27 @@ func (o *Options) LogOptions() {
 	if o.DiffIgnore != "" {
 		log.Info().Msgf("✨ - diff-ignore: %s", o.DiffIgnore)
 	}
-	if o.LineCount > 0 {
+	if o.LineCount != DefaultLineCount {
 		log.Info().Msgf("✨ - line-count: %d", o.LineCount)
 	}
 	if o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-version: %s", o.ArgocdChartVersion)
 	}
-	if o.MaxDiffLength > 0 {
+	if o.MaxDiffLength != DefaultMaxDiffLength {
 		log.Info().Msgf("✨ - max-diff-length: %d", o.MaxDiffLength)
 	}
 	if len(o.parsedFilesChanged) > 0 {
 		log.Info().Msgf("✨ - files-changed: %s", o.FilesChanged)
 	}
 	if len(o.parsedSelectors) > 0 {
-		log.Info().Msgf("✨ - selectors: %s", o.parsedSelectors)
+		// Convert each selector to string and join with commas
+		selectorStrings := make([]string, len(o.parsedSelectors))
+		for i, selector := range o.parsedSelectors {
+			selectorStrings[i] = selector.String()
+		}
+		log.Info().Msgf("✨ - selectors: %s", strings.Join(selectorStrings, ", "))
 	}
-	if o.parsedRedirectRevisions != nil {
+	if len(o.parsedRedirectRevisions) > 0 {
 		log.Info().Msgf("✨ - redirect-target-revisions: %s", o.parsedRedirectRevisions)
 	}
 	if o.IgnoreInvalidWatchPattern {
