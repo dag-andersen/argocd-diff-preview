@@ -149,5 +149,11 @@ https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accu
   <img src="https://contrib.rocks/image?repo=dag-andersen/argocd-diff-preview" />
 </a>
 
+## Contributing
+
+We welcome contributions to ArgoCD Diff Preview! Whether it's bug fixes, feature additions, or documentation improvements.
+
+Please check out our [contribution guidelines](CONTRIBUTING.md) for details on how to set up your development environment, run tests, and submit changes.
+
 ## Questions, issues, or suggestions
 If you experience issues or have any questions or suggestions, please open an issue in this repository! 🚀

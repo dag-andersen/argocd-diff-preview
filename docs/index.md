@@ -59,3 +59,9 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 - Talk description: [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](
 https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
 - Talk recording: [YouTube](https://youtu.be/3aeP__qPSms)
+
+## Contributing
+
+We welcome contributions to ArgoCD Diff Preview! Whether you want to fix bugs, add new features, or improve documentation, your help is appreciated.
+
+Please check out our [contribution guidelines](https://github.com/dag-andersen/argocd-diff-preview/blob/main/CONTRIBUTING.md) for details on how to set up your development environment, run tests, and submit changes.

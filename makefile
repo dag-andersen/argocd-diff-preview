@@ -70,27 +70,3 @@ run-test-all-docker:
 
 run-test-all-go: go-build
 	cd tests && $(MAKE) run-test-all-go
-
-## How to run the tool locally
-
-### Run with Go:
-# Verify it if builds correctly:
-# make run-with-go target_branch=helm-example-3
-
-# Run on your own fork of the repository:
-# make run-with-go target_branch=<your-test-branch> github_org=<your-username>
-
-### Run with Docker:
-# Verify it if builds correctly:
-# make run-with-docker target_branch=helm-example-3
-
-# Run with Docker on your own fork of the repository:
-# make run-with-docker target_branch=<your-test-branch> github_org=<your-username>
-
-## Run Integration Tests
-
-# Run with Go:
-# make run-test-all-go
-
-# Run with Docker:
-# make run-test-all-docker
