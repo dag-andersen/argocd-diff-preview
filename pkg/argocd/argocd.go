@@ -52,12 +52,6 @@ func (a *ArgoCDInstallation) createNamespace() error {
 }
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
-	if a.Version != "" {
-		log.Info().Msgf("🦑 Installing Argo CD Helm Chart version: '%s'", a.Version)
-	} else {
-		log.Info().Msg("🦑 Installing Argo CD Helm Chart version: 'latest'")
-	}
-
 	// Create namespace if it doesn't exist
 	if err := a.createNamespace(); err != nil {
 		return err
@@ -116,6 +110,14 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 // installWithHelm installs ArgoCD using Helm
 func (a *ArgoCDInstallation) installWithHelm() error {
+
+	installLatest := strings.TrimSpace(a.Version) == "" || strings.TrimSpace(a.Version) == "latest"
+	if installLatest {
+		log.Info().Msg("🦑 Installing Argo CD Helm Chart version: 'latest'")
+	} else {
+		log.Info().Msgf("🦑 Installing Argo CD Helm Chart version: '%s'", a.Version)
+	}
+
 	// Check for values files
 	valuesFiles, err := a.findValuesFiles()
 	if err != nil {
@@ -142,7 +144,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	for _, valuesFile := range valuesFiles {
 		args = append(args, "-f", valuesFile)
 	}
-	if a.Version != "" {
+	if !installLatest {
 		args = append(args, "--version", a.Version)
 	}
 

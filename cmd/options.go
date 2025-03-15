@@ -29,16 +29,17 @@ var (
 
 // defaults
 var (
-	DefaultTimeout         = uint64(180)
-	DefaultLineCount       = uint(10)
-	DefaultBaseBranch      = "main"
-	DefaultOutputFolder    = "./output"
-	DefaultSecretsFolder   = "./secrets"
-	DefaultCluster         = "auto"
-	DefaultClusterName     = "argocd-diff-preview"
-	DefaultMaxDiffLength   = uint(65536)
-	DefaultArgocdNamespace = "argocd"
-	DefaultLogFormat       = "human"
+	DefaultTimeout            = uint64(180)
+	DefaultLineCount          = uint(10)
+	DefaultBaseBranch         = "main"
+	DefaultOutputFolder       = "./output"
+	DefaultSecretsFolder      = "./secrets"
+	DefaultCluster            = "auto"
+	DefaultClusterName        = "argocd-diff-preview"
+	DefaultMaxDiffLength      = uint(65536)
+	DefaultArgocdNamespace    = "argocd"
+	DefaultLogFormat          = "human"
+	DefaultArgocdChartVersion = "latest"
 )
 
 type Options struct {
@@ -78,11 +79,7 @@ func Parse() *Options {
 
 	// Create root command with the main run functionality directly in it
 	rootCmd := &cobra.Command{
-		Use:   "argocd-diff-preview",
-		Short: "A tool to preview changes in Argo CD applications between branches",
-		Long: `argocd-diff-preview is a tool that helps you preview changes in Argo CD applications
-between two branches. It creates a local Kubernetes cluster, installs Argo CD,
-and generates a diff of the resources that would be applied.`,
+		Use:     "argocd-diff-preview",
 		Version: fmt.Sprintf("%s (commit: %s, built: %s)", Version, Commit, BuildDate),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip validation if we're just showing help
@@ -110,18 +107,24 @@ and generates a diff of the resources that would be applied.`,
 				return fmt.Errorf("error parsing command line flags: %s", errorMsg)
 			}
 
-			// Configure logging based on debug mode
+			// Configure logging based on debug mode and log format
+			consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true}
 			if opts.Debug {
 				zerolog.SetGlobalLevel(zerolog.DebugLevel)
 				if opts.LogFormat == "human" {
-					log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC850})
+					consoleWriter.TimeFormat = time.RFC1123
 				}
 			} else {
 				zerolog.SetGlobalLevel(zerolog.InfoLevel)
 				if opts.LogFormat == "human" {
-					log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, PartsExclude: []string{"time", "level"}})
+					consoleWriter.PartsExclude = []string{"time", "level"}
 				}
 			}
+			if opts.LogFormat == "human" {
+				consoleWriter.FormatFieldName = func(i interface{}) string { return fmt.Sprintf("(%s: ", i) }
+				consoleWriter.FormatFieldValue = func(i interface{}) string { return fmt.Sprintf("%s)", i) }
+			}
+			log.Logger = log.Output(consoleWriter)
 
 			// Parse all dependent options
 			var err error
@@ -199,8 +202,8 @@ and generates a diff of the resources that would be applied.`,
 
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
-	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name")
-	rootCmd.Flags().String("repo", "", "Git Repository. Format: OWNER/REPO")
+	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
+	rootCmd.Flags().String("repo", "", "Git Repository. Format: OWNER/REPO (required)")
 
 	// Folders
 	rootCmd.Flags().StringP("output-folder", "o", DefaultOutputFolder, "Output folder where the diff will be saved")
@@ -381,6 +384,9 @@ func (o *Options) LogOptions() {
 	}
 	if o.IgnoreInvalidWatchPattern {
 		log.Info().Msg("✨ Ignoring invalid watch patterns Regex on Applications")
+	}
+	if o.ArgocdChartVersion != DefaultArgocdChartVersion {
+		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)
 	}
 }
 
