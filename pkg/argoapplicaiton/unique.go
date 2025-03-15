@@ -2,6 +2,7 @@ package argoapplicaiton
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
@@ -29,10 +30,10 @@ func UniqueNames(apps []ArgoResource, branch *types.Branch) []ArgoResource {
 				Str("branch", branch.Name).
 				Msgf("Found %d duplicate applications with same name: %s", len(appsWithSameName), name)
 
-			// // Sort apps by filename for stable ordering
-			// sort.Slice(appsWithSameName, func(i, j int) bool {
-			// 	return appsWithSameName[i].FileName < appsWithSameName[j].FileName
-			// })
+			// Sort apps by filename for stable ordering
+			sort.Slice(appsWithSameName, func(i, j int) bool {
+				return appsWithSameName[i].FileName < appsWithSameName[j].FileName
+			})
 
 			// Rename each app with a suffix
 			for i, app := range appsWithSameName {

@@ -8,13 +8,19 @@ line_count := 10
 
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
-	cd base-branch   && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(base_branch)"   && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
+	cd base-branch   && git clone https://github.com/$(github_org)/$(gitops_repo).git --depth=1 --branch "$(base_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
 pull-target:
 	@rm -rf target-branch || true && mkdir -p target-branch
-	cd target-branch && gh repo clone $(github_org)/$(gitops_repo) -- --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
+	cd target-branch && git clone https://github.com/$(github_org)/$(gitops_repo).git --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
-run-single-test-go: pull-base pull-target
+clean:
+	rm -rf base-branch || true
+	rm -rf target-branch || true
+	rm -rf output || true
+	rm -rf temp || true
+
+run-single-test-go: clean pull-base pull-target
 	../bin/argocd-diff-preview \
 		--base-branch "$(base_branch)" \
 		--target-branch "$(target_branch)" \
@@ -32,7 +38,7 @@ run-single-test-go: pull-base pull-target
 docker-build:
 	docker build -f ../$(docker_file) -t argocd-diff-preview ..
 
-run-single-test-docker: pull-base pull-target
+run-single-test-docker: clean pull-base pull-target
 	docker run --network=host \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(PWD)/base-branch:/base-branch \
@@ -55,8 +61,6 @@ run-single-test-docker: pull-base pull-target
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 run-test-all-with-%:
-	rm -rf output || true
-	rm -rf temp || true
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-1 base_branch=tool-test-branch-1-og diff_ignore="image" line_count=3
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-2 base_branch=tool-test-branch-2-og
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-3 base_branch=tool-test-branch-3-og
