@@ -87,6 +87,12 @@ func extractResourcesFromCluster(
 	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")
 
 	destinationFolder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
+
+	// Create destination folder
+	if err := utils.CreateFolder(destinationFolder); err != nil {
+		return fmt.Errorf("failed to create destination folder: %w", err)
+	}
+
 	processedApps := make(map[string]bool)
 	failedApps := make(map[string]string)
 	startTime := time.Now()
