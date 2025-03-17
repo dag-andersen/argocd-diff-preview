@@ -122,7 +122,7 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 				return false
 			}
 			log.Warn().Msgf("⚠️ Ignoring invalid watch pattern '%s' in file: %s", pattern, a.FileName)
-			return true
+			continue
 		}
 
 		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("watch pattern '%s' is valid. Checking files changed", pattern)

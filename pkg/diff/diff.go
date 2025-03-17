@@ -3,6 +3,7 @@ package diff
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -51,6 +52,16 @@ func GenerateDiff(
 	patternsToIgnore := ""
 	if diffIgnore != nil && *diffIgnore != "" {
 		patternsToIgnore = fmt.Sprintf("--ignore-matching-lines \"%s\"", *diffIgnore)
+	}
+
+	// verify that the output folder exists
+	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
+	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
+	if _, err := os.Stat(basePath); os.IsNotExist(err) {
+		return fmt.Errorf("base path does not exist: %s", basePath)
+	}
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		return fmt.Errorf("target path does not exist: %s", targetPath)
 	}
 
 	// Get summary diff

@@ -385,7 +385,7 @@ func (o *Options) LogOptions() {
 	if o.IgnoreInvalidWatchPattern {
 		log.Info().Msg("✨ Ignoring invalid watch patterns Regex on Applications")
 	}
-	if o.ArgocdChartVersion != DefaultArgocdChartVersion {
+	if o.ArgocdChartVersion != DefaultArgocdChartVersion && o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)
 	}
 }
