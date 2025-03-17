@@ -2,6 +2,7 @@ package argoapplicaiton
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
@@ -70,6 +71,12 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 	if len(filesChanged) == 0 {
 		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no files changed. Skipping")
 		return false
+	}
+
+	// check if the application itself is in the list of files changed
+	if slices.Contains(filesChanged, a.FileName) {
+		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("application itself is in the list of files changed. Returning application")
+		return true
 	}
 
 	log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking files changed: %v", filesChanged)
