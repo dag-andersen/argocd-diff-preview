@@ -66,11 +66,12 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-3 base_branch=tool-test-branch-3-og
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-4 base_branch=tool-test-branch-4-og
 	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="examples/helm/values/filtered.yaml" suffix="-1"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="something/else.yaml" suffix="-2"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=my-team" suffix="-3"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=other-team" suffix="-4"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex=".*labels\.yaml" suffix="-5"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex="this-does-not-exist\.yaml" suffix="-6"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml" suffix="-2"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="something/else.yaml" suffix="-3"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=my-team" suffix="-4"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=other-team" suffix="-5"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex=".*labels\.yaml" suffix="-6"
+	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex="this-does-not-exist\.yaml" suffix="-7"
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker
