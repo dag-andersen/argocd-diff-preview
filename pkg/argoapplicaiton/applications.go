@@ -129,6 +129,7 @@ func GetApplications(
 		selector,
 		filesChanged,
 		ignoreInvalidWatchPattern,
+		branch,
 	)
 
 	if len(applications) == 0 {
@@ -178,6 +179,7 @@ func FromResourceToApplication(
 	selector []types.Selector,
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
+	branch *types.Branch,
 ) []ArgoResource {
 	var apps []ArgoResource
 
@@ -228,16 +230,16 @@ func FromResourceToApplication(
 
 	// Log filtering results
 	if numberOfAppsBeforeFiltering != len(filteredApps) {
-		log.Info().Msgf(
+		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets] before filtering",
 			numberOfAppsBeforeFiltering,
 		)
-		log.Info().Msgf(
+		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets] after filtering",
 			len(filteredApps),
 		)
 	} else {
-		log.Info().Msgf(
+		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets]",
 			numberOfAppsBeforeFiltering,
 		)
