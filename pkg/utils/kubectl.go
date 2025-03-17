@@ -16,6 +16,18 @@ import (
 func KubectlApply(path string, extraArgs ...string) error {
 	log.Debug().Str("path", path).Msg("Applying manifest")
 
+	// check if the file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		log.Warn().Str("path", path).Msg("⚠️ File does not exist")
+		return fmt.Errorf("file does not exist: %s", path)
+	}
+
+	// check if the file is empty
+	if fileInfo, err := os.Stat(path); err == nil && fileInfo.Size() == 0 {
+		log.Debug().Str("path", path).Msg("Applies 0 resources because file is empty")
+		return nil
+	}
+
 	// Try to apply the manifest multiple times in case of temporary failures
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
