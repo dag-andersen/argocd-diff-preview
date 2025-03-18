@@ -46,12 +46,12 @@ func GetResourcesFromBothBranches(
 	baseBranch *types.Branch,
 	targetBranch *types.Branch,
 	timeout uint64,
-	inputFolder string,
+	baseManifest string,
+	targetManifest string,
 	outputFolder string,
 ) error {
-	// Apply files to cluster with kubectl
-	baseAppsPath := fmt.Sprintf("%s/%s.yaml", inputFolder, baseBranch.FolderName())
-	if err := utils.KubectlApply(baseAppsPath); err != nil {
+	// Apply base manifest directly from string with kubectl
+	if err := utils.KubectlApplyFromString(baseManifest); err != nil {
 		return fmt.Errorf("failed to apply base apps: %w", err)
 	}
 
@@ -64,9 +64,8 @@ func GetResourcesFromBothBranches(
 		return fmt.Errorf("failed to delete applications: %w", err)
 	}
 
-	// apply target apps
-	targetAppsPath := fmt.Sprintf("%s/%s.yaml", inputFolder, targetBranch.FolderName())
-	if err := utils.KubectlApply(targetAppsPath); err != nil {
+	// apply target manifest
+	if err := utils.KubectlApplyFromString(targetManifest); err != nil {
 		return fmt.Errorf("failed to apply target apps: %w", err)
 	}
 
