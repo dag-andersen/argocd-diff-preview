@@ -40,17 +40,47 @@ func GenerateDiff(
 	diffIgnore *string,
 	lineCount uint,
 	maxCharCount uint,
+	debug bool,
 ) error {
 
-	// convert map to string
+	// Sort map keys for deterministic processing
+	baseKeys := make([]string, 0, len(baseManifests))
+	for k := range baseManifests {
+		baseKeys = append(baseKeys, k)
+	}
+	sort.Strings(baseKeys)
+
+	targetKeys := make([]string, 0, len(targetManifests))
+	for k := range targetManifests {
+		targetKeys = append(targetKeys, k)
+	}
+	sort.Strings(targetKeys)
+
+	// convert map to string using sorted keys
 	baseManifestString := ""
-	for _, manifest := range baseManifests {
-		baseManifestString += manifest
+	for _, key := range baseKeys {
+		baseManifestString += fmt.Sprintf("# %s\n", key)
+		baseManifestString += baseManifests[key]
+		baseManifestString += "\n\n"
 	}
 
 	targetManifestString := ""
-	for _, manifest := range targetManifests {
-		targetManifestString += manifest
+	for _, key := range targetKeys {
+		targetManifestString += fmt.Sprintf("# %s\n", key)
+		targetManifestString += targetManifests[key]
+		targetManifestString += "\n\n"
+	}
+
+	if debug {
+		// Write base manifests to disk
+		basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
+		if err := utils.WriteFile(basePath, baseManifestString); err != nil {
+			return fmt.Errorf("failed to write base manifest: %w", err)
+		}
+		targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
+		if err := utils.WriteFile(targetPath, targetManifestString); err != nil {
+			return fmt.Errorf("failed to write target manifest: %w", err)
+		}
 	}
 
 	dmp := diffmatchpatch.New()
