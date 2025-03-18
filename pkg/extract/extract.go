@@ -48,58 +48,33 @@ func GetResourcesFromBothBranches(
 	timeout uint64,
 	baseManifest string,
 	targetManifest string,
-	outputFolder string,
-) error {
+) (map[string]string, map[string]string, error) {
 	// Apply base manifest directly from string with kubectl
 	if err := utils.KubectlApplyFromString(baseManifest); err != nil {
-		return fmt.Errorf("failed to apply base apps: %w", err)
+		return nil, nil, fmt.Errorf("failed to apply base apps: %w", err)
 	}
 
 	baseManifests, err := extractResourcesFromCluster(argocd, baseBranch, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to get resources: %w", err)
-	}
-
-	// Write base manifests to disk
-	destinationFolder := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
-	if err := utils.CreateFolder(destinationFolder); err != nil {
-		return fmt.Errorf("failed to create destination folder: %w", err)
-	}
-
-	for name, manifest := range baseManifests {
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", destinationFolder, name), manifest); err != nil {
-			return fmt.Errorf("failed to write manifests: %v", err)
-		}
+		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
 
 	// delete applications
 	if err := utils.DeleteApplications(); err != nil {
-		return fmt.Errorf("failed to delete applications: %w", err)
+		return nil, nil, fmt.Errorf("failed to delete applications: %w", err)
 	}
 
 	// apply target manifest
 	if err := utils.KubectlApplyFromString(targetManifest); err != nil {
-		return fmt.Errorf("failed to apply target apps: %w", err)
+		return nil, nil, fmt.Errorf("failed to apply target apps: %w", err)
 	}
 
 	targetManifests, err := extractResourcesFromCluster(argocd, targetBranch, timeout)
 	if err != nil {
-		return fmt.Errorf("failed to get resources: %w", err)
+		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
 
-	// Write target manifests to disk
-	destinationFolder = fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	if err := utils.CreateFolder(destinationFolder); err != nil {
-		return fmt.Errorf("failed to create destination folder: %w", err)
-	}
-
-	for name, manifest := range targetManifests {
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", destinationFolder, name), manifest); err != nil {
-			return fmt.Errorf("failed to write manifests: %v", err)
-		}
-	}
-
-	return nil
+	return baseManifests, targetManifests, nil
 }
 
 // extractResourcesFromCluster extracts resources from Argo CD for a specific branch
