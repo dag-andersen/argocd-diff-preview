@@ -55,8 +55,21 @@ func GetResourcesFromBothBranches(
 		return fmt.Errorf("failed to apply base apps: %w", err)
 	}
 
-	if err := extractResourcesFromCluster(argocd, baseBranch, timeout, outputFolder); err != nil {
+	baseManifests, err := extractResourcesFromCluster(argocd, baseBranch, timeout)
+	if err != nil {
 		return fmt.Errorf("failed to get resources: %w", err)
+	}
+
+	// Write base manifests to disk
+	destinationFolder := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
+	if err := utils.CreateFolder(destinationFolder); err != nil {
+		return fmt.Errorf("failed to create destination folder: %w", err)
+	}
+
+	for name, manifest := range baseManifests {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", destinationFolder, name), manifest); err != nil {
+			return fmt.Errorf("failed to write manifests: %v", err)
+		}
 	}
 
 	// delete applications
@@ -69,8 +82,21 @@ func GetResourcesFromBothBranches(
 		return fmt.Errorf("failed to apply target apps: %w", err)
 	}
 
-	if err := extractResourcesFromCluster(argocd, targetBranch, timeout, outputFolder); err != nil {
+	targetManifests, err := extractResourcesFromCluster(argocd, targetBranch, timeout)
+	if err != nil {
 		return fmt.Errorf("failed to get resources: %w", err)
+	}
+
+	// Write target manifests to disk
+	destinationFolder = fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
+	if err := utils.CreateFolder(destinationFolder); err != nil {
+		return fmt.Errorf("failed to create destination folder: %w", err)
+	}
+
+	for name, manifest := range targetManifests {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", destinationFolder, name), manifest); err != nil {
+			return fmt.Errorf("failed to write manifests: %v", err)
+		}
 	}
 
 	return nil
@@ -81,16 +107,11 @@ func extractResourcesFromCluster(
 	argocd *argocd.ArgoCDInstallation,
 	branch *types.Branch,
 	timeout uint64,
-	outputFolder string,
-) error {
+) (map[string]string, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")
 
-	destinationFolder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
-
-	// Create destination folder
-	if err := utils.CreateFolder(destinationFolder); err != nil {
-		return fmt.Errorf("failed to create destination folder: %w", err)
-	}
+	// Create a map to store all manifests with app name as key
+	allManifests := make(map[string]string)
 
 	processedApps := make(map[string]bool)
 	failedApps := make(map[string]string)
@@ -118,11 +139,11 @@ func extractResourcesFromCluster(
 		cmd := "kubectl get applications -A -oyaml"
 		output, err := utils.RunCommand(cmd)
 		if err != nil {
-			return fmt.Errorf("failed to get applications: %v", err)
+			return nil, fmt.Errorf("failed to get applications: %v", err)
 		}
 
 		if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-			return fmt.Errorf("failed to parse applications yaml: %v", err)
+			return nil, fmt.Errorf("failed to parse applications yaml: %v", err)
 		}
 
 		if len(yamlOutput.Items) == 0 || len(yamlOutput.Items) == len(processedApps) {
@@ -150,10 +171,8 @@ func extractResourcesFromCluster(
 					continue
 				}
 
-				if err := utils.WriteFile(fmt.Sprintf("%s/%s", destinationFolder, name), manifests); err != nil {
-					return fmt.Errorf("failed to write manifests: %v", err)
-				}
-
+				// Add manifest to our map with app name as key
+				allManifests[name] = manifests
 				processedApps[name] = true
 
 			case "Unknown":
@@ -181,7 +200,7 @@ func extractResourcesFromCluster(
 			for name, msg := range failedApps {
 				log.Error().Msgf("❌ Failed to process application: %s with error: \n%s", name, msg)
 			}
-			return fmt.Errorf("failed to process applications")
+			return nil, fmt.Errorf("failed to process applications")
 		}
 
 		// Handle timeouts
@@ -195,7 +214,7 @@ func extractResourcesFromCluster(
 					log.Error().Msgf("❌ %s, %s", err.name, err.msg)
 				}
 			}
-			return fmt.Errorf("timed out")
+			return nil, fmt.Errorf("timed out")
 		}
 
 		// Handle timed out apps
@@ -215,9 +234,8 @@ func extractResourcesFromCluster(
 	}
 
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications", len(processedApps))
-	log.Info().Str("branch", branch.Name).Msgf("💾 Writing resources to: '%s/<app_name>'", destinationFolder)
 
-	return nil
+	return allManifests, nil
 }
 
 func isErrorCondition(condType string) bool {
