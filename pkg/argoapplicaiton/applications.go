@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	k8s "github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
-	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
-	"gopkg.in/yaml.v3"
+	"sigs.k8s.io/yaml"
 )
 
 // GetApplicationsForBranches gets applications for both base and target branches
@@ -57,10 +57,10 @@ func GetApplicationsForBranches(
 	}
 
 	// Find duplicates
-	var duplicateYaml []*yaml.Node
+	var duplicateYaml []*unstructured.Unstructured
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
-			if baseApp.Name == targetApp.Name && yamlutil.YamlEqual(baseApp.Yaml, targetApp.Yaml) {
+			if baseApp.Name == targetApp.Name && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
 				log.Debug().Msgf("Skipping application '%s' because it has not changed", baseApp.Name)
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
@@ -158,12 +158,12 @@ func GetApplications(
 
 // Helper functions
 
-func filterDuplicates(apps []ArgoResource, duplicates []*yaml.Node) []ArgoResource {
+func filterDuplicates(apps []ArgoResource, duplicates []*unstructured.Unstructured) []ArgoResource {
 	var filtered []ArgoResource
 	for _, app := range apps {
 		isDuplicate := false
 		for _, dup := range duplicates {
-			if yamlutil.YamlEqual(app.Yaml, dup) {
+			if yamlEqual(app.Yaml, dup) {
 				isDuplicate = true
 				break
 			}
@@ -444,21 +444,21 @@ func ConvertAppSetsToApps(
 		// check if output is list of applications
 		isList := strings.HasPrefix(output, "-")
 
-		var yamlData []yaml.Node
+		var yamlData []unstructured.Unstructured
 		if isList {
-			var yamlOutput []yaml.Node
+			var yamlOutput []unstructured.Unstructured
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
 				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
 				continue
 			}
 			yamlData = yamlOutput
 		} else {
-			var yamlOutput yaml.Node
+			var yamlOutput unstructured.Unstructured
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
 				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
 				continue
 			}
-			yamlData = []yaml.Node{yamlOutput}
+			yamlData = []unstructured.Unstructured{yamlOutput}
 		}
 
 		if len(yamlData) == 0 {
@@ -468,33 +468,33 @@ func ConvertAppSetsToApps(
 
 		// Convert each document to ArgoResource
 		for _, doc := range yamlData {
-			kind := yamlutil.GetYamlValue(&doc, []string{"kind"})
-			if kind == nil {
+			kind := doc.GetKind()
+			if kind == "" {
 				log.Error().
 					Str("file", appSet.FileName).
 					Msg("❌ Output from ApplicationSet contains no kind")
 				continue
 			}
-			if kind.Value != "Application" {
+			if kind != "Application" {
 				log.Error().
 					Str("file", appSet.FileName).
 					Msg("❌ Output from ApplicationSet contains non-Application resources")
 				continue
 			}
 
-			name := yamlutil.GetYamlValue(&doc, []string{"metadata", "name"})
-			if name == nil {
+			name := doc.GetName()
+			if name == "" {
 				log.Error().Str("file", appSet.FileName).Msg("❌ Generated Application missing name")
 				continue
 			}
 
 			// Create a deep copy of the YAML node to avoid reference issues
-			docCopy := yamlutil.DeepCopyYaml(&doc)
+			docCopy := doc.DeepCopy()
 
 			app := ArgoResource{
 				Yaml:     docCopy,
 				Kind:     Application,
-				Name:     name.Value,
+				Name:     name,
 				FileName: appSet.FileName,
 			}
 
@@ -506,7 +506,7 @@ func ConvertAppSetsToApps(
 				redirectRevisions,
 			)
 			if err != nil {
-				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to patch application: %s", name.Value)
+				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to patch application: %s", name)
 				continue
 			}
 

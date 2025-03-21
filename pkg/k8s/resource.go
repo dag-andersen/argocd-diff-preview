@@ -1,9 +1,9 @@
 package k8s
 
-import "gopkg.in/yaml.v3"
+import "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 // Resource represents a Kubernetes resource from a YAML file
 type Resource struct {
 	FileName string
-	Yaml     yaml.Node
+	Yaml     unstructured.Unstructured
 }

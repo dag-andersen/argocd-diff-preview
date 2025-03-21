@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func TestUniqueNames(t *testing.T) {
@@ -100,7 +100,7 @@ func TestUniqueNames(t *testing.T) {
 				assert.Equal(t, tt.want[i].Name, got[i].Name, "App %d: Expected name %s, got %s", i, tt.want[i].Name, got[i].Name)
 
 				// Check YAML name matches
-				gotName := yamlutil.GetYamlValue(got[i].Yaml, []string{"metadata", "name"}).Value
+				gotName := got[i].Yaml.GetName()
 				assert.Equal(t, got[i].Name, gotName, "App %d: YAML name %s doesn't match struct name %s", i, gotName, got[i].Name)
 			}
 
@@ -125,13 +125,13 @@ spec:
   destination:
     namespace: default`
 
-	var node yaml.Node
-	if err := yaml.Unmarshal([]byte(yamlStr), &node); err != nil {
+	var y unstructured.Unstructured
+	if err := yaml.Unmarshal([]byte(yamlStr), &y); err != nil {
 		panic(fmt.Sprintf("failed to unmarshal yaml in test: %v", err))
 	}
 
 	return ArgoResource{
-		Yaml:     &node,
+		Yaml:     &y,
 		Kind:     Application,
 		Name:     name,
 		FileName: fileName,

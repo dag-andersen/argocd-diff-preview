@@ -33,10 +33,6 @@ RUN apt-get update && apt-get install -y curl
 RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.26.0/kind-linux-${TARGETARCH} && \
     chmod +x ./kind
 
-# Install kubectl
-RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/${TARGETARCH}/kubectl \
-    && chmod +x ./kubectl
-
 # Install Argo CD
 RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
     install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
@@ -46,7 +42,6 @@ FROM gcr.io/distroless/static-debian12 AS final
 
 # Copy necessary binaries from the build stage
 COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
-COPY --from=build /argocd-diff-preview/kubectl /usr/local/bin/kubectl
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
 COPY --from=build /argocd-diff-preview/argocd-diff-preview .
 

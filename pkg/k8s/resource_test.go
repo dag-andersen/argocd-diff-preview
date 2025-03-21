@@ -4,21 +4,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestResource(t *testing.T) {
 	tests := []struct {
 		name     string
 		fileName string
-		yaml     yaml.Node
+		yaml     unstructured.Unstructured
 	}{
 		{
 			name:     "simple resource",
 			fileName: "test.yaml",
-			yaml: yaml.Node{
-				Kind: yaml.DocumentNode,
-			},
+			yaml:     unstructured.Unstructured{},
 		},
 	}
 

@@ -6,7 +6,8 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func TestRedirectGenerators(t *testing.T) {
@@ -247,13 +248,13 @@ func TestRedirectGenerators(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse YAML
-			var node yaml.Node
+			var node map[string]interface{}
 			err := yaml.Unmarshal([]byte(tt.yaml), &node)
 			assert.NoError(t, err)
 
 			// Create ArgoResource
 			app := &ArgoResource{
-				Yaml:     &node,
+				Yaml:     &unstructured.Unstructured{Object: node},
 				Kind:     ApplicationSet,
 				Name:     "test-set",
 				FileName: "test-set.yaml",
@@ -276,12 +277,28 @@ func TestRedirectGenerators(t *testing.T) {
 }
 
 func applicationSetSpec(spec string) string {
-	metadata := `apiVersion: argoproj.io/v1alpha1
+	metadata := `
+apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-    name: test-set
-    namespace: default
+  name: test-set
+  namespace: default
 spec:`
 
-	return fmt.Sprintf("%s%s", metadata, spec)
+	yamlString := fmt.Sprintf("%s%s", metadata, spec)
+
+	// convert to yaml unstructured
+	unstructured := &unstructured.Unstructured{}
+	err := yaml.Unmarshal([]byte(yamlString), unstructured)
+	if err != nil {
+		panic(err)
+	}
+
+	// convert back to yaml string
+	yamlBytes, err := yaml.Marshal(unstructured)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(yamlBytes)
 }

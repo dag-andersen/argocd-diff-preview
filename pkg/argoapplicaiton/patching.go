@@ -6,14 +6,14 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
-	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // ArgoResource represents an Argo CD Application or ApplicationSet
 type ArgoResource struct {
-	Yaml     *yaml.Node
+	Yaml     *unstructured.Unstructured
 	Kind     ApplicationKind
 	Name     string
 	FileName string
@@ -30,42 +30,67 @@ func (a *ArgoResource) AsString() (string, error) {
 
 // SetNamespace sets the namespace of the resource
 func (a *ArgoResource) SetNamespace(namespace string) error {
-	yamlutil.SetYamlValue(a.Yaml, []string{"metadata", "namespace"}, namespace)
+	a.Yaml.SetNamespace(namespace)
 	return nil
 }
 
 // SetProjectToDefault sets the project to "default"
 func (a *ArgoResource) SetProjectToDefault() error {
-	spec := a.getAppSpec()
-	if spec == nil {
-		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
+	if a.Yaml == nil {
+		log.Debug().Msgf("no YAML for Application: %s", a.Name)
+		return nil
 	}
 
-	project := yamlutil.GetYamlValue(spec, []string{"project"})
-	if project == nil {
-		log.Debug().Msgf("no 'spec.project' key found in Application: %s (file: %s)",
-			a.Name, a.FileName)
+	switch a.Kind {
+	case Application:
+		if _, found, _ := unstructured.NestedString(a.Yaml.Object, "spec", "project"); !found {
+			log.Debug().Msgf("no 'spec.project' key found in Application: %s (file: %s)",
+				a.Name, a.FileName)
+		}
+		unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "project")
+	case ApplicationSet:
+		if _, found, _ := unstructured.NestedString(a.Yaml.Object, "spec", "template", "spec", "project"); !found {
+			log.Debug().Msgf("no 'spec.template.spec.project' key found in ApplicationSet: %s (file: %s)",
+				a.Name, a.FileName)
+		}
+		unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "template", "spec", "project")
 	}
 
-	yamlutil.SetYamlValue(spec, []string{"project"}, "default")
 	return nil
 }
 
 // PointDestinationToInCluster updates the destination to point to the in-cluster service
 func (a *ArgoResource) PointDestinationToInCluster() error {
-	spec := a.getAppSpec()
-	if spec == nil {
-		log.Debug().Msgf("no 'spec' key found in Application: %s", a.Name)
+	if a.Yaml == nil {
+		log.Debug().Msgf("no YAML for Application: %s", a.Name)
+		return nil
 	}
 
-	dest := yamlutil.GetYamlValue(spec, []string{"destination"})
-	if dest == nil {
-		log.Debug().Msgf("no 'spec.destination' key found in Application: %s (file: %s)",
-			a.Name, a.FileName)
+	var destPath []string
+	switch a.Kind {
+	case Application:
+		destPath = []string{"spec", "destination"}
+	case ApplicationSet:
+		destPath = []string{"spec", "template", "spec", "destination"}
+	default:
+		return nil
 	}
 
-	yamlutil.SetYamlValue(dest, []string{"name"}, "in-cluster")
-	yamlutil.RemoveYamlValue(dest, []string{"server"})
+	// Check if destination exists
+	destMap, found, _ := unstructured.NestedMap(a.Yaml.Object, destPath...)
+	if !found {
+		log.Debug().Msgf("no '%s' key found in %s: %s (file: %s)",
+			strings.Join(destPath, "."), a.Kind, a.Name, a.FileName)
+		return nil
+	}
+
+	// Update destination
+	destMap["name"] = "in-cluster"
+	delete(destMap, "server")
+
+	// Set it back
+	unstructured.SetNestedMap(a.Yaml.Object, destMap, destPath...)
+
 	return nil
 }
 
@@ -76,50 +101,116 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 		return nil
 	}
 
-	if a.Yaml.Content == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because YAML content is nil")
+	var specPath []string
+	switch a.Kind {
+	case Application:
+		specPath = []string{"spec"}
+	case ApplicationSet:
+		specPath = []string{"spec", "template", "spec"}
+	default:
 		return nil
 	}
 
-	spec := yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
-	if spec == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because 'spec' key not found")
+	// Check if spec exists
+	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
+	if !found {
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because spec not found")
 		return nil
 	}
 
-	yamlutil.RemoveYamlValue(spec, []string{"syncPolicy"})
+	// Remove syncPolicy
+	delete(specMap, "syncPolicy")
+
+	// Set it back
+	unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...)
+
 	return nil
 }
 
 // RedirectSources updates the source/sources targetRevision to point to the specified branch
 func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) error {
-	spec := a.getAppSpec()
-	if spec == nil {
-		log.Warn().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("⚠️ No 'spec' key found in Application: %s", a.Name)
+	if a.Yaml == nil {
+		log.Warn().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("⚠️ No YAML for Application: %s", a.Name)
+		return nil
+	}
+
+	var specPath []string
+	switch a.Kind {
+	case Application:
+		specPath = []string{"spec"}
+	case ApplicationSet:
+		specPath = []string{"spec", "template", "spec"}
+	default:
+		return nil
+	}
+
+	// Get spec
+	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
+	if !found {
+		log.Warn().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("⚠️ No spec found in %s: %s", a.Kind, a.Name)
+		return nil
 	}
 
 	// Handle single source
-	source := yamlutil.GetYamlValue(spec, []string{"source"})
-	if source != nil {
-		if err := a.redirectSource(source, repo, branch, redirectRevisions); err != nil {
+	if source, ok := specMap["source"].(map[string]interface{}); ok {
+		if err := a.redirectSourceMap(source, repo, branch, redirectRevisions); err != nil {
 			return err
 		}
-		return nil
 	}
 
 	// Handle multiple sources
-	sources := yamlutil.GetYamlValue(spec, []string{"sources"})
-	if sources != nil {
-		for _, src := range sources.Content {
-			if err := a.redirectSource(src, repo, branch, redirectRevisions); err != nil {
-				return err
+	if sourcesInterface, ok := specMap["sources"]; ok {
+		if sources, ok := sourcesInterface.([]interface{}); ok {
+			for _, sourceInterface := range sources {
+				if source, ok := sourceInterface.(map[string]interface{}); ok {
+					if err := a.redirectSourceMap(source, repo, branch, redirectRevisions); err != nil {
+						return err
+					}
+				}
 			}
 		}
+	}
+
+	// Set updated spec back
+	unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...)
+
+	return nil
+}
+
+// Helper function to redirect a single source
+func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, branch string, redirectRevisions []string) error {
+	// Skip helm charts
+	if _, hasChart := source["chart"]; hasChart {
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found helm chart")
 		return nil
 	}
 
-	log.Debug().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("no 'spec.source' or 'spec.sources' key found in Application: %s",
-		a.Name)
+	// Check repoURL
+	repoURL, ok := source["repoURL"].(string)
+	if !ok {
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'repoURL' under source")
+		return nil
+	}
+
+	if !containsIgnoreCase(repoURL, repo) {
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
+		return nil
+	}
+
+	// Get or set targetRevision
+	targetRev, ok := source["targetRevision"].(string)
+	if !ok {
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'targetRevision' under source")
+		targetRev = "HEAD"
+		source["targetRevision"] = targetRev
+	}
+
+	shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRev)
+
+	if shouldRedirect {
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Redirecting targetRevision from %s to %s", targetRev, branch)
+		source["targetRevision"] = branch
+	}
 
 	return nil
 }
@@ -127,163 +218,111 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 // RedirectGenerators updates the git generator targetRevision to point to the specified branch
 func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions []string) error {
 	// Only process ApplicationSets
-	if a.Kind != ApplicationSet {
+	if a.Kind != ApplicationSet || a.Yaml == nil {
 		return nil
 	}
 
-	spec := a.getRootSpec()
-	if spec == nil {
-		log.Warn().Str("patchType", "redirectGenerators").Str("file", a.FileName).Msgf("⚠️ No 'spec' key found in ApplicationSet: %s", a.Name)
-		return nil
-	}
-
-	generators := yamlutil.GetYamlValue(spec, []string{"generators"})
-	if generators == nil {
+	// Get generators
+	generators, found, err := unstructured.NestedSlice(a.Yaml.Object, "spec", "generators")
+	if err != nil || !found {
 		log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators' key found in ApplicationSet: %s", a.Name)
 		return nil
 	}
 
-	log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("found %d generators in ApplicationSet: %s", len(generators.Content), a.Name)
-
-	parent := "spec"
-	if err := a.redirectGenerators(generators, repo, branch, redirectRevisions, parent, 0); err != nil {
+	// Process generators
+	if err := a.processGenerators(generators, repo, branch, redirectRevisions, "spec.generators", 0); err != nil {
+		log.Error().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Err(err).Msg("error processing generators")
 		return err
 	}
 
-	return nil
+	// Set back updated generators
+	return unstructured.SetNestedSlice(a.Yaml.Object, generators, "spec", "generators")
 }
 
-// Helper functions
-func (a *ArgoResource) redirectGenerators(generators *yaml.Node, repo, branch string, redirectRevisions []string, parent string, level int) error {
-	// Process each generator
-	for index, generator := range generators.Content {
-		if generator.Kind != yaml.MappingNode {
-			continue
-		}
-
-		// A restriction of ArgoCD Matrix generators, only 2 child generators are allowed
-		if level > 0 && index > 1 {
-			return fmt.Errorf("only 2 child generators are allowed for matrix generator '%s' in ApplicationSet: %s", parent, a.Name)
-		}
-
-		// Look for matrix generator
-		matrixGen := yamlutil.GetYamlValue(generator, []string{"matrix"})
-		if matrixGen != nil {
-			matrixParent := fmt.Sprintf("%s.generators[%d].matrix", parent, index)
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("'%s' key found in ApplicationSet: %s", matrixParent, a.Name)
-
-			if err := a.redirectMatrixGenerators(matrixGen, repo, branch, redirectRevisions, matrixParent, level+1); err != nil {
-				return err
-			}
-			continue
-		}
-
-		// Look for git generator
-		gitGen := yamlutil.GetYamlValue(generator, []string{"git"})
-		if gitGen == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators[%d].git' key found in ApplicationSet: %s", parent, index, a.Name)
-			continue
-		}
-
-		// Check repoURL
-		repoURL := yamlutil.GetYamlValue(gitGen, []string{"repoURL"})
-		if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators[%d].git.repoURL' key found in ApplicationSet: %s", parent, index, a.Name)
-			continue
-		}
-
-		// Check targetRevision
-		revision := yamlutil.GetYamlValue(gitGen, []string{"revision"})
-		if revision == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators[%d].git.revision' key found in ApplicationSet: %s", parent, index, a.Name)
-			continue
-		}
-
-		// Check if we should redirect this revision
-		shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, revision.Value)
-		if shouldRedirect {
-			yamlutil.SetYamlValue(gitGen, []string{"revision"}, branch)
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf(
-				"Patched git generators in ApplicationSet: %s",
-				a.Name,
-			)
-		}
-	}
-
-	return nil
-}
-
-// Helper functions
-func (a *ArgoResource) redirectMatrixGenerators(matrix *yaml.Node, repo, branch string, redirectRevisions []string, parent string, level int) error {
-	// A restriction of ArgoCD Matrix gnenerators, only 2 levels of nested matrix generators are allowed
+// processGenerators processes a slice of generators recursively
+func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch string, redirectRevisions []string, parent string, level int) error {
+	// Limit nesting level to prevent infinite recursion
 	if level > 2 {
 		return fmt.Errorf("too many levels of nested matrix generators in ApplicationSet: %s", a.Name)
 	}
 
-	// Look for child generators
-	childGen := yamlutil.GetYamlValue(matrix, []string{"generators"})
-	if childGen == nil {
-		log.Debug().Str("patchType", "redirectMatrixGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators' key found in ApplicationSet: %s", parent, a.Name)
-		return nil
-	}
+	// Process each generator
+	for i, genInterface := range generators {
+		gen, ok := genInterface.(map[string]interface{})
+		if !ok {
+			continue
+		}
 
-	if err := a.redirectGenerators(childGen, repo, branch, redirectRevisions, parent, level); err != nil {
-		return err
+		// Check for matrix generator
+		if matrixGen, hasMatrix := gen["matrix"]; hasMatrix {
+			matrixMap, ok := matrixGen.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msg("Matrix generator found")
+
+			// Get nested generators
+			nestedGens, hasNestedGens := matrixMap["generators"]
+			if !hasNestedGens {
+				continue
+			}
+
+			log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msg("Nested generators found")
+
+			nestedGenSlice, ok := nestedGens.([]interface{})
+			if !ok {
+				continue
+			}
+
+			// Make sure there are at most 2 child generators
+			if len(nestedGenSlice) > 2 {
+				return fmt.Errorf("only 2 child generators are allowed for matrix generator '%s' in ApplicationSet: %s",
+					fmt.Sprintf("%s[%d].matrix", parent, i), a.Name)
+			}
+
+			// Process nested generators
+			matrixParent := fmt.Sprintf("%s[%d].matrix.generators", parent, i)
+			if err := a.processGenerators(nestedGenSlice, repo, branch, redirectRevisions, matrixParent, level+1); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		// Check for git generator
+		if gitGen, hasGit := gen["git"]; hasGit {
+			gitMap, ok := gitGen.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msg("Git generator found")
+
+			// Check repoURL
+			repoURL, ok := gitMap["repoURL"].(string)
+			if !ok || !containsIgnoreCase(repoURL, repo) {
+				log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
+				continue
+			}
+
+			// Check revision
+			revision, ok := gitMap["revision"].(string)
+			if !ok {
+				continue
+			}
+
+			// Check if we should redirect this revision
+			shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, revision)
+			if shouldRedirect {
+				gitMap["revision"] = branch
+				log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).
+					Msgf("Redirecting revision from %s to %s in %s[%d].git", revision, branch, parent, i)
+			}
+		}
 	}
 
 	return nil
-}
-
-// Helper functions
-func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, redirectRevisions []string) error {
-	if yamlutil.GetYamlValue(source, []string{"chart"}) != nil {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found helm chart")
-		return nil
-	}
-
-	repoURL := yamlutil.GetYamlValue(source, []string{"repoURL"})
-	if repoURL == nil {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'repoURL' under spec.source")
-		return nil
-	}
-
-	if !containsIgnoreCase(repoURL.Value, repo) {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Skipping source: %s (repoURL does not match %s)", repoURL.Value, repo)
-		return nil
-	}
-
-	targetRev := yamlutil.GetYamlValue(source, []string{"targetRevision"})
-	if targetRev == nil {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'targetRevision' under spec.source")
-		targetRev = &yaml.Node{Value: "HEAD"}
-		yamlutil.SetYamlValue(source, []string{"targetRevision"}, "HEAD")
-	}
-
-	shouldRedirect := len(redirectRevisions) == 0 ||
-		contains(redirectRevisions, targetRev.Value)
-
-	if shouldRedirect {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Redirecting targetRevision from %s to %s", targetRev.Value, branch)
-		yamlutil.SetYamlValue(source, []string{"targetRevision"}, branch)
-	}
-
-	return nil
-}
-
-// Helper functions for YAML manipulation
-func (a *ArgoResource) getAppSpec() *yaml.Node {
-	switch a.Kind {
-	case Application:
-		return yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
-	case ApplicationSet:
-		return yamlutil.GetYamlValue(a.Yaml, []string{"spec", "template", "spec"})
-	default:
-		return nil
-	}
-}
-
-func (a *ArgoResource) getRootSpec() *yaml.Node {
-	return yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
 }
 
 func containsIgnoreCase(s, substr string) bool {

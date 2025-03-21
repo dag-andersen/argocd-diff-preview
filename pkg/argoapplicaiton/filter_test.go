@@ -6,7 +6,8 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func TestFilterBySelectors(t *testing.T) {
@@ -130,7 +131,7 @@ metadata:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse YAML
-			var node yaml.Node
+			var node unstructured.Unstructured
 			err := yaml.Unmarshal([]byte(tt.yaml), &node)
 			assert.NoError(t, err)
 
@@ -281,7 +282,7 @@ spec:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse YAML
-			var node yaml.Node
+			var node unstructured.Unstructured
 			err := yaml.Unmarshal([]byte(tt.yaml), &node)
 			assert.NoError(t, err)
 
@@ -530,7 +531,7 @@ metadata:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse YAML
-			var node yaml.Node
+			var node unstructured.Unstructured
 			err := yaml.Unmarshal([]byte(tt.yaml), &node)
 			assert.NoError(t, err)
 
