@@ -25,6 +25,7 @@ COPY pkg/ ./pkg/
 # Build the application with version information
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" \
+    -trimpath \
     -o argocd-diff-preview ./cmd
 
 # install kind
@@ -41,8 +42,8 @@ RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/
     install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
     rm argocd-linux-${TARGETARCH}
 
-# our final base
-FROM debian:bookworm-slim
+# Option 1: Use Alpine as final base for smaller image
+FROM alpine:3.21 AS final
 
 COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 
@@ -50,10 +51,6 @@ COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
 COPY --from=build /argocd-diff-preview/kubectl /usr/local/bin/kubectl
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
 COPY --from=build /argocd-diff-preview/argocd-diff-preview .
-
-RUN apt-get update && \
-    apt-get install -y git && \
-    rm -rf /var/lib/apt/lists/*
 
 # copy argocd helm chart values
 COPY ./argocd-config ./argocd-config
