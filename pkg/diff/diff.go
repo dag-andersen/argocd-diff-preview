@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -279,7 +280,7 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 					return "", "", fmt.Errorf("failed to read target blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatNewFileDiff(content))
+				diffBuilder.WriteString(formatNewFileDiff(content, path))
 			}
 
 		case merkletrie.Delete:
@@ -301,7 +302,7 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 					return "", "", fmt.Errorf("failed to read base blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatDeletedFileDiff(content))
+				diffBuilder.WriteString(formatDeletedFileDiff(content, path))
 			}
 
 		case merkletrie.Modify:
@@ -316,8 +317,12 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 				return "", "", fmt.Errorf("failed to generate patch: %w", err)
 			}
 
-			// Add the unified diff with context lines
-			diffBuilder.WriteString(patch.String())
+			// Get the patch string and remove the headers
+			patchString := patch.String()
+			patchString = removeUnifiedDiffHeaders(patchString, path)
+
+			// Add the unified diff without the headers
+			diffBuilder.WriteString(patchString)
 		}
 	}
 
@@ -332,30 +337,32 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 	return summaryBuilder.String(), diffBuilder.String(), nil
 }
 
-// formatNewFileDiff formats a diff for a new file
-func formatNewFileDiff(content string) string {
+// formatNewFileDiff formats a diff for a new file with custom header
+func formatNewFileDiff(content string, filePath string) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
 
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("@@ -0,0 +1,%d @@\n", len(lines)))
+	// Add our custom header with line information for new file
+	buffer.WriteString(fmt.Sprintf("@@ application: %s (new file) @@@@@@@@@@\n", filePath))
 	for _, line := range lines {
 		buffer.WriteString("+" + line + "\n")
 	}
 	return buffer.String()
 }
 
-// formatDeletedFileDiff formats a diff for a deleted file
-func formatDeletedFileDiff(content string) string {
+// formatDeletedFileDiff formats a diff for a deleted file with custom header
+func formatDeletedFileDiff(content string, filePath string) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
 
 	var buffer bytes.Buffer
-	buffer.WriteString(fmt.Sprintf("@@ -1,%d +0,0 @@\n", len(lines)))
+	// Add our custom header with line information for deleted file
+	buffer.WriteString(fmt.Sprintf("@@ application: %s (deleted file) @@@@@@\n", filePath))
 	for _, line := range lines {
 		buffer.WriteString("-" + line + "\n")
 	}
@@ -420,4 +427,42 @@ func printDiff(summary, diff string) string {
 	return strings.TrimSpace(strings.ReplaceAll(
 		strings.ReplaceAll(markdownTemplate, "%summary%", summary),
 		"%diff%", diff)) + "\n"
+}
+
+// removeUnifiedDiffHeaders replaces the @@ -line,count +line,count @@ headers with a more readable format
+// It also includes the current file path in the header
+func removeUnifiedDiffHeaders(diffOutput string, filePath string) string {
+	// Define a regexp to match the unified diff headers and capture the line numbers
+	headerPattern := regexp.MustCompile(`(?m)^@@ -(\d+),\d+ \+(\d+),\d+ @@.*\n`)
+
+	// Use ReplaceAllStringFunc to perform custom replacement with the captured line numbers
+	return headerPattern.ReplaceAllStringFunc(diffOutput, func(match string) string {
+		// Extract line numbers from the match
+		submatches := headerPattern.FindStringSubmatch(match)
+		if len(submatches) < 3 {
+			// If no match found, just return the replacement header
+			return fmt.Sprintf("@@ application: %s @@@@@@@@@@@@@@@@@@\n", filePath)
+		}
+
+		// Get the line numbers from the match
+		oldLine := submatches[1]
+		newLine := submatches[2]
+
+		// Use the new line number for additions, old line number for deletions,
+		// or both if the change is a modification
+		lineInfo := oldLine
+		if oldLine == "0" {
+			// It's an addition (new file), use new line
+			lineInfo = newLine
+		} else if newLine == "0" {
+			// It's a deletion (removed file), use old line
+			lineInfo = oldLine
+		} else {
+			// It's a modification, use both
+			lineInfo = oldLine + "→" + newLine
+		}
+
+		// Format the new header with the line and file information
+		return fmt.Sprintf("@@ application: %s, line: %s @@@@@@@@\n", filePath, lineInfo)
+	})
 }
