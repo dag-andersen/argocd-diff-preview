@@ -12,8 +12,10 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/utils/diff"
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/rs/zerolog/log"
+	"github.com/sergi/go-diff/diffmatchpatch"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
@@ -280,7 +282,7 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 					return "", "", fmt.Errorf("failed to read target blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatNewFileDiff(content, path))
+				diffBuilder.WriteString(formatNewFileDiff(content))
 			}
 
 		case merkletrie.Delete:
@@ -302,27 +304,44 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 					return "", "", fmt.Errorf("failed to read base blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatDeletedFileDiff(content, path))
+				diffBuilder.WriteString(formatDeletedFileDiff(content))
 			}
 
 		case merkletrie.Modify:
 			// File modified
 			modifiedCount++
-			diffBuilder.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", path, path))
-			diffBuilder.WriteString(fmt.Sprintf("--- a/%s\n", path))
-			diffBuilder.WriteString(fmt.Sprintf("+++ b/%s\n", path))
+			diffBuilder.WriteString("--- a\n")
+			diffBuilder.WriteString("+++ b\n")
 
-			patch, err := change.Patch()
-			if err != nil {
-				return "", "", fmt.Errorf("failed to generate patch: %w", err)
+			// Get content of both files and use the diff package
+			var oldContent, newContent string
+
+			if from != nil {
+				blob, err := baseRepo.BlobObject(from.Hash)
+				if err != nil {
+					return "", "", fmt.Errorf("failed to get base blob: %w", err)
+				}
+
+				oldContent, err = getBlobContent(blob)
+				if err != nil {
+					return "", "", fmt.Errorf("failed to read base blob: %w", err)
+				}
 			}
 
-			// Get the patch string and remove the headers
-			patchString := patch.String()
-			patchString = removeUnifiedDiffHeaders(patchString, path)
+			if to != nil {
+				blob, err := targetRepo.BlobObject(to.Hash)
+				if err != nil {
+					return "", "", fmt.Errorf("failed to get target blob: %w", err)
+				}
 
-			// Add the unified diff without the headers
-			diffBuilder.WriteString(patchString)
+				newContent, err = getBlobContent(blob)
+				if err != nil {
+					return "", "", fmt.Errorf("failed to read target blob: %w", err)
+				}
+			}
+
+			// Use diff.Do to generate the diff
+			diffBuilder.WriteString(generateModifiedFileDiff(oldContent, newContent))
 		}
 	}
 
@@ -337,36 +356,73 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 	return summaryBuilder.String(), diffBuilder.String(), nil
 }
 
-// formatNewFileDiff formats a diff for a new file with custom header
-func formatNewFileDiff(content string, filePath string) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
+// formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
+func formatNewFileDiff(content string) string {
+	// For new files, we diff from empty string to the content
+	diffs := diff.Do("", content)
+	return formatDiff(diffs, 0, countLines(content))
+}
+
+// formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
+func formatDeletedFileDiff(content string) string {
+	// For deleted files, we diff from the content to empty string
+	diffs := diff.Do(content, "")
+	return formatDiff(diffs, countLines(content), 0)
+}
+
+// formatDiff formats diffmatchpatch.Diff into unified diff format
+func formatDiff(diffs []diffmatchpatch.Diff, srcLineCount, dstLineCount int) string {
+	var buffer bytes.Buffer
+
+	// Write the unified diff header
+	srcLine := 0
+	if srcLineCount > 0 {
+		srcLine = 1
 	}
 
-	var buffer bytes.Buffer
-	// Add our custom header with line information for new file
-	buffer.WriteString(fmt.Sprintf("@@ application: %s (new file) @@@@@@@@@@\n", filePath))
-	for _, line := range lines {
-		buffer.WriteString("+" + line + "\n")
+	dstLine := 0
+	if dstLineCount > 0 {
+		dstLine = 1
 	}
+
+	buffer.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n",
+		srcLine, srcLineCount, dstLine, dstLineCount))
+
+	// Process the diffs and format them in unified diff format
+	for _, d := range diffs {
+		lines := strings.Split(d.Text, "\n")
+		// If the last element is empty (due to trailing newline), remove it
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+
+		for _, line := range lines {
+			switch d.Type {
+			case diffmatchpatch.DiffDelete:
+				buffer.WriteString("-" + line + "\n")
+			case diffmatchpatch.DiffInsert:
+				buffer.WriteString("+" + line + "\n")
+			case diffmatchpatch.DiffEqual:
+				buffer.WriteString(" " + line + "\n")
+			}
+		}
+	}
+
 	return buffer.String()
 }
 
-// formatDeletedFileDiff formats a diff for a deleted file with custom header
-func formatDeletedFileDiff(content string, filePath string) string {
-	lines := strings.Split(content, "\n")
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
+// generateModifiedFileDiff generates a diff for a modified file using the go-git/utils/diff package
+func generateModifiedFileDiff(oldContent, newContent string) string {
+	diffs := diff.Do(oldContent, newContent)
+	return formatDiff(diffs, countLines(oldContent), countLines(newContent))
+}
 
-	var buffer bytes.Buffer
-	// Add our custom header with line information for deleted file
-	buffer.WriteString(fmt.Sprintf("@@ application: %s (deleted file) @@@@@@\n", filePath))
-	for _, line := range lines {
-		buffer.WriteString("-" + line + "\n")
+// countLines counts the number of lines in a string
+func countLines(s string) int {
+	if s == "" {
+		return 0
 	}
-	return buffer.String()
+	return len(strings.Split(s, "\n"))
 }
 
 // getBlobContent reads the content of a Git blob
