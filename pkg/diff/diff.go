@@ -37,10 +37,34 @@ func GenerateDiff(
 	outputFolder string,
 	baseBranch *types.Branch,
 	targetBranch *types.Branch,
+	baseManifests map[string]string,
+	targetManifests map[string]string,
 	diffIgnore *string,
 	lineCount uint,
 	maxCharCount uint,
 ) error {
+	// Write base manifests to disk
+	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
+	if err := utils.CreateFolder(basePath); err != nil {
+		return fmt.Errorf("failed to create base folder: %s: %w", basePath, err)
+	}
+	for name, manifest := range baseManifests {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", basePath, name), manifest); err != nil {
+			return fmt.Errorf("failed to write base manifest %s: %w", name, err)
+		}
+	}
+
+	// Write target manifests to disk
+	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
+	if err := utils.CreateFolder(targetPath); err != nil {
+		return fmt.Errorf("failed to create target folder: %s: %w", targetPath, err)
+	}
+	for name, manifest := range targetManifests {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", targetPath, name), manifest); err != nil {
+			return fmt.Errorf("failed to write target manifest %s: %w", name, err)
+		}
+	}
+
 	maxDiffMessageCharCount := maxCharCount
 	if maxDiffMessageCharCount == 0 {
 		maxDiffMessageCharCount = 65536
@@ -55,8 +79,6 @@ func GenerateDiff(
 	}
 
 	// verify that the output folder exists
-	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
-	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
 	if _, err := os.Stat(basePath); os.IsNotExist(err) {
 		return fmt.Errorf("base path does not exist: %s", basePath)
 	}
