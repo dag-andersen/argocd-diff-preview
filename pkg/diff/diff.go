@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/utils/diff"
 	"github.com/go-git/go-git/v5/utils/merkletrie"
@@ -25,7 +23,7 @@ const markdownTemplate = `
 ## Argo CD Diff Preview
 
 Summary:
-` + "```bash" + `
+` + "```diff" + `
 %summary%
 ` + "```" + `
 
@@ -90,12 +88,17 @@ func GenerateDiff(
 	}
 
 	// Set default context line count if not provided
+	if lineCount <= 0 {
+		lineCount = 3 // Default to 3 context lines if not specified
+	}
+
+	// Set default context line count if not provided
 	if lineCount == 0 {
 		lineCount = 10
 	}
 
 	// Generate diffs using go-git by creating temporary git repos
-	summary, detailedDiff, err := generateGitDiff(basePath, targetPath, lineCount, diffIgnore)
+	summary, detailedDiff, err := generateGitDiff(basePath, targetPath, diffIgnore, lineCount)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -119,7 +122,7 @@ func GenerateDiff(
 	}
 
 	// Generate and write markdown
-	markdown := printDiff(summary, strings.TrimSpace(diffTruncated))
+	markdown := printDiff(strings.TrimSpace(summary), strings.TrimSpace(diffTruncated))
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
 		return fmt.Errorf("failed to write markdown: %w", err)
@@ -130,7 +133,7 @@ func GenerateDiff(
 }
 
 // generateGitDiff creates temporary Git repositories and uses go-git to generate a diff
-func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore *string) (string, string, error) {
+func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContextLines uint) (string, string, error) {
 	// Create temporary directories for Git repositories
 	baseRepoPath, err := os.MkdirTemp("", "base-repo-*")
 	if err != nil {
@@ -239,6 +242,9 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 	var diffBuilder strings.Builder
 	var addedCount, modifiedCount, deletedCount int
 
+	// Keep track of file paths by change type
+	var addedFiles, deletedFiles, modifiedFiles []string
+
 	for _, change := range changes {
 		action, err := change.Action()
 		if err != nil {
@@ -266,10 +272,8 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 		case merkletrie.Insert:
 			// File added
 			addedCount++
-			diffBuilder.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", path, path))
-			diffBuilder.WriteString(fmt.Sprintf("new file mode %o\n", filemode.Regular))
-			diffBuilder.WriteString("--- /dev/null\n")
-			diffBuilder.WriteString(fmt.Sprintf("+++ b/%s\n", path))
+			addedFiles = append(addedFiles, path)
+			diffBuilder.WriteString(fmt.Sprintf("@ Application added: %s\n", path))
 
 			if to != nil {
 				blob, err := targetRepo.BlobObject(to.Hash)
@@ -282,16 +286,15 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 					return "", "", fmt.Errorf("failed to read target blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatNewFileDiff(content))
+				diffBuilder.WriteString(formatNewFileDiff(content, diffContextLines))
 			}
 
 		case merkletrie.Delete:
 			// File deleted
 			deletedCount++
-			diffBuilder.WriteString(fmt.Sprintf("diff --git a/%s b/%s\n", path, path))
-			diffBuilder.WriteString(fmt.Sprintf("deleted file mode %o\n", filemode.Regular))
-			diffBuilder.WriteString(fmt.Sprintf("--- a/%s\n", path))
-			diffBuilder.WriteString("+++ /dev/null\n")
+			deletedFiles = append(deletedFiles, path)
+
+			diffBuilder.WriteString(fmt.Sprintf("@ Application deleted: %s\n", path))
 
 			if from != nil {
 				blob, err := baseRepo.BlobObject(from.Hash)
@@ -304,14 +307,15 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 					return "", "", fmt.Errorf("failed to read base blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatDeletedFileDiff(content))
+				diffBuilder.WriteString(formatDeletedFileDiff(content, diffContextLines))
 			}
 
 		case merkletrie.Modify:
 			// File modified
 			modifiedCount++
-			diffBuilder.WriteString("--- a\n")
-			diffBuilder.WriteString("+++ b\n")
+			modifiedFiles = append(modifiedFiles, path)
+
+			diffBuilder.WriteString(fmt.Sprintf("@ Application modified: %s\n", path))
 
 			// Get content of both files and use the diff package
 			var oldContent, newContent string
@@ -341,15 +345,36 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 			}
 
 			// Use diff.Do to generate the diff
-			diffBuilder.WriteString(generateModifiedFileDiff(oldContent, newContent))
+			diffBuilder.WriteString(formatModifiedFileDiff(oldContent, newContent, diffContextLines))
 		}
 	}
 
 	// Build summary
-	summaryBuilder.WriteString(fmt.Sprintf("%d files changed, %d added, %d deleted, %d modified\n",
-		addedCount+modifiedCount+deletedCount, addedCount, deletedCount, modifiedCount))
+	totalChanges := addedCount + deletedCount + modifiedCount
+	summaryBuilder.WriteString(fmt.Sprintf("Total: %d files changed\n", totalChanges))
 
-	if addedCount+modifiedCount+deletedCount == 0 {
+	if addedCount > 0 {
+		summaryBuilder.WriteString(fmt.Sprintf("\nAdded (%d):\n", addedCount))
+		for _, file := range addedFiles {
+			summaryBuilder.WriteString(fmt.Sprintf("+ %s\n", file))
+		}
+	}
+
+	if deletedCount > 0 {
+		summaryBuilder.WriteString(fmt.Sprintf("\nDeleted (%d):\n", deletedCount))
+		for _, file := range deletedFiles {
+			summaryBuilder.WriteString(fmt.Sprintf("- %s\n", file))
+		}
+	}
+
+	if modifiedCount > 0 {
+		summaryBuilder.WriteString(fmt.Sprintf("\nModified (%d):\n", modifiedCount))
+		for _, file := range modifiedFiles {
+			summaryBuilder.WriteString(fmt.Sprintf("± %s\n", file))
+		}
+	}
+
+	if totalChanges == 0 {
 		return "No changes found", "No changes found", nil
 	}
 
@@ -357,38 +382,37 @@ func generateGitDiff(basePath, targetPath string, contextLines uint, diffIgnore 
 }
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
-func formatNewFileDiff(content string) string {
+func formatNewFileDiff(content string, contextLines uint) string {
 	// For new files, we diff from empty string to the content
 	diffs := diff.Do("", content)
-	return formatDiff(diffs, 0, countLines(content))
+	return formatDiff(diffs, contextLines)
 }
 
 // formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
-func formatDeletedFileDiff(content string) string {
+func formatDeletedFileDiff(content string, contextLines uint) string {
 	// For deleted files, we diff from the content to empty string
 	diffs := diff.Do(content, "")
-	return formatDiff(diffs, countLines(content), 0)
+	return formatDiff(diffs, contextLines)
+}
+
+// formatModifiedFileDiff formats a diff for a modified file using the go-git/utils/diff package
+func formatModifiedFileDiff(oldContent, newContent string, contextLines uint) string {
+	diffs := diff.Do(oldContent, newContent)
+	return formatDiff(diffs, contextLines)
 }
 
 // formatDiff formats diffmatchpatch.Diff into unified diff format
-func formatDiff(diffs []diffmatchpatch.Diff, srcLineCount, dstLineCount int) string {
+func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
 	var buffer bytes.Buffer
 
-	// Write the unified diff header
-	srcLine := 0
-	if srcLineCount > 0 {
-		srcLine = 1
-	}
-
-	dstLine := 0
-	if dstLineCount > 0 {
-		dstLine = 1
-	}
-
-	buffer.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n",
-		srcLine, srcLineCount, dstLine, dstLineCount))
-
 	// Process the diffs and format them in unified diff format
+	// We'll keep track of context lines to include only the specified number
+	var processedLines []struct {
+		prefix   string
+		text     string
+		isChange bool
+	}
+
 	for _, d := range diffs {
 		lines := strings.Split(d.Text, "\n")
 		// If the last element is empty (due to trailing newline), remove it
@@ -396,33 +420,100 @@ func formatDiff(diffs []diffmatchpatch.Diff, srcLineCount, dstLineCount int) str
 			lines = lines[:len(lines)-1]
 		}
 
+		isChange := d.Type != diffmatchpatch.DiffEqual
+
 		for _, line := range lines {
-			switch d.Type {
-			case diffmatchpatch.DiffDelete:
-				buffer.WriteString("-" + line + "\n")
-			case diffmatchpatch.DiffInsert:
-				buffer.WriteString("+" + line + "\n")
-			case diffmatchpatch.DiffEqual:
-				buffer.WriteString(" " + line + "\n")
+			prefix := " "
+			if d.Type == diffmatchpatch.DiffDelete {
+				prefix = "-"
+			} else if d.Type == diffmatchpatch.DiffInsert {
+				prefix = "+"
+			}
+
+			processedLines = append(processedLines, struct {
+				prefix   string
+				text     string
+				isChange bool
+			}{prefix, line, isChange})
+		}
+	}
+
+	// Now filter to include only contextLines of unchanged text around changes
+	var filteredLines []struct {
+		prefix string
+		text   string
+	}
+
+	// Track which original lines we're including to detect gaps
+	includedLines := make(map[int]bool)
+
+	// First pass: determine which lines to include
+	for i, line := range processedLines {
+		if line.isChange {
+			// Always include changed lines
+			includedLines[i] = true
+		} else {
+			// For unchanged lines, check if they're within contextLines of a change
+			includeContext := false
+
+			// Look back to see if there's a change within contextLines
+			for j := i - 1; j >= 0 && j >= i-int(contextLines); j-- {
+				if processedLines[j].isChange {
+					includeContext = true
+					break
+				}
+			}
+
+			// Look ahead to see if there's a change within contextLines
+			if !includeContext {
+				for j := i + 1; j < len(processedLines) && j <= i+int(contextLines); j++ {
+					if processedLines[j].isChange {
+						includeContext = true
+						break
+					}
+				}
+			}
+
+			if includeContext {
+				includedLines[i] = true
 			}
 		}
 	}
 
-	return buffer.String()
-}
+	lineSeparator := "@@@@@@@@@@@@@@@@"
 
-// generateModifiedFileDiff generates a diff for a modified file using the go-git/utils/diff package
-func generateModifiedFileDiff(oldContent, newContent string) string {
-	diffs := diff.Do(oldContent, newContent)
-	return formatDiff(diffs, countLines(oldContent), countLines(newContent))
-}
+	// Second pass: add lines and separator where needed
+	var lastIncludedIndex = -1
+	for i, line := range processedLines {
+		if includedLines[i] {
+			// If there's a gap larger than 2*contextLines between this line and the last included line,
+			// add a separator line unless this is the first line we're including
+			if lastIncludedIndex != -1 && i-lastIncludedIndex > 2*int(contextLines) {
+				filteredLines = append(filteredLines, struct {
+					prefix string
+					text   string
+				}{"", lineSeparator})
+			}
 
-// countLines counts the number of lines in a string
-func countLines(s string) int {
-	if s == "" {
-		return 0
+			filteredLines = append(filteredLines, struct {
+				prefix string
+				text   string
+			}{line.prefix, line.text})
+
+			lastIncludedIndex = i
+		}
 	}
-	return len(strings.Split(s, "\n"))
+
+	// Write the filtered lines
+	for _, line := range filteredLines {
+		if line.text == lineSeparator {
+			buffer.WriteString(line.text + "\n")
+		} else {
+			buffer.WriteString(line.prefix + line.text + "\n")
+		}
+	}
+
+	return buffer.String()
 }
 
 // getBlobContent reads the content of a Git blob
@@ -483,42 +574,4 @@ func printDiff(summary, diff string) string {
 	return strings.TrimSpace(strings.ReplaceAll(
 		strings.ReplaceAll(markdownTemplate, "%summary%", summary),
 		"%diff%", diff)) + "\n"
-}
-
-// removeUnifiedDiffHeaders replaces the @@ -line,count +line,count @@ headers with a more readable format
-// It also includes the current file path in the header
-func removeUnifiedDiffHeaders(diffOutput string, filePath string) string {
-	// Define a regexp to match the unified diff headers and capture the line numbers
-	headerPattern := regexp.MustCompile(`(?m)^@@ -(\d+),\d+ \+(\d+),\d+ @@.*\n`)
-
-	// Use ReplaceAllStringFunc to perform custom replacement with the captured line numbers
-	return headerPattern.ReplaceAllStringFunc(diffOutput, func(match string) string {
-		// Extract line numbers from the match
-		submatches := headerPattern.FindStringSubmatch(match)
-		if len(submatches) < 3 {
-			// If no match found, just return the replacement header
-			return fmt.Sprintf("@@ application: %s @@@@@@@@@@@@@@@@@@\n", filePath)
-		}
-
-		// Get the line numbers from the match
-		oldLine := submatches[1]
-		newLine := submatches[2]
-
-		// Use the new line number for additions, old line number for deletions,
-		// or both if the change is a modification
-		lineInfo := oldLine
-		if oldLine == "0" {
-			// It's an addition (new file), use new line
-			lineInfo = newLine
-		} else if newLine == "0" {
-			// It's a deletion (removed file), use old line
-			lineInfo = oldLine
-		} else {
-			// It's a modification, use both
-			lineInfo = oldLine + "→" + newLine
-		}
-
-		// Format the new header with the line and file information
-		return fmt.Sprintf("@@ application: %s, line: %s @@@@@@@@\n", filePath, lineInfo)
-	})
 }
