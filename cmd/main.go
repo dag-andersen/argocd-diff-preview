@@ -24,7 +24,7 @@ func main() {
 
 	defer func() {
 		duration := time.Since(startTime)
-		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Millisecond))
+		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Second))
 	}()
 
 	if err := run(opts); err != nil {

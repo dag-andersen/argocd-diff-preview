@@ -52,18 +52,18 @@ func getNoAppsFoundMessage(selectors []types.Selector, changedFiles []string) st
 	switch {
 	case len(selectors) > 0 && len(changedFiles) > 0:
 		return fmt.Sprintf(
-			"Found no changed Applications that matched '%s' and watched these files: '%s'",
+			"Found no changed Applications that matched `%s` and watched these files: `%s`",
 			selectorString(selectors),
 			strings.Join(changedFiles, "`, `"),
 		)
 	case len(selectors) > 0:
 		return fmt.Sprintf(
-			"Found no changed Applications that matched '%s'",
+			"Found no changed Applications that matched `%s`",
 			selectorString(selectors),
 		)
 	case len(changedFiles) > 0:
 		return fmt.Sprintf(
-			"Found no changed Applications that watched these files: '%s'",
+			"Found no changed Applications that watched these files: `%s`",
 			strings.Join(changedFiles, "`, `"),
 		)
 	default:
