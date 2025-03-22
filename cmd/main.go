@@ -75,7 +75,7 @@ func run(opts *Options) error {
 		log.Info().Msg("👀 Found no applications to process in either branch")
 
 		// Write a message to the output file when no applications are found
-		if err := utils.CreateFolder(opts.OutputFolder); err != nil {
+		if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
 			log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
 			return err
 		}
@@ -109,7 +109,7 @@ func run(opts *Options) error {
 	}
 
 	tempFolder := "temp"
-	if err := utils.CreateFolder(tempFolder); err != nil {
+	if err := utils.CreateFolder(tempFolder, true); err != nil {
 		log.Error().Msgf("❌ Failed to create temp folder: %s", tempFolder)
 		return err
 	}
@@ -131,7 +131,7 @@ func run(opts *Options) error {
 		return err
 	}
 
-	if err := utils.CreateFolder(opts.OutputFolder); err != nil {
+	if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
 		log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
 		return err
 	}

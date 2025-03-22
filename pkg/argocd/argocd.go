@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 
-	"gopkg.in/yaml.v3"
+	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart/loader"
+	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/repo"
 )
 
 type ArgoCDInstallation struct {
@@ -76,11 +82,6 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	}
 	log.Info().Msg("🦑 Argo CD is now available")
 
-	// Get installed versions
-	if err := a.logInstalledVersions(); err != nil {
-		log.Error().Msgf("❌ Failed to get installed versions: %v", err)
-	}
-
 	// Login to ArgoCD
 	if err := a.login(); err != nil {
 		return fmt.Errorf("failed to login: %w", err)
@@ -110,12 +111,13 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 // installWithHelm installs ArgoCD using Helm
 func (a *ArgoCDInstallation) installWithHelm() error {
-
 	installLatest := strings.TrimSpace(a.Version) == "" || strings.TrimSpace(a.Version) == "latest"
-	if installLatest {
-		log.Info().Msg("🦑 Installing Argo CD Helm Chart version: 'latest'")
-	} else {
+	chartVersion := ""
+	if !installLatest {
+		chartVersion = a.Version
 		log.Info().Msgf("🦑 Installing Argo CD Helm Chart version: '%s'", a.Version)
+	} else {
+		log.Info().Msg("🦑 Installing Argo CD Helm Chart version: 'latest'")
 	}
 
 	// Check for values files
@@ -124,36 +126,115 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		log.Info().Msgf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with default configuration", a.ConfigPath)
 	}
 
-	// Add argo repo to helm
-	if err := runCommand("helm", "repo", "add", "argo", "https://argoproj.github.io/argo-helm"); err != nil {
-		log.Error().Msgf("❌ Failed to add argo repo")
-		return fmt.Errorf("failed to add argo repo: %w", err)
+	// Initialize Helm client settings
+	settings := cli.New()
+
+	// Setup repository
+	repoName := "argo"
+	repoURL := "https://argoproj.github.io/argo-helm"
+
+	// Try to add the repo first
+	repoFile := settings.RepositoryConfig
+
+	// Create repository config if it doesn't exist
+	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
+		os.MkdirAll(filepath.Dir(repoFile), 0755)
+
+		// Create a new repository file
+		r := repo.NewFile()
+		r.Add(&repo.Entry{
+			Name: repoName,
+			URL:  repoURL,
+		})
+
+		if err := r.WriteFile(repoFile, 0644); err != nil {
+			return fmt.Errorf("failed to write repository file: %w", err)
+		}
+	} else {
+		// Update existing repository
+		r, err := repo.LoadFile(repoFile)
+		if err != nil {
+			return fmt.Errorf("failed to load repository file: %w", err)
+		}
+
+		if !r.Has(repoName) {
+			r.Add(&repo.Entry{
+				Name: repoName,
+				URL:  repoURL,
+			})
+
+			if err := r.WriteFile(repoFile, 0644); err != nil {
+				return fmt.Errorf("failed to update repository file: %w", err)
+			}
+		}
 	}
 
-	// Update helm repos
-	if err := runCommand("helm", "repo", "update"); err != nil {
-		log.Error().Msgf("❌ Failed to update helm repo")
-		return fmt.Errorf("failed to update helm repo: %w", err)
+	// Update repository
+	repoEntry := &repo.Entry{
+		Name: repoName,
+		URL:  repoURL,
 	}
 
-	// Construct helm install command
-	args := []string{
-		"install", "argocd", "argo/argo-cd",
-		"-n", a.Namespace,
-	}
-	for _, valuesFile := range valuesFiles {
-		args = append(args, "-f", valuesFile)
-	}
-	if !installLatest {
-		args = append(args, "--version", a.Version)
+	chartRepo, err := repo.NewChartRepository(repoEntry, getter.All(settings))
+	if err != nil {
+		return fmt.Errorf("failed to create chart repository: %w", err)
 	}
 
-	// Install ArgoCD
-	if err := runCommand("helm", args...); err != nil {
-		log.Error().Msgf("❌ Failed to install Argo CD")
-		return fmt.Errorf("failed to install argo cd: %w", err)
+	if _, err := chartRepo.DownloadIndexFile(); err != nil {
+		return fmt.Errorf("failed to download index file: %w", err)
 	}
 
+	// Initialize the action configuration
+	actionConfig := new(action.Configuration)
+	if err := actionConfig.Init(settings.RESTClientGetter(), a.Namespace, os.Getenv("HELM_DRIVER"), log.Debug().Msgf); err != nil {
+		return fmt.Errorf("failed to initialize helm configuration: %w", err)
+	}
+
+	// Create the install action
+	client := action.NewInstall(actionConfig)
+	client.Namespace = a.Namespace
+	client.ReleaseName = "argocd"
+	client.CreateNamespace = false // We already created the namespace
+	client.Wait = true
+	client.Timeout = 300 * time.Second
+
+	if chartVersion != "" {
+		client.Version = chartVersion
+	}
+
+	// Locate chart
+	chartName := fmt.Sprintf("%s/argo-cd", repoName)
+	chartPath, err := client.ChartPathOptions.LocateChart(chartName, settings)
+	if err != nil {
+		return fmt.Errorf("failed to locate chart: %w", err)
+	}
+
+	// Load chart
+	chart, err := loader.Load(chartPath)
+	if err != nil {
+		return fmt.Errorf("failed to load chart: %w", err)
+	}
+
+	// Load values from files
+	valueOpts := &values.Options{
+		ValueFiles: valuesFiles,
+	}
+	chartValues, err := valueOpts.MergeValues(getter.All(settings))
+	if err != nil {
+		return fmt.Errorf("failed to merge values: %w", err)
+	}
+
+	// Install chart
+	_, err = client.Run(chart, chartValues)
+	if err != nil {
+		return fmt.Errorf("failed to install chart: %w", err)
+	}
+
+	// Log installed versions
+	log.Info().Msgf("🦑 Installed Chart version: '%s' and App version: '%s'",
+		chart.Metadata.Version, chart.Metadata.AppVersion)
+
+	log.Info().Msg("🦑 Argo CD Helm chart installed successfully")
 	return nil
 }
 
@@ -183,10 +264,10 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 
 	valuesFiles := []string{}
 	if foundValues {
-		valuesFiles = append(valuesFiles, fmt.Sprintf("%s/values.yaml", a.ConfigPath))
+		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, "values.yaml"))
 	}
 	if foundValuesOverride {
-		valuesFiles = append(valuesFiles, fmt.Sprintf("%s/values-override.yaml", a.ConfigPath))
+		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, "values-override.yaml"))
 	}
 
 	return valuesFiles, nil
@@ -253,33 +334,6 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 	}
 
 	return string(decoded), nil
-}
-
-func (a *ArgoCDInstallation) logInstalledVersions() error {
-	output, err := exec.Command("helm", "list", "-A", "-o", "yaml").Output()
-	if err != nil {
-		return fmt.Errorf("failed to list helm charts: %w", err)
-	}
-
-	var helmList []map[string]interface{}
-	if err := yaml.Unmarshal(output, &helmList); err != nil {
-		return fmt.Errorf("failed to parse helm list output: %w", err)
-	}
-
-	if len(helmList) > 0 {
-		chartVersion := helmList[0]["chart"]
-		appVersion := helmList[0]["app_version"]
-		if chartVersion != nil && appVersion != nil {
-			log.Info().Msgf("🦑 Installed Chart version: '%v' and App version: '%v'",
-				chartVersion, appVersion)
-		} else {
-			log.Error().Msgf("❌ Failed to get chart version")
-		}
-	} else {
-		log.Error().Msgf("❌ Failed to get chart version")
-	}
-
-	return nil
 }
 
 func runCommand(name string, args ...string) error {
