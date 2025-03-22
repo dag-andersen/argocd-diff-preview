@@ -438,75 +438,86 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
 		}
 	}
 
-	// Now filter to include only contextLines of unchanged text around changes
+	// First find all changed lines
+	var changedLines []int
+	for i, line := range processedLines {
+		if line.isChange {
+			changedLines = append(changedLines, i)
+		}
+	}
+
+	// No changes, so return empty string
+	if len(changedLines) == 0 {
+		return ""
+	}
+
+	// Now create chunks of lines to include based on context
+	var chunks []struct {
+		start int
+		end   int
+	}
+
+	// Start with the first changed line and its context
+	chunkStart := max(0, changedLines[0]-int(contextLines))
+	chunkEnd := min(len(processedLines)-1, changedLines[0]+int(contextLines))
+
+	// Extend chunk to include other changed lines that are within 2*contextLines
+	for i := 1; i < len(changedLines); i++ {
+		currentLine := changedLines[i]
+		// If this changed line is close to our current chunk, extend the chunk
+		if currentLine-chunkEnd <= 2*int(contextLines) {
+			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
+		} else {
+			// Otherwise, finish this chunk and start a new one
+			chunks = append(chunks, struct {
+				start int
+				end   int
+			}{chunkStart, chunkEnd})
+
+			chunkStart = max(0, currentLine-int(contextLines))
+			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
+		}
+	}
+
+	// Add the last chunk
+	chunks = append(chunks, struct {
+		start int
+		end   int
+	}{chunkStart, chunkEnd})
+
+	// Now build the output with separators between chunks
 	var filteredLines []struct {
 		prefix string
 		text   string
 	}
 
-	// Track which original lines we're including to detect gaps
-	includedLines := make(map[int]bool)
-
-	// First pass: determine which lines to include
-	for i, line := range processedLines {
-		if line.isChange {
-			// Always include changed lines
-			includedLines[i] = true
-		} else {
-			// For unchanged lines, check if they're within contextLines of a change
-			includeContext := false
-
-			// Look back to see if there's a change within contextLines
-			for j := i - 1; j >= 0 && j >= i-int(contextLines); j-- {
-				if processedLines[j].isChange {
-					includeContext = true
-					break
-				}
-			}
-
-			// Look ahead to see if there's a change within contextLines
-			if !includeContext {
-				for j := i + 1; j < len(processedLines) && j <= i+int(contextLines); j++ {
-					if processedLines[j].isChange {
-						includeContext = true
-						break
-					}
-				}
-			}
-
-			if includeContext {
-				includedLines[i] = true
-			}
-		}
-	}
-
-	lineSeparator := "@@@@@@@@@@@@@@@@"
-
-	// Second pass: add lines and separator where needed
-	var lastIncludedIndex = -1
-	for i, line := range processedLines {
-		if includedLines[i] {
-			// If there's a gap larger than 2*contextLines between this line and the last included line,
-			// add a separator line unless this is the first line we're including
-			if lastIncludedIndex != -1 && i-lastIncludedIndex > 2*int(contextLines) {
-				filteredLines = append(filteredLines, struct {
-					prefix string
-					text   string
-				}{"", lineSeparator})
-			}
-
+	for i, chunk := range chunks {
+		// Add all lines in this chunk
+		for j := chunk.start; j <= chunk.end; j++ {
 			filteredLines = append(filteredLines, struct {
 				prefix string
 				text   string
-			}{line.prefix, line.text})
+			}{processedLines[j].prefix, processedLines[j].text})
+		}
 
-			lastIncludedIndex = i
+		// Add separator if there's a next chunk and it's far enough away
+		if i < len(chunks)-1 {
+			nextChunk := chunks[i+1]
+			skippedLines := nextChunk.start - chunk.end - 1
+
+			if skippedLines > 0 {
+				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, chunk.end+1, nextChunk.start-1)
+				filteredLines = append(filteredLines, struct {
+					prefix string
+					text   string
+				}{"", separator})
+			}
 		}
 	}
 
 	// Write the filtered lines
 	for _, line := range filteredLines {
-		if line.text == lineSeparator {
+		if strings.HasPrefix(line.text, "@@ skipped") {
 			buffer.WriteString(line.text + "\n")
 		} else {
 			buffer.WriteString(line.prefix + line.text + "\n")
@@ -514,6 +525,21 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
 	}
 
 	return buffer.String()
+}
+
+// Helper functions for min/max
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // getBlobContent reads the content of a Git blob
