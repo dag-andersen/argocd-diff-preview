@@ -56,7 +56,7 @@ run-with-docker: pull-repository docker-build
 		-e LINE_COUNT="$(line_count)" \
 		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		image \
-		--argocd-namespace="$(argocd_namespace)"
+		--argocd-namespace="$(argocd_namespace)" --debug
 
 mkdocs:
 	python3 -m venv venv \

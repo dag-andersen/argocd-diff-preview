@@ -45,7 +45,7 @@ func GenerateDiff(
 ) error {
 	// Write base manifests to disk
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
-	if err := utils.CreateFolder(basePath); err != nil {
+	if err := utils.CreateFolder(basePath, true); err != nil {
 		return fmt.Errorf("failed to create base folder: %s: %w", basePath, err)
 	}
 	for name, manifest := range baseManifests {
@@ -56,7 +56,7 @@ func GenerateDiff(
 
 	// Write target manifests to disk
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	if err := utils.CreateFolder(targetPath); err != nil {
+	if err := utils.CreateFolder(targetPath, true); err != nil {
 		return fmt.Errorf("failed to create target folder: %s: %w", targetPath, err)
 	}
 	for name, manifest := range targetManifests {
