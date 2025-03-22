@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ func GenerateDiff(
 	targetBranch *types.Branch,
 	baseManifests map[string]string,
 	targetManifests map[string]string,
-	diffIgnore *string,
+	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
 ) error {
@@ -98,7 +99,7 @@ func GenerateDiff(
 	}
 
 	// Generate diffs using go-git by creating temporary git repos
-	summary, detailedDiff, err := generateGitDiff(basePath, targetPath, diffIgnore, lineCount)
+	summary, detailedDiff, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -263,11 +264,6 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 			path = to.Name
 		}
 
-		// Skip if should be ignored based on diffIgnore pattern
-		if diffIgnore != nil && *diffIgnore != "" && shouldIgnore(path, *diffIgnore) {
-			continue
-		}
-
 		switch action {
 		case merkletrie.Insert:
 			// File added
@@ -286,7 +282,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 					return "", "", fmt.Errorf("failed to read target blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatNewFileDiff(content, diffContextLines))
+				diffBuilder.WriteString(formatNewFileDiff(content, diffContextLines, diffIgnore))
 			}
 
 		case merkletrie.Delete:
@@ -307,7 +303,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 					return "", "", fmt.Errorf("failed to read base blob: %w", err)
 				}
 
-				diffBuilder.WriteString(formatDeletedFileDiff(content, diffContextLines))
+				diffBuilder.WriteString(formatDeletedFileDiff(content, diffContextLines, diffIgnore))
 			}
 
 		case merkletrie.Modify:
@@ -345,7 +341,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 			}
 
 			// Use diff.Do to generate the diff
-			diffBuilder.WriteString(formatModifiedFileDiff(oldContent, newContent, diffContextLines))
+			diffBuilder.WriteString(formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore))
 		}
 	}
 
@@ -381,28 +377,18 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 	return summaryBuilder.String(), diffBuilder.String(), nil
 }
 
-// formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
-func formatNewFileDiff(content string, contextLines uint) string {
-	// For new files, we diff from empty string to the content
-	diffs := diff.Do("", content)
-	return formatDiff(diffs, contextLines)
-}
-
-// formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
-func formatDeletedFileDiff(content string, contextLines uint) string {
-	// For deleted files, we diff from the content to empty string
-	diffs := diff.Do(content, "")
-	return formatDiff(diffs, contextLines)
-}
-
-// formatModifiedFileDiff formats a diff for a modified file using the go-git/utils/diff package
-func formatModifiedFileDiff(oldContent, newContent string, contextLines uint) string {
-	diffs := diff.Do(oldContent, newContent)
-	return formatDiff(diffs, contextLines)
+// shouldIgnoreLine checks if a line should be ignored based on regex pattern
+func shouldIgnoreLine(line, pattern string) bool {
+	matched, err := regexp.MatchString(pattern, line)
+	if err != nil {
+		// If regex fails, fall back to simple string matching
+		return strings.Contains(line, pattern)
+	}
+	return matched
 }
 
 // formatDiff formats diffmatchpatch.Diff into unified diff format
-func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
+func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string) string {
 	var buffer bytes.Buffer
 
 	// Process the diffs and format them in unified diff format
@@ -411,6 +397,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
 		prefix   string
 		text     string
 		isChange bool
+		show     bool
 	}
 
 	for _, d := range diffs {
@@ -423,6 +410,13 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
 		isChange := d.Type != diffmatchpatch.DiffEqual
 
 		for _, line := range lines {
+			// Determine if this line should be shown or filtered out
+			show := true
+			if isChange && ignorePattern != nil && *ignorePattern != "" {
+				// Only apply regex filter to changed lines
+				show = !shouldIgnoreLine(line, *ignorePattern)
+			}
+
 			prefix := " "
 			if d.Type == diffmatchpatch.DiffDelete {
 				prefix = "-"
@@ -434,19 +428,20 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint) string {
 				prefix   string
 				text     string
 				isChange bool
-			}{prefix, line, isChange})
+				show     bool
+			}{prefix, line, isChange, show})
 		}
 	}
 
-	// First find all changed lines
+	// First find all changed lines that should be shown
 	var changedLines []int
 	for i, line := range processedLines {
-		if line.isChange {
+		if line.isChange && line.show {
 			changedLines = append(changedLines, i)
 		}
 	}
 
-	// No changes, so return empty string
+	// No changes to show, so return empty string
 	if len(changedLines) == 0 {
 		return ""
 	}
@@ -584,12 +579,6 @@ func copyFilesToRepo(srcDir, destDir string) error {
 	})
 }
 
-// shouldIgnore checks if a file path should be ignored based on pattern
-func shouldIgnore(path, pattern string) bool {
-	// Simple implementation - can be expanded for more complex patterns
-	return strings.Contains(path, pattern)
-}
-
 func markdownTemplateLength() int {
 	return len(strings.ReplaceAll(
 		strings.ReplaceAll(markdownTemplate, "%summary%", ""),
@@ -600,4 +589,24 @@ func printDiff(summary, diff string) string {
 	return strings.TrimSpace(strings.ReplaceAll(
 		strings.ReplaceAll(markdownTemplate, "%summary%", summary),
 		"%diff%", diff)) + "\n"
+}
+
+// formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
+func formatNewFileDiff(content string, contextLines uint, ignorePattern *string) string {
+	// For new files, we diff from empty string to the content
+	diffs := diff.Do("", content)
+	return formatDiff(diffs, contextLines, ignorePattern)
+}
+
+// formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
+func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string) string {
+	// For deleted files, we diff from the content to empty string
+	diffs := diff.Do(content, "")
+	return formatDiff(diffs, contextLines, ignorePattern)
+}
+
+// formatModifiedFileDiff formats a diff for a modified file using the go-git/utils/diff package
+func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string) string {
+	diffs := diff.Do(oldContent, newContent)
+	return formatDiff(diffs, contextLines, ignorePattern)
 }
