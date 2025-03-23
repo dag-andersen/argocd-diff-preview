@@ -49,12 +49,12 @@ func WriteFile(path string, content string) error {
 func CreateFolder(path string, override bool) error {
 	if override {
 		if err := os.RemoveAll(path); err != nil {
-			log.Debug().Msgf("❌ Failed to delete folder: %s", err)
+			log.Debug().Str("path", path).Msgf("⚠️ Failed to delete folder: %s", err)
 		}
 	}
 	err := os.MkdirAll(path, dirMode)
 	if err != nil {
-		log.Debug().Msgf("❌ Failed to create folder: %s", err)
+		log.Debug().Str("path", path).Msgf("❌ Failed to create folder: %s", err)
 	}
 	return err
 }
