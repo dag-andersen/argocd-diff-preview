@@ -65,8 +65,15 @@ mkdocs:
 	&& open http://localhost:8000 \
 	&& mkdocs serve
 
-run-test-all-docker:
+run-unit-tests:
+	go test ./...
+	go test -race ./...
+	go test -cover ./...
+# go test -coverprofile=coverage.out ./...
+# go tool cover -html=coverage.out
+
+run-integration-tests-docker:
 	cd tests && $(MAKE) run-test-all-docker
 
-run-test-all-go: go-build
+run-integration-tests-go: go-build
 	cd tests && $(MAKE) run-test-all-go

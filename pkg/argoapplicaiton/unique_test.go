@@ -115,7 +115,8 @@ func TestUniqueNames(t *testing.T) {
 
 // Helper function to create a test ArgoResource with basic YAML structure
 func createTestApp(name, fileName string) ArgoResource {
-	yamlStr := `apiVersion: argoproj.io/v1alpha1
+	yamlStr := `
+apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: ` + name + `
