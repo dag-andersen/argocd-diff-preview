@@ -272,7 +272,7 @@ func (o *Options) ParseFilesChanged() []string {
 		return nil
 	}
 	return strings.FieldsFunc(o.FilesChanged, func(r rune) bool {
-		return r == ',' || r == ' '
+		return r == ',' || r == ' ' || r == '\n'
 	})
 }
 
