@@ -55,6 +55,11 @@ func UniqueNames(apps []ArgoResource, branch *types.Branch) []ArgoResource {
 		}
 	}
 
+	// sort newApps by filename
+	sort.Slice(newApps, func(i, j int) bool {
+		return newApps[i].Name < newApps[j].Name
+	})
+
 	if duplicateCounter > 0 {
 		log.Info().
 			Str("branch", branch.Name).
