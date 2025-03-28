@@ -217,7 +217,7 @@ func Parse() *Options {
 	// Other options
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
-	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma or space separated)")
+	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
 
