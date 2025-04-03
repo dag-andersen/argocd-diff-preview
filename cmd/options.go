@@ -339,7 +339,9 @@ func (o *Options) LogOptions() {
 	}
 	log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
 	log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
-	log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+	if o.KindOptions != "" {
+		log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+	}
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
