@@ -20,8 +20,8 @@ func IsInstalled() bool {
 	return err == nil
 }
 
-// CreateCluster creates a new kind cluster with the given name
-func CreateCluster(clusterName string) error {
+// CreateCluster creates a new kind cluster with the given name, optional kindOptions
+func CreateCluster(clusterName string, kindOptions string) error {
 	// Check if docker is running
 	if _, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
@@ -36,7 +36,7 @@ func CreateCluster(clusterName string) error {
 	}
 
 	// Create new cluster
-	if _, err := runCommand("kind", "create", "cluster", "--name", clusterName); err != nil {
+	if _, err := runCommand("kind", "create", "cluster", "--name", clusterName, kindOptions); err != nil {
 		log.Error().Msg("❌ Failed to create cluster")
 		return fmt.Errorf("failed to create cluster: %w", err)
 	}
@@ -93,10 +93,11 @@ var _ cluster.Provider = (*Kind)(nil)
 
 type Kind struct {
 	clusterName string
+	kindOptions string
 }
 
-func New(clusterName string) *Kind {
-	return &Kind{clusterName: clusterName}
+func New(clusterName string, kindOptions string) *Kind {
+	return &Kind{clusterName: clusterName, kindOptions: kindOptions}
 }
 
 // Implement cluster.Provider interface
@@ -105,7 +106,7 @@ func (k *Kind) IsInstalled() bool {
 }
 
 func (k *Kind) CreateCluster() error {
-	return CreateCluster(k.clusterName)
+	return CreateCluster(k.clusterName, k.kindOptions)
 }
 
 func (k *Kind) ClusterExists() bool {

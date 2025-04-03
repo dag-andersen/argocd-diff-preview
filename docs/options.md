@@ -34,6 +34,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--base-branch <branch>`, `-b` | `BASE_BRANCH` | `main` | Base branch name |
 | `--cluster <tool>` | `CLUSTER` | `auto` | Local cluster tool. Options: kind, minikube, auto |
 | `--cluster-name <name>` | `CLUSTER_NAME` | `argocd-diff-preview` | Cluster name (only for kind) |
+| `--kind-options <options>` | `KIND_OPTIONS` | - | Additional options for kind cluster creation |
 | `--diff-ignore <pattern>`, `-i` | `DIFF_IGNORE` | - | Ignore lines in diff. Example: `v[1,9]+.[1,9]+.[1,9]+` for ignoring version changes |
 | `--file-regex <regex>`, `-r` | `FILE_REGEX` | - | Regex to filter files. Example: `/apps_.*\.yaml` |
 | `--files-changed <files>` | `FILES_CHANGED` | - | List of files changed between branches (comma, space or newline separated) |
