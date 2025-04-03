@@ -107,7 +107,7 @@ If your ArgoCD Applications use SSH to access the private repositories, then you
             argocd.argoproj.io/secret-type: repo-creds
         stringData:
           type: git
-          url: https://github.com/${{ github.repository }}
+          url: git@github.com/${{ github.repository }}
           sshPrivateKey: |
         $(echo "${{ secrets.REPO_ACCESS_SSH_PRIVATE_KEY }}" | sed 's/^/    /') ⬅️ Private SSH key with proper indentation
         EOF
