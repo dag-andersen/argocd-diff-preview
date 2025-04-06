@@ -194,8 +194,13 @@ func (a *ArgoResource) redirectSource(source *yaml.Node, repo, branch string, re
 	}
 
 	repoURL := yamlutil.GetYamlValue(source, []string{"repoURL"})
-	if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
+	if repoURL == nil {
 		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'repoURL' under spec.source")
+		return nil
+	}
+
+	if !containsIgnoreCase(repoURL.Value, repo) {
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Skipping source: %s (repoURL does not match %s)", repoURL.Value, repo)
 		return nil
 	}
 
