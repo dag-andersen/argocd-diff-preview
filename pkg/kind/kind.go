@@ -23,22 +23,31 @@ func IsInstalled() bool {
 // CreateCluster creates a new kind cluster with the given name, optional kindOptions
 func CreateCluster(clusterName string, kindOptions string) error {
 	// Check if docker is running
-	if _, err := runCommand("docker", "ps"); err != nil {
+	if output, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
-		return fmt.Errorf("docker is not running: %w", err)
+		return fmt.Errorf("docker is not running: %s", output)
 	}
 
 	log.Info().Msg("🚀 Creating cluster...")
 
 	// Delete existing cluster if it exists
-	if _, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
-		return fmt.Errorf("failed to delete existing cluster: %w", err)
+	if output, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
+		return fmt.Errorf("failed to delete existing cluster: %s", output)
 	}
 
 	// Create new cluster
-	if _, err := runCommand("kind", "create", "cluster", "--name", clusterName, kindOptions); err != nil {
-		log.Error().Msg("❌ Failed to create cluster")
-		return fmt.Errorf("failed to create cluster: %w", err)
+	args := []string{"create", "cluster", "--name", clusterName}
+	if strings.TrimSpace(kindOptions) != "" {
+		args = append(args, strings.TrimSpace(kindOptions))
+	}
+
+	if output, err := runCommand("kind", args...); err != nil {
+		if strings.TrimSpace(kindOptions) == "" {
+			log.Error().Msg("❌ Failed to create cluster")
+		} else {
+			log.Error().Msgf("❌ Failed to create cluster with options: %s", kindOptions)
+		}
+		return fmt.Errorf("failed to create cluster: %s", output)
 	}
 
 	log.Info().Msg("🚀 Cluster created successfully")
