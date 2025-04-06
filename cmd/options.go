@@ -36,6 +36,7 @@ var (
 	DefaultSecretsFolder      = "./secrets"
 	DefaultCluster            = "auto"
 	DefaultClusterName        = "argocd-diff-preview"
+	DefaultKindOptions        = ""
 	DefaultMaxDiffLength      = uint(65536)
 	DefaultArgocdNamespace    = "argocd"
 	DefaultLogFormat          = "human"
@@ -56,6 +57,7 @@ type Options struct {
 	SecretsFolder             string `mapstructure:"secrets-folder"`
 	ClusterType               string `mapstructure:"cluster"`
 	ClusterName               string `mapstructure:"cluster-name"`
+	KindOptions               string `mapstructure:"kind-options"`
 	MaxDiffLength             uint   `mapstructure:"max-diff-length"`
 	Selector                  string `mapstructure:"selector"`
 	FilesChanged              string `mapstructure:"files-changed"`
@@ -212,6 +214,7 @@ func Parse() *Options {
 	// Cluster related
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind)")
+	rootCmd.Flags().String("kind-options", DefaultKindOptions, "Kind Options (only for kind)")
 	rootCmd.Flags().Bool("keep-cluster-alive", false, "Keep cluster alive after the tool finishes")
 
 	// Other options
@@ -303,12 +306,12 @@ func (o *Options) ParseClusterType() (cluster.Provider, error) {
 	var provider cluster.Provider
 	switch o.ClusterType {
 	case "kind":
-		provider = kind.New(o.ClusterName)
+		provider = kind.New(o.ClusterName, o.KindOptions)
 	case "minikube":
 		provider = minikube.New()
 	case "auto":
 		if kind.IsInstalled() {
-			provider = kind.New(o.ClusterName)
+			provider = kind.New(o.ClusterName, o.KindOptions)
 			log.Debug().Msg("Using kind as cluster provider")
 		} else if minikube.IsInstalled() {
 			provider = minikube.New()
@@ -336,6 +339,9 @@ func (o *Options) LogOptions() {
 	}
 	log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
 	log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
+	if o.KindOptions != "" {
+		log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+	}
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
