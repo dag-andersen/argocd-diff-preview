@@ -378,8 +378,9 @@ func (a *ArgoCDInstallation) RefreshApp(appName string) error {
 	cmd := exec.Command("argocd", "app", "get", appName, "--refresh")
 	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to refresh app: %w", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to refresh app: %s", output)
 	}
 
 	return nil

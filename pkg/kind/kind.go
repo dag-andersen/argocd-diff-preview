@@ -77,15 +77,14 @@ func DeleteCluster(clusterName string, wait bool) {
 	log.Info().Msg("💥 Deleting cluster...")
 
 	if wait {
-		if _, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
-			log.Error().Msgf("❌ Failed to delete cluster: %v", err)
+		if output, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
+			log.Error().Msgf("❌ Failed to delete cluster: %s", output)
 			return
 		}
 		log.Info().Msg("💥 Cluster deleted successfully")
 	} else {
-		cmd := exec.Command("kind", "delete", "cluster", "--name", clusterName)
-		if err := cmd.Start(); err != nil {
-			log.Error().Msgf("❌ Failed to start cluster deletion: %v", err)
+		if output, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
+			log.Error().Msgf("❌ Failed to start cluster deletion: %s", output)
 		}
 	}
 }

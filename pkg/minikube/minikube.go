@@ -22,22 +22,22 @@ func IsInstalled() bool {
 // CreateCluster creates a new minikube cluster
 func CreateCluster() error {
 	// Check if docker is running
-	if _, err := runCommand("docker", "ps"); err != nil {
+	if output, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
-		return fmt.Errorf("docker is not running: %w", err)
+		return fmt.Errorf("docker is not running: %s", output)
 	}
 
 	log.Info().Msg("🚀 Creating cluster...")
 
 	// Delete existing cluster if it exists
-	if _, err := runCommand("minikube", "delete"); err != nil {
-		return fmt.Errorf("failed to delete existing cluster: %w", err)
+	if output, err := runCommand("minikube", "delete"); err != nil {
+		return fmt.Errorf("failed to delete existing cluster: %s", output)
 	}
 
 	// Create new cluster
-	if _, err := runCommand("minikube", "start"); err != nil {
+	if output, err := runCommand("minikube", "start"); err != nil {
 		log.Error().Msg("❌ Failed to create cluster")
-		return fmt.Errorf("failed to create cluster: %w", err)
+		return fmt.Errorf("failed to create cluster: %s", output)
 	}
 
 	log.Info().Msg("🚀 Cluster created successfully")
@@ -57,7 +57,7 @@ func DeleteCluster(wait bool) {
 	if wait {
 		output, err := runCommand("minikube", "delete")
 		if err != nil {
-			log.Error().Msgf("❌ Failed to delete cluster: %v", err)
+			log.Error().Msgf("❌ Failed to delete cluster: %v", output)
 			return
 		}
 		log.Info().Msgf("💥 Cluster deleted successfully: %s", output)
