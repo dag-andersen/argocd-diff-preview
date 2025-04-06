@@ -36,10 +36,11 @@ func CreateCluster(clusterName string, kindOptions string) error {
 	}
 
 	// Create new cluster
-	args := []string{"create", "cluster", "--name", clusterName}
+	args := []string{"create", "cluster"}
 	if strings.TrimSpace(kindOptions) != "" {
-		args = append(args, strings.TrimSpace(kindOptions))
+		args = append(args, strings.Fields(kindOptions)...)
 	}
+	args = append(args, "--name", clusterName)
 
 	if output, err := runCommand("kind", args...); err != nil {
 		if strings.TrimSpace(kindOptions) == "" {
