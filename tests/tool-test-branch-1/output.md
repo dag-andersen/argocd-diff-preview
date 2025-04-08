@@ -1,9 +1,11 @@
 ## Argo CD Diff Preview
 
 Summary:
-```bash
- {base => target}/nginx-ingress | 48 +++++++++++++++++++++---------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+```diff
+Total: 1 files changed
+
+Modified (1):
+± nginx-ingress
 ```
 
 <details>
@@ -11,11 +13,7 @@ Summary:
 <br>
 
 ```diff
-diff --git base/nginx-ingress target/nginx-ingress
-index c0f21e4..3b9b73c 100644
---- base/nginx-ingress
-+++ target/nginx-ingress
-@@ -10,9 +10,9 @@ metadata:
+@ Application modified: nginx-ingress
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -27,7 +25,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  
-@@ -27,9 +27,9 @@ metadata:
+@@ skipped 8 lines (20 -> 27) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -39,7 +37,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  spec:
-@@ -63,9 +63,9 @@ metadata:
+@@ skipped 27 lines (39 -> 65) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -51,7 +49,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx-controller-admission
    namespace: default
  spec:
-@@ -91,9 +91,9 @@ metadata:
+@@ skipped 19 lines (77 -> 95) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -63,7 +61,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx
    namespace: default
  
-@@ -108,9 +108,9 @@ metadata:
+@@ skipped 8 lines (107 -> 114) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -75,7 +73,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx-admission
  webhooks:
  - admissionReviewVersions:
-@@ -145,9 +145,9 @@ metadata:
+@@ skipped 28 lines (126 -> 153) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -87,7 +85,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  spec:
-@@ -167,8 +167,8 @@ spec:
+@@ skipped 13 lines (165 -> 177) @@
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: ingress-nginx
          app.kubernetes.io/part-of: ingress-nginx
@@ -98,7 +96,7 @@ index c0f21e4..3b9b73c 100644
      spec:
        containers:
        - args:
-@@ -271,9 +271,9 @@ metadata:
+@@ skipped 97 lines (188 -> 284) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -110,7 +108,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx
  spec:
    controller: k8s.io/ingress-nginx
-@@ -287,9 +287,9 @@ metadata:
+@@ skipped 7 lines (296 -> 302) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -122,7 +120,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx
  rules:
  - apiGroups:
-@@ -372,9 +372,9 @@ metadata:
+@@ skipped 76 lines (314 -> 389) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -134,7 +132,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx
  roleRef:
    apiGroup: rbac.authorization.k8s.io
-@@ -395,9 +395,9 @@ metadata:
+@@ skipped 14 lines (401 -> 414) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -146,7 +144,7 @@ index c0f21e4..3b9b73c 100644
    name: nginx-ingress-ingress-nginx
    namespace: default
  rules:
-@@ -489,9 +489,9 @@ metadata:
+@@ skipped 85 lines (426 -> 510) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx

@@ -1,9 +1,11 @@
 ## Argo CD Diff Preview
 
 Summary:
-```bash
- {base => target}/my-service-staging | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+```diff
+Total: 1 files changed
+
+Modified (1):
+± my-service-staging
 ```
 
 <details>
@@ -11,11 +13,7 @@ Summary:
 <br>
 
 ```diff
-diff --git base/my-service-staging target/my-service-staging
-index 7af0462..395b870 100644
---- base/my-service-staging
-+++ target/my-service-staging
-@@ -16,21 +16,21 @@ spec:
+@ Application modified: my-service-staging
  ---
  apiVersion: apps/v1
  kind: Deployment
