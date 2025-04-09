@@ -3,7 +3,7 @@ package argoapplicaiton
 import (
 	"testing"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -11,13 +11,13 @@ import (
 func TestFromK8sResource(t *testing.T) {
 	tests := []struct {
 		name     string
-		resource *types.K8sResource
+		resource *k8s.Resource
 		want     *ArgoResource
 		wantErr  bool
 	}{
 		{
 			name: "valid application",
-			resource: &types.K8sResource{
+			resource: &k8s.Resource{
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
@@ -41,7 +41,7 @@ spec:
 		},
 		{
 			name: "valid application set",
-			resource: &types.K8sResource{
+			resource: &k8s.Resource{
 				FileName: "test-set.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
@@ -66,7 +66,7 @@ spec:
 		},
 		{
 			name: "invalid kind",
-			resource: &types.K8sResource{
+			resource: &k8s.Resource{
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
@@ -82,7 +82,7 @@ metadata:
 		},
 		{
 			name: "missing metadata",
-			resource: &types.K8sResource{
+			resource: &k8s.Resource{
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
@@ -99,7 +99,7 @@ spec:
 		},
 		{
 			name: "missing name",
-			resource: &types.K8sResource{
+			resource: &k8s.Resource{
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
@@ -118,7 +118,7 @@ spec:
 		},
 		{
 			name: "nil yaml",
-			resource: &types.K8sResource{
+			resource: &k8s.Resource{
 				FileName: "test.yaml",
 				Yaml:     yaml.Node{},
 			},
@@ -129,7 +129,7 @@ spec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FromK8sResource(tt.resource)
+			got := FromK8sResource(*tt.resource)
 
 			if tt.wantErr {
 				assert.Nil(t, got)

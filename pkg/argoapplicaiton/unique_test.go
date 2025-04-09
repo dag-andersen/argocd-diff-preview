@@ -3,7 +3,7 @@ package argoapplicaiton
 import (
 	"testing"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
@@ -13,7 +13,7 @@ func TestUniqueNames(t *testing.T) {
 	tests := []struct {
 		name    string
 		apps    []ArgoResource
-		branch  *types.Branch
+		branch  *git.Branch
 		want    []ArgoResource
 		wantErr bool
 	}{
@@ -24,7 +24,7 @@ func TestUniqueNames(t *testing.T) {
 				createTestApp("app2", "app2.yaml"),
 				createTestApp("app3", "app3.yaml"),
 			},
-			branch: &types.Branch{Name: "test-branch"},
+			branch: &git.Branch{Name: "test-branch"},
 			want: []ArgoResource{
 				createTestApp("app1", "app1.yaml"),
 				createTestApp("app2", "app2.yaml"),
@@ -39,7 +39,7 @@ func TestUniqueNames(t *testing.T) {
 				createTestApp("app1", "app1-2.yaml"),
 				createTestApp("app2", "app2.yaml"),
 			},
-			branch: &types.Branch{Name: "test-branch"},
+			branch: &git.Branch{Name: "test-branch"},
 			want: []ArgoResource{
 				createTestApp("app1-1", "app1.yaml"),
 				createTestApp("app1-2", "app1-2.yaml"),
@@ -56,7 +56,7 @@ func TestUniqueNames(t *testing.T) {
 				createTestApp("app2", "app2.yaml"),
 				createTestApp("app2", "app2-2.yaml"),
 			},
-			branch: &types.Branch{Name: "test-branch"},
+			branch: &git.Branch{Name: "test-branch"},
 			want: []ArgoResource{
 				createTestApp("app1-1", "app1.yaml"),
 				createTestApp("app1-2", "app1-2.yaml"),
@@ -69,7 +69,7 @@ func TestUniqueNames(t *testing.T) {
 		{
 			name:    "empty slice",
 			apps:    []ArgoResource{},
-			branch:  &types.Branch{Name: "test-branch"},
+			branch:  &git.Branch{Name: "test-branch"},
 			want:    []ArgoResource{},
 			wantErr: false,
 		},
@@ -78,7 +78,7 @@ func TestUniqueNames(t *testing.T) {
 			apps: []ArgoResource{
 				createTestApp("app1", "app1.yaml"),
 			},
-			branch: &types.Branch{Name: "test-branch"},
+			branch: &git.Branch{Name: "test-branch"},
 			want: []ArgoResource{
 				createTestApp("app1", "app1.yaml"),
 			},

@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
 )
@@ -17,7 +17,7 @@ const (
 
 // Filter checks if the application matches the given selectors and watches the given files
 func (a *ArgoResource) Filter(
-	selectors []types.Selector,
+	selectors []selector.Selector,
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
 ) *ArgoResource {
@@ -39,7 +39,7 @@ func (a *ArgoResource) Filter(
 }
 
 // filterBySelectors checks if the application matches the given selectors
-func (a *ArgoResource) filterBySelectors(selectors []types.Selector) bool {
+func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) bool {
 	metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
 	if metadata == nil {
 		return false
@@ -50,14 +50,14 @@ func (a *ArgoResource) filterBySelectors(selectors []types.Selector) bool {
 		return false
 	}
 
-	for _, selector := range selectors {
-		labelValue := yamlutil.GetYamlValue(labels, []string{selector.Key})
+	for _, s := range selectors {
+		labelValue := yamlutil.GetYamlValue(labels, []string{s.Key})
 		if labelValue == nil {
 			return false
 		}
 
-		matches := labelValue.Value == selector.Value
-		if (selector.Operator == types.Eq && !matches) || (selector.Operator == types.Ne && matches) {
+		matches := labelValue.Value == s.Value
+		if (s.Operator == selector.Eq && !matches) || (s.Operator == selector.Ne && matches) {
 			return false
 		}
 	}

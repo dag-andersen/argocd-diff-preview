@@ -1,4 +1,4 @@
-package types
+package selector
 
 import (
 	"fmt"
@@ -11,8 +11,10 @@ import (
 type Operator int
 
 const (
-	Eq Operator = iota // Equal
-	Ne                 // Not Equal
+	// Eq represents the equality operator
+	Eq Operator = iota
+	// Ne represents the inequality operator
+	Ne
 )
 
 // String returns the string representation of the Operator
@@ -37,6 +39,16 @@ type Selector struct {
 // String returns the string representation of the Selector
 func (s *Selector) String() string {
 	return fmt.Sprintf("%s%s%s", s.Key, s.Operator, s.Value)
+}
+
+// InvalidSelectorError represents an error in selector format
+type InvalidSelectorError struct {
+	Selector string
+	Reason   string
+}
+
+func (e *InvalidSelectorError) Error() string {
+	return fmt.Sprintf("invalid selector '%s': %s", e.Selector, e.Reason)
 }
 
 // FromString creates a new Selector from a string representation
@@ -70,29 +82,44 @@ func FromString(s string) (*Selector, error) {
 			}
 		} else {
 			log.Error().Msgf("❌ Invalid label selector format: %s", s)
-			return nil, fmt.Errorf("invalid label selector format")
+			return nil, &InvalidSelectorError{
+				Selector: s,
+				Reason:   "invalid format",
+			}
 		}
 	default:
 		log.Error().Msgf("❌ Invalid label selector format: %s", s)
-		return nil, fmt.Errorf("invalid label selector format")
+		return nil, &InvalidSelectorError{
+			Selector: s,
+			Reason:   "invalid format",
+		}
 	}
 
 	// Validate selector
 	if selector.Key == "" || selector.Value == "" {
 		log.Error().Msgf("❌ Invalid label selector format: empty key or value: %s", s)
-		return nil, fmt.Errorf("invalid label selector format: empty key or value")
+		return nil, &InvalidSelectorError{
+			Selector: s,
+			Reason:   "empty key or value",
+		}
 	}
 
 	// Check for invalid characters in key
 	if strings.Contains(selector.Key, "!") || strings.Contains(selector.Key, "=") {
 		log.Error().Msgf("❌ Invalid label selector format: key contains invalid characters: %s", s)
-		return nil, fmt.Errorf("invalid label selector format: key contains invalid characters")
+		return nil, &InvalidSelectorError{
+			Selector: s,
+			Reason:   "key contains invalid characters",
+		}
 	}
 
 	// Check for invalid characters in value
 	if strings.Contains(selector.Value, "!") || strings.Contains(selector.Value, "=") {
 		log.Error().Msgf("❌ Invalid label selector format: value contains invalid characters: %s", s)
-		return nil, fmt.Errorf("invalid label selector format: value contains invalid characters")
+		return nil, &InvalidSelectorError{
+			Selector: s,
+			Reason:   "value contains invalid characters",
+		}
 	}
 
 	return selector, nil

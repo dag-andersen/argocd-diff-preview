@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
 )
@@ -12,7 +12,7 @@ import (
 // UniqueNames ensures that each application has a unique name by appending the branch name if necessary.
 // It returns a new slice with unique names.
 // UniqueNames ensures all applications have unique names by adding suffixes to duplicates
-func UniqueNames(apps []ArgoResource, branch *types.Branch) []ArgoResource {
+func UniqueNames(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 	// Group applications by name
 	duplicateNames := make(map[string][]ArgoResource)
 	for _, app := range apps {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
@@ -18,7 +18,7 @@ const noAppsFoundTemplate = `
 // WriteNoAppsFoundMessage writes a message to the output folder when no applications are found
 func WriteNoAppsFoundMessage(
 	outputFolder string,
-	selectors []types.Selector,
+	selectors []selector.Selector,
 	changedFiles []string,
 ) error {
 	message := getNoAppsFoundMessage(selectors, changedFiles)
@@ -40,8 +40,8 @@ func generateNoAppsFoundMarkdown(message string) string {
 }
 
 // getNoAppsFoundMessage generates an appropriate message based on selectors and changed files
-func getNoAppsFoundMessage(selectors []types.Selector, changedFiles []string) string {
-	selectorString := func(s []types.Selector) string {
+func getNoAppsFoundMessage(selectors []selector.Selector, changedFiles []string) string {
+	selectorString := func(s []selector.Selector) string {
 		var strs []string
 		for _, selector := range s {
 			strs = append(strs, selector.String())
