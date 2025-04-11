@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -127,7 +128,7 @@ func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, er
 			return "", err
 		}
 
-		resultString, err := json.Marshal(result)
+		resultString, err := yaml.Marshal(result)
 		if err != nil {
 			return "", err
 		}
@@ -150,7 +151,7 @@ func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, er
 		Items: items,
 	}
 
-	resultString, err := json.Marshal(combinedResult)
+	resultString, err := yaml.Marshal(combinedResult)
 	if err != nil {
 		return "", err
 	}
@@ -178,7 +179,6 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 	}
 
 	// decode
-
 	decoded, err := base64.StdEncoding.DecodeString(valueString)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode value: %w", err)
