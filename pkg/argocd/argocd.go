@@ -1,7 +1,6 @@
 package argocd
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,16 +20,18 @@ import (
 )
 
 type ArgoCDInstallation struct {
+	K8sClient  *utils.K8sClient
 	Namespace  string
 	Version    string
 	ConfigPath string
 }
 
-func New(namespace string, version string, configPath string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, configPath string) *ArgoCDInstallation {
 	if configPath == "" {
 		configPath = "argocd-config"
 	}
 	return &ArgoCDInstallation{
+		K8sClient:  client,
 		Namespace:  namespace,
 		Version:    version,
 		ConfigPath: configPath,
@@ -41,14 +42,7 @@ func (a *ArgoCDInstallation) createNamespace() error {
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
 	// Check if namespace exists
-	cmd := fmt.Sprintf("kubectl get namespace %s", a.Namespace)
-	if err := runCommand("sh", "-c", cmd); err == nil {
-		log.Debug().Msgf("Namespace %s already exists", a.Namespace)
-		return nil
-	}
-
-	// Create namespace
-	if err := runCommand("kubectl", "create", "namespace", a.Namespace); err != nil {
+	if err := a.K8sClient.CreateNamespace(a.Namespace); err != nil {
 		log.Error().Msgf("❌ Failed to create namespace %s", a.Namespace)
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
@@ -89,13 +83,12 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 	if debug {
 		// Get ConfigMaps
-		cmd := fmt.Sprintf("kubectl get configmap -n %s -o yaml argocd-cmd-params-cm argocd-cm", a.Namespace)
-		output, err := utils.RunCommand(cmd)
+		configMaps, err := a.K8sClient.GetConfigMaps(a.Namespace, "argocd-cmd-params-cm", "argocd-cm")
 		if err != nil {
 			log.Error().Err(err).Msg("❌ Failed to get ConfigMaps")
 			return fmt.Errorf("failed to get ConfigMaps: %w", err)
 		}
-		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", output)
+		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", configMaps)
 	}
 
 	// Add extra permissions to the default AppProject
@@ -310,30 +303,13 @@ func (a *ArgoCDInstallation) login() error {
 }
 
 func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
-	secretName := "argocd-initial-admin-secret"
-	cmd := fmt.Sprintf("kubectl -n %s get secret %s -o jsonpath={.data.password}",
-		a.Namespace, secretName)
 
-	var password []byte
-	for retries := 0; retries < 5; retries++ {
-		output, err := exec.Command("sh", "-c", cmd).Output()
-		if err == nil {
-			password = output
-			break
-		}
-		if retries == 4 {
-			return "", fmt.Errorf("failed to get secret %s: %w", secretName, err)
-		}
-		log.Info().Msgf("⏳ Retrying to get secret %s", secretName)
-		time.Sleep(2 * time.Second)
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(string(password))
+	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
 	if err != nil {
-		return "", fmt.Errorf("failed to decode password: %w", err)
+		return "", fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	return string(decoded), nil
+	return secret, nil
 }
 
 func runCommand(name string, args ...string) error {
