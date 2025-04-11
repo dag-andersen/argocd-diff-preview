@@ -49,18 +49,24 @@ func GetResourcesFromBothBranches(
 	baseManifest string,
 	targetManifest string,
 ) (map[string]string, map[string]string, error) {
+
+	k8sClient, err := utils.NewK8sClient()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
 	// Apply base manifest directly from string with kubectl
 	if err := utils.KubectlApplyFromString(baseManifest); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply base apps: %w", err)
 	}
 
-	baseManifests, err := extractResourcesFromCluster(argocd, baseBranch, timeout)
+	baseManifests, err := extractResourcesFromCluster(k8sClient, argocd, baseBranch, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
 
 	// delete applications
-	if err := utils.DeleteApplications(); err != nil {
+	if err := k8sClient.DeleteArgoCDApplications(argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to delete applications: %w", err)
 	}
 
@@ -69,7 +75,7 @@ func GetResourcesFromBothBranches(
 		return nil, nil, fmt.Errorf("failed to apply target apps: %w", err)
 	}
 
-	targetManifests, err := extractResourcesFromCluster(argocd, targetBranch, timeout)
+	targetManifests, err := extractResourcesFromCluster(k8sClient, argocd, targetBranch, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -79,6 +85,7 @@ func GetResourcesFromBothBranches(
 
 // extractResourcesFromCluster extracts resources from Argo CD for a specific branch
 func extractResourcesFromCluster(
+	k8sClient *utils.K8sClient,
 	argocd *argocd.ArgoCDInstallation,
 	branch *git.Branch,
 	timeout uint64,
@@ -111,8 +118,7 @@ func extractResourcesFromCluster(
 			} `yaml:"items"`
 		}
 
-		cmd := "kubectl get applications -A -oyaml"
-		output, err := utils.RunCommand(cmd)
+		output, err := k8sClient.GetArgoCDApplications(argocd.Namespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get applications: %v", err)
 		}
