@@ -82,6 +82,11 @@ func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 
 	log.Info().Msg("🧼 Removing applications")
 
+	// Remove obstructive finalizers
+	if err := c.RemoveObstructiveFinalizers(namespace); err != nil {
+		return fmt.Errorf("failed to remove obstructive finalizers: %w", err)
+	}
+
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
 	apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
@@ -96,6 +101,69 @@ func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 		}
 	}
 	log.Info().Msg("🧼 Deleted applications")
+	return nil
+}
+
+// RemoveObstructiveFinalizers removes finalizers from applications that would prevent deletion
+func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
+
+	// List of obstructiveFinalizers that prevent deletion of applications
+	obstructiveFinalizers := []string{
+		"post-delete-finalizer.argocd.argoproj.io",
+		"post-delete-finalizer.argoproj.io/cleanup",
+	}
+
+	log.Info().Msg("🧹 Removing obstructive finalizers from applications")
+
+	// Get ArgoCD applications
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+	apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list applications: %w", err)
+	}
+
+	for _, app := range apps.Items {
+		appName := app.GetName()
+		currentFinalizers := app.GetFinalizers()
+
+		if len(currentFinalizers) == 0 {
+			continue
+		}
+
+		// Create a map for faster lookup of obstructive finalizers
+		obstructiveMap := make(map[string]bool)
+		for _, f := range obstructiveFinalizers {
+			obstructiveMap[f] = true
+		}
+
+		// Check if any current finalizers are in our obstructive list
+		foundObstructive := false
+		for _, fin := range currentFinalizers {
+			if obstructiveMap[fin] {
+				foundObstructive = true
+				break
+			}
+		}
+
+		if !foundObstructive {
+			continue
+		}
+
+		app.SetFinalizers(nil)
+		_, err := c.clientset.Resource(applicationRes).Namespace(namespace).Update(
+			context.Background(),
+			&app,
+			metav1.UpdateOptions{},
+		)
+
+		if err != nil {
+			log.Error().Err(err).Msgf("❌ Failed to update finalizers for application %s", appName)
+		} else {
+			log.Info().Msgf("✅ Removed finalizers from application %s", appName)
+		}
+	}
+
+	log.Info().Msg("🧹 Finished removing finalizers")
 	return nil
 }
 
