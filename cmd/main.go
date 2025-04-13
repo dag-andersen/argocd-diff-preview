@@ -9,7 +9,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/diff"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 )
@@ -48,8 +48,8 @@ func run(opts *Options) error {
 	clusterProvider := opts.GetClusterProvider()
 
 	// Create branches
-	baseBranch := types.NewBranch(opts.BaseBranch, types.Base)
-	targetBranch := types.NewBranch(opts.TargetBranch, types.Target)
+	baseBranch := git.NewBranch(opts.BaseBranch, git.Base)
+	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
 	// Get applications for both branches
 	baseApps, targetApps, err := argoapplicaiton.GetApplicationsForBranches(

@@ -14,7 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/rs/zerolog/log"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
@@ -40,8 +40,8 @@ Summary:
 // GenerateDiff generates a diff between base and target branches
 func GenerateDiff(
 	outputFolder string,
-	baseBranch *types.Branch,
-	targetBranch *types.Branch,
+	baseBranch *gitt.Branch,
+	targetBranch *gitt.Branch,
 	baseManifests map[string]string,
 	targetManifests map[string]string,
 	diffIgnoreRegex *string,

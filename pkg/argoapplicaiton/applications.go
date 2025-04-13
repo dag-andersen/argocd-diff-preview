@@ -9,7 +9,9 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	k8s "github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"gopkg.in/yaml.v3"
 )
@@ -17,10 +19,10 @@ import (
 // GetApplicationsForBranches gets applications for both base and target branches
 func GetApplicationsForBranches(
 	argocdNamespace string,
-	baseBranch *types.Branch,
-	targetBranch *types.Branch,
+	baseBranch *git.Branch,
+	targetBranch *git.Branch,
 	fileRegex *string,
-	selector []types.Selector,
+	selector []selector.Selector,
 	filesChanged []string,
 	repo string,
 	ignoreInvalidWatchPattern bool,
@@ -108,9 +110,9 @@ func GetApplicationsForBranches(
 // GetApplications gets applications for a single branch
 func GetApplications(
 	argocdNamespace string,
-	branch *types.Branch,
+	branch *git.Branch,
 	fileRegex *string,
-	selector []types.Selector,
+	selector []selector.Selector,
 	filesChanged []string,
 	repo string,
 	ignoreInvalidWatchPattern bool,
@@ -118,10 +120,10 @@ func GetApplications(
 ) ([]ArgoResource, error) {
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Fetching all files for branch %s", branch.Name)
 
-	yamlFiles := types.GetYamlFiles(branch.FolderName(), fileRegex)
+	yamlFiles := k8s.GetYamlFiles(branch.FolderName(), fileRegex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
-	k8sResources := types.ParseYaml(branch.FolderName(), yamlFiles)
+	k8sResources := k8s.ParseYaml(branch.FolderName(), yamlFiles)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d k8sResources", len(k8sResources))
 
 	applications := FromResourceToApplication(
@@ -175,17 +177,17 @@ func filterDuplicates(apps []ArgoResource, duplicates []*yaml.Node) []ArgoResour
 
 // FromResourceToApplication converts K8sResources to ArgoResources with filtering
 func FromResourceToApplication(
-	k8sResources []types.K8sResource,
-	selector []types.Selector,
+	k8sResources []k8s.Resource,
+	selector []selector.Selector,
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
-	branch *types.Branch,
+	branch *git.Branch,
 ) []ArgoResource {
 	var apps []ArgoResource
 
 	// Convert K8sResources to ArgoResources
 	for _, r := range k8sResources {
-		if app := FromK8sResource(&r); app != nil {
+		if app := FromK8sResource(r); app != nil {
 			apps = append(apps, *app)
 		}
 	}
@@ -252,7 +254,7 @@ func FromResourceToApplication(
 func PatchApplication(
 	argocdNamespace string,
 	application ArgoResource,
-	branch *types.Branch,
+	branch *git.Branch,
 	repo string,
 	redirectRevisions []string,
 ) (*ArgoResource, error) {
@@ -303,7 +305,7 @@ func PatchApplication(
 func PatchApplications(
 	argocdNamespace string,
 	applications []ArgoResource,
-	branch *types.Branch,
+	branch *git.Branch,
 	repo string,
 	redirectRevisions []string,
 ) ([]ArgoResource, error) {
@@ -330,8 +332,8 @@ func ConvertAppSetsToAppsInBothBranches(
 	argocd *argocd.ArgoCDInstallation,
 	baseApps []ArgoResource,
 	targetApps []ArgoResource,
-	baseBranch *types.Branch,
-	targetBranch *types.Branch,
+	baseBranch *git.Branch,
+	targetBranch *git.Branch,
 	repo string,
 	tempFolder string,
 	redirectRevisions []string,
@@ -378,7 +380,7 @@ func ConvertAppSetsToAppsInBothBranches(
 func ConvertAppSetsToApps(
 	argocd *argocd.ArgoCDInstallation,
 	appSets []ArgoResource,
-	branch *types.Branch,
+	branch *git.Branch,
 	repo string,
 	tempFolder string,
 	redirectRevisions []string,

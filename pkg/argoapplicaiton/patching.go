@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
@@ -302,7 +302,7 @@ func contains(slice []string, str string) bool {
 // WriteApplications writes applications to YAML files in the specified folder
 func WriteApplications(
 	apps []ArgoResource,
-	branch *types.Branch,
+	branch *git.Branch,
 	folder string,
 ) error {
 	filePath := fmt.Sprintf("%s/%s.yaml", folder, branch.FolderName())

@@ -15,7 +15,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 )
 
 var (
@@ -69,7 +69,7 @@ type Options struct {
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
-	parsedSelectors         []types.Selector
+	parsedSelectors         []selector.Selector
 	parsedFilesChanged      []string
 	parsedRedirectRevisions []string
 	clusterProvider         cluster.Provider
@@ -255,11 +255,11 @@ func (o *Options) CheckRequired() []string {
 }
 
 // ParseSelectors parses the selector string into a slice of Selectors
-func (o *Options) ParseSelectors() ([]types.Selector, error) {
-	var selectors []types.Selector
+func (o *Options) ParseSelectors() ([]selector.Selector, error) {
+	var selectors []selector.Selector
 	if o.Selector != "" {
 		for _, s := range strings.Split(o.Selector, ",") {
-			selector, err := types.FromString(strings.TrimSpace(s))
+			selector, err := selector.FromString(strings.TrimSpace(s))
 			if err != nil {
 				return nil, err
 			}
@@ -402,7 +402,7 @@ func (o *Options) GetFileRegex() *string {
 }
 
 // GetSelectors returns the parsed selectors
-func (o *Options) GetSelectors() []types.Selector {
+func (o *Options) GetSelectors() []selector.Selector {
 	return o.parsedSelectors
 }
 

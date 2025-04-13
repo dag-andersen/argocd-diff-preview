@@ -1,4 +1,4 @@
-package types
+package k8s
 
 import (
 	"bufio"
@@ -10,12 +10,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
-
-// K8sResource represents a Kubernetes resource from a YAML file
-type K8sResource struct {
-	FileName string
-	Yaml     yaml.Node
-}
 
 // GetYamlFiles gets all YAML files in a directory
 func GetYamlFiles(directory string, fileRegex *string) []string {
@@ -70,9 +64,9 @@ func GetYamlFiles(directory string, fileRegex *string) []string {
 	return yamlFiles
 }
 
-// ParseYaml parses YAML files into K8sResources
-func ParseYaml(dir string, files []string) []K8sResource {
-	var resources []K8sResource
+// ParseYaml parses YAML files into Resources
+func ParseYaml(dir string, files []string) []Resource {
+	var resources []Resource
 
 	for _, file := range files {
 		log.Debug().Msgf("In dir '%s' found yaml file: %s", dir, file)
@@ -113,7 +107,7 @@ func ParseYaml(dir string, files []string) []K8sResource {
 	return resources
 }
 
-func processYamlChunk(filename, chunk string, resources *[]K8sResource) {
+func processYamlChunk(filename, chunk string, resources *[]Resource) {
 	var yamlData yaml.Node
 	err := yaml.Unmarshal([]byte(chunk), &yamlData)
 	if err != nil {
@@ -121,7 +115,7 @@ func processYamlChunk(filename, chunk string, resources *[]K8sResource) {
 		return
 	}
 
-	*resources = append(*resources, K8sResource{
+	*resources = append(*resources, Resource{
 		FileName: filename,
 		Yaml:     yamlData,
 	})
