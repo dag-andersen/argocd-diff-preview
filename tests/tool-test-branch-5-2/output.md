@@ -1,9 +1,11 @@
 ## Argo CD Diff Preview
 
 Summary:
-```bash
- {base => target}/my-app-watch-pattern-valid-regex | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+```diff
+Total: 1 files changed
+
+Modified (1):
+± my-app-watch-pattern-valid-regex
 ```
 
 <details>
@@ -11,11 +13,7 @@ Summary:
 <br>
 
 ```diff
-diff --git base/my-app-watch-pattern-valid-regex target/my-app-watch-pattern-valid-regex
-index 5024fcb..36a884c 100644
---- base/my-app-watch-pattern-valid-regex
-+++ target/my-app-watch-pattern-valid-regex
-@@ -2,21 +2,21 @@
+@ Application modified: my-app-watch-pattern-valid-regex
  apiVersion: v1
  kind: Service
  metadata:
@@ -38,7 +36,10 @@ index 5024fcb..36a884c 100644
    selector:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/name: myApp
-@@ -27,35 +27,35 @@ apiVersion: v1
+   type: ClusterIP
+ 
+ ---
+ apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
@@ -76,7 +77,7 @@ index 5024fcb..36a884c 100644
    template:
      metadata:
        labels:
-@@ -77,12 +77,12 @@ spec:
+@@ skipped 15 lines (64 -> 78) @@
          - containerPort: 80
            name: http
            protocol: TCP

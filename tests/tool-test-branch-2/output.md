@@ -1,9 +1,11 @@
 ## Argo CD Diff Preview
 
 Summary:
-```bash
- {base => target}/my-app | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+```diff
+Total: 1 files changed
+
+Modified (1):
+± my-app
 ```
 
 <details>
@@ -11,11 +13,7 @@ Summary:
 <br>
 
 ```diff
-diff --git base/my-app target/my-app
-index eb9e290..7cf6187 100644
---- base/my-app
-+++ target/my-app
-@@ -2,21 +2,21 @@
+@ Application modified: my-app
  apiVersion: v1
  kind: Service
  metadata:
@@ -38,7 +36,10 @@ index eb9e290..7cf6187 100644
    selector:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/name: myApp
-@@ -27,38 +27,38 @@ apiVersion: v1
+   type: ClusterIP
+ 
+ ---
+ apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
@@ -80,7 +81,7 @@ index eb9e290..7cf6187 100644
          app.kubernetes.io/instance: my-app
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: myApp
-@@ -77,12 +77,12 @@ spec:
+@@ skipped 12 lines (68 -> 79) @@
          - containerPort: 80
            name: http
            protocol: TCP

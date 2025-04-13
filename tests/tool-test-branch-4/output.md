@@ -1,9 +1,11 @@
 ## Argo CD Diff Preview
 
 Summary:
-```bash
- /dev/null => target/folder3 | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+```diff
+Total: 1 files changed
+
+Added (1):
++ folder3
 ```
 
 <details>
@@ -11,12 +13,7 @@ Summary:
 <br>
 
 ```diff
-diff --git target/folder3 target/folder3
-new file mode 100644
-index 0000000..98a842f
---- /dev/null
-+++ target/folder3
-@@ -0,0 +1,23 @@
+@ Application added: folder3
 +---
 +apiVersion: apps/v1
 +kind: Deployment
