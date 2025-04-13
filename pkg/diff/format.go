@@ -51,9 +51,10 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			}
 
 			prefix := " "
-			if d.Type == diffmatchpatch.DiffDelete {
+			switch d.Type {
+			case diffmatchpatch.DiffDelete:
 				prefix = "-"
-			} else if d.Type == diffmatchpatch.DiffInsert {
+			case diffmatchpatch.DiffInsert:
 				prefix = "+"
 			}
 

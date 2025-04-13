@@ -137,7 +137,9 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Create repository config if it doesn't exist
 	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
-		os.MkdirAll(filepath.Dir(repoFile), 0755)
+		if err := os.MkdirAll(filepath.Dir(repoFile), 0755); err != nil {
+			return fmt.Errorf("failed to create repository directory: %w", err)
+		}
 
 		// Create a new repository file
 		r := repo.NewFile()
@@ -203,7 +205,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Locate chart
 	chartName := fmt.Sprintf("%s/argo-cd", repoName)
-	chartPath, err := client.ChartPathOptions.LocateChart(chartName, settings)
+	chartPath, err := client.LocateChart(chartName, settings)
 	if err != nil {
 		return fmt.Errorf("failed to locate chart: %w", err)
 	}

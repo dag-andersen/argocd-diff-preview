@@ -1,6 +1,7 @@
 package argoapplicaiton
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
@@ -125,7 +126,9 @@ spec:
     namespace: default`
 
 	var node yaml.Node
-	yaml.Unmarshal([]byte(yamlStr), &node)
+	if err := yaml.Unmarshal([]byte(yamlStr), &node); err != nil {
+		panic(fmt.Sprintf("failed to unmarshal yaml in test: %v", err))
+	}
 
 	return ArgoResource{
 		Yaml:     &node,

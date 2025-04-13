@@ -21,14 +21,16 @@ func TestFromK8sResource(t *testing.T) {
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: test-app
   namespace: default
 spec:
   destination:
-    namespace: default`), &node)
+    namespace: default`), &node); err != nil {
+						t.Fatalf("failed to unmarshal yaml: %v", err)
+					}
 					return node
 				}(),
 			},
@@ -45,7 +47,7 @@ spec:
 				FileName: "test-set.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: test-set
@@ -53,7 +55,9 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: https://github.com/org/repo.git`), &node)
+        repoURL: https://github.com/org/repo.git`), &node); err != nil {
+						t.Fatalf("failed to unmarshal yaml: %v", err)
+					}
 					return node
 				}(),
 			},
@@ -70,10 +74,12 @@ spec:
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: InvalidKind
 metadata:
-  name: test-app`), &node)
+  name: test-app`), &node); err != nil {
+						t.Fatalf("failed to unmarshal yaml: %v", err)
+					}
 					return node
 				}(),
 			},
@@ -86,11 +92,13 @@ metadata:
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 spec:
   destination:
-    namespace: default`), &node)
+    namespace: default`), &node); err != nil {
+						t.Fatalf("failed to unmarshal yaml: %v", err)
+					}
 					return node
 				}(),
 			},
@@ -103,13 +111,15 @@ spec:
 				FileName: "test.yaml",
 				Yaml: func() yaml.Node {
 					var node yaml.Node
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   namespace: default
 spec:
   destination:
-    namespace: default`), &node)
+    namespace: default`), &node); err != nil {
+						t.Fatalf("failed to unmarshal yaml: %v", err)
+					}
 					return node
 				}(),
 			},

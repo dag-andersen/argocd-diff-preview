@@ -66,6 +66,9 @@ mkdocs:
 	&& open http://localhost:8000 \
 	&& mkdocs serve
 
+run-lint:
+	golangci-lint run
+
 run-unit-tests:
 	go test $(GO_TEST_FLAGS) ./...
 	go test $(GO_TEST_FLAGS) -race ./...

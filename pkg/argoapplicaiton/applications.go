@@ -421,7 +421,11 @@ func ConvertAppSetsToApps(
 			continue
 		}
 		if !debug {
-			defer os.Remove(randomFileName)
+			defer func() {
+				if err := os.Remove(randomFileName); err != nil {
+					log.Warn().Err(err).Str("branch", branch.Name).Msg("Failed to remove temporary file")
+				}
+			}()
 		}
 
 		// Generate applications using argocd appset generate
