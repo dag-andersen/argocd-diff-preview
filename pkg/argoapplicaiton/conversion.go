@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
 )
 
 // FromK8sResource creates an ArgoResource from a K8sResource
-func FromK8sResource(resource *types.K8sResource) *ArgoResource {
+func FromK8sResource(resource k8s.Resource) *ArgoResource {
 	// Get the kind
 	if resource.Yaml.Content == nil {
 		log.Debug().Str("file", resource.FileName).Msg("No content found in file")

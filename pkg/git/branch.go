@@ -1,4 +1,4 @@
-package types
+package git
 
 import "fmt"
 
@@ -9,10 +9,13 @@ type Branch struct {
 	branchType BranchType
 }
 
+// BranchType represents the type of branch (base or target)
 type BranchType string
 
 const (
-	Base   BranchType = "base"
+	// Base represents the base branch for comparison
+	Base BranchType = "base"
+	// Target represents the target branch for comparison
 	Target BranchType = "target"
 )
 
@@ -30,6 +33,7 @@ func (b *Branch) FolderName() string {
 	return b.folderName
 }
 
+// Type returns the type of the branch
 func (b *Branch) Type() BranchType {
 	return b.branchType
 }

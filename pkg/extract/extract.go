@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"gopkg.in/yaml.v3"
 )
@@ -43,8 +43,8 @@ var timeoutMessages = []string{
 // by applying their manifests to the cluster and capturing the resulting resources
 func GetResourcesFromBothBranches(
 	argocd *argocd.ArgoCDInstallation,
-	baseBranch *types.Branch,
-	targetBranch *types.Branch,
+	baseBranch *git.Branch,
+	targetBranch *git.Branch,
 	timeout uint64,
 	baseManifest string,
 	targetManifest string,
@@ -80,7 +80,7 @@ func GetResourcesFromBothBranches(
 // extractResourcesFromCluster extracts resources from Argo CD for a specific branch
 func extractResourcesFromCluster(
 	argocd *argocd.ArgoCDInstallation,
-	branch *types.Branch,
+	branch *git.Branch,
 	timeout uint64,
 ) (map[string]string, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")

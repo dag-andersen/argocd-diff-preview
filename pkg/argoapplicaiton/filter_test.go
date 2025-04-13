@@ -3,7 +3,7 @@ package argoapplicaiton
 import (
 	"testing"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/types"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
@@ -16,7 +16,7 @@ func TestFilterBySelectors(t *testing.T) {
 	tests := []struct {
 		name      string
 		yaml      string
-		selectors []types.Selector
+		selectors []selector.Selector
 		want      bool
 	}{
 		{
@@ -28,7 +28,7 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors: []types.Selector{},
+			selectors: []selector.Selector{},
 			want:      true,
 		},
 		{
@@ -40,8 +40,8 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
 			want: true,
 		},
@@ -54,8 +54,8 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "other", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "other", Operator: selector.Eq},
 			},
 			want: false,
 		},
@@ -67,8 +67,8 @@ metadata:
   name: test-app
   labels:
     other: value`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
 			want: false,
 		},
@@ -79,8 +79,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: test-app`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
 			want: false,
 		},
@@ -92,8 +92,8 @@ kind: Application
 spec:
   destination:
     namespace: default`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
 			want: false,
 		},
@@ -106,8 +106,8 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "other", Operator: types.Ne},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "other", Operator: selector.Ne},
 			},
 			want: true,
 		},
@@ -120,8 +120,8 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Ne},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Ne},
 			},
 			want: false,
 		},
@@ -309,7 +309,7 @@ func TestFilter(t *testing.T) {
 	tests := []struct {
 		name                      string
 		yaml                      string
-		selectors                 []types.Selector
+		selectors                 []selector.Selector
 		filesChanged              []string
 		ignoreInvalidWatchPattern bool
 		want                      *ArgoResource
@@ -325,7 +325,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
 			want:                      &ArgoResource{Name: "test-app"},
@@ -341,8 +341,8 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
@@ -359,8 +359,8 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "other", Operator: types.Eq},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "other", Operator: selector.Eq},
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
@@ -377,7 +377,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.yaml"},
 			ignoreInvalidWatchPattern: false,
 			want:                      &ArgoResource{Name: "test-app"},
@@ -393,7 +393,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.txt"},
 			ignoreInvalidWatchPattern: false,
 			want:                      nil,
@@ -409,7 +409,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$,.*\\.txt$"`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.txt"},
 			ignoreInvalidWatchPattern: false,
 			want:                      &ArgoResource{Name: "test-app"},
@@ -425,7 +425,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: "[invalid"`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.yaml"},
 			ignoreInvalidWatchPattern: true,
 			want:                      &ArgoResource{Name: "test-app"},
@@ -441,7 +441,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: "[invalid"`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
 			want:                      nil,
@@ -457,7 +457,7 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ""`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
 			want:                      nil,
@@ -471,7 +471,7 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
 			want:                      nil,
@@ -484,7 +484,7 @@ kind: Application
 spec:
   destination:
     namespace: default`,
-			selectors:                 []types.Selector{},
+			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
 			want:                      nil,
@@ -500,8 +500,8 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "other", Operator: types.Ne},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "other", Operator: selector.Ne},
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
@@ -518,8 +518,8 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
-			selectors: []types.Selector{
-				{Key: "app", Value: "test", Operator: types.Ne},
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Ne},
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
