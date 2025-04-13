@@ -16,7 +16,8 @@ const (
 
 // RunCommand executes a command and returns its output
 func RunCommand(cmd string) (string, error) {
-	command := exec.Command("sh", "-c", cmd)
+	cmd_split := strings.Split(cmd, " ")
+	command := exec.Command(cmd_split[0], cmd_split[1:]...)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("command failed: %s: %w", string(output), err)

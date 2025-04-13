@@ -41,8 +41,7 @@ func (a *ArgoCDInstallation) createNamespace() error {
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
 	// Check if namespace exists
-	cmd := fmt.Sprintf("kubectl get namespace %s", a.Namespace)
-	if err := runCommand("sh", "-c", cmd); err == nil {
+	if err := runCommand("kubectl", "get", "namespace", a.Namespace); err == nil {
 		log.Debug().Msgf("Namespace %s already exists", a.Namespace)
 		return nil
 	}
@@ -313,10 +312,11 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 	secretName := "argocd-initial-admin-secret"
 	cmd := fmt.Sprintf("kubectl -n %s get secret %s -o jsonpath={.data.password}",
 		a.Namespace, secretName)
+	cmd_split := strings.Split(cmd, " ")
 
 	var password []byte
 	for retries := 0; retries < 5; retries++ {
-		output, err := exec.Command("sh", "-c", cmd).Output()
+		output, err := exec.Command(cmd_split[0], cmd_split[1:]...).Output()
 		if err == nil {
 			password = output
 			break

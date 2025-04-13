@@ -42,15 +42,16 @@ RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/
     install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
     rm argocd-linux-${TARGETARCH}
 
-# Option 1: Use Alpine as final base for smaller image
-FROM alpine:3.21 AS final
+FROM gcr.io/distroless/static-debian12 AS final
 
-COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
-
+# Copy necessary binaries from the build stage
 COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
 COPY --from=build /argocd-diff-preview/kubectl /usr/local/bin/kubectl
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
 COPY --from=build /argocd-diff-preview/argocd-diff-preview .
+
+# Copy docker from the docker image
+COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 
 # copy argocd helm chart values
 COPY ./argocd-config ./argocd-config
