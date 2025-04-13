@@ -145,30 +145,57 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 
 	log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("found %d generators in ApplicationSet: %s", len(generators.Content), a.Name)
 
+	parent := "spec"
+	if err := a.redirectGenerators(generators, repo, branch, redirectRevisions, parent, 0); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Helper functions
+func (a *ArgoResource) redirectGenerators(generators *yaml.Node, repo, branch string, redirectRevisions []string, parent string, level int) error {
 	// Process each generator
 	for index, generator := range generators.Content {
 		if generator.Kind != yaml.MappingNode {
 			continue
 		}
 
+		// A restriction of ArgoCD Matrix generators, only 2 child generators are allowed
+		if level > 0 && index > 1 {
+			return fmt.Errorf("only 2 child generators are allowed for matrix generator '%s' in ApplicationSet: %s", parent, a.Name)
+		}
+
+		// Look for matrix generator
+		matrixGen := yamlutil.GetYamlValue(generator, []string{"matrix"})
+		if matrixGen != nil {
+			matrixParent := fmt.Sprintf("%s.generators[%d].matrix", parent, index)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("'%s' key found in ApplicationSet: %s", matrixParent, a.Name)
+
+			if err := a.redirectMatrixGenerators(matrixGen, repo, branch, redirectRevisions, matrixParent, level+1); err != nil {
+				return err
+			}
+			continue
+		}
+
 		// Look for git generator
 		gitGen := yamlutil.GetYamlValue(generator, []string{"git"})
 		if gitGen == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git' key found in ApplicationSet: %s", index, a.Name)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators[%d].git' key found in ApplicationSet: %s", parent, index, a.Name)
 			continue
 		}
 
 		// Check repoURL
 		repoURL := yamlutil.GetYamlValue(gitGen, []string{"repoURL"})
 		if repoURL == nil || !containsIgnoreCase(repoURL.Value, repo) {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git.repoURL' key found in ApplicationSet: %s", index, a.Name)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators[%d].git.repoURL' key found in ApplicationSet: %s", parent, index, a.Name)
 			continue
 		}
 
 		// Check targetRevision
 		revision := yamlutil.GetYamlValue(gitGen, []string{"revision"})
 		if revision == nil {
-			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators[%d].git.revision' key found in ApplicationSet: %s", index, a.Name)
+			log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators[%d].git.revision' key found in ApplicationSet: %s", parent, index, a.Name)
 			continue
 		}
 
@@ -181,6 +208,27 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 				a.Name,
 			)
 		}
+	}
+
+	return nil
+}
+
+// Helper functions
+func (a *ArgoResource) redirectMatrixGenerators(matrix *yaml.Node, repo, branch string, redirectRevisions []string, parent string, level int) error {
+	// A restriction of ArgoCD Matrix gnenerators, only 2 levels of nested matrix generators are allowed
+	if level > 2 {
+		return fmt.Errorf("too many levels of nested matrix generators in ApplicationSet: %s", a.Name)
+	}
+
+	// Look for child generators
+	childGen := yamlutil.GetYamlValue(matrix, []string{"generators"})
+	if childGen == nil {
+		log.Debug().Str("patchType", "redirectMatrixGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no '%s.generators' key found in ApplicationSet: %s", parent, a.Name)
+		return nil
+	}
+
+	if err := a.redirectGenerators(childGen, repo, branch, redirectRevisions, parent, level); err != nil {
+		return err
 	}
 
 	return nil
