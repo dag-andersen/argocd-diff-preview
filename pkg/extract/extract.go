@@ -157,11 +157,11 @@ func extractResourcesFromCluster(
 						if containsAny(msg, errorMessages) {
 							failedApps[name] = msg
 						} else if containsAny(msg, timeoutMessages) {
-							log.Warn().Msgf("Application: %s timed out with error: %s", name, msg)
+							log.Warn().Msgf("⚠️ Application: %s timed out with error: %s", name, msg)
 							timedOutApps = append(timedOutApps, name)
 							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
 						} else {
-							log.Error().Msgf("Application: %s failed with error: %s", name, msg)
+							log.Error().Msgf("❌ Application: %s failed with error: %s", name, msg)
 							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
 						}
 					}

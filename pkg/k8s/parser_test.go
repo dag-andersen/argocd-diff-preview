@@ -13,7 +13,11 @@ func TestParser(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "test")
 	assert.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("Failed to remove temporary directory: %v", err)
+		}
+	}()
 
 	// Create test YAML files
 	testFiles := []struct {
@@ -86,7 +90,7 @@ spec:
 					FileName: "test.yaml",
 					Yaml: func() yaml.Node {
 						var node yaml.Node
-						yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+						err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: test-app
@@ -94,6 +98,7 @@ spec:
   destination:
     namespace: default
     server: https://kubernetes.default.svc`), &node)
+						assert.NoError(t, err)
 						return node
 					}(),
 				},

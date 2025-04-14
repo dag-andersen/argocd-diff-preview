@@ -77,7 +77,11 @@ func ParseYaml(dir string, files []string) []Resource {
 			log.Warn().Err(err).Msgf("⚠️ Failed to open file '%s'", file)
 			continue
 		}
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				log.Warn().Err(err).Msgf("⚠️ Failed to close file '%s'", file)
+			}
+		}()
 
 		// Read file line by line and split on "---"
 		var currentChunk strings.Builder

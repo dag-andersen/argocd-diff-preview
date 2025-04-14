@@ -355,7 +355,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		debug,
 	)
 	if err != nil {
-		log.Error().Msgf("Failed to generate base apps: %v", err)
+		log.Error().Msgf("❌ Failed to generate base apps: %v", err)
 	}
 
 	targetApps, err = ConvertAppSetsToApps(
@@ -368,7 +368,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		debug,
 	)
 	if err != nil {
-		log.Error().Msgf("Failed to generate target apps: %v", err)
+		log.Error().Msgf("❌ Failed to generate target apps: %v", err)
 	}
 
 	baseApps = UniqueNames(baseApps, baseBranch)
@@ -421,7 +421,11 @@ func ConvertAppSetsToApps(
 			continue
 		}
 		if !debug {
-			defer os.Remove(randomFileName)
+			defer func() {
+				if err := os.Remove(randomFileName); err != nil {
+					log.Warn().Err(err).Str("branch", branch.Name).Msg("⚠️ Failed to remove temporary file")
+				}
+			}()
 		}
 
 		// Generate applications using argocd appset generate

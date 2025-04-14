@@ -138,13 +138,21 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create temp dir for base repo: %w", err)
 	}
-	defer os.RemoveAll(baseRepoPath)
+	defer func() {
+		if err := os.RemoveAll(baseRepoPath); err != nil {
+			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary base repo path")
+		}
+	}()
 
 	targetRepoPath, err := os.MkdirTemp("", "target-repo-*")
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create temp dir for target repo: %w", err)
 	}
-	defer os.RemoveAll(targetRepoPath)
+	defer func() {
+		if err := os.RemoveAll(targetRepoPath); err != nil {
+			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary target repo path")
+		}
+	}()
 
 	// Initialize Git repositories
 	baseRepo, err := git.PlainInit(baseRepoPath, false)
@@ -381,7 +389,11 @@ func getBlobContent(blob *object.Blob) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Warn().Err(err).Msg("⚠️ Failed to close blob reader")
+		}
+	}()
 
 	buf := new(bytes.Buffer)
 	if _, err := buf.ReadFrom(reader); err != nil {
