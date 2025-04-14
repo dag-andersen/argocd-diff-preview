@@ -22,7 +22,7 @@ const markdownTemplate = `
 ## Argo CD Diff Preview
 
 Summary:
-` + "```diff" + `
+` + "```yaml" + `
 %summary%
 ` + "```" + `
 

@@ -1,7 +1,7 @@
 ## Argo CD Diff Preview
 
 Summary:
-```diff
+```yaml
 Total: 1 files changed
 
 Added (1):
