@@ -22,7 +22,7 @@ const markdownTemplate = `
 ## Argo CD Diff Preview
 
 Summary:
-` + "```diff" + `
+` + "```yaml" + `
 %summary%
 ` + "```" + `
 
@@ -267,7 +267,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 			// File added
 			addedCount++
 			addedFiles = append(addedFiles, path)
-			diffBuilder.WriteString(fmt.Sprintf("@ Application added: %s\n", path))
+			diffBuilder.WriteString(fmt.Sprintf("@@ Application added: %s @@\n", path))
 
 			if to != nil {
 				blob, err := targetRepo.BlobObject(to.Hash)
@@ -288,7 +288,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 			deletedCount++
 			deletedFiles = append(deletedFiles, path)
 
-			diffBuilder.WriteString(fmt.Sprintf("@ Application deleted: %s\n", path))
+			diffBuilder.WriteString(fmt.Sprintf("@@ Application deleted: %s @@\n", path))
 
 			if from != nil {
 				blob, err := baseRepo.BlobObject(from.Hash)
@@ -309,7 +309,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 			modifiedCount++
 			modifiedFiles = append(modifiedFiles, path)
 
-			diffBuilder.WriteString(fmt.Sprintf("@ Application modified: %s\n", path))
+			diffBuilder.WriteString(fmt.Sprintf("@@ Application modified: %s @@\n", path))
 
 			// Get content of both files and use the diff package
 			var oldContent, newContent string

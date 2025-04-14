@@ -1,7 +1,7 @@
 ## Argo CD Diff Preview
 
 Summary:
-```diff
+```yaml
 Total: 1 files changed
 
 Modified (1):
@@ -13,7 +13,7 @@ Modified (1):
 <br>
 
 ```diff
-@ Application modified: my-app
+@@ Application modified: my-app @@
  apiVersion: v1
  kind: Service
  metadata:
