@@ -13,7 +13,7 @@ Modified (1):
 <br>
 
 ```diff
-@ Application modified: my-app
+@@ Application modified: my-app @@
  apiVersion: v1
  kind: Service
  metadata:

@@ -13,7 +13,7 @@ Modified (1):
 <br>
 
 ```diff
-@ Application modified: nginx-ingress
+@@ Application modified: nginx-ingress @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx

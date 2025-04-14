@@ -13,7 +13,7 @@ Added (1):
 <br>
 
 ```diff
-@ Application added: folder3
+@@ Application added: folder3 @@
 +---
 +apiVersion: apps/v1
 +kind: Deployment

@@ -13,7 +13,7 @@ Modified (1):
 <br>
 
 ```diff
-@ Application modified: my-app-watch-pattern-valid-regex
+@@ Application modified: my-app-watch-pattern-valid-regex @@
  apiVersion: v1
  kind: Service
  metadata:
