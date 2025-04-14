@@ -72,18 +72,18 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 // RemoveSyncPolicy removes the syncPolicy from the resource
 func (a *ArgoResource) RemoveSyncPolicy() error {
 	if a.Yaml == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("Can't remove 'syncPolicy' because YAML is nil")
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because YAML is nil")
 		return nil
 	}
 
 	if a.Yaml.Content == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("Can't remove 'syncPolicy' because YAML content is nil")
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because YAML content is nil")
 		return nil
 	}
 
 	spec := yamlutil.GetYamlValue(a.Yaml, []string{"spec"})
 	if spec == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("Can't remove 'syncPolicy' because 'spec' key not found")
+		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because 'spec' key not found")
 		return nil
 	}
 

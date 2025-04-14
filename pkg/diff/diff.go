@@ -140,7 +140,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 	}
 	defer func() {
 		if err := os.RemoveAll(baseRepoPath); err != nil {
-			log.Warn().Err(err).Msg("Failed to remove temporary base repo path")
+			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary base repo path")
 		}
 	}()
 
@@ -150,7 +150,7 @@ func generateGitDiff(basePath, targetPath string, diffIgnore *string, diffContex
 	}
 	defer func() {
 		if err := os.RemoveAll(targetRepoPath); err != nil {
-			log.Warn().Err(err).Msg("Failed to remove temporary target repo path")
+			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary target repo path")
 		}
 	}()
 
@@ -391,7 +391,7 @@ func getBlobContent(blob *object.Blob) (string, error) {
 	}
 	defer func() {
 		if err := reader.Close(); err != nil {
-			log.Warn().Err(err).Msg("Failed to close blob reader")
+			log.Warn().Err(err).Msg("⚠️ Failed to close blob reader")
 		}
 	}()
 
