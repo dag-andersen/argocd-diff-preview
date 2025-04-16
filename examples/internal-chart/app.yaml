@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: internal-chart-example
+  name: my-super-app
   namespace: argocd
 spec:
   project: default
