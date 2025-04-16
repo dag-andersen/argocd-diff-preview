@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nginx-ingress-3
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  sources:
+    - chart: ingress-nginx
+      repoURL: "https://kubernetes.github.io/ingress-nginx"
+      targetRevision: 4.10.0
