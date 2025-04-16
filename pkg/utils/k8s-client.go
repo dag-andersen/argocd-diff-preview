@@ -57,13 +57,6 @@ func NewK8sClient() (*K8sClient, error) {
 func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
-	// application := &unstructured.Unstructured{
-	// 	Object: map[string]interface{}{
-	// 		"apiVersion": "argoproj.io/v1alpha1",
-	// 		"kind":       "Application",
-	// 	},
-	// }
-
 	result, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return "", err

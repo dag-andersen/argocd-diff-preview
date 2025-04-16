@@ -94,7 +94,13 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 		return false
 	}
 
-	patterns := strings.Split(watchPattern, ",")
+	patternList := strings.TrimSpace(watchPattern)
+	if patternList == "" {
+		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern value found. Skipping")
+		return false
+	}
+
+	patterns := strings.Split(patternList, ",")
 
 	for _, pattern := range patterns {
 		pattern = strings.TrimSpace(pattern)
