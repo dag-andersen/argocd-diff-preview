@@ -22,7 +22,7 @@ func TestFromK8sResource(t *testing.T) {
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: test-app
@@ -30,6 +30,9 @@ metadata:
 spec:
   destination:
     namespace: default`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
+					}
 					return obj
 				}(),
 			},
@@ -46,7 +49,7 @@ spec:
 				FileName: "test-set.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: test-set
@@ -55,6 +58,9 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/org/repo.git`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
+					}
 					return obj
 				}(),
 			},
@@ -71,10 +77,13 @@ spec:
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: InvalidKind
 metadata:
   name: test-app`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
+					}
 					return obj
 				}(),
 			},
@@ -87,11 +96,14 @@ metadata:
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 spec:
   destination:
     namespace: default`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
+					}
 					return obj
 				}(),
 			},
@@ -104,13 +116,16 @@ spec:
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
-					yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   namespace: default
 spec:
   destination:
     namespace: default`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
+					}
 					return obj
 				}(),
 			},

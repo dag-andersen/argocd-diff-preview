@@ -47,13 +47,17 @@ func (a *ArgoResource) SetProjectToDefault() error {
 			log.Debug().Msgf("no 'spec.project' key found in Application: %s (file: %s)",
 				a.Name, a.FileName)
 		}
-		unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "project")
+		if err := unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "project"); err != nil {
+			return fmt.Errorf("failed to set spec.project field: %w", err)
+		}
 	case ApplicationSet:
 		if _, found, _ := unstructured.NestedString(a.Yaml.Object, "spec", "template", "spec", "project"); !found {
 			log.Debug().Msgf("no 'spec.template.spec.project' key found in ApplicationSet: %s (file: %s)",
 				a.Name, a.FileName)
 		}
-		unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "template", "spec", "project")
+		if err := unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "template", "spec", "project"); err != nil {
+			return fmt.Errorf("failed to set spec.template.spec.project field: %w", err)
+		}
 	}
 
 	return nil
@@ -89,7 +93,9 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	delete(destMap, "server")
 
 	// Set it back
-	unstructured.SetNestedMap(a.Yaml.Object, destMap, destPath...)
+	if err := unstructured.SetNestedMap(a.Yaml.Object, destMap, destPath...); err != nil {
+		return fmt.Errorf("failed to set destination field: %w", err)
+	}
 
 	return nil
 }
@@ -122,7 +128,9 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 	delete(specMap, "syncPolicy")
 
 	// Set it back
-	unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...)
+	if err := unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...); err != nil {
+		return fmt.Errorf("failed to set %s map: %w", strings.Join(specPath, "."), err)
+	}
 
 	return nil
 }
@@ -172,7 +180,9 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 	}
 
 	// Set updated spec back
-	unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...)
+	if err := unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...); err != nil {
+		return fmt.Errorf("failed to set %s map: %w", strings.Join(specPath, "."), err)
+	}
 
 	return nil
 }
