@@ -9,7 +9,7 @@ Modified (1):
 ```
 
 <details>
-<summary>Diff:</summary>
+<summary>my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
 ```diff

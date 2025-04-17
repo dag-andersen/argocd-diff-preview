@@ -9,7 +9,7 @@ Modified (1):
 ```
 
 <details>
-<summary>Diff:</summary>
+<summary>my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
 ```diff

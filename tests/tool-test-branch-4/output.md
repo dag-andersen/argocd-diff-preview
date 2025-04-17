@@ -9,7 +9,7 @@ Added (1):
 ```
 
 <details>
-<summary>Diff:</summary>
+<summary>folder3 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
 ```diff
