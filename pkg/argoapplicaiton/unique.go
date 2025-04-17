@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
 )
 
@@ -44,7 +43,7 @@ func UniqueNames(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 				newApp.Name = newName
 
 				// Update the name in the YAML
-				yamlutil.SetYamlValue(newApp.Yaml, []string{"metadata", "name"}, newName)
+				newApp.Yaml.SetName(newName)
 				log.Debug().Str("branch", branch.Name).Msgf("updated name in yaml: %s", newName)
 
 				newApps = append(newApps, newApp)

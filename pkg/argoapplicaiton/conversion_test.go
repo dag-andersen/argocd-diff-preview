@@ -5,7 +5,8 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func TestFromK8sResource(t *testing.T) {
@@ -19,19 +20,20 @@ func TestFromK8sResource(t *testing.T) {
 			name: "valid application",
 			resource: &k8s.Resource{
 				FileName: "test.yaml",
-				Yaml: func() yaml.Node {
-					var node yaml.Node
-					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+				Yaml: func() unstructured.Unstructured {
+					var obj unstructured.Unstructured
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: test-app
   namespace: default
 spec:
   destination:
-    namespace: default`), &node); err != nil {
-						t.Fatalf("failed to unmarshal yaml: %v", err)
+    namespace: default`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
 					}
-					return node
+					return obj
 				}(),
 			},
 			want: &ArgoResource{
@@ -45,9 +47,9 @@ spec:
 			name: "valid application set",
 			resource: &k8s.Resource{
 				FileName: "test-set.yaml",
-				Yaml: func() yaml.Node {
-					var node yaml.Node
-					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+				Yaml: func() unstructured.Unstructured {
+					var obj unstructured.Unstructured
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: test-set
@@ -55,10 +57,11 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: https://github.com/org/repo.git`), &node); err != nil {
-						t.Fatalf("failed to unmarshal yaml: %v", err)
+        repoURL: https://github.com/org/repo.git`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
 					}
-					return node
+					return obj
 				}(),
 			},
 			want: &ArgoResource{
@@ -72,15 +75,16 @@ spec:
 			name: "invalid kind",
 			resource: &k8s.Resource{
 				FileName: "test.yaml",
-				Yaml: func() yaml.Node {
-					var node yaml.Node
-					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+				Yaml: func() unstructured.Unstructured {
+					var obj unstructured.Unstructured
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: InvalidKind
 metadata:
-  name: test-app`), &node); err != nil {
-						t.Fatalf("failed to unmarshal yaml: %v", err)
+  name: test-app`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
 					}
-					return node
+					return obj
 				}(),
 			},
 			want:    nil,
@@ -90,16 +94,17 @@ metadata:
 			name: "missing metadata",
 			resource: &k8s.Resource{
 				FileName: "test.yaml",
-				Yaml: func() yaml.Node {
-					var node yaml.Node
-					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+				Yaml: func() unstructured.Unstructured {
+					var obj unstructured.Unstructured
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 spec:
   destination:
-    namespace: default`), &node); err != nil {
-						t.Fatalf("failed to unmarshal yaml: %v", err)
+    namespace: default`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
 					}
-					return node
+					return obj
 				}(),
 			},
 			want:    nil,
@@ -109,18 +114,19 @@ spec:
 			name: "missing name",
 			resource: &k8s.Resource{
 				FileName: "test.yaml",
-				Yaml: func() yaml.Node {
-					var node yaml.Node
-					if err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
+				Yaml: func() unstructured.Unstructured {
+					var obj unstructured.Unstructured
+					err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   namespace: default
 spec:
   destination:
-    namespace: default`), &node); err != nil {
-						t.Fatalf("failed to unmarshal yaml: %v", err)
+    namespace: default`), &obj)
+					if err != nil {
+						t.Fatalf("Failed to unmarshal YAML: %v", err)
 					}
-					return node
+					return obj
 				}(),
 			},
 			want:    nil,
@@ -130,7 +136,7 @@ spec:
 			name: "nil yaml",
 			resource: &k8s.Resource{
 				FileName: "test.yaml",
-				Yaml:     yaml.Node{},
+				Yaml:     unstructured.Unstructured{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -154,15 +160,8 @@ spec:
 			// Verify YAML structure
 			assert.NotNil(t, got.Yaml)
 
-			// Get the root node - either the first document or the root itself
-			rootNode := &tt.resource.Yaml
-			if len(tt.resource.Yaml.Content) > 0 {
-				rootNode = tt.resource.Yaml.Content[0]
-			}
-
-			// Verify the YAML content matches
-			assert.Equal(t, rootNode.Content[0].Value, got.Yaml.Content[0].Value) // apiVersion
-			assert.Equal(t, rootNode.Content[1].Value, got.Yaml.Content[1].Value) // kind
+			// Verify the yaml is equal
+			assert.True(t, yamlEqual(&tt.resource.Yaml, got.Yaml))
 		})
 	}
 }

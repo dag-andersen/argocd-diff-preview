@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
-	yamlutil "github.com/dag-andersen/argocd-diff-preview/pkg/yaml"
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -40,23 +40,25 @@ func (a *ArgoResource) Filter(
 
 // filterBySelectors checks if the application matches the given selectors
 func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) bool {
-	metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
-	if metadata == nil {
+	// Early return if no YAML
+	if a.Yaml == nil {
 		return false
 	}
 
-	labels := yamlutil.GetYamlValue(metadata, []string{"labels"})
-	if labels == nil {
+	// Get all labels directly from unstructured
+	labels, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "labels")
+	if err != nil || !found || len(labels) == 0 {
 		return false
 	}
 
+	// Check each selector against the labels
 	for _, s := range selectors {
-		labelValue := yamlutil.GetYamlValue(labels, []string{s.Key})
-		if labelValue == nil {
+		labelValue, exists := labels[s.Key]
+		if !exists {
 			return false
 		}
 
-		matches := labelValue.Value == s.Value
+		matches := labelValue == s.Value
 		if (s.Operator == selector.Eq && !matches) || (s.Operator == selector.Ne && matches) {
 			return false
 		}
@@ -67,7 +69,6 @@ func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) bool {
 
 // filterByFilesChanged checks if the application watches any of the changed files
 func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalidWatchPattern bool) bool {
-
 	if len(filesChanged) == 0 {
 		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no files changed. Skipping")
 		return false
@@ -81,23 +82,19 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 
 	log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("checking files changed: %v", filesChanged)
 
-	metadata := yamlutil.GetYamlValue(a.Yaml, []string{"metadata"})
-	if metadata == nil {
+	// Get annotations directly from unstructured
+	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
+	if err != nil || !found || len(annotations) == 0 {
 		return false
 	}
 
-	annotations := yamlutil.GetYamlValue(metadata, []string{"annotations"})
-	if annotations == nil {
-		return false
-	}
-
-	watchPattern := yamlutil.GetYamlValue(annotations, []string{AnnotationWatchPattern})
-	if watchPattern == nil {
+	watchPattern, exists := annotations[AnnotationWatchPattern]
+	if !exists || strings.TrimSpace(watchPattern) == "" {
 		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern annotation found. Skipping")
 		return false
 	}
 
-	patternList := strings.TrimSpace(watchPattern.Value)
+	patternList := strings.TrimSpace(watchPattern)
 	if patternList == "" {
 		log.Debug().Str("patchType", "filter").Str("file", a.FileName).Msgf("no watch pattern value found. Skipping")
 		return false

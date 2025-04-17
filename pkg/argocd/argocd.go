@@ -1,7 +1,6 @@
 package argocd
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,49 +20,38 @@ import (
 )
 
 type ArgoCDInstallation struct {
+	K8sClient  *utils.K8sClient
 	Namespace  string
 	Version    string
 	ConfigPath string
 }
 
-func New(namespace string, version string, configPath string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, configPath string) *ArgoCDInstallation {
 	if configPath == "" {
 		configPath = "argocd-config"
 	}
 	return &ArgoCDInstallation{
+		K8sClient:  client,
 		Namespace:  namespace,
 		Version:    version,
 		ConfigPath: configPath,
 	}
 }
 
-func (a *ArgoCDInstallation) createNamespace() error {
+func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
+
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
 	// Check if namespace exists
-	if err := runCommand("kubectl", "get", "namespace", a.Namespace); err == nil {
-		log.Debug().Msgf("Namespace %s already exists", a.Namespace)
-		return nil
-	}
-
-	// Create namespace
-	if err := runCommand("kubectl", "create", "namespace", a.Namespace); err != nil {
+	if err := a.K8sClient.CreateNamespace(a.Namespace); err != nil {
 		log.Error().Msgf("❌ Failed to create namespace %s", a.Namespace)
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
 	log.Debug().Msgf("Created namespace: %s", a.Namespace)
-	return nil
-}
-
-func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
-	// Create namespace if it doesn't exist
-	if err := a.createNamespace(); err != nil {
-		return err
-	}
 
 	// Apply secrets before installing ArgoCD
-	if err := utils.ApplySecretsFromFolder(secretsFolder, a.Namespace); err != nil {
+	if err := ApplySecretsFromFolder(a.K8sClient, secretsFolder, a.Namespace); err != nil {
 		return fmt.Errorf("failed to apply secrets: %w", err)
 	}
 
@@ -72,15 +60,6 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 		return err
 	}
 
-	// Wait for argocd-server to be ready
-	log.Info().Msgf("🦑 Waiting for Argo CD to start...")
-	if err := runCommand("kubectl", "wait", "--for=condition=available",
-		"deployment/argocd-server", "-n", a.Namespace, "--timeout=300s"); err != nil {
-		log.Error().Msgf("❌ Failed to wait for argocd-server")
-		return fmt.Errorf("failed to wait for argocd-server: %w", err)
-	}
-	log.Info().Msg("🦑 Argo CD is now available")
-
 	// Login to ArgoCD
 	if err := a.login(); err != nil {
 		return fmt.Errorf("failed to login: %w", err)
@@ -88,13 +67,12 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 	if debug {
 		// Get ConfigMaps
-		cmd := fmt.Sprintf("kubectl get configmap -n %s -o yaml argocd-cmd-params-cm argocd-cm", a.Namespace)
-		output, err := utils.RunCommand(cmd)
+		configMaps, err := a.K8sClient.GetConfigMaps(a.Namespace, "argocd-cmd-params-cm", "argocd-cm")
 		if err != nil {
 			log.Error().Err(err).Msg("❌ Failed to get ConfigMaps")
 			return fmt.Errorf("failed to get ConfigMaps: %w", err)
 		}
-		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", output)
+		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", configMaps)
 	}
 
 	// Add extra permissions to the default AppProject
@@ -191,21 +169,24 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to initialize helm configuration: %w", err)
 	}
 
+	timeout := 300 * time.Second
+
 	// Create the install action
-	client := action.NewInstall(actionConfig)
-	client.Namespace = a.Namespace
-	client.ReleaseName = "argocd"
-	client.CreateNamespace = false // We already created the namespace
-	client.Wait = true
-	client.Timeout = 300 * time.Second
+	helmClient := action.NewInstall(actionConfig)
+	helmClient.Namespace = a.Namespace
+	helmClient.ReleaseName = "argocd"
+	helmClient.CreateNamespace = false // We already created the namespace
+	helmClient.Wait = false
+	helmClient.WaitForJobs = false
+	helmClient.Timeout = timeout
 
 	if chartVersion != "" {
-		client.Version = chartVersion
+		helmClient.Version = chartVersion
 	}
 
 	// Locate chart
 	chartName := fmt.Sprintf("%s/argo-cd", repoName)
-	chartPath, err := client.LocateChart(chartName, settings)
+	chartPath, err := helmClient.LocateChart(chartName, settings)
 	if err != nil {
 		return fmt.Errorf("failed to locate chart: %w", err)
 	}
@@ -225,10 +206,19 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 
-	// Install chart
-	_, err = client.Run(chart, chartValues)
-	if err != nil {
-		return fmt.Errorf("failed to install chart: %w", err)
+	log.Debug().Msgf("Installing Argo CD Helm Chart with timeout: %s", timeout)
+
+	// Install chart in go routine
+	go func() {
+		_, err = helmClient.Run(chart, chartValues)
+		if err != nil {
+			log.Error().Msgf("❌ Failed to install chart")
+		}
+	}()
+
+	// Wait for deployment to be ready
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-server", int(timeout.Seconds())); err != nil {
+		return fmt.Errorf("failed to wait for argocd-server to be ready: %w", err)
 	}
 
 	// Log installed versions
@@ -311,41 +301,14 @@ func (a *ArgoCDInstallation) login() error {
 }
 
 func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
-	secretName := "argocd-initial-admin-secret"
-	cmd := fmt.Sprintf("kubectl -n %s get secret %s -o jsonpath={.data.password}",
-		a.Namespace, secretName)
-	cmd_split := strings.Split(cmd, " ")
 
-	var password []byte
-	for retries := 0; retries < 5; retries++ {
-		output, err := exec.Command(cmd_split[0], cmd_split[1:]...).Output()
-		if err == nil {
-			password = output
-			break
-		}
-		if retries == 4 {
-			return "", fmt.Errorf("failed to get secret %s: %w", secretName, err)
-		}
-		log.Info().Msgf("⏳ Retrying to get secret %s", secretName)
-		time.Sleep(2 * time.Second)
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(string(password))
+	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
 	if err != nil {
-		return "", fmt.Errorf("failed to decode password: %w", err)
+		log.Error().Msgf("❌ Failed to get secret %s", err)
+		return "", fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	return string(decoded), nil
-}
-
-func runCommand(name string, args ...string) error {
-	log.Debug().Msgf("Running command: %s %s", name, strings.Join(args, " "))
-	cmd := exec.Command(name, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("command failed: %s: %w", string(output), err)
-	}
-	return nil
+	return secret, nil
 }
 
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output

@@ -101,8 +101,15 @@ func run(opts *Options) error {
 		}
 	}()
 
+	// create k8s client
+	k8sClient, err := utils.NewK8sClient()
+	if err != nil {
+		log.Error().Msgf("❌ Failed to create k8s client")
+		return err
+	}
+
 	// Install Argo CD
-	argocd := argocd.New(opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
+	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
 	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
 		log.Error().Msgf("❌ Failed to install Argo CD")
 		return err

@@ -6,11 +6,10 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"sigs.k8s.io/yaml"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
-	"gopkg.in/yaml.v3"
 )
 
 // Error and timeout messages that we look for in application status
@@ -49,30 +48,39 @@ func GetResourcesFromBothBranches(
 	baseManifest string,
 	targetManifest string,
 ) (map[string]string, map[string]string, error) {
+
 	// Apply base manifest directly from string with kubectl
-	if err := utils.KubectlApplyFromString(baseManifest); err != nil {
+	if err := argocd.K8sClient.ApplyManifestFromString(baseManifest, argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply base apps: %w", err)
 	}
+
+	log.Debug().Str("branch", baseBranch.Name).Msg("Applied manifest")
 
 	baseManifests, err := extractResourcesFromCluster(argocd, baseBranch, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
 
+	log.Debug().Str("branch", baseBranch.Name).Msg("Extracted manifests")
+
 	// delete applications
-	if err := utils.DeleteApplications(); err != nil {
+	if err := argocd.K8sClient.DeleteArgoCDApplications(argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to delete applications: %w", err)
 	}
 
 	// apply target manifest
-	if err := utils.KubectlApplyFromString(targetManifest); err != nil {
+	if err := argocd.K8sClient.ApplyManifestFromString(targetManifest, argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply target apps: %w", err)
 	}
+
+	log.Debug().Str("branch", targetBranch.Name).Msg("Applied manifest")
 
 	targetManifests, err := extractResourcesFromCluster(argocd, targetBranch, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
+
+	log.Debug().Str("branch", targetBranch.Name).Msg("Extracted manifests")
 
 	return baseManifests, targetManifests, nil
 }
@@ -111,8 +119,7 @@ func extractResourcesFromCluster(
 			} `yaml:"items"`
 		}
 
-		cmd := "kubectl get applications -A -oyaml"
-		output, err := utils.RunCommand(cmd)
+		output, err := argocd.K8sClient.GetArgoCDApplications(argocd.Namespace)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get applications: %v", err)
 		}

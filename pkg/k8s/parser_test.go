@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func TestParser(t *testing.T) {
@@ -88,8 +89,8 @@ spec:
 			want: []Resource{
 				{
 					FileName: "test.yaml",
-					Yaml: func() yaml.Node {
-						var node yaml.Node
+					Yaml: func() unstructured.Unstructured {
+						var y unstructured.Unstructured
 						err := yaml.Unmarshal([]byte(`apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -97,9 +98,9 @@ metadata:
 spec:
   destination:
     namespace: default
-    server: https://kubernetes.default.svc`), &node)
+    server: https://kubernetes.default.svc`), &y)
 						assert.NoError(t, err)
-						return node
+						return y
 					}(),
 				},
 			},

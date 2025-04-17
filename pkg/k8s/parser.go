@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // GetYamlFiles gets all YAML files in a directory
@@ -111,11 +112,36 @@ func ParseYaml(dir string, files []string) []Resource {
 	return resources
 }
 
+// processYamlChunk parses a YAML chunk into an unstructured.Unstructured
+// A chunk is a single YAML object, e.g. a Deployment, Service, etc.
 func processYamlChunk(filename, chunk string, resources *[]Resource) {
-	var yamlData yaml.Node
-	err := yaml.Unmarshal([]byte(chunk), &yamlData)
+	// Skip empty chunks or chunks with only whitespace
+	if strings.TrimSpace(chunk) == "" {
+		return
+	}
+
+	// Create a new map to hold the parsed YAML
+	var yamlObj map[string]interface{}
+	err := yaml.Unmarshal([]byte(chunk), &yamlObj)
 	if err != nil {
 		log.Debug().Err(err).Msgf("⚠️ Failed to parse YAML in file '%s'", filename)
+		return
+	}
+
+	// Skip empty objects
+	if len(yamlObj) == 0 {
+		return
+	}
+
+	// Convert the map to an unstructured.Unstructured
+	yamlData := unstructured.Unstructured{Object: yamlObj}
+
+	// Check if this is a valid Kubernetes resource
+	apiVersion, found, _ := unstructured.NestedString(yamlObj, "apiVersion")
+	kind, kindFound, _ := unstructured.NestedString(yamlObj, "kind")
+
+	if !found || !kindFound || apiVersion == "" || kind == "" {
+		log.Debug().Msgf("⚠️ Skipping invalid Kubernetes resource in file '%s' (missing apiVersion or kind)", filename)
 		return
 	}
 
