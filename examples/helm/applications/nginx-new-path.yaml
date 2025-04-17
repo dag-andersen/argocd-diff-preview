@@ -15,4 +15,4 @@ spec:
       helm:
         valuesObject:
           controller:
-            ingressClass: "test"
+            ingressClass: "new-test"
