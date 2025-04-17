@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/annotations"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
@@ -334,6 +335,24 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 	}
 
 	return nil
+}
+
+func (a *ArgoResource) SetSourcePath(sourcePath string) {
+	annotationMap := a.Yaml.GetAnnotations()
+	if annotationMap == nil {
+		annotationMap = make(map[string]string)
+	}
+	annotationMap[annotations.SourcePathKey] = sourcePath
+	a.Yaml.SetAnnotations(annotationMap)
+}
+
+func (a *ArgoResource) SetOriginalApplicationName(originalApplicationName string) {
+	annotationMap := a.Yaml.GetAnnotations()
+	if annotationMap == nil {
+		annotationMap = make(map[string]string)
+	}
+	annotationMap[annotations.OriginalApplicationNameKey] = originalApplicationName
+	a.Yaml.SetAnnotations(annotationMap)
 }
 
 func containsIgnoreCase(s, substr string) bool {
