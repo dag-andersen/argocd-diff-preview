@@ -106,7 +106,7 @@ func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
 		"post-delete-finalizer.argoproj.io/cleanup",
 	}
 
-	log.Info().Msg("🧹 Removing obstructive finalizers from applications")
+	log.Debug().Msg("Removing obstructive finalizers from applications")
 
 	// Get ArgoCD applications
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
@@ -142,6 +142,8 @@ func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
 			continue
 		}
 
+		log.Info().Msgf("🧹 Removing obstructive finalizers from application %s", appName)
+
 		app.SetFinalizers(nil)
 		_, err := c.clientset.Resource(applicationRes).Namespace(namespace).Update(
 			context.Background(),
@@ -156,7 +158,7 @@ func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
 		}
 	}
 
-	log.Info().Msg("🧹 Finished removing finalizers")
+	log.Debug().Msg("Finished removing finalizers")
 	return nil
 }
 

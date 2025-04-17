@@ -49,6 +49,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	}
 
 	log.Debug().Msgf("Created namespace: %s", a.Namespace)
+
 	// Apply secrets before installing ArgoCD
 	if err := ApplySecretsFromFolder(a.K8sClient, secretsFolder, a.Namespace); err != nil {
 		return fmt.Errorf("failed to apply secrets: %w", err)
@@ -169,20 +170,20 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}
 
 	// Create the install action
-	client := action.NewInstall(actionConfig)
-	client.Namespace = a.Namespace
-	client.ReleaseName = "argocd"
-	client.CreateNamespace = false // We already created the namespace
-	client.Wait = true
-	client.Timeout = 300 * time.Second
+	helmClient := action.NewInstall(actionConfig)
+	helmClient.Namespace = a.Namespace
+	helmClient.ReleaseName = "argocd"
+	helmClient.CreateNamespace = false // We already created the namespace
+	helmClient.Wait = true
+	helmClient.Timeout = 300 * time.Second
 
 	if chartVersion != "" {
-		client.Version = chartVersion
+		helmClient.Version = chartVersion
 	}
 
 	// Locate chart
 	chartName := fmt.Sprintf("%s/argo-cd", repoName)
-	chartPath, err := client.LocateChart(chartName, settings)
+	chartPath, err := helmClient.LocateChart(chartName, settings)
 	if err != nil {
 		return fmt.Errorf("failed to locate chart: %w", err)
 	}
@@ -203,7 +204,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}
 
 	// Install chart
-	_, err = client.Run(chart, chartValues)
+	_, err = helmClient.Run(chart, chartValues)
 	if err != nil {
 		return fmt.Errorf("failed to install chart: %w", err)
 	}

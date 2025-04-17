@@ -210,8 +210,9 @@ func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, br
 	// Get or set targetRevision
 	targetRev, ok := source["targetRevision"].(string)
 	if !ok {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'targetRevision' under source")
-		targetRev = "HEAD"
+		defaultTargetRev := "HEAD"
+		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Found no 'targetRevision' under source. Defaulting to '%s'", defaultTargetRev)
+		targetRev = defaultTargetRev
 		source["targetRevision"] = targetRev
 	}
 
