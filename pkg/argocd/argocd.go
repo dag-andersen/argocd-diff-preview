@@ -169,13 +169,16 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to initialize helm configuration: %w", err)
 	}
 
+	timeout := 300 * time.Second
+
 	// Create the install action
 	helmClient := action.NewInstall(actionConfig)
 	helmClient.Namespace = a.Namespace
 	helmClient.ReleaseName = "argocd"
 	helmClient.CreateNamespace = false // We already created the namespace
-	helmClient.Wait = true
-	helmClient.Timeout = 300 * time.Second
+	helmClient.Wait = false
+	helmClient.WaitForJobs = false
+	helmClient.Timeout = timeout
 
 	if chartVersion != "" {
 		helmClient.Version = chartVersion
@@ -203,10 +206,19 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 
-	// Install chart
-	_, err = helmClient.Run(chart, chartValues)
-	if err != nil {
-		return fmt.Errorf("failed to install chart: %w", err)
+	log.Debug().Msgf("Installing Argo CD Helm Chart with timeout: %s", timeout)
+
+	// Install chart in go routine
+	go func() {
+		_, err = helmClient.Run(chart, chartValues)
+		if err != nil {
+			log.Error().Msgf("❌ Failed to install chart")
+		}
+	}()
+
+	// Wait for deployment to be ready
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-server", int(timeout.Seconds())); err != nil {
+		return fmt.Errorf("failed to wait for argocd-server to be ready: %w", err)
 	}
 
 	// Log installed versions

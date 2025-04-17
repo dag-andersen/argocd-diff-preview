@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -342,4 +343,121 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 	}
 
 	return string(decoded), nil
+}
+
+// WaitForDeploymentReady waits for a deployment to be available
+// Equivalent to: kubectl wait --for=condition=available deployment/name
+func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSeconds int) error {
+	log.Info().Msgf("Waiting for deployment %s in namespace %s to be ready", name, namespace)
+
+	// Define the Deployment resource
+	deploymentRes := schema.GroupVersionResource{
+		Group:    "apps",
+		Version:  "v1",
+		Resource: "deployments",
+	}
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	// Poll until ready or timeout
+	pollInterval := 1 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for deployment %s to be ready", name)
+		default:
+			// Get the current deployment state
+			deployment, err := c.clientset.Resource(deploymentRes).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					log.Debug().Msgf("Deployment %s not found, waiting...", name)
+					time.Sleep(pollInterval)
+					continue
+				}
+				return fmt.Errorf("failed to get deployment %s: %w", name, err)
+			}
+
+			// Check if status field exists
+			_, found, err := unstructured.NestedMap(deployment.Object, "status")
+			if err != nil || !found {
+				log.Debug().Msgf("Status field not found in deployment %s, waiting...", name)
+				time.Sleep(pollInterval)
+				continue
+			}
+
+			// Check if deployment is available
+			readyReplicas, found, err := unstructured.NestedInt64(deployment.Object, "status", "readyReplicas")
+			if err != nil || !found {
+				log.Debug().Msgf("readyReplicas field not found in deployment %s status, waiting...", name)
+				time.Sleep(pollInterval)
+				continue
+			}
+
+			desiredReplicas, found, err := unstructured.NestedInt64(deployment.Object, "spec", "replicas")
+			if err != nil || !found {
+				desiredReplicas = 1 // Default to 1 if not specified
+				log.Debug().Msgf("replicas field not found in deployment %s spec, assuming default of 1", name)
+			}
+
+			// Get available replicas
+			availableReplicas, found, err := unstructured.NestedInt64(deployment.Object, "status", "availableReplicas")
+			if err != nil || !found {
+				availableReplicas = 0
+				log.Debug().Msgf("availableReplicas field not found in deployment %s status, assuming 0", name)
+			}
+
+			// Get updated replicas
+			updatedReplicas, found, err := unstructured.NestedInt64(deployment.Object, "status", "updatedReplicas")
+			if err != nil || !found {
+				updatedReplicas = 0
+				log.Debug().Msgf("updatedReplicas field not found in deployment %s status, assuming 0", name)
+			}
+
+			// Log current status
+			log.Debug().Msgf("Deployment %s status: %d/%d replicas ready, %d available, %d updated",
+				name, readyReplicas, desiredReplicas, availableReplicas, updatedReplicas)
+
+			// Check if deployment is ready
+			if readyReplicas == desiredReplicas && availableReplicas == desiredReplicas {
+				conditions, found, err := unstructured.NestedSlice(deployment.Object, "status", "conditions")
+				if err != nil || !found {
+					log.Debug().Msgf("No conditions found in deployment %s status, continuing to wait...", name)
+					time.Sleep(pollInterval)
+					continue
+				}
+
+				// Check for Available condition
+				isAvailable := false
+				for _, conditionUnstructured := range conditions {
+					condition, ok := conditionUnstructured.(map[string]interface{})
+					if !ok {
+						continue
+					}
+
+					conditionType, ok := condition["type"].(string)
+					if !ok {
+						continue
+					}
+
+					if conditionType == "Available" {
+						status, ok := condition["status"].(string)
+						if ok && status == "True" {
+							isAvailable = true
+							break
+						}
+					}
+				}
+
+				if isAvailable {
+					log.Debug().Msgf("Deployment %s is ready and available", name)
+					return nil
+				}
+			}
+
+			// Sleep before next poll
+			time.Sleep(pollInterval)
+		}
+	}
 }
