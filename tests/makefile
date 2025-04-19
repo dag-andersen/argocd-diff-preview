@@ -33,6 +33,7 @@ run-single-test-go: clean pull-base pull-target
 		--line-count="$(line_count)" \
 		--timeout=$(timeout) \
 		--kind-options="$(kind_options)" 
+	mkdir -p ./$(target_branch)$(suffix)/
 	diff ./output/diff.md ./$(target_branch)$(suffix)/output.md
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
@@ -60,21 +61,23 @@ run-single-test-docker: clean pull-base pull-target
 		-e TIMEOUT="$(timeout)" \
 		-e KIND_OPTIONS="$(kind_options)" \
 		argocd-diff-preview
+	mkdir -p ./$(target_branch)$(suffix)/
 	diff ./output/diff.md ./$(target_branch)$(suffix)/output.md
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 run-test-all-with-%:
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-1 base_branch=tool-test-branch-1-og diff_ignore="image" line_count=3 kind_options="--name tests"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-2 base_branch=tool-test-branch-2-og kind_options="--config=./kind-config/options.yaml"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-3 base_branch=tool-test-branch-3-og kind_options="--config ./kind-config/options.yaml"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-4 base_branch=tool-test-branch-4-og
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="examples/helm/values/filtered.yaml" suffix="-1"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml" suffix="-2"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og files_changed="something/else.yaml" suffix="-3"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=my-team" suffix="-4"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og selector="team=other-team" suffix="-5"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex=".*labels\.yaml" suffix="-6"
-	$(MAKE) run-single-test-$* target_branch=tool-test-branch-5 base_branch=tool-test-branch-5-og file_regex="this-does-not-exist\.yaml" suffix="-7"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" line_count=3 kind_options="--name tests"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base kind_options="--config=./kind-config/options.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base kind_options="--config ./kind-config/options.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="examples/helm/values/filtered.yaml" suffix="-1"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml" suffix="-2"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="something/else.yaml" suffix="-3"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base selector="team=my-team" suffix="-4"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base selector="team=other-team" suffix="-5"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base file_regex=".*labels\.yaml" suffix="-6"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base file_regex="this-does-not-exist\.yaml" suffix="-7"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target base_branch=integration-test/branch-6/base
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker
