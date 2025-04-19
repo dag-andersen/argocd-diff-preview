@@ -16,4 +16,4 @@ spec:
         - name: myapp
           image: dag-andersen/myapp:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 80

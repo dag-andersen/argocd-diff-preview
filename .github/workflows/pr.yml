@@ -3,7 +3,7 @@ name: PR build
 on:
   pull_request:
     branches:
-      - "temp-disable-pr-build"
+      - "main"
     paths:
       - "cmd/**"
       - "pkg/**"

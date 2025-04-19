@@ -27,8 +27,6 @@ jobs:
 
       - name: Generate Diff
         run: |
-          cd pull-request && docker build -t test-image .
-          cd ..
           docker run \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
@@ -37,7 +35,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            test-image
+            dagandersen/argocd-diff-preview:v0.1.3
 
       - name: Post diff as comment
         run: |
