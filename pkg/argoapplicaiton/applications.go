@@ -263,8 +263,6 @@ func PatchApplication(
 	// Chain the modifications
 	app := &application
 	err := app.SetNamespace(argocdNamespace)
-	app.SetSourcePath(app.FileName)
-	app.SetOriginalApplicationName(appName)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", appName)
 		return nil, fmt.Errorf("failed to set namespace: %w", err)
