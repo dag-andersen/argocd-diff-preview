@@ -9,7 +9,7 @@ Modified (1):
 ```
 
 <details>
-<summary>Diff:</summary>
+<summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
 ```diff

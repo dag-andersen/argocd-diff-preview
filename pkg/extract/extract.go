@@ -8,8 +8,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"sigs.k8s.io/yaml"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/annotations"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
 // Error and timeout messages that we look for in application status
@@ -38,6 +40,13 @@ var timeoutMessages = []string{
 	"=git-upload-pack",
 }
 
+// contains a app name, source path, and extracted manifest
+type ExtractedApp struct {
+	Name       string
+	SourcePath string
+	Manifest   string
+}
+
 // GetResourcesFromBothBranches extracts resources from both base and target branches
 // by applying their manifests to the cluster and capturing the resulting resources
 func GetResourcesFromBothBranches(
@@ -47,8 +56,7 @@ func GetResourcesFromBothBranches(
 	timeout uint64,
 	baseManifest string,
 	targetManifest string,
-) (map[string]string, map[string]string, error) {
-
+) ([]ExtractedApp, []ExtractedApp, error) {
 	// Apply base manifest directly from string with kubectl
 	if err := argocd.K8sClient.ApplyManifestFromString(baseManifest, argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply base apps: %w", err)
@@ -56,7 +64,7 @@ func GetResourcesFromBothBranches(
 
 	log.Debug().Str("branch", baseBranch.Name).Msg("Applied manifest")
 
-	baseManifests, err := extractResourcesFromCluster(argocd, baseBranch, timeout)
+	baseApps, err := extractResourcesFromClusterAsApps(argocd, baseBranch, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -74,27 +82,25 @@ func GetResourcesFromBothBranches(
 	}
 
 	log.Debug().Str("branch", targetBranch.Name).Msg("Applied manifest")
-
-	targetManifests, err := extractResourcesFromCluster(argocd, targetBranch, timeout)
+	targetApps, err := extractResourcesFromClusterAsApps(argocd, targetBranch, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
 
 	log.Debug().Str("branch", targetBranch.Name).Msg("Extracted manifests")
-
-	return baseManifests, targetManifests, nil
+	return baseApps, targetApps, nil
 }
 
-// extractResourcesFromCluster extracts resources from Argo CD for a specific branch
-func extractResourcesFromCluster(
+// extractResourcesFromClusterAsApps extracts resources from Argo CD for a specific branch as ExtractedApp structs
+func extractResourcesFromClusterAsApps(
 	argocd *argocd.ArgoCDInstallation,
 	branch *git.Branch,
 	timeout uint64,
-) (map[string]string, error) {
+) ([]ExtractedApp, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")
 
-	// Create a map to store all manifests with app name as key
-	allManifests := make(map[string]string)
+	// Create a slice to store all extracted apps
+	extractedApps := make([]ExtractedApp, 0)
 
 	processedApps := make(map[string]bool)
 	failedApps := make(map[string]string)
@@ -153,8 +159,25 @@ func extractResourcesFromCluster(
 					continue
 				}
 
-				// Add manifest to our map with app name as key
-				allManifests[name] = manifests
+				sourcePath, err := getApplicationSourcePath(argocd.K8sClient, argocd.Namespace, name)
+				if err != nil {
+					log.Error().Msgf("❌ Failed to get source path for application: %s, error: %v", name, err)
+					sourcePath = "Unknown"
+				}
+
+				originalApplicationName, err := getOriginalApplicationName(argocd.K8sClient, argocd.Namespace, name)
+				if err != nil {
+					log.Error().Msgf("❌ Failed to get original application name for application: %s, error: %v", name, err)
+					originalApplicationName = "Unknown"
+				}
+
+				// Create an ExtractedApp and add to our slice
+				app := ExtractedApp{
+					Name:       originalApplicationName,
+					SourcePath: sourcePath,
+					Manifest:   manifests,
+				}
+				extractedApps = append(extractedApps, app)
 				processedApps[name] = true
 
 			case "Unknown":
@@ -217,7 +240,15 @@ func extractResourcesFromCluster(
 
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications", len(processedApps))
 
-	return allManifests, nil
+	return extractedApps, nil
+}
+
+func getApplicationSourcePath(k8sClient *utils.K8sClient, namespace string, appName string) (string, error) {
+	return k8sClient.GetResourceAnnotation(annotations.ApplicationGVR, namespace, appName, annotations.SourcePathKey)
+}
+
+func getOriginalApplicationName(k8sClient *utils.K8sClient, namespace string, appName string) (string, error) {
+	return k8sClient.GetResourceAnnotation(annotations.ApplicationGVR, namespace, appName, annotations.OriginalApplicationNameKey)
 }
 
 func isErrorCondition(condType string) bool {

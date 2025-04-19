@@ -9,7 +9,7 @@ Modified (1):
 ```
 
 <details>
-<summary>Diff:</summary>
+<summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
 ```diff

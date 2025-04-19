@@ -348,7 +348,7 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 // WaitForDeploymentReady waits for a deployment to be available
 // Equivalent to: kubectl wait --for=condition=available deployment/name
 func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSeconds int) error {
-	log.Info().Msgf("Waiting for deployment %s in namespace %s to be ready", name, namespace)
+	log.Debug().Msgf("Waiting for deployment %s in namespace %s to be ready", name, namespace)
 
 	// Define the Deployment resource
 	deploymentRes := schema.GroupVersionResource{
@@ -460,4 +460,39 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 			time.Sleep(pollInterval)
 		}
 	}
+}
+
+// GetResourceAnnotation retrieves a specific annotation from any Kubernetes resource
+func (c *K8sClient) GetResourceAnnotation(gvr schema.GroupVersionResource, namespace string, name string, annotationKey string) (string, error) {
+	// Get the resource
+	result, err := c.clientset.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get %s '%s' in namespace '%s': %w", gvr.Resource, name, namespace, err)
+	}
+
+	// Extract metadata
+	metadata, ok := result.Object["metadata"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("failed to extract metadata from %s '%s'", gvr.Resource, name)
+	}
+
+	// Extract annotations
+	annotations, ok := metadata["annotations"].(map[string]interface{})
+	if !ok {
+		return "", fmt.Errorf("no annotations found in %s '%s'", gvr.Resource, name)
+	}
+
+	// Get the specific annotation
+	value, ok := annotations[annotationKey]
+	if !ok {
+		return "", fmt.Errorf("annotation '%s' not found in %s '%s'", annotationKey, gvr.Resource, name)
+	}
+
+	// Convert to string
+	valueStr, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("annotation value is not a string")
+	}
+
+	return valueStr, nil
 }

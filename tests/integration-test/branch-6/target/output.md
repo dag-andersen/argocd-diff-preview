@@ -9,13 +9,13 @@ Modified (7):
 ± app1-2
 ± app2-1
 ± app2-2
-± my-app
+± my-super-app
 ± my-service-staging
 ± nginx-ingress
 ```
 
 <details>
-<summary>Diff:</summary>
+<summary>app1-1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
 ```diff
@@ -32,7 +32,15 @@ Modified (7):
          ports:
 -        - containerPort: 80
 +        - containerPort: 8080
- 
+```
+
+</details>
+
+<details>
+<summary>app1-2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
+<br>
+
+```diff
 @@ Application modified: app1-2 @@
        app: myapp
    template:
@@ -46,7 +54,15 @@ Modified (7):
          ports:
 -        - containerPort: 80
 +        - containerPort: 8080
- 
+```
+
+</details>
+
+<details>
+<summary>app2-1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
+<br>
+
+```diff
 @@ Application modified: app2-1 @@
        app: myapp
    template:
@@ -60,7 +76,15 @@ Modified (7):
          ports:
 -        - containerPort: 80
 +        - containerPort: 8080
- 
+```
+
+</details>
+
+<details>
+<summary>app2-2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
+<br>
+
+```diff
 @@ Application modified: app2-2 @@
        app: myapp
    template:
@@ -74,8 +98,16 @@ Modified (7):
          ports:
 -        - containerPort: 80
 +        - containerPort: 8080
- 
-@@ Application modified: my-app @@
+```
+
+</details>
+
+<details>
+<summary>my-app -> my-super-app (examples/helm/applications/my-app.yaml)</summary>
+<br>
+
+```diff
+@@ Application modified: my-super-app @@
  ---
  apiVersion: v1
  kind: Service
@@ -157,6 +189,15 @@ Modified (7):
          imagePullPolicy: IfNotPresent
          livenessProbe:
            httpGet:
+```
+
+</details>
+
+<details>
+<summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
+<br>
+
+```diff
 @@ Application modified: my-service-staging @@
      spec:
        containers:
@@ -170,7 +211,15 @@ Modified (7):
            requests:
 -            memory: 128Mi
 +            memory: 64Mi
- 
+```
+
+</details>
+
+<details>
+<summary>nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
+<br>
+
+```diff
 @@ Application modified: nginx-ingress @@
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0
