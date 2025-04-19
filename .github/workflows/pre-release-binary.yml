@@ -20,12 +20,12 @@ jobs:
       matrix:
         platform:
           - os_name: Linux-x86_64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             goos: linux
             goarch: amd64
             name: argocd-diff-preview-Linux-x86_64.tar.gz
           - os_name: Linux-aarch64
-            os: ubuntu-20.04
+            os: ubuntu-24.04
             goos: linux
             goarch: arm64
             name: argocd-diff-preview-Linux-aarch64.tar.gz
