@@ -294,11 +294,11 @@ func generateGitDiff(
 	// Keep track of file paths by change type
 	var addedFiles, deletedFiles, modifiedFiles []string
 
+	// Keep track of old file name (if any)
+	oldFileName := make(map[string]string)
+
 	// Map to store individual app diffs
 	appDiffs := make(map[string]string)
-
-	// Map to store source paths for each file
-	sourcePaths := make(map[string]string)
 
 	for _, change := range changes {
 		action, err := change.Action()
@@ -326,10 +326,6 @@ func generateGitDiff(
 			addedCount++
 			addedFiles = append(addedFiles, path)
 			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application added: %s @@\n", path))
-			// Store source path for added file
-			if sourcePath, ok := targetSourcePaths[path]; ok {
-				sourcePaths[path] = sourcePath
-			}
 
 			if to != nil {
 				blob, err := targetRepo.BlobObject(to.Hash)
@@ -352,10 +348,6 @@ func generateGitDiff(
 			deletedCount++
 			deletedFiles = append(deletedFiles, path)
 			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application deleted: %s @@\n", path))
-			// Store source path for deleted file
-			if sourcePath, ok := baseSourcePaths[path]; ok {
-				sourcePaths[path] = sourcePath
-			}
 
 			if from != nil {
 				blob, err := baseRepo.BlobObject(from.Hash)
@@ -377,7 +369,14 @@ func generateGitDiff(
 			// File modified
 			modifiedCount++
 			modifiedFiles = append(modifiedFiles, path)
+
 			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application modified: %s @@\n", path))
+
+			// Store old file name for modified file
+			if from != nil && from.Name != to.Name {
+				log.Debug().Str("from", from.Name).Str("to", to.Name).Msg("Storing old file name")
+				oldFileName[path] = from.Name
+			}
 
 			// Get content of both files and use the diff package
 			var oldContent, newContent string
@@ -438,29 +437,49 @@ func generateGitDiff(
 		}
 	}
 
+	allChanges := append(addedFiles, append(deletedFiles, modifiedFiles...)...)
+	log.Debug().Str("allChanges", fmt.Sprintf("%v", allChanges)).Msg("All changes")
+
+	// print base source paths
+	log.Debug().Str("baseSourcePaths", fmt.Sprintf("%v", baseSourcePaths)).Msg("Base source paths")
+
+	// print target source paths
+	log.Debug().Str("targetSourcePaths", fmt.Sprintf("%v", targetSourcePaths)).Msg("Target source paths")
+
 	// Create array of formatted file sections
 	fileSections := make([]string, 0, len(changes))
-	for _, file := range append(addedFiles, append(deletedFiles, modifiedFiles...)...) {
+	for _, file := range allChanges {
 		if diff, ok := appDiffs[file]; ok {
 			// Get source path for this file, or use empty string if not found
-			baseSourcePath := sourcePaths[file]
+			baseSourcePath := baseSourcePaths[file]
 			targetSourcePath := targetSourcePaths[file]
-			var displayHeader string
+			var filePathPart string
 
 			switch {
 			case baseSourcePath != "" && targetSourcePath != "" && baseSourcePath != targetSourcePath:
-				displayHeader = fmt.Sprintf("%s (%s -> %s)", file, baseSourcePath, targetSourcePath)
+				filePathPart = fmt.Sprintf("%s -> %s", baseSourcePath, targetSourcePath)
 			case baseSourcePath != "":
-				displayHeader = fmt.Sprintf("%s (%s)", file, baseSourcePath)
+				filePathPart = baseSourcePath
 			case targetSourcePath != "":
-				displayHeader = fmt.Sprintf("%s (%s)", file, targetSourcePath)
+				filePathPart = targetSourcePath
 			default:
-				displayHeader = file
+				filePathPart = file
 			}
+
+			// Get old file name if it exists
+			oldFileName := oldFileName[file]
+			var fileNamePart string
+			if oldFileName != "" {
+				fileNamePart = fmt.Sprintf("%s -> %s", oldFileName, file)
+			} else {
+				fileNamePart = file
+			}
+
+			header := fmt.Sprintf("%s (%s)", fileNamePart, filePathPart)
 
 			diffContent := strings.TrimSpace(diff)
 
-			fileSection := fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n", displayHeader, diffContent)
+			fileSection := fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n", header, diffContent)
 			fileSections = append(fileSections, fileSection)
 		}
 	}
