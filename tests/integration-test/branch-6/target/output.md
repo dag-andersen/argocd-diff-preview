@@ -5,21 +5,21 @@ Summary:
 Total: 7 files changed
 
 Modified (7):
-± app1-1
-± app1-2
-± app2-1
-± app2-2
+± app1
+± app1
+± app2
+± app2
 ± my-super-app
 ± my-service-staging
 ± nginx-ingress
 ```
 
 <details>
-<summary>app1-1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
+<summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
 ```diff
-@@ Application modified: app1-1 @@
+@@ Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml) @@
        app: myapp
    template:
      metadata:
@@ -37,11 +37,11 @@ Modified (7):
 </details>
 
 <details>
-<summary>app1-2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
+<summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
 ```diff
-@@ Application modified: app1-2 @@
+@@ Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml) @@
        app: myapp
    template:
      metadata:
@@ -59,11 +59,11 @@ Modified (7):
 </details>
 
 <details>
-<summary>app2-1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
+<summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
 ```diff
-@@ Application modified: app2-1 @@
+@@ Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml) @@
        app: myapp
    template:
      metadata:
@@ -81,11 +81,11 @@ Modified (7):
 </details>
 
 <details>
-<summary>app2-2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
+<summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
 ```diff
-@@ Application modified: app2-2 @@
+@@ Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml) @@
        app: myapp
    template:
      metadata:
@@ -107,7 +107,7 @@ Modified (7):
 <br>
 
 ```diff
-@@ Application modified: my-super-app @@
+@@ Application modified: my-super-app (examples/helm/applications/my-app.yaml) @@
  ---
  apiVersion: v1
  kind: Service
@@ -198,7 +198,7 @@ Modified (7):
 <br>
 
 ```diff
-@@ Application modified: my-service-staging @@
+@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
      spec:
        containers:
        - image: dag-andersen/myapp:latest
@@ -220,7 +220,7 @@ Modified (7):
 <br>
 
 ```diff
-@@ Application modified: nginx-ingress @@
+@@ Application modified: nginx-ingress (examples/helm/applications/nginx-new-path.yaml) @@
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0
          helm.sh/chart: ingress-nginx-4.10.0
