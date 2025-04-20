@@ -42,6 +42,7 @@ var timeoutMessages = []string{
 
 // contains a app name, source path, and extracted manifest
 type ExtractedApp struct {
+	Id         string
 	Name       string
 	SourcePath string
 	Manifest   string
@@ -151,7 +152,7 @@ func extractResourcesFromClusterAsApps(
 
 			switch item.Status.Sync.Status {
 			case "OutOfSync", "Synced":
-				log.Debug().Msgf("Getting manifests for application: %s", name)
+				log.Debug().Str("name", name).Msg("Extracting manifests from Application")
 				manifests, err := argocd.GetManifests(name)
 				if err != nil {
 					log.Error().Msgf("❌ Failed to get manifests for application: %s, error: %v", name, err)
@@ -171,8 +172,11 @@ func extractResourcesFromClusterAsApps(
 					originalApplicationName = "Unknown"
 				}
 
+				log.Debug().Str("branch", branch.Name).Str("name", originalApplicationName).Str("id", name).Str("path", sourcePath).Msg("Extracted manifests from Application")
+
 				// Create an ExtractedApp and add to our slice
 				app := ExtractedApp{
+					Id:         name,
 					Name:       originalApplicationName,
 					SourcePath: sourcePath,
 					Manifest:   manifests,

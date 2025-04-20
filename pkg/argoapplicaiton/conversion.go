@@ -37,6 +37,7 @@ func FromK8sResource(resource k8s.Resource) *ArgoResource {
 	return &ArgoResource{
 		Yaml:     &resource.Yaml,
 		Kind:     ApplicationKind(appKind),
+		Id:       name,
 		Name:     name,
 		FileName: resource.FileName,
 	}
@@ -48,7 +49,7 @@ func ApplicationsToString(apps []ArgoResource) string {
 	for _, app := range apps {
 		yamlStr, err := app.AsString()
 		if err != nil {
-			log.Debug().Err(err).Str("file", app.FileName).Msgf("Failed to convert app %s to YAML", app.Name)
+			log.Debug().Err(err).Str("App", app.GetLongName()).Msg("Failed to convert app to YAML")
 			continue
 		}
 		// add a comment with the name of the file

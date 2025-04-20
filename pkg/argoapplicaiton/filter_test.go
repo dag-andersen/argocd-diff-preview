@@ -139,7 +139,7 @@ metadata:
 			app := &ArgoResource{
 				Yaml:     &node,
 				Kind:     Application,
-				Name:     "test-app",
+				Id:       "test-app",
 				FileName: "test.yaml",
 			}
 
@@ -329,7 +329,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Name: "test-app"},
+			want:                      &ArgoResource{Id: "test-app"},
 		},
 		{
 			name: "matching label selector",
@@ -347,7 +347,7 @@ metadata:
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Name: "test-app"},
+			want:                      &ArgoResource{Id: "test-app"},
 		},
 		{
 			name: "non-matching label selector",
@@ -381,7 +381,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.yaml"},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Name: "test-app"},
+			want:                      &ArgoResource{Id: "test-app"},
 		},
 		{
 			name: "non-matching file watch pattern",
@@ -413,7 +413,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.txt"},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Name: "test-app"},
+			want:                      &ArgoResource{Id: "test-app"},
 		},
 		{
 			name: "invalid watch pattern with ignore",
@@ -429,7 +429,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.yaml"},
 			ignoreInvalidWatchPattern: true,
-			want:                      &ArgoResource{Name: "test-app"},
+			want:                      &ArgoResource{Id: "test-app"},
 		},
 		{
 			name: "invalid watch pattern without ignore",
@@ -506,7 +506,7 @@ metadata:
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Name: "test-app"},
+			want:                      &ArgoResource{Id: "test-app"},
 		},
 		{
 			name: "not equals operator with matching value",
@@ -539,7 +539,7 @@ metadata:
 			app := &ArgoResource{
 				Yaml:     &node,
 				Kind:     Application,
-				Name:     "test-app",
+				Id:       "test-app",
 				FileName: "test.yaml",
 			}
 
@@ -551,7 +551,7 @@ metadata:
 				assert.Nil(t, got)
 			} else {
 				assert.NotNil(t, got)
-				assert.Equal(t, tt.want.Name, got.Name)
+				assert.Equal(t, tt.want.Id, got.Id)
 			}
 		})
 	}

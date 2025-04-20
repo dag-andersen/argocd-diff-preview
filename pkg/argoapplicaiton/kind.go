@@ -8,13 +8,13 @@ const (
 	ApplicationSet
 )
 
-// String returns the string representation of ApplicationKind
-func (k ApplicationKind) String() string {
+// ShortName returns the string representation of ApplicationKind
+func (k ApplicationKind) ShortName() string {
 	switch k {
 	case Application:
-		return "Application"
+		return "App"
 	case ApplicationSet:
-		return "ApplicationSet"
+		return "AppSet"
 	default:
 		return "Unknown"
 	}

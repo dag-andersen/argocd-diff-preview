@@ -256,6 +256,7 @@ func TestRedirectGenerators(t *testing.T) {
 			app := &ArgoResource{
 				Yaml:     &unstructured.Unstructured{Object: node},
 				Kind:     ApplicationSet,
+				Id:       "test-set",
 				Name:     "test-set",
 				FileName: "test-set.yaml",
 			}

@@ -40,36 +40,8 @@ func GenerateDiff(
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
+	debug bool,
 ) error {
-	// Write base manifests to disk
-	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
-	if err := utils.CreateFolder(basePath, true); err != nil {
-		return fmt.Errorf("failed to create base folder: %s: %w", basePath, err)
-	}
-
-	// Create a map to store source paths for each app
-	baseSourcePaths := make(map[string]string)
-	for _, app := range baseApps {
-		baseSourcePaths[app.Name] = app.SourcePath
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", basePath, app.Name), app.Manifest); err != nil {
-			return fmt.Errorf("failed to write base manifest %s: %w", app.Name, err)
-		}
-	}
-
-	// Write target manifests to disk
-	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	if err := utils.CreateFolder(targetPath, true); err != nil {
-		return fmt.Errorf("failed to create target folder: %s: %w", targetPath, err)
-	}
-
-	// Create a map to store source paths for each app
-	targetSourcePaths := make(map[string]string)
-	for _, app := range targetApps {
-		targetSourcePaths[app.Name] = app.SourcePath
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", targetPath, app.Name), app.Manifest); err != nil {
-			return fmt.Errorf("failed to write target manifest %s: %w", app.Name, err)
-		}
-	}
 
 	maxDiffMessageCharCount := maxCharCount
 	if maxDiffMessageCharCount == 0 {
@@ -78,14 +50,6 @@ func GenerateDiff(
 
 	log.Info().Msgf("🔮 Generating diff between %s and %s",
 		baseBranch.Name, targetBranch.Name)
-
-	// verify that the output folders exist
-	if _, err := os.Stat(basePath); os.IsNotExist(err) {
-		return fmt.Errorf("base path does not exist: %s", basePath)
-	}
-	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-		return fmt.Errorf("target path does not exist: %s", targetPath)
-	}
 
 	// Set default context line count if not provided
 	if lineCount <= 0 {
@@ -98,7 +62,9 @@ func GenerateDiff(
 	}
 
 	// Generate diffs using go-git by creating temporary git repos
-	summary, fileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseSourcePaths, targetSourcePaths)
+	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
+	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
+	summary, fileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps, debug)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -168,14 +134,48 @@ func GenerateDiff(
 	return nil
 }
 
+func writeManifestsToDisk(apps []extract.ExtractedApp, folder string) error {
+	if err := utils.CreateFolder(folder, true); err != nil {
+		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
+	}
+	for _, app := range apps {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), app.Manifest); err != nil {
+			return fmt.Errorf("failed to write manifest %s: %w", app.Id, err)
+		}
+	}
+	return nil
+}
+
 // generateGitDiff creates temporary Git repositories and uses go-git to generate a diff
 func generateGitDiff(
 	basePath, targetPath string,
 	diffIgnore *string,
 	diffContextLines uint,
-	baseSourcePaths map[string]string,
-	targetSourcePaths map[string]string,
+	baseExtractedApps []extract.ExtractedApp,
+	targetExtractedApps []extract.ExtractedApp,
+	debug bool,
 ) (string, []string, error) {
+
+	// Write base manifests to disk
+	if err := writeManifestsToDisk(baseExtractedApps, basePath); err != nil {
+		return "", nil, fmt.Errorf("failed to write base manifests: %w", err)
+	}
+
+	// Write target manifests to disk
+	if err := writeManifestsToDisk(targetExtractedApps, targetPath); err != nil {
+		return "", nil, fmt.Errorf("failed to write target manifests: %w", err)
+	}
+
+	baseExtractedAppsMap := make(map[string]extract.ExtractedApp)
+	for _, app := range baseExtractedApps {
+		baseExtractedAppsMap[app.Id] = app
+	}
+
+	targetExtractedAppsMap := make(map[string]extract.ExtractedApp)
+	for _, app := range targetExtractedApps {
+		targetExtractedAppsMap[app.Id] = app
+	}
+
 	// Create temporary directories for Git repositories
 	baseRepoPath, err := os.MkdirTemp("", "base-repo-*")
 	if err != nil {
@@ -311,11 +311,11 @@ func generateGitDiff(
 			return "", nil, fmt.Errorf("failed to get files: %w", err)
 		}
 
-		path := ""
+		id := ""
 		if to != nil {
-			path = to.Name
+			id = to.Name
 		} else if from != nil {
-			path = from.Name
+			id = from.Name
 		}
 
 		var appDiffBuilder strings.Builder
@@ -324,8 +324,12 @@ func generateGitDiff(
 		case merkletrie.Insert:
 			// File added
 			addedCount++
-			addedFiles = append(addedFiles, path)
-			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application added: %s @@\n", path))
+			addedFiles = append(addedFiles, id)
+
+			name := targetExtractedAppsMap[id].Name
+			sourcePath := targetExtractedAppsMap[id].SourcePath
+
+			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application added: %s (%s) @@\n", name, sourcePath))
 
 			if to != nil {
 				blob, err := targetRepo.BlobObject(to.Hash)
@@ -341,13 +345,17 @@ func generateGitDiff(
 				appDiffBuilder.WriteString(formatNewFileDiff(content, diffContextLines, diffIgnore))
 			}
 
-			appDiffs[path] = appDiffBuilder.String()
+			appDiffs[id] = appDiffBuilder.String()
 
 		case merkletrie.Delete:
 			// File deleted
 			deletedCount++
-			deletedFiles = append(deletedFiles, path)
-			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application deleted: %s @@\n", path))
+			deletedFiles = append(deletedFiles, id)
+
+			name := targetExtractedAppsMap[id].Name
+			sourcePath := targetExtractedAppsMap[id].SourcePath
+
+			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application deleted: %s (%s) @@\n", name, sourcePath))
 
 			if from != nil {
 				blob, err := baseRepo.BlobObject(from.Hash)
@@ -363,19 +371,22 @@ func generateGitDiff(
 				appDiffBuilder.WriteString(formatDeletedFileDiff(content, diffContextLines, diffIgnore))
 			}
 
-			appDiffs[path] = appDiffBuilder.String()
+			appDiffs[id] = appDiffBuilder.String()
 
 		case merkletrie.Modify:
 			// File modified
 			modifiedCount++
-			modifiedFiles = append(modifiedFiles, path)
+			modifiedFiles = append(modifiedFiles, id)
 
-			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application modified: %s @@\n", path))
+			sourcePath := targetExtractedAppsMap[id].SourcePath
+			name := targetExtractedAppsMap[id].Name
+
+			appDiffBuilder.WriteString(fmt.Sprintf("@@ Application modified: %s (%s) @@\n", name, sourcePath))
 
 			// Store old file name for modified file
 			if from != nil && from.Name != to.Name {
 				log.Debug().Str("from", from.Name).Str("to", to.Name).Msg("Storing old file name")
-				oldFileName[path] = from.Name
+				oldFileName[id] = from.Name
 			}
 
 			// Get content of both files and use the diff package
@@ -408,7 +419,7 @@ func generateGitDiff(
 			// Use diff.Do to generate the diff
 			appDiffBuilder.WriteString(formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore))
 
-			appDiffs[path] = appDiffBuilder.String()
+			appDiffs[id] = appDiffBuilder.String()
 		}
 	}
 
@@ -419,60 +430,79 @@ func generateGitDiff(
 	if addedCount > 0 {
 		summaryBuilder.WriteString(fmt.Sprintf("\nAdded (%d):\n", addedCount))
 		for _, file := range addedFiles {
-			summaryBuilder.WriteString(fmt.Sprintf("+ %s\n", file))
+			name := targetExtractedAppsMap[file].Name
+			summaryBuilder.WriteString(fmt.Sprintf("+ %s\n", name))
 		}
 	}
 
 	if deletedCount > 0 {
 		summaryBuilder.WriteString(fmt.Sprintf("\nDeleted (%d):\n", deletedCount))
 		for _, file := range deletedFiles {
-			summaryBuilder.WriteString(fmt.Sprintf("- %s\n", file))
+			name := targetExtractedAppsMap[file].Name
+			summaryBuilder.WriteString(fmt.Sprintf("- %s\n", name))
 		}
 	}
 
 	if modifiedCount > 0 {
 		summaryBuilder.WriteString(fmt.Sprintf("\nModified (%d):\n", modifiedCount))
 		for _, file := range modifiedFiles {
-			summaryBuilder.WriteString(fmt.Sprintf("± %s\n", file))
+			name := targetExtractedAppsMap[file].Name
+			summaryBuilder.WriteString(fmt.Sprintf("± %s\n", name))
 		}
 	}
 
 	allChanges := append(addedFiles, append(deletedFiles, modifiedFiles...)...)
 	log.Debug().Str("allChanges", fmt.Sprintf("%v", allChanges)).Msg("All changes")
 
-	// print base source paths
-	log.Debug().Str("baseSourcePaths", fmt.Sprintf("%v", baseSourcePaths)).Msg("Base source paths")
+	if debug {
+		// print base's id and name
+		baseIdAndName := make(map[string]string)
+		for _, app := range baseExtractedApps {
+			baseIdAndName[app.Id] = app.Name
+		}
 
-	// print target source paths
-	log.Debug().Str("targetSourcePaths", fmt.Sprintf("%v", targetSourcePaths)).Msg("Target source paths")
+		// print target's id and name
+		targetIdAndName := make(map[string]string)
+		for _, app := range targetExtractedApps {
+			targetIdAndName[app.Id] = app.Name
+		}
+
+		log.Debug().Str("baseIdAndName", fmt.Sprintf("%v", baseIdAndName)).Msg("Base ID and name")
+		log.Debug().Str("targetIdAndName", fmt.Sprintf("%v", targetIdAndName)).Msg("Target ID and name")
+	}
 
 	// Create array of formatted file sections
 	fileSections := make([]string, 0, len(changes))
 	for _, file := range allChanges {
 		if diff, ok := appDiffs[file]; ok {
 			// Get source path for this file, or use empty string if not found
-			baseSourcePath := baseSourcePaths[file]
-			targetSourcePath := targetSourcePaths[file]
+			baseSourcePath := baseExtractedAppsMap[file].SourcePath
+			targetSourcePath := targetExtractedAppsMap[file].SourcePath
 			var filePathPart string
 
 			switch {
-			case baseSourcePath != "" && targetSourcePath != "" && baseSourcePath != targetSourcePath:
+			case baseSourcePath != "" && baseSourcePath != targetSourcePath:
 				filePathPart = fmt.Sprintf("%s -> %s", baseSourcePath, targetSourcePath)
 			case baseSourcePath != "":
 				filePathPart = baseSourcePath
 			case targetSourcePath != "":
 				filePathPart = targetSourcePath
 			default:
-				filePathPart = file
+				filePathPart = "Unknown"
 			}
 
+			name := targetExtractedAppsMap[file].Name
+			oldName := baseExtractedAppsMap[oldFileName[file]].Name
+
 			// Get old file name if it exists
-			oldFileName := oldFileName[file]
 			var fileNamePart string
-			if oldFileName != "" {
-				fileNamePart = fmt.Sprintf("%s -> %s", oldFileName, file)
-			} else {
-				fileNamePart = file
+			switch {
+			case oldName != "" && oldName != name:
+				fileNamePart = fmt.Sprintf("%s -> %s", oldName, name)
+			case name != "":
+				fileNamePart = name
+			default:
+				fileNamePart = "Unknown"
 			}
 
 			header := fmt.Sprintf("%s (%s)", fileNamePart, filePathPart)

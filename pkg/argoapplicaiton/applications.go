@@ -60,8 +60,8 @@ func GetApplicationsForBranches(
 	var duplicateYaml []*unstructured.Unstructured
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
-			if baseApp.Name == targetApp.Name && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
-				log.Debug().Msgf("Skipping application '%s' because it has not changed", baseApp.Name)
+			if baseApp.Id == targetApp.Id && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
+				log.Debug().Str("App", baseApp.GetLongName()).Msg("Skipping application because it has not changed")
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
 			}
@@ -118,7 +118,7 @@ func GetApplications(
 	ignoreInvalidWatchPattern bool,
 	redirectRevisions []string,
 ) ([]ArgoResource, error) {
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Fetching all files for branch %s", branch.Name)
+	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
 
 	yamlFiles := k8s.GetYamlFiles(branch.FolderName(), fileRegex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
@@ -253,52 +253,50 @@ func FromResourceToApplication(
 // PatchApplication patches a single ArgoResource
 func PatchApplication(
 	argocdNamespace string,
-	application ArgoResource,
+	app ArgoResource,
 	branch *git.Branch,
 	repo string,
 	redirectRevisions []string,
 ) (*ArgoResource, error) {
-	appName := application.Name
 
 	// Chain the modifications
-	app := &application
 	err := app.SetNamespace(argocdNamespace)
 	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to set namespace: %w", err)
 	}
 
 	err = app.RemoveSyncPolicy()
 	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
 	}
 
 	err = app.SetProjectToDefault()
 	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to set project to default: %w", err)
 	}
 
 	err = app.PointDestinationToInCluster()
 	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
 	}
 
 	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to redirect sources: %w", err)
 	}
 
 	err = app.RedirectGenerators(repo, branch.Name, redirectRevisions)
 	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", appName)
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to redirect generators: %w", err)
 	}
 
-	return app, nil
+	return &app, nil
 }
 
 // PatchApplications patches a slice of ArgoResources
@@ -342,8 +340,8 @@ func ConvertAppSetsToAppsInBothBranches(
 
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
 
-	baseApps = UniqueNames(baseApps, baseBranch)
-	targetApps = UniqueNames(targetApps, targetBranch)
+	baseApps = UniqueIds(baseApps, baseBranch)
+	targetApps = UniqueIds(targetApps, targetBranch)
 
 	baseApps, err := ConvertAppSetsToApps(
 		argocd,
@@ -355,7 +353,8 @@ func ConvertAppSetsToAppsInBothBranches(
 		debug,
 	)
 	if err != nil {
-		log.Error().Msgf("❌ Failed to generate base apps: %v", err)
+		log.Error().Str("branch", baseBranch.Name).Msg("❌ Failed to generate base apps")
+		return nil, nil, err
 	}
 
 	targetApps, err = ConvertAppSetsToApps(
@@ -368,11 +367,12 @@ func ConvertAppSetsToAppsInBothBranches(
 		debug,
 	)
 	if err != nil {
-		log.Error().Msgf("❌ Failed to generate target apps: %v", err)
+		log.Error().Str("branch", targetBranch.Name).Msg("❌ Failed to generate target apps")
+		return nil, nil, err
 	}
 
-	baseApps = UniqueNames(baseApps, baseBranch)
-	targetApps = UniqueNames(targetApps, targetBranch)
+	baseApps = UniqueIds(baseApps, baseBranch)
+	targetApps = UniqueIds(targetApps, targetBranch)
 
 	return baseApps, targetApps, nil
 }
@@ -405,25 +405,25 @@ func ConvertAppSetsToApps(
 		// Generate random filename for the patched ApplicationSet
 		randomFileName := fmt.Sprintf("%s/%s-%d.yaml",
 			tempFolder,
-			appSet.Name,
+			appSet.Id,
 			time.Now().UnixNano(),
 		)
 
 		// Write patched ApplicationSet to file
 		yamlStr, err := appSet.AsString()
 		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to convert ApplicationSet to YAML")
+			log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf("❌ Failed to convert ApplicationSet to YAML")
 			continue
 		}
 
 		if err := os.WriteFile(randomFileName, []byte(yamlStr), 0644); err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to write ApplicationSet to file")
+			log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf("❌ Failed to write ApplicationSet to file")
 			continue
 		}
 		if !debug {
 			defer func() {
 				if err := os.Remove(randomFileName); err != nil {
-					log.Warn().Err(err).Str("branch", branch.Name).Msg("⚠️ Failed to remove temporary file")
+					log.Warn().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("⚠️ Failed to remove temporary file")
 				}
 			}()
 		}
@@ -431,13 +431,14 @@ func ConvertAppSetsToApps(
 		// Generate applications using argocd appset generate
 		output, err := argocd.AppsetGenerate(randomFileName)
 		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to generate applications from ApplicationSet %s", appSet.Name)
-			continue
+			log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
+			log.Error().Err(err)
+			return nil, err
 		}
 
 		// check if output is empty / null
 		if strings.TrimSpace(output) == "" || strings.TrimSpace(output) == "null" {
-			log.Warn().Str("branch", branch.Name).Str("file", appSet.FileName).Msgf("⚠️ ApplicationSet %s generated empty output", appSet.Name)
+			log.Warn().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf("⚠️ ApplicationSet generated empty output")
 			continue
 		}
 
@@ -448,21 +449,23 @@ func ConvertAppSetsToApps(
 		if isList {
 			var yamlOutput []unstructured.Unstructured
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
+				log.Error().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
+				log.Error().Err(err)
 				continue
 			}
 			yamlData = yamlOutput
 		} else {
 			var yamlOutput unstructured.Unstructured
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to read output from ApplicationSet %s", appSet.Name)
+				log.Error().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
+				log.Error().Err(err)
 				continue
 			}
 			yamlData = []unstructured.Unstructured{yamlOutput}
 		}
 
 		if len(yamlData) == 0 {
-			log.Error().Str("branch", branch.Name).Msgf("❌ No applications found in ApplicationSet %s", appSet.Name)
+			log.Error().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ No applications found in ApplicationSet")
 			continue
 		}
 
@@ -471,20 +474,20 @@ func ConvertAppSetsToApps(
 			kind := doc.GetKind()
 			if kind == "" {
 				log.Error().
-					Str("file", appSet.FileName).
+					Str("AppSet", appSet.GetLongName()).
 					Msg("❌ Output from ApplicationSet contains no kind")
 				continue
 			}
 			if kind != "Application" {
 				log.Error().
-					Str("file", appSet.FileName).
+					Str("AppSet", appSet.GetLongName()).
 					Msg("❌ Output from ApplicationSet contains non-Application resources")
 				continue
 			}
 
 			name := doc.GetName()
 			if name == "" {
-				log.Error().Str("file", appSet.FileName).Msg("❌ Generated Application missing name")
+				log.Error().Str("AppSet", appSet.GetLongName()).Msg("❌ Generated Application missing name")
 				continue
 			}
 
@@ -494,6 +497,7 @@ func ConvertAppSetsToApps(
 			app := ArgoResource{
 				Yaml:     docCopy,
 				Kind:     Application,
+				Id:       name,
 				Name:     name,
 				FileName: appSet.FileName,
 			}
@@ -506,7 +510,7 @@ func ConvertAppSetsToApps(
 				redirectRevisions,
 			)
 			if err != nil {
-				log.Error().Err(err).Str("branch", branch.Name).Msgf("❌ Failed to patch application: %s", name)
+				log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to patch application")
 				continue
 			}
 
@@ -515,14 +519,14 @@ func ConvertAppSetsToApps(
 			appsNew = append(appsNew, *patchedApp)
 		}
 
-		log.Debug().Str("branch", branch.Name).Str("file", appSet.FileName).Str("appSet", appSet.Name).Msgf(
+		log.Debug().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf(
 			"Generated %d Applications from ApplicationSet",
 			localGeneratedAppsCounter,
 		)
 	}
 
 	// After all apps are processed, ensure unique names
-	appsNew = UniqueNames(appsNew, branch)
+	appsNew = UniqueIds(appsNew, branch)
 
 	if appSetCounter > 0 {
 		log.Info().Str("branch", branch.Name).Msgf(

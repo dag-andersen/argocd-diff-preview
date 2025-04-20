@@ -8,55 +8,55 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// UniqueNames ensures that each application has a unique name by appending the branch name if necessary.
-// It returns a new slice with unique names.
-// UniqueNames ensures all applications have unique names by adding suffixes to duplicates
-func UniqueNames(apps []ArgoResource, branch *git.Branch) []ArgoResource {
-	// Group applications by name
-	duplicateNames := make(map[string][]ArgoResource)
+// UniqueIds ensures that each application has a unique ID by appending the branch name if necessary.
+// It returns a new slice with unique IDs.
+// UniqueIds ensures all applications have unique IDs by adding suffixes to duplicates
+func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
+	// Group applications by ID
+	duplicateIds := make(map[string][]ArgoResource)
 	for _, app := range apps {
-		duplicateNames[app.Name] = append(duplicateNames[app.Name], app)
+		duplicateIds[app.Id] = append(duplicateIds[app.Id], app)
 	}
 
 	var newApps []ArgoResource
 	duplicateCounter := 0
 
 	// Process each group of applications
-	for name, appsWithSameName := range duplicateNames {
-		if len(appsWithSameName) > 1 {
+	for id, appsWithSameId := range duplicateIds {
+		if len(appsWithSameId) > 1 {
 			duplicateCounter++
 			log.Debug().
 				Str("branch", branch.Name).
-				Msgf("Found %d duplicate applications with same name: %s", len(appsWithSameName), name)
+				Msgf("Found %d duplicate applications with same name: %s", len(appsWithSameId), id)
 
 			// Sort apps by filename for stable ordering
-			sort.Slice(appsWithSameName, func(i, j int) bool {
-				return appsWithSameName[i].FileName < appsWithSameName[j].FileName
+			sort.Slice(appsWithSameId, func(i, j int) bool {
+				return appsWithSameId[i].FileName < appsWithSameId[j].FileName
 			})
 
 			// Rename each app with a suffix
-			for i, app := range appsWithSameName {
-				newName := fmt.Sprintf("%s-%d", name, i+1)
+			for i, app := range appsWithSameId {
+				newId := fmt.Sprintf("%s-%d", id, i+1)
 
 				// Create a copy of the app
 				newApp := app
-				newApp.Name = newName
+				newApp.Id = newId
 
 				// Update the name in the YAML
-				newApp.Yaml.SetName(newName)
-				log.Debug().Str("branch", branch.Name).Msgf("updated name in yaml: %s", newName)
+				newApp.Yaml.SetName(newId)
+				log.Debug().Str("branch", branch.Name).Str(newApp.Kind.ShortName(), newApp.GetLongName()).Msgf("Updated name in yaml to: %s", newId)
 
 				newApps = append(newApps, newApp)
 			}
 		} else {
 			// No duplicates, keep as is
-			newApps = append(newApps, appsWithSameName[0])
+			newApps = append(newApps, appsWithSameId[0])
 		}
 	}
 
 	// sort newApps by filename
 	sort.Slice(newApps, func(i, j int) bool {
-		return newApps[i].Name < newApps[j].Name
+		return newApps[i].Id < newApps[j].Id
 	})
 
 	if duplicateCounter > 0 {

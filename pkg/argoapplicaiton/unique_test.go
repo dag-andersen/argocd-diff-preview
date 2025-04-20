@@ -90,25 +90,25 @@ func TestUniqueNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Run UniqueNames
-			got := UniqueNames(tt.apps, tt.branch)
+			got := UniqueIds(tt.apps, tt.branch)
 
 			// Check length
 			assert.Equal(t, len(tt.want), len(got), "Expected %d apps, got %d", len(tt.want), len(got))
 
 			// Check each app
 			for i := range got {
-				assert.Equal(t, tt.want[i].Name, got[i].Name, "App %d: Expected name %s, got %s", i, tt.want[i].Name, got[i].Name)
+				assert.Equal(t, tt.want[i].Id, got[i].Id, "App %d: Expected name %s, got %s", i, tt.want[i].Id, got[i].Id)
 
 				// Check YAML name matches
 				gotName := got[i].Yaml.GetName()
-				assert.Equal(t, got[i].Name, gotName, "App %d: YAML name %s doesn't match struct name %s", i, gotName, got[i].Name)
+				assert.Equal(t, got[i].Id, gotName, "App %d: YAML name %s doesn't match struct name %s", i, gotName, got[i].Id)
 			}
 
 			// Check uniqueness
 			names := make(map[string]bool)
 			for _, app := range got {
-				assert.False(t, names[app.Name], "Duplicate name found: %s", app.Name)
-				names[app.Name] = true
+				assert.False(t, names[app.Id], "Duplicate name found: %s", app.Id)
+				names[app.Id] = true
 			}
 		})
 	}
@@ -133,7 +133,7 @@ spec:
 	return ArgoResource{
 		Yaml:     &y,
 		Kind:     Application,
-		Name:     name,
+		Id:       name,
 		FileName: fileName,
 	}
 }
