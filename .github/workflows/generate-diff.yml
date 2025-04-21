@@ -35,7 +35,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.3
+            dagandersen/argocd-diff-preview:v0.1.4
 
       - name: Post diff as comment
         run: |
