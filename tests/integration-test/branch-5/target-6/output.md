@@ -13,7 +13,7 @@ Modified (1):
 <br>
 
 ```diff
-@@ Application modified: my-app-labels @@
+@@ Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml) @@
  apiVersion: v1
  kind: Service
  metadata:

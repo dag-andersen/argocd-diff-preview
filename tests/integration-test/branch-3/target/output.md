@@ -13,7 +13,7 @@ Modified (1):
 <br>
 
 ```diff
-@@ Application modified: my-service-staging @@
+@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
  ---
  apiVersion: apps/v1
  kind: Deployment

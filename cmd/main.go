@@ -143,10 +143,6 @@ func run(opts *Options) error {
 		return err
 	}
 
-	// Enrich applications with source path and original application name so we can identify the application in the diff
-	argoapplicaiton.EnrichApplications(baseApps)
-	argoapplicaiton.EnrichApplications(targetApps)
-
 	// Generate application manifests as strings
 	baseManifest := argoapplicaiton.ApplicationsToString(baseApps)
 	targetManifest := argoapplicaiton.ApplicationsToString(targetApps)

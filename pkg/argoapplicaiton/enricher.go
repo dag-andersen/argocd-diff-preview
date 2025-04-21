@@ -5,7 +5,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (a *ArgoResource) SetSourcePath(sourcePath string) {
+func (a *ArgoResource) setSourcePath(sourcePath string) {
 	annotationMap := a.Yaml.GetAnnotations()
 	if annotationMap == nil {
 		annotationMap = make(map[string]string)
@@ -14,7 +14,7 @@ func (a *ArgoResource) SetSourcePath(sourcePath string) {
 	a.Yaml.SetAnnotations(annotationMap)
 }
 
-func (a *ArgoResource) SetOriginalApplicationName(originalApplicationName string) {
+func (a *ArgoResource) setOriginalApplicationName(originalApplicationName string) {
 	annotationMap := a.Yaml.GetAnnotations()
 	if annotationMap == nil {
 		annotationMap = make(map[string]string)
@@ -23,17 +23,14 @@ func (a *ArgoResource) SetOriginalApplicationName(originalApplicationName string
 	a.Yaml.SetAnnotations(annotationMap)
 }
 
-func (a *ArgoResource) EnrichApplication() error {
-	a.SetSourcePath(a.FileName)
-	a.SetOriginalApplicationName(a.Name)
-
-	return nil
+func (a *ArgoResource) enrichApplication() {
+	a.setSourcePath(a.FileName)
+	a.setOriginalApplicationName(a.Name)
 }
 
-func EnrichApplications(applications []ArgoResource) error {
+func enrichApplications(applications []ArgoResource) {
 	log.Debug().Msgf("Adding source path and original application name to applications: %d", len(applications))
 	for _, application := range applications {
-		application.EnrichApplication()
+		application.enrichApplication()
 	}
-	return nil
 }

@@ -61,7 +61,7 @@ diff:
 
 ## Private repositories and Helm Charts
 
-In the simple code example above, we do not provide the cluster with any credentials, which only works if the image/Helm Chart registry and the Git repository are public. Since your repository might not be public, you need to provide the tool with the necessary read-access credentials for the repository. This can be done by placing the Argo CD repo secrets in a folder mounted at /secrets. When the tool starts, it will simply run kubectl apply -f /secrets to apply every resource to the cluster before starting the rendering process.
+In the simple code example above, we do not provide the cluster with any credentials, which only works if the image/Helm Chart registry and the Git repository are public. Since your repository might not be public, you need to provide the tool with the necessary read-access credentials for the repository. This can be done by placing the Argo CD repo secrets in a folder mounted at /secrets. When the tool starts, it will simply run `kubectl apply -f /secrets` to apply every resource to the cluster before starting the rendering process.
 
 ```yaml
 ...

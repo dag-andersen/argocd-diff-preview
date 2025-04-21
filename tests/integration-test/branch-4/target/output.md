@@ -13,7 +13,7 @@ Added (1):
 <br>
 
 ```diff
-@@ Application added: folder3 @@
+@@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
 +---
 +apiVersion: apps/v1
 +kind: Deployment

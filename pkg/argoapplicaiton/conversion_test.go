@@ -39,6 +39,7 @@ spec:
 			want: &ArgoResource{
 				Kind:     Application,
 				Name:     "test-app",
+				Id:       "test-app",
 				FileName: "test.yaml",
 			},
 			wantErr: false,
@@ -67,6 +68,7 @@ spec:
 			want: &ArgoResource{
 				Kind:     ApplicationSet,
 				Name:     "test-set",
+				Id:       "test-set",
 				FileName: "test-set.yaml",
 			},
 			wantErr: false,
@@ -154,7 +156,7 @@ spec:
 
 			assert.NotNil(t, got)
 			assert.Equal(t, tt.want.Kind, got.Kind)
-			assert.Equal(t, tt.want.Name, got.Name)
+			assert.Equal(t, tt.want.Id, got.Id)
 			assert.Equal(t, tt.want.FileName, got.FileName)
 
 			// Verify YAML structure

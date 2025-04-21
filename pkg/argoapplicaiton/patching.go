@@ -15,8 +15,13 @@ import (
 type ArgoResource struct {
 	Yaml     *unstructured.Unstructured
 	Kind     ApplicationKind
+	Id       string
 	Name     string
 	FileName string
+}
+
+func (a *ArgoResource) GetLongName() string {
+	return fmt.Sprintf("%s [%s]", a.Name, a.FileName)
 }
 
 // AsString returns the YAML representation of the resource
@@ -37,23 +42,21 @@ func (a *ArgoResource) SetNamespace(namespace string) error {
 // SetProjectToDefault sets the project to "default"
 func (a *ArgoResource) SetProjectToDefault() error {
 	if a.Yaml == nil {
-		log.Debug().Msgf("no YAML for Application: %s", a.Name)
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msg("Resource contains no YAML")
 		return nil
 	}
 
 	switch a.Kind {
 	case Application:
 		if _, found, _ := unstructured.NestedString(a.Yaml.Object, "spec", "project"); !found {
-			log.Debug().Msgf("no 'spec.project' key found in Application: %s (file: %s)",
-				a.Name, a.FileName)
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no 'spec.project' key found in %s", a.Kind.ShortName())
 		}
 		if err := unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "project"); err != nil {
 			return fmt.Errorf("failed to set spec.project field: %w", err)
 		}
 	case ApplicationSet:
 		if _, found, _ := unstructured.NestedString(a.Yaml.Object, "spec", "template", "spec", "project"); !found {
-			log.Debug().Msgf("no 'spec.template.spec.project' key found in ApplicationSet: %s (file: %s)",
-				a.Name, a.FileName)
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no 'spec.template.spec.project' key found in %s", a.Kind.ShortName())
 		}
 		if err := unstructured.SetNestedField(a.Yaml.Object, "default", "spec", "template", "spec", "project"); err != nil {
 			return fmt.Errorf("failed to set spec.template.spec.project field: %w", err)
@@ -66,7 +69,7 @@ func (a *ArgoResource) SetProjectToDefault() error {
 // PointDestinationToInCluster updates the destination to point to the in-cluster service
 func (a *ArgoResource) PointDestinationToInCluster() error {
 	if a.Yaml == nil {
-		log.Debug().Msgf("no YAML for Application: %s", a.Name)
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msg("Resource contains no YAML")
 		return nil
 	}
 
@@ -83,8 +86,8 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	// Check if destination exists
 	destMap, found, _ := unstructured.NestedMap(a.Yaml.Object, destPath...)
 	if !found {
-		log.Debug().Msgf("no '%s' key found in %s: %s (file: %s)",
-			strings.Join(destPath, "."), a.Kind, a.Name, a.FileName)
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no '%s' key found in %s",
+			strings.Join(destPath, "."), a.Kind.ShortName())
 		return nil
 	}
 
@@ -103,7 +106,7 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 // RemoveSyncPolicy removes the syncPolicy from the resource
 func (a *ArgoResource) RemoveSyncPolicy() error {
 	if a.Yaml == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because YAML is nil")
+		log.Warn().Str("patchType", "removeSyncPolicy").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't remove 'syncPolicy' because YAML is nil")
 		return nil
 	}
 
@@ -120,7 +123,7 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 	// Check if spec exists
 	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
 	if !found {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str("file", a.FileName).Msgf("⚠️ Can't remove 'syncPolicy' because spec not found")
+		log.Warn().Str("patchType", "removeSyncPolicy").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't remove 'syncPolicy' because spec not found")
 		return nil
 	}
 
@@ -138,7 +141,7 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 // RedirectSources updates the source/sources targetRevision to point to the specified branch
 func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) error {
 	if a.Yaml == nil {
-		log.Warn().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("⚠️ No YAML for Application: %s", a.Name)
+		log.Warn().Str("patchType", "redirectSources").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ No YAML for Application")
 		return nil
 	}
 
@@ -155,7 +158,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 	// Get spec
 	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
 	if !found {
-		log.Warn().Str("patchType", "redirectSources").Str("file", a.FileName).Msgf("⚠️ No spec found in %s: %s", a.Kind, a.Name)
+		log.Warn().Str("patchType", "redirectSources").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("⚠️ No spec found in %s", a.Kind.ShortName())
 		return nil
 	}
 
@@ -191,19 +194,19 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, branch string, redirectRevisions []string) error {
 	// Skip helm charts
 	if _, hasChart := source["chart"]; hasChart {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found helm chart")
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Found helm chart")
 		return nil
 	}
 
 	// Check repoURL
 	repoURL, ok := source["repoURL"].(string)
 	if !ok {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msg("Found no 'repoURL' under source")
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Found no 'repoURL' under source")
 		return nil
 	}
 
 	if !containsIgnoreCase(repoURL, repo) {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
 		return nil
 	}
 
@@ -211,7 +214,7 @@ func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, br
 	targetRev, ok := source["targetRevision"].(string)
 	if !ok {
 		defaultTargetRev := "HEAD"
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Found no 'targetRevision' under source. Defaulting to '%s'", defaultTargetRev)
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Found no 'targetRevision' under source. Defaulting to '%s'", defaultTargetRev)
 		targetRev = defaultTargetRev
 		source["targetRevision"] = targetRev
 	}
@@ -219,7 +222,7 @@ func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, br
 	shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRev)
 
 	if shouldRedirect {
-		log.Debug().Str("patchType", "redirectSource").Str("file", a.FileName).Msgf("Redirecting targetRevision from %s to %s", targetRev, branch)
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Redirecting targetRevision from %s to %s", targetRev, branch)
 		source["targetRevision"] = branch
 	}
 
@@ -236,13 +239,13 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 	// Get generators
 	generators, found, err := unstructured.NestedSlice(a.Yaml.Object, "spec", "generators")
 	if err != nil || !found {
-		log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Msgf("no 'spec.generators' key found in ApplicationSet: %s", a.Name)
+		log.Debug().Str("patchType", "redirectGenerators").Str("branch", branch).Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no 'spec.generators' key found in ApplicationSet: %s", a.Name)
 		return nil
 	}
 
 	// Process generators
 	if err := a.processGenerators(generators, repo, branch, redirectRevisions, "spec.generators", 0); err != nil {
-		log.Error().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).Err(err).Msg("error processing generators")
+		log.Error().Str("patchType", "redirectGenerators").Str("branch", branch).Str(a.Kind.ShortName(), a.GetLongName()).Err(err).Msg("error processing generators")
 		return err
 	}
 
@@ -271,7 +274,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 				continue
 			}
 
-			log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msg("Matrix generator found")
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Matrix generator found")
 
 			// Get nested generators
 			nestedGens, hasNestedGens := matrixMap["generators"]
@@ -279,7 +282,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 				continue
 			}
 
-			log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msg("Nested generators found")
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Nested generators found")
 
 			nestedGenSlice, ok := nestedGens.([]interface{})
 			if !ok {
@@ -308,12 +311,12 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 				continue
 			}
 
-			log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msg("Git generator found")
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Git generator found")
 
 			// Check repoURL
 			repoURL, ok := gitMap["repoURL"].(string)
 			if !ok || !containsIgnoreCase(repoURL, repo) {
-				log.Debug().Str("file", a.FileName).Str("patchType", "redirectGenerators").Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
+				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
 				continue
 			}
 
@@ -327,7 +330,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 			shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, revision)
 			if shouldRedirect {
 				gitMap["revision"] = branch
-				log.Debug().Str("patchType", "redirectGenerators").Str("file", a.FileName).Str("branch", branch).
+				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Str("branch", branch).
 					Msgf("Redirecting revision from %s to %s in %s[%d].git", revision, branch, parent, i)
 			}
 		}

@@ -16,7 +16,7 @@ Modified (1):
 <br>
 
 ```diff
-@@ Application deleted: folder2 @@
+@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 ----
 -apiVersion: apps/v1
 -kind: Deployment
@@ -49,7 +49,7 @@ Modified (1):
 <br>
 
 ```diff
-@@ Application modified: nginx-ingress @@
+@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
