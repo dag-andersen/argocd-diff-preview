@@ -2,11 +2,47 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
+Total: 2 files changed
+
+Deleted (1):
+- folder2
 
 Modified (1):
 ± nginx-ingress
 ```
+
+<details>
+<summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
+<br>
+
+```diff
+@@ Application deleted: folder2 @@
+----
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  labels:
+-    argocd.argoproj.io/instance: folder2
+-  name: deploy-from-folder-two
+-spec:
+-  replicas: 2
+-  selector:
+-    matchLabels:
+-      app: myapp
+-  template:
+-    metadata:
+-      labels:
+-        app: myapp
+-    spec:
+-      containers:
+-      - image: dag-andersen/myapp:latest
+-        name: myapp
+-        ports:
+-        - containerPort: 80
+-
+```
+
+</details>
 
 <details>
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
