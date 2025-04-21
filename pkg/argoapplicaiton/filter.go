@@ -70,17 +70,17 @@ func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) bool {
 // filterByFilesChanged checks if the application watches any of the changed files
 func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalidWatchPattern bool) bool {
 	if len(filesChanged) == 0 {
-		log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("no files changed. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed. Skipping")
 		return false
 	}
 
 	// check if the application itself is in the list of files changed
 	if slices.Contains(filesChanged, a.FileName) {
-		log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("application itself is in the list of files changed. Returning application")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("application itself is in the list of files changed. Returning application")
 		return true
 	}
 
-	log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("checking files changed: %v", filesChanged)
+	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("checking files changed: %v", filesChanged)
 
 	// Get annotations directly from unstructured
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
@@ -90,13 +90,13 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 
 	watchPattern, exists := annotations[AnnotationWatchPattern]
 	if !exists || strings.TrimSpace(watchPattern) == "" {
-		log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("no watch pattern annotation found. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern annotation found. Skipping")
 		return false
 	}
 
 	patternList := strings.TrimSpace(watchPattern)
 	if patternList == "" {
-		log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("no watch pattern value found. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern value found. Skipping")
 		return false
 	}
 
@@ -105,33 +105,33 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 	for _, pattern := range patterns {
 		pattern = strings.TrimSpace(pattern)
 
-		log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("checking watch pattern: %s", pattern)
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("checking watch pattern: %s", pattern)
 
 		if pattern == "" {
-			log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("empty watch pattern found. Continuing")
+			log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("empty watch pattern found. Continuing")
 			continue
 		}
 
 		regex, err := regexp.Compile(pattern)
 		if err != nil {
 			if !ignoreInvalidWatchPattern {
-				log.Warn().Str("App", a.GetLongName()).Msgf("⚠️ Invalid watch pattern '%s'", pattern)
+				log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("⚠️ Invalid watch pattern '%s'", pattern)
 				return false
 			}
-			log.Warn().Str("App", a.GetLongName()).Msgf("⚠️ Ignoring invalid watch pattern '%s'", pattern)
+			log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("⚠️ Ignoring invalid watch pattern '%s'", pattern)
 			continue
 		}
 
-		log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("watch pattern '%s' is valid. Checking files changed", pattern)
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("watch pattern '%s' is valid. Checking files changed", pattern)
 
 		for _, file := range filesChanged {
 			if regex.MatchString(file) {
-				log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("file '%s' matches watch pattern. Returning application", file)
+				log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("file '%s' matches watch pattern. Returning application", file)
 				return true
 			}
 		}
 	}
 
-	log.Debug().Str("patchType", "filter").Str("App", a.GetLongName()).Msgf("no files changed match watch pattern. Skipping")
+	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed match watch pattern. Skipping")
 	return false
 }

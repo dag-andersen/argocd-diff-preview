@@ -8,8 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// UniqueIds ensures that each application has a unique ID by appending the branch name if necessary.
-// It returns a new slice with unique IDs.
 // UniqueIds ensures all applications have unique IDs by adding suffixes to duplicates
 func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 	// Group applications by ID

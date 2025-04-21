@@ -61,7 +61,7 @@ func GetApplicationsForBranches(
 	for _, baseApp := range baseApps {
 		for _, targetApp := range targetApps {
 			if baseApp.Id == targetApp.Id && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
-				log.Debug().Str("App", baseApp.GetLongName()).Msg("Skipping application because it has not changed")
+				log.Debug().Str(baseApp.Kind.ShortName(), baseApp.Name).Msg("Skipping application because it has not changed")
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
 			}
@@ -412,18 +412,18 @@ func ConvertAppSetsToApps(
 		// Write patched ApplicationSet to file
 		yamlStr, err := appSet.AsString()
 		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf("❌ Failed to convert ApplicationSet to YAML")
+			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("❌ Failed to convert ApplicationSet to YAML")
 			continue
 		}
 
 		if err := os.WriteFile(randomFileName, []byte(yamlStr), 0644); err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf("❌ Failed to write ApplicationSet to file")
+			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("❌ Failed to write ApplicationSet to file")
 			continue
 		}
 		if !debug {
 			defer func() {
 				if err := os.Remove(randomFileName); err != nil {
-					log.Warn().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("⚠️ Failed to remove temporary file")
+					log.Warn().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("⚠️ Failed to remove temporary file")
 				}
 			}()
 		}
@@ -431,14 +431,13 @@ func ConvertAppSetsToApps(
 		// Generate applications using argocd appset generate
 		output, err := argocd.AppsetGenerate(randomFileName)
 		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
-			log.Error().Err(err)
+			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
 			return nil, err
 		}
 
 		// check if output is empty / null
 		if strings.TrimSpace(output) == "" || strings.TrimSpace(output) == "null" {
-			log.Warn().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf("⚠️ ApplicationSet generated empty output")
+			log.Warn().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("⚠️ ApplicationSet generated empty output")
 			continue
 		}
 
@@ -449,7 +448,7 @@ func ConvertAppSetsToApps(
 		if isList {
 			var yamlOutput []unstructured.Unstructured
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
+				log.Error().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
 				log.Error().Err(err)
 				continue
 			}
@@ -457,7 +456,7 @@ func ConvertAppSetsToApps(
 		} else {
 			var yamlOutput unstructured.Unstructured
 			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
+				log.Error().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
 				log.Error().Err(err)
 				continue
 			}
@@ -465,7 +464,7 @@ func ConvertAppSetsToApps(
 		}
 
 		if len(yamlData) == 0 {
-			log.Error().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ No applications found in ApplicationSet")
+			log.Error().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ No applications found in ApplicationSet")
 			continue
 		}
 
@@ -474,20 +473,20 @@ func ConvertAppSetsToApps(
 			kind := doc.GetKind()
 			if kind == "" {
 				log.Error().
-					Str("AppSet", appSet.GetLongName()).
+					Str(appSet.Kind.ShortName(), appSet.GetLongName()).
 					Msg("❌ Output from ApplicationSet contains no kind")
 				continue
 			}
 			if kind != "Application" {
 				log.Error().
-					Str("AppSet", appSet.GetLongName()).
+					Str(appSet.Kind.ShortName(), appSet.GetLongName()).
 					Msg("❌ Output from ApplicationSet contains non-Application resources")
 				continue
 			}
 
 			name := doc.GetName()
 			if name == "" {
-				log.Error().Str("AppSet", appSet.GetLongName()).Msg("❌ Generated Application missing name")
+				log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Generated Application missing name")
 				continue
 			}
 
@@ -510,7 +509,7 @@ func ConvertAppSetsToApps(
 				redirectRevisions,
 			)
 			if err != nil {
-				log.Error().Err(err).Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msg("❌ Failed to patch application")
+				log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to patch application")
 				continue
 			}
 
@@ -519,7 +518,7 @@ func ConvertAppSetsToApps(
 			appsNew = append(appsNew, *patchedApp)
 		}
 
-		log.Debug().Str("branch", branch.Name).Str("AppSet", appSet.GetLongName()).Msgf(
+		log.Debug().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf(
 			"Generated %d Applications from ApplicationSet",
 			localGeneratedAppsCounter,
 		)
