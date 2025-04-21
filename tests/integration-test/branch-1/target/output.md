@@ -16,7 +16,7 @@ Modified (1):
 <br>
 
 ```diff
-@@ Application deleted: folder2 @@
+@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 ----
 -apiVersion: apps/v1
 -kind: Deployment

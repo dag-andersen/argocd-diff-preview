@@ -9,7 +9,7 @@ Modified (7):
 ± app1
 ± app2
 ± app2
-± my-super-app
+± my-app -> my-super-app
 ± my-service-staging
 ± nginx-ingress
 ```
@@ -107,7 +107,7 @@ Modified (7):
 <br>
 
 ```diff
-@@ Application modified: my-super-app (examples/helm/applications/my-app.yaml) @@
+@@ Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml) @@
  ---
  apiVersion: v1
  kind: Service
@@ -220,7 +220,7 @@ Modified (7):
 <br>
 
 ```diff
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx-new-path.yaml) @@
+@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml) @@
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0
          helm.sh/chart: ingress-nginx-4.10.0
