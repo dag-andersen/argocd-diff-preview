@@ -74,7 +74,7 @@ func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
 
 func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 
-	log.Info().Msg("🧼 Removing applications")
+	log.Info().Msg("🧼 Deleting applications")
 
 	// Remove obstructive finalizers
 	if err := c.RemoveObstructiveFinalizers(namespace); err != nil {

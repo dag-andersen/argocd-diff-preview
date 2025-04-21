@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -13,17 +12,6 @@ import (
 const (
 	dirMode = os.ModePerm // 0755 - read/write/execute for owner, read/execute for group and others
 )
-
-// RunCommand executes a command and returns its output
-func RunCommand(cmd string) (string, error) {
-	cmd_split := strings.Split(cmd, " ")
-	command := exec.Command(cmd_split[0], cmd_split[1:]...)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("command failed: %s: %w", string(output), err)
-	}
-	return string(output), nil
-}
 
 // WriteFile writes content to a file
 func WriteFile(path string, content string) error {
