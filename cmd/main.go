@@ -177,7 +177,6 @@ func run(opts *Options) error {
 		&opts.DiffIgnore,
 		opts.LineCount,
 		opts.MaxDiffLength,
-		opts.Debug,
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err

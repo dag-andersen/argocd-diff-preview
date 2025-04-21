@@ -29,7 +29,6 @@ func GenerateDiff(
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
-	debug bool,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -53,7 +52,7 @@ func GenerateDiff(
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, fileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps, debug)
+	summary, fileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -142,7 +141,6 @@ func generateGitDiff(
 	diffContextLines uint,
 	baseExtractedApps []extract.ExtractedApp,
 	targetExtractedApps []extract.ExtractedApp,
-	debug bool,
 ) (string, []string, error) {
 
 	// Write base manifests to disk
@@ -390,25 +388,6 @@ func generateGitDiff(
 
 	// Build summary
 	summary := buildSummary(changedFiles)
-
-	log.Debug().Str("allChanges", fmt.Sprintf("%v", changedFiles)).Msg("All changes")
-
-	if debug {
-		// print base's id and name
-		baseIdAndName := make(map[string]string)
-		for _, app := range baseExtractedApps {
-			baseIdAndName[app.Id] = app.Name
-		}
-
-		// print target's id and name
-		targetIdAndName := make(map[string]string)
-		for _, app := range targetExtractedApps {
-			targetIdAndName[app.Id] = app.Name
-		}
-
-		log.Debug().Str("baseIdAndName", fmt.Sprintf("%v", baseIdAndName)).Msg("Base ID and name")
-		log.Debug().Str("targetIdAndName", fmt.Sprintf("%v", targetIdAndName)).Msg("Target ID and name")
-	}
 
 	// Create array of formatted file sections
 	fileSections := make([]string, 0, len(changedFiles))
