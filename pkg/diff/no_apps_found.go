@@ -10,19 +10,20 @@ import (
 
 // Constants for markdown template
 const noAppsFoundTemplate = `
-## Argo CD Diff Preview
+## %title%
 
 %message%
 `
 
 // WriteNoAppsFoundMessage writes a message to the output folder when no applications are found
 func WriteNoAppsFoundMessage(
+	title string,
 	outputFolder string,
 	selectors []selector.Selector,
 	changedFiles []string,
 ) error {
 	message := getNoAppsFoundMessage(selectors, changedFiles)
-	markdown := generateNoAppsFoundMarkdown(message)
+	markdown := generateNoAppsFoundMarkdown(title, message)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
@@ -33,10 +34,10 @@ func WriteNoAppsFoundMessage(
 }
 
 // generateNoAppsFoundMarkdown generates markdown from the message
-func generateNoAppsFoundMarkdown(message string) string {
-	return strings.TrimSpace(
-		strings.ReplaceAll(noAppsFoundTemplate, "%message%", message),
-	)
+func generateNoAppsFoundMarkdown(title, message string) string {
+	markdown := strings.ReplaceAll(noAppsFoundTemplate, "%title%", title)
+	markdown = strings.ReplaceAll(markdown, "%message%", message)
+	return strings.TrimSpace(markdown)
 }
 
 // getNoAppsFoundMessage generates an appropriate message based on selectors and changed files

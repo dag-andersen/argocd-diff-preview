@@ -41,6 +41,7 @@ var (
 	DefaultArgocdNamespace    = "argocd"
 	DefaultLogFormat          = "human"
 	DefaultArgocdChartVersion = "latest"
+	DefaultTitle              = "Argo CD Diff Preview"
 )
 
 type Options struct {
@@ -66,6 +67,7 @@ type Options struct {
 	ArgocdNamespace           string `mapstructure:"argocd-namespace"`
 	RedirectTargetRevisions   string `mapstructure:"redirect-target-revisions"`
 	LogFormat                 string `mapstructure:"log-format"`
+	Title                     string `mapstructure:"title"`
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
@@ -188,6 +190,7 @@ func Parse() *Options {
 	viper.SetDefault("max-diff-length", DefaultMaxDiffLength)
 	viper.SetDefault("argocd-namespace", DefaultArgocdNamespace)
 	viper.SetDefault("log-format", DefaultLogFormat)
+	viper.SetDefault("title", DefaultTitle)
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
 	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
@@ -223,6 +226,7 @@ func Parse() *Options {
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
+	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -394,6 +398,9 @@ func (o *Options) LogOptions() {
 	if o.ArgocdChartVersion != DefaultArgocdChartVersion && o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)
 	}
+	if o.Title != "" {
+		log.Info().Msgf("✨ - title: %s", o.Title)
+	}
 }
 
 // GetFileRegex returns the parsed regex
@@ -419,4 +426,9 @@ func (o *Options) GetRedirectRevisions() []string {
 // GetClusterProvider returns the cluster provider
 func (o *Options) GetClusterProvider() cluster.Provider {
 	return o.clusterProvider
+}
+
+// GetTitle returns the custom title for the markdown output
+func (o *Options) GetTitle() string {
+	return o.Title
 }

@@ -80,7 +80,7 @@ func run(opts *Options) error {
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(opts.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(opts.GetTitle(), opts.OutputFolder, selectors, filesChanged); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
@@ -169,6 +169,7 @@ func run(opts *Options) error {
 
 	// Generate diff between base and target branches
 	if err := diff.GenerateDiff(
+		opts.GetTitle(),
 		opts.OutputFolder,
 		baseBranch,
 		targetBranch,
