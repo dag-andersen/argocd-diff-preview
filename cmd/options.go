@@ -427,8 +427,3 @@ func (o *Options) GetRedirectRevisions() []string {
 func (o *Options) GetClusterProvider() cluster.Provider {
 	return o.clusterProvider
 }
-
-// GetTitle returns the custom title for the markdown output
-func (o *Options) GetTitle() string {
-	return o.Title
-}
