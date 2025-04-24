@@ -221,6 +221,10 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to wait for argocd-server to be ready: %w", err)
 	}
 
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-repo-server", int(timeout.Seconds())); err != nil {
+		return fmt.Errorf("failed to wait for argocd-repo-server to be ready: %w", err)
+	}
+
 	// Log installed versions
 	log.Info().Msgf("🦑 Installed Chart version: '%s' and App version: '%s'",
 		chart.Metadata.Version, chart.Metadata.AppVersion)
