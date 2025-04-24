@@ -398,7 +398,7 @@ func (o *Options) LogOptions() {
 	if o.ArgocdChartVersion != DefaultArgocdChartVersion && o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)
 	}
-	if o.Title != "" {
+	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)
 	}
 }
