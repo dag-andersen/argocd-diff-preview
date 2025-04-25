@@ -5,6 +5,7 @@ docker_file := Dockerfile
 argocd_namespace := argocd
 timeout := 90
 line_count := 10
+title := Argo CD Diff Preview
 
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
@@ -32,7 +33,8 @@ run-single-test-go: clean pull-base pull-target
 		--diff-ignore="$(diff_ignore)" \
 		--line-count="$(line_count)" \
 		--timeout=$(timeout) \
-		--kind-options="$(kind_options)" 
+		--kind-options="$(kind_options)" \
+		--title="$(title)"
 	mkdir -p ./$(target_branch)$(suffix)/
 	diff ./output/diff.md ./$(target_branch)$(suffix)/output.md
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
@@ -60,6 +62,7 @@ run-single-test-docker: clean pull-base pull-target
 		-e SELECTOR="$(selector)" \
 		-e TIMEOUT="$(timeout)" \
 		-e KIND_OPTIONS="$(kind_options)" \
+		-e TITLE="$(title)" \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
 	diff ./output/diff.md ./$(target_branch)$(suffix)/output.md
@@ -69,12 +72,12 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" line_count=3 kind_options="--name tests"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base kind_options="--config=./kind-config/options.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base kind_options="--config ./kind-config/options.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base title="integration-test/branch-4"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="examples/helm/values/filtered.yaml" suffix="-1"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml" suffix="-2"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="something/else.yaml" suffix="-3"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base selector="team=my-team" suffix="-4"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base selector="team=other-team" suffix="-5"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base selector="team=other-team" suffix="-5" title="integration-test/branch-5"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base file_regex=".*labels\.yaml" suffix="-6"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base file_regex="this-does-not-exist\.yaml" suffix="-7"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target base_branch=integration-test/branch-6/base
