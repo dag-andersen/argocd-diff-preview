@@ -3,7 +3,7 @@ package diff
 import "strings"
 
 const markdownTemplate = `
-## Argo CD Diff Preview
+## %title%
 
 Summary:
 ` + "```yaml" + `
@@ -15,12 +15,15 @@ Summary:
 
 func markdownTemplateLength() int {
 	return len(strings.ReplaceAll(
-		strings.ReplaceAll(markdownTemplate, "%summary%", ""),
-		"%app_diffs%", ""))
+		strings.ReplaceAll(
+			strings.ReplaceAll(markdownTemplate, "%summary%", ""),
+			"%app_diffs%", ""),
+		"%title%", ""))
 }
 
-func printDiff(summary, diff string) string {
-	return strings.TrimSpace(strings.ReplaceAll(
-		strings.ReplaceAll(markdownTemplate, "%summary%", summary),
-		"%app_diffs%", diff)) + "\n"
+func printDiff(title, summary, diff string) string {
+	markdown := strings.ReplaceAll(markdownTemplate, "%title%", title)
+	markdown = strings.ReplaceAll(markdown, "%summary%", summary)
+	markdown = strings.ReplaceAll(markdown, "%app_diffs%", diff)
+	return strings.TrimSpace(markdown) + "\n"
 }

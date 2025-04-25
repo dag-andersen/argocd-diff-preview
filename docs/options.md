@@ -46,3 +46,4 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--secrets-folder <folder>`, `-s` | `SECRETS_FOLDER` | `./secrets` | Secrets folder where the secrets are read from |
 | `--selector <selector>`, `-l` | `SELECTOR` | - | Label selector to filter on (e.g., `key1=value1,key2=value2`) |
 | `--timeout <seconds>` | `TIMEOUT` | `180` | Set timeout in seconds |
+| `--title <title>` | `TITLE` | `Argo CD Diff Preview` | Custom title for the markdown output |

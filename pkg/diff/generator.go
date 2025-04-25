@@ -21,6 +21,7 @@ import (
 
 // GenerateDiff generates a diff between base and target branches
 func GenerateDiff(
+	title string,
 	outputFolder string,
 	baseBranch *gitt.Branch,
 	targetBranch *gitt.Branch,
@@ -112,7 +113,7 @@ func GenerateDiff(
 	}
 
 	// Generate and write markdown
-	markdown := printDiff(strings.TrimSpace(summary), strings.TrimSpace(combinedDiff.String()))
+	markdown := printDiff(title, strings.TrimSpace(summary), strings.TrimSpace(combinedDiff.String()))
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
 		return fmt.Errorf("failed to write markdown: %w", err)
