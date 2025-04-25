@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubernetes-event-exporter
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: monitoring
+    server: https://kubernetes.default.svc
+  project: default
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: registry-1.docker.io/bitnamicharts
+    chart: kubernetes-event-exporter
+    targetRevision: 3.4.5
+    helm:
+      values: |
+        config:
+          logLevel: info
+          logFormat: json
+          metricsNamePrefix: event_exporter_
+          receivers:
+            - name: "elasticsearch-dump"
+              elasticsearch:
+                hosts:
+                  - http://<host1>:9200
+                indexFormat: "kube-events-{2006-01-02}"
+          route:
+            routes:
+              - match:
+                  - receiver: "elasticsearch-dump"
