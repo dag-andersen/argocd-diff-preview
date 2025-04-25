@@ -125,5 +125,3 @@ func (k *Kind) ClusterExists() bool {
 func (k *Kind) DeleteCluster(wait bool) {
 	DeleteCluster(k.clusterName, wait)
 }
-
-// implement Provider methods...

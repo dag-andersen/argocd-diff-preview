@@ -325,7 +325,7 @@ func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return "", fmt.Errorf("argocd appset generate failed: %s: %w", string(exitErr.Stderr), err)
 		}
-		return "", fmt.Errorf("failed to run argocd appset generate: %w", err)
+		return "", fmt.Errorf("failed to run argocd appset generate: %s", string(output))
 	}
 
 	return string(output), nil
@@ -337,7 +337,10 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to get manifests: %w", err)
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("failed to get manifests: %s: %w", string(exitErr.Stderr), err)
+		}
+		return "", fmt.Errorf("failed to get manifests: %s", string(output))
 	}
 
 	return string(output), nil
@@ -349,7 +352,10 @@ func (a *ArgoCDInstallation) RefreshApp(appName string) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to refresh app: %s", output)
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return fmt.Errorf("failed to refresh app: %s: %w", string(exitErr.Stderr), err)
+		}
+		return fmt.Errorf("failed to refresh app: %s", string(output))
 	}
 
 	return nil
