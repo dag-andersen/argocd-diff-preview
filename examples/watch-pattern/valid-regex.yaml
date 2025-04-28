@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: my-app-labels
+  name: watch-pattern-valid-regex-example
   namespace: argocd
-  labels:
-    team: my-team
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered"
 spec:
   project: default
   destination:

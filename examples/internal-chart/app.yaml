@@ -1,10 +1,8 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: my-app-watch-pattern-valid-regex
+  name: internal-chart-example
   namespace: argocd
-  annotations:
-    argocd-diff-preview/watch-pattern: "examples/helm/charts/myApp/.*, examples/helm/values/filtered"
 spec:
   project: default
   destination:
@@ -17,6 +15,4 @@ spec:
       repoURL: https://github.com/dag-andersen/argocd-diff-preview
       helm:
         valueFiles:
-          - $local-files/examples/helm/values/filtered.yaml
-        valuesObject:
-          replicaCount: 5
+          - $local-files/examples/helm/values/my-app.yaml

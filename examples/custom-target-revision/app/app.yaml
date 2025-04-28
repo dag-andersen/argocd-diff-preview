@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: my-app-custom-target-revision
+  name: custom-target-revision-example
   namespace: argocd
 spec:
   project: default
