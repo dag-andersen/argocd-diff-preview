@@ -92,19 +92,23 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 		return false
 	}
 
-	return a.filterByAnnotationWatchPattern(annotations, filesChanged, ignoreInvalidWatchPattern) || a.filterByManifestGeneratePaths(annotations, filesChanged)
+	filter := a.filterByAnnotationWatchPattern(annotations, filesChanged, ignoreInvalidWatchPattern) || a.filterByManifestGeneratePaths(annotations, filesChanged)
+	if !filter {
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Skipping application. Does not match watch pattern or manifest-generate-paths")
+	}
+	return filter
 }
 
 func (a *ArgoResource) filterByAnnotationWatchPattern(annotations map[string]string, filesChanged []string, ignoreInvalidWatchPattern bool) bool {
 	watchPattern, exists := annotations[AnnotationWatchPattern]
 	if !exists || strings.TrimSpace(watchPattern) == "" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern annotation found. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern annotation found")
 		return false
 	}
 
 	patternList := strings.TrimSpace(watchPattern)
 	if patternList == "" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern value found. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern value found")
 		return false
 	}
 
@@ -140,7 +144,7 @@ func (a *ArgoResource) filterByAnnotationWatchPattern(annotations map[string]str
 		}
 	}
 
-	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed match watch pattern. Skipping")
+	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed match watch pattern")
 	return false
 }
 
@@ -150,7 +154,7 @@ func (a *ArgoResource) filterByManifestGeneratePaths(annotations map[string]stri
 	// Get manifest-generate-paths annotation
 	manifestGeneratePaths, exists := annotations[AnnotationArgoCDManifestGeneratePaths]
 	if !exists || strings.TrimSpace(manifestGeneratePaths) == "" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no manifest-generate-paths annotation found. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no manifest-generate-paths annotation found")
 		return false
 	}
 
@@ -158,13 +162,16 @@ func (a *ArgoResource) filterByManifestGeneratePaths(annotations map[string]stri
 	paths := strings.Split(manifestGeneratePaths, ";")
 
 	if len(paths) == 0 {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no manifest-generate-paths found. Skipping")
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no manifest-generate-paths found")
 		return false
 	}
 
 	var refreshPaths []string
 
 	for _, path := range paths {
+		// trim whitespace
+		path = strings.TrimSpace(path)
+
 		// If manifest path is absolute, add it to the list of refresh paths
 		if filepath.IsAbs(path) {
 			refreshPaths = append(refreshPaths, filepath.Clean(path))
@@ -191,6 +198,8 @@ func (a *ArgoResource) filterByManifestGeneratePaths(annotations map[string]stri
 		}
 	}
 
+	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Paths to compare with files changed: %v", refreshPaths)
+
 	for _, f := range filesChanged {
 		if !filepath.IsAbs(f) {
 			f = string(filepath.Separator) + f
@@ -209,6 +218,6 @@ func (a *ArgoResource) filterByManifestGeneratePaths(annotations map[string]stri
 		}
 	}
 
-	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed match manifest-generate-paths. Skipping")
+	log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed match manifest-generate-paths")
 	return false
 }
