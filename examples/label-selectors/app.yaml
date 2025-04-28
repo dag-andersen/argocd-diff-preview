@@ -1,8 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: my-app
+  name: label-selectors-example
   namespace: argocd
+  labels:
+    team: my-team
 spec:
   project: default
   destination:
@@ -15,4 +17,6 @@ spec:
       repoURL: https://github.com/dag-andersen/argocd-diff-preview
       helm:
         valueFiles:
-          - $local-files/examples/helm/values/my-app.yaml
+          - $local-files/examples/helm/values/filtered.yaml
+        valuesObject:
+          replicaCount: 5
