@@ -59,7 +59,7 @@ func GetResourcesFromBothBranches(
 	targetManifest string,
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	// Apply base manifest directly from string with kubectl
-	if err := argocd.K8sClient.ApplyManifestFromString(baseManifest, argocd.Namespace); err != nil {
+	if _, err := argocd.K8sClient.ApplyManifestFromString(baseManifest, argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply base apps: %w", err)
 	}
 
@@ -78,7 +78,7 @@ func GetResourcesFromBothBranches(
 	}
 
 	// apply target manifest
-	if err := argocd.K8sClient.ApplyManifestFromString(targetManifest, argocd.Namespace); err != nil {
+	if _, err := argocd.K8sClient.ApplyManifestFromString(targetManifest, argocd.Namespace); err != nil {
 		return nil, nil, fmt.Errorf("failed to apply target apps: %w", err)
 	}
 

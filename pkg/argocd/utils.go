@@ -30,10 +30,11 @@ func ApplySecretsFromFolder(client *utils.K8sClient, secretsFolder string, names
 		}
 
 		// Use the existing ApplyManifestFromFile method to apply each secret
-		if err := client.ApplyManifestFromFile(filepath.Join(secretsFolder, file.Name()), namespace); err != nil {
+		count, err := client.ApplyManifestFromFile(filepath.Join(secretsFolder, file.Name()), namespace)
+		if err != nil {
 			return fmt.Errorf("failed to apply secret %s: %w", file.Name(), err)
 		}
-		secretCount++
+		secretCount += count
 	}
 
 	if secretCount > 0 {
