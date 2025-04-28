@@ -556,3 +556,109 @@ metadata:
 		})
 	}
 }
+
+func TestFilterByAnnotationWatchPattern(t *testing.T) {
+
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	tests := []struct {
+		name           string
+		app            *unstructured.Unstructured
+		files          []string
+		changeExpected bool
+	}{
+		{"default no path", &unstructured.Unstructured{}, []string{"README.md"}, false},
+		{"no files changed", getYamlApp(t, ".", "source/path"), []string{}, false},
+		{"relative path - matching", getYamlApp(t, ".", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"relative path, multi source - matching #1", getMultiSourceYamlApp(t, ".", "source/path", "other/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"relative path, multi source - matching #2", getMultiSourceYamlApp(t, ".", "other/path", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"relative path - not matching", getYamlApp(t, ".", "source/path"), []string{"README.md"}, false},
+		{"relative path, multi source - not matching", getMultiSourceYamlApp(t, ".", "other/path", "unrelated/path"), []string{"README.md"}, false},
+		{"absolute path - matching", getYamlApp(t, "/source/path", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"absolute path, multi source - matching #1", getMultiSourceYamlApp(t, "/source/path", "source/path", "other/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"absolute path, multi source - matching #2", getMultiSourceYamlApp(t, "/source/path", "other/path", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"absolute path - not matching", getYamlApp(t, "/source/path1", "source/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"absolute path, multi source - not matching", getMultiSourceYamlApp(t, "/source/path1", "other/path", "source/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"glob path * - matching", getYamlApp(t, "/source/**/my-deployment.yaml", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"glob path * - not matching", getYamlApp(t, "/source/**/my-service.yaml", "source/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"glob path ? - matching", getYamlApp(t, "/source/path/my-deployment-?.yaml", "source/path"), []string{"source/path/my-deployment-0.yaml"}, true},
+		{"glob path ? - not matching", getYamlApp(t, "/source/path/my-deployment-?.yaml", "source/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"glob path char range - matching", getYamlApp(t, "/source/path[0-9]/my-deployment.yaml", "source/path"), []string{"source/path1/my-deployment.yaml"}, true},
+		{"glob path char range - not matching", getYamlApp(t, "/source/path[0-9]/my-deployment.yaml", "source/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"mixed glob path - matching", getYamlApp(t, "/source/path[0-9]/my-*.yaml", "source/path"), []string{"source/path1/my-deployment.yaml"}, true},
+		{"mixed glob path - not matching", getYamlApp(t, "/source/path[0-9]/my-*.yaml", "source/path"), []string{"README.md"}, false},
+		{"two relative paths - matching", getYamlApp(t, ".;../shared", "my-app"), []string{"shared/my-deployment.yaml"}, true},
+		{"two relative paths, multi source - matching #1", getMultiSourceYamlApp(t, ".;../shared", "my-app", "other/path"), []string{"shared/my-deployment.yaml"}, true},
+		{"two relative paths, multi source - matching #2", getMultiSourceYamlApp(t, ".;../shared", "my-app", "other/path"), []string{"shared/my-deployment.yaml"}, true},
+		{"two relative paths - not matching", getYamlApp(t, ".;../shared", "my-app"), []string{"README.md"}, false},
+		{"two relative paths, multi source - not matching", getMultiSourceYamlApp(t, ".;../shared", "my-app", "other/path"), []string{"README.md"}, false},
+		{"file relative path - matching", getYamlApp(t, "./my-deployment.yaml", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"file relative path, multi source - matching #1", getMultiSourceYamlApp(t, "./my-deployment.yaml", "source/path", "other/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"file relative path, multi source - matching #2", getMultiSourceYamlApp(t, "./my-deployment.yaml", "other/path", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"file relative path - not matching", getYamlApp(t, "./my-deployment.yaml", "source/path"), []string{"README.md"}, false},
+		{"file relative path, multi source - not matching", getMultiSourceYamlApp(t, "./my-deployment.yaml", "source/path", "other/path"), []string{"README.md"}, false},
+		{"file absolute path - matching", getYamlApp(t, "/source/path/my-deployment.yaml", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"file absolute path, multi source - matching #1", getMultiSourceYamlApp(t, "/source/path/my-deployment.yaml", "source/path", "other/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"file absolute path, multi source - matching #2", getMultiSourceYamlApp(t, "/source/path/my-deployment.yaml", "other/path", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
+		{"file absolute path - not matching", getYamlApp(t, "/source/path1/README.md", "source/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"file absolute path, multi source - not matching", getMultiSourceYamlApp(t, "/source/path1/README.md", "source/path", "other/path"), []string{"source/path/my-deployment.yaml"}, false},
+		{"file two relative paths - matching", getYamlApp(t, "./README.md;../shared/my-deployment.yaml", "my-app"), []string{"shared/my-deployment.yaml"}, true},
+		{"file two relative paths, multi source - matching", getMultiSourceYamlApp(t, "./README.md;../shared/my-deployment.yaml", "my-app", "other-path"), []string{"shared/my-deployment.yaml"}, true},
+		{"file two relative paths - not matching", getYamlApp(t, ".README.md;../shared/my-deployment.yaml", "my-app"), []string{"kustomization.yaml"}, false},
+		{"file two relative paths, multi source - not matching", getMultiSourceYamlApp(t, ".README.md;../shared/my-deployment.yaml", "my-app", "other-path"), []string{"kustomization.yaml"}, false},
+		{"changed file absolute path - matching", getYamlApp(t, ".", "source/path"), []string{"/source/path/my-deployment.yaml"}, true},
+	}
+	for _, tt := range tests {
+		ttc := tt
+		t.Run(ttc.name, func(t *testing.T) {
+			t.Parallel()
+			app := &ArgoResource{
+				Yaml:     ttc.app,
+				Kind:     Application,
+				Name:     "test-app",
+				FileName: "test.yaml",
+			}
+
+			annotations, _, err := unstructured.NestedStringMap(ttc.app.Object, "metadata", "annotations")
+			assert.NoError(t, err)
+			assert.Equal(t, ttc.changeExpected, app.filterByManifestGeneratePaths(annotations, ttc.files))
+		})
+	}
+}
+
+func getYamlApp(t *testing.T, annotation string, sourcePath string) *unstructured.Unstructured {
+	var node unstructured.Unstructured
+	yamlText := `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: "` + annotation + `"
+spec:
+  source:
+    path: "` + sourcePath + `"`
+	if err := yaml.Unmarshal([]byte(yamlText), &node); err != nil {
+		t.Fatalf("Error unmarshalling YAML: %v", err)
+	}
+	return &node
+}
+
+func getMultiSourceYamlApp(t *testing.T, annotation string, paths ...string) *unstructured.Unstructured {
+	var node unstructured.Unstructured
+	yamlText := `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: "` + annotation + `"
+spec:
+  sources:`
+	for _, path := range paths {
+		yamlText += `
+    - path: "` + path + `"`
+	}
+	if err := yaml.Unmarshal([]byte(yamlText), &node); err != nil {
+		t.Fatalf("Error unmarshalling YAML: %v", err)
+	}
+	return &node
+}
