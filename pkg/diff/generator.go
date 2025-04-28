@@ -221,6 +221,7 @@ func generateGitDiff(
 			Email: "noreply@example.com",
 			When:  time.Now(),
 		},
+		AllowEmptyCommits: true,
 	})
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to commit to base repo: %w", err)
@@ -242,6 +243,7 @@ func generateGitDiff(
 			Email: "noreply@example.com",
 			When:  time.Now(),
 		},
+		AllowEmptyCommits: true,
 	})
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to commit to target repo: %w", err)
