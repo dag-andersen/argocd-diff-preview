@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	AnnotationWatchPattern                = "argocd-diff-preview/watch-pattern"
-	AnnotationIgnore                      = "argocd-diff-preview/ignore"
-	AnnotationArgoCDManifestGeneratePaths = "argocd.argoproj.io/manifest-generate-paths"
+	annotationWatchPattern                = "argocd-diff-preview/watch-pattern"
+	annotationIgnore                      = "argocd-diff-preview/ignore"
+	annotationArgoCDManifestGeneratePaths = "argocd.argoproj.io/manifest-generate-paths"
 )
 
 // Filter checks if the application matches the given selectors and watches the given files
@@ -25,7 +25,13 @@ func (a *ArgoResource) Filter(
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
 ) *ArgoResource {
-	// First check selectors
+
+	// First check ignore annotation
+	if !a.filterByIgnoreAnnotation() {
+		return nil
+	}
+
+	// Then check selectors
 	if len(selectors) > 0 {
 		if !a.filterBySelectors(selectors) {
 			return nil
@@ -40,6 +46,14 @@ func (a *ArgoResource) Filter(
 	}
 
 	return a
+}
+
+func (a *ArgoResource) filterByIgnoreAnnotation() bool {
+	if value, exists := a.Yaml.Object["metadata"].(map[string]any)["annotations"].(map[string]any)[annotationIgnore]; exists && value == "true" {
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("application is ignored because of `argocd-diff-preview/ignore: true`. Skipping")
+		return false
+	}
+	return true
 }
 
 // filterBySelectors checks if the application matches the given selectors
@@ -100,7 +114,7 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 }
 
 func (a *ArgoResource) filterByAnnotationWatchPattern(annotations map[string]string, filesChanged []string, ignoreInvalidWatchPattern bool) bool {
-	watchPattern, exists := annotations[AnnotationWatchPattern]
+	watchPattern, exists := annotations[annotationWatchPattern]
 	if !exists || strings.TrimSpace(watchPattern) == "" {
 		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern annotation found")
 		return false
@@ -152,7 +166,7 @@ func (a *ArgoResource) filterByAnnotationWatchPattern(annotations map[string]str
 // Mimics the behavior of the watch pattern from ArgoCD: https://github.com/argoproj/argo-cd/blob/master/util/app/path/path.go#L122-L151
 func (a *ArgoResource) filterByManifestGeneratePaths(annotations map[string]string, filesChanged []string) bool {
 	// Get manifest-generate-paths annotation
-	manifestGeneratePaths, exists := annotations[AnnotationArgoCDManifestGeneratePaths]
+	manifestGeneratePaths, exists := annotations[annotationArgoCDManifestGeneratePaths]
 	if !exists || strings.TrimSpace(manifestGeneratePaths) == "" {
 		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no manifest-generate-paths annotation found")
 		return false
