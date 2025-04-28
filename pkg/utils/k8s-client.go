@@ -210,31 +210,33 @@ func (c *K8sClient) applyManifest(obj *unstructured.Unstructured, source string,
 }
 
 // ApplyManifestFromFile applies a Kubernetes manifest from a file
-func (c *K8sClient) ApplyManifestFromFile(path string, fallbackNamespace string) error {
+func (c *K8sClient) ApplyManifestFromFile(path string, fallbackNamespace string) (int, error) {
 	// Read manifest file
 	manifestBytes, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read manifest file: %w", err)
+		return 0, fmt.Errorf("failed to read manifest file: %w", err)
 	}
 
 	// Check if file is empty
 	if len(manifestBytes) == 0 {
 		log.Debug().Str("path", path).Msg("Skipping empty manifest file")
-		return nil
+		return 0, nil
 	}
 
 	return c.ApplyManifestFromString(string(manifestBytes), fallbackNamespace)
 }
 
-func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace string) error {
+func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace string) (int, error) {
 	// Check if manifest is empty
 	if strings.TrimSpace(manifest) == "" {
 		log.Debug().Msg("Skipping empty manifest string")
-		return nil
+		return 0, nil
 	}
 
 	// Split manifest into multiple documents (if any)
 	documents := strings.Split(manifest, "---")
+
+	count := 0
 
 	for _, doc := range documents {
 		// Skip empty documents
@@ -246,15 +248,17 @@ func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace s
 		// Parse YAML into unstructured object
 		obj := &unstructured.Unstructured{}
 		if err := yaml.Unmarshal([]byte(trimmedDoc), &obj.Object); err != nil {
-			return fmt.Errorf("failed to parse manifest YAML: %w", err)
+			return count, fmt.Errorf("failed to parse manifest YAML: %w", err)
 		}
 
 		if err := c.applyManifest(obj, "string", fallbackNamespace); err != nil {
-			return err
+			return count, err
 		}
+
+		count++
 	}
 
-	return nil
+	return count, nil
 }
 
 // create namespace
