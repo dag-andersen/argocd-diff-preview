@@ -223,13 +223,7 @@ func (c *K8sClient) ApplyManifestFromFile(path string, fallbackNamespace string)
 		return nil
 	}
 
-	// Parse YAML into unstructured object
-	obj := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal(manifestBytes, &obj.Object); err != nil {
-		return fmt.Errorf("failed to parse manifest YAML: %w", err)
-	}
-
-	return c.applyManifest(obj, fmt.Sprintf("file:%s", path), fallbackNamespace)
+	return c.ApplyManifestFromString(string(manifestBytes), fallbackNamespace)
 }
 
 func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace string) error {
