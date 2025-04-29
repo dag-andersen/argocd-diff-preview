@@ -225,8 +225,8 @@ func FromResourceToApplication(
 	// Filter applications
 	var filteredApps []ArgoResource
 	for _, app := range apps {
-		if filtered := app.Filter(selector, filesChanged, ignoreInvalidWatchPattern); filtered != nil {
-			filteredApps = append(filteredApps, *filtered)
+		if app.Filter(selector, filesChanged, ignoreInvalidWatchPattern) {
+			filteredApps = append(filteredApps, app)
 		}
 	}
 

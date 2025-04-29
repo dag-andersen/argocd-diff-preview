@@ -52,7 +52,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
 	// Apply secrets before installing ArgoCD
 	if err := ApplySecretsFromFolder(a.K8sClient, secretsFolder, a.Namespace); err != nil {
-		return fmt.Errorf("failed to apply secrets: %w", err)
+		return fmt.Errorf("failed to apply secrets: %w from folder: %s", err, secretsFolder)
 	}
 
 	// Install ArgoCD using Helm

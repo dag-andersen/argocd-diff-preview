@@ -10,6 +10,67 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func TestFilterByIgnoreAnnotation(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]any
+		want        bool
+	}{
+		{
+			name:        "no annotations",
+			annotations: map[string]any{},
+			want:        true,
+		},
+		{
+			name: "ignore annotation not set",
+			annotations: map[string]any{
+				"other-annotation": "value",
+			},
+			want: true,
+		},
+		{
+			name: "ignore annotation set to true",
+			annotations: map[string]any{
+				"argocd-diff-preview/ignore": "true",
+			},
+			want: false,
+		},
+		{
+			name: "ignore annotation set to false",
+			annotations: map[string]any{
+				"argocd-diff-preview/ignore": "false",
+			},
+			want: true,
+		},
+		{
+			name: "ignore annotation set to non-boolean value",
+			annotations: map[string]any{
+				"argocd-diff-preview/ignore": "some-value",
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &ArgoResource{
+				Yaml: &unstructured.Unstructured{
+					Object: map[string]any{
+						"metadata": map[string]any{
+							"annotations": tt.annotations,
+						},
+					},
+				},
+			}
+
+			got := resource.filterByIgnoreAnnotation()
+			if got != tt.want {
+				t.Errorf("filterByIgnoreAnnotation() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFilterBySelectors(t *testing.T) {
 
 	zerolog.SetGlobalLevel(zerolog.FatalLevel)
@@ -313,7 +374,7 @@ func TestFilter(t *testing.T) {
 		selectors                 []selector.Selector
 		filesChanged              []string
 		ignoreInvalidWatchPattern bool
-		want                      *ArgoResource
+		want                      bool
 	}{
 		{
 			name: "no selectors or files changed",
@@ -329,7 +390,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Id: "test-app"},
+			want:                      true,
 		},
 		{
 			name: "matching label selector",
@@ -347,7 +408,7 @@ metadata:
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Id: "test-app"},
+			want:                      true,
 		},
 		{
 			name: "non-matching label selector",
@@ -365,7 +426,7 @@ metadata:
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
 		},
 		{
 			name: "matching file watch pattern",
@@ -381,7 +442,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.yaml"},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Id: "test-app"},
+			want:                      true,
 		},
 		{
 			name: "non-matching file watch pattern",
@@ -397,7 +458,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.txt"},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
 		},
 		{
 			name: "multiple watch patterns",
@@ -413,7 +474,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.txt"},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Id: "test-app"},
+			want:                      true,
 		},
 		{
 			name: "invalid watch pattern with ignore",
@@ -429,7 +490,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"test.yaml"},
 			ignoreInvalidWatchPattern: true,
-			want:                      &ArgoResource{Id: "test-app"},
+			want:                      true,
 		},
 		{
 			name: "invalid watch pattern without ignore",
@@ -445,7 +506,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
 		},
 		{
 			name: "empty watch pattern",
@@ -461,7 +522,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
 		},
 		{
 			name: "no watch pattern annotation",
@@ -475,7 +536,7 @@ metadata:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
 		},
 		{
 			name: "no metadata",
@@ -488,7 +549,7 @@ spec:
 			selectors:                 []selector.Selector{},
 			filesChanged:              []string{"some-file.yaml"},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
 		},
 		{
 			name: "not equals operator",
@@ -506,7 +567,7 @@ metadata:
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      &ArgoResource{Id: "test-app"},
+			want:                      true,
 		},
 		{
 			name: "not equals operator with matching value",
@@ -524,7 +585,71 @@ metadata:
 			},
 			filesChanged:              []string{},
 			ignoreInvalidWatchPattern: false,
-			want:                      nil,
+			want:                      false,
+		},
+		{
+			name: "ignore annotation",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/ignore: "true"`,
+			selectors:                 []selector.Selector{},
+			filesChanged:              []string{},
+			ignoreInvalidWatchPattern: false,
+			want:                      false,
+		},
+		{
+			name: "ignore annotation with watch pattern",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/ignore: "true"
+    argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
+			selectors:                 []selector.Selector{},
+			filesChanged:              []string{},
+			ignoreInvalidWatchPattern: false,
+			want:                      false,
+		},
+		{
+			name: "ignore annotation = false with matching selectors",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    app: test
+  annotations:
+    argocd-diff-preview/ignore: "false"`,
+			selectors: []selector.Selector{
+				{Key: "app", Value: "test", Operator: selector.Eq},
+			},
+			filesChanged:              []string{},
+			ignoreInvalidWatchPattern: false,
+			want:                      true,
+		},
+		{
+			name: "ignore annotation = false with watch pattern",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    app: test
+  annotations:
+    argocd-diff-preview/ignore: "false"
+    argocd-diff-preview/watch-pattern: ".*\\.yaml$"`,
+			selectors:                 []selector.Selector{},
+			filesChanged:              []string{"test.yaml"},
+			ignoreInvalidWatchPattern: false,
+			want:                      true,
 		},
 	}
 
@@ -547,12 +672,7 @@ metadata:
 			got := app.Filter(tt.selectors, tt.filesChanged, tt.ignoreInvalidWatchPattern)
 
 			// Check result
-			if tt.want == nil {
-				assert.Nil(t, got)
-			} else {
-				assert.NotNil(t, got)
-				assert.Equal(t, tt.want.Id, got.Id)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
