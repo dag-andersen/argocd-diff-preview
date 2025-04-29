@@ -1,4 +1,4 @@
-package argoapplicaiton
+package argoapplication
 
 import (
 	"testing"
