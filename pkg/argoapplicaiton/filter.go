@@ -49,8 +49,15 @@ func (a *ArgoResource) Filter(
 }
 
 func (a *ArgoResource) filterByIgnoreAnnotation() bool {
-	if value, exists := a.Yaml.Object["metadata"].(map[string]any)["annotations"].(map[string]any)[annotationIgnore]; exists && value == "true" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("application is ignored because of `argocd-diff-preview/ignore: true`. Skipping")
+
+	// get annotations
+	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
+	if err != nil || !found || len(annotations) == 0 {
+		return true
+	}
+
+	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
+		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("application is ignored because of `argocd-diff-preview/ignore: %s`. Skipping", value)
 		return false
 	}
 	return true
