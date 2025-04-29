@@ -24,28 +24,28 @@ func (a *ArgoResource) Filter(
 	selectors []selector.Selector,
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
-) *ArgoResource {
+) bool {
 
 	// First check ignore annotation
 	if !a.filterByIgnoreAnnotation() {
-		return nil
+		return false
 	}
 
 	// Then check selectors
 	if len(selectors) > 0 {
 		if !a.filterBySelectors(selectors) {
-			return nil
+			return false
 		}
 	}
 
 	// Then check files changed
 	if len(filesChanged) > 0 {
 		if !a.filterByFilesChanged(filesChanged, ignoreInvalidWatchPattern) {
-			return nil
+			return false
 		}
 	}
 
-	return a
+	return true
 }
 
 func (a *ArgoResource) filterByIgnoreAnnotation() bool {
