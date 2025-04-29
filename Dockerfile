@@ -33,6 +33,9 @@ RUN apt-get update && apt-get install -y curl
 RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.26.0/kind-linux-${TARGETARCH} && \
     chmod +x ./kind
 
+# Install k3d
+RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
 # Install Argo CD
 RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
     install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
@@ -42,6 +45,7 @@ FROM gcr.io/distroless/static-debian12 AS final
 
 # Copy necessary binaries from the build stage
 COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
+COPY --from=build /usr/local/bin/k3d /usr/local/bin/k3d
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
 COPY --from=build /argocd-diff-preview/argocd-diff-preview .
 
