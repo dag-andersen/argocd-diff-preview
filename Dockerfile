@@ -33,9 +33,6 @@ RUN apt-get update && apt-get install -y curl
 RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.26.0/kind-linux-${TARGETARCH} && \
     chmod +x ./kind
 
-# Install k3d
-RUN curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-
 # Install Argo CD
 RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
     install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
