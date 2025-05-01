@@ -359,6 +359,10 @@ func generateGitDiff(
 			diffContent = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
 		}
 
+		if diffContent == "" {
+			continue
+		}
+
 		toName := ""
 		fromName := ""
 		if to != nil {
