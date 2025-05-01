@@ -42,7 +42,6 @@ FROM gcr.io/distroless/static-debian12 AS final
 
 # Copy necessary binaries from the build stage
 COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
-COPY --from=build /usr/local/bin/k3d /usr/local/bin/k3d
 COPY --from=build /usr/local/bin/argocd /usr/local/bin/argocd
 COPY --from=build /argocd-diff-preview/argocd-diff-preview .
 
