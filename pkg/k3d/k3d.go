@@ -41,16 +41,18 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) error {
 	}
 
 	// Create new cluster
-	args := []string{"create", "cluster"}
+	args := []string{"cluster", "create"}
 	if strings.TrimSpace(k3dOptions) != "" {
 		args = append(args, strings.Fields(k3dOptions)...)
 	}
 	args = append(args, clusterName)
 
 	if output, err := runCommand("k3d", args...); err != nil {
-		log.Error().Msg("❌ Failed to create cluster")
-	} else {
-		log.Error().Msgf("❌ Failed to create cluster with options: %s", k3dOptions)
+		if strings.TrimSpace(k3dOptions) == "" {
+			log.Error().Msg("❌ Failed to create cluster")
+		} else {
+			log.Error().Msgf("❌ Failed to create cluster with options: %s", k3dOptions)
+		}
 		return fmt.Errorf("failed to create cluster: %s", output)
 	}
 
