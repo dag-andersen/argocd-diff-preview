@@ -1,4 +1,4 @@
-package argoapplicaiton
+package argoapplication
 
 // ApplicationKind represents the type of Argo CD application
 type ApplicationKind int

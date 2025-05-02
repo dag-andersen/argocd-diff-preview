@@ -1,4 +1,4 @@
-package argoapplicaiton
+package argoapplication
 
 import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/annotations"

@@ -13,17 +13,35 @@ on:
       - .github/workflows/pr.yml
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'  # Adjust this to match your Go version
-      
+          go-version: '1.24.0'
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5
+
+      - name: Run lint
+        run: make run-lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.0'
+
       - name: Run unit tests
         run: make run-unit-tests GO_TEST_FLAGS="-mod=readonly"
 
@@ -33,7 +51,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        # platform: [amd64, arm64] // Takes to long to run both 
+        # platform: [amd64, arm64] // Takes too long to run both
         platform: [amd64]
     steps:
       - name: Checkout

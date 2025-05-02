@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplicaiton"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/diff"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
@@ -52,7 +52,7 @@ func run(opts *Options) error {
 	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
 	// Get applications for both branches
-	baseApps, targetApps, err := argoapplicaiton.GetApplicationsForBranches(
+	baseApps, targetApps, err := argoapplication.GetApplicationsForBranches(
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
@@ -122,7 +122,7 @@ func run(opts *Options) error {
 	}
 
 	// Generate applications from ApplicationSets
-	baseApps, targetApps, err = argoapplicaiton.ConvertAppSetsToAppsInBothBranches(
+	baseApps, targetApps, err = argoapplication.ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		baseApps,
 		targetApps,
@@ -144,8 +144,8 @@ func run(opts *Options) error {
 	}
 
 	// Generate application manifests as strings
-	baseManifest := argoapplicaiton.ApplicationsToString(baseApps)
-	targetManifest := argoapplicaiton.ApplicationsToString(targetApps)
+	baseManifest := argoapplication.ApplicationsToString(baseApps)
+	targetManifest := argoapplication.ApplicationsToString(targetApps)
 
 	// For debugging purposes, we can still write the manifests to files
 	if opts.Debug {
