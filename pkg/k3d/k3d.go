@@ -33,7 +33,7 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) error {
 		return fmt.Errorf("docker is not running: %s", output)
 	}
 
-	log.Info().Msg("🚀 Creating cluster...")
+	log.Info().Msg("🚀 Creating k3d cluster...")
 
 	// Delete existing cluster if it exists
 	if output, err := runCommand("k3d", "cluster", "delete", clusterName); err != nil {

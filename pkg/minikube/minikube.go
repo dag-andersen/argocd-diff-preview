@@ -27,7 +27,7 @@ func CreateCluster() error {
 		return fmt.Errorf("docker is not running: %s", output)
 	}
 
-	log.Info().Msg("🚀 Creating cluster...")
+	log.Info().Msg("🚀 Creating minikube cluster...")
 
 	// Delete existing cluster if it exists
 	if output, err := runCommand("minikube", "delete"); err != nil {
