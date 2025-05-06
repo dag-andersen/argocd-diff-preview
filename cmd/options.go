@@ -375,7 +375,7 @@ func (o *Options) LogOptions() {
 		log.Info().Msgf("✨ - keep-cluster-alive: %t", o.KeepClusterAlive)
 	}
 	if o.Debug {
-		log.Info().Msgf("✨ - debug: %t", o.Debug)
+		log.Info().Msgf("✨ - debug: %t - This is slower because it will do more checks", o.Debug)
 	}
 	if o.parsedFileRegex != nil {
 		log.Info().Msgf("✨ - file-regex: %s", *o.parsedFileRegex)

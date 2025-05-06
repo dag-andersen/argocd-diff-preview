@@ -217,12 +217,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}()
 
 	// Wait for deployment to be ready
-	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-server", int(timeout.Seconds())); err != nil {
-		return fmt.Errorf("failed to wait for argocd-server to be ready: %w", err)
-	}
-
-	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-repo-server", int(timeout.Seconds())); err != nil {
-		return fmt.Errorf("failed to wait for argocd-repo-server to be ready: %w", err)
+	if err := a.EnsureArgoCdIsReady(); err != nil {
+		return fmt.Errorf("failed to wait for deployments to be ready: %w", err)
 	}
 
 	// Log installed versions
@@ -356,6 +352,20 @@ func (a *ArgoCDInstallation) RefreshApp(appName string) error {
 			return fmt.Errorf("failed to refresh app: %s: %w", string(exitErr.Stderr), err)
 		}
 		return fmt.Errorf("failed to refresh app: %s", string(output))
+	}
+
+	return nil
+}
+
+func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
+	timeout := 300 * time.Second
+	// Wait for deployment to be ready
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-server", int(timeout.Seconds())); err != nil {
+		return fmt.Errorf("failed to wait for argocd-server to be ready: %w", err)
+	}
+
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-repo-server", int(timeout.Seconds())); err != nil {
+		return fmt.Errorf("failed to wait for argocd-repo-server to be ready: %w", err)
 	}
 
 	return nil
