@@ -161,7 +161,10 @@ func extractResourcesFromClusterAsApps(
 			switch item.Status.Sync.Status {
 			case "OutOfSync", "Synced":
 				log.Debug().Str("name", name).Msg("Extracting manifests from Application")
-				manifests, err := argocd.GetManifests(name)
+				manifests, exists, err := argocd.GetManifests(name)
+				if !exists {
+					log.Error().Msgf("❌ Application %s did not exist! This should not happen, please report this issue", name)
+				}
 				if err != nil {
 					log.Error().Msgf("❌ Failed to get manifests for application: %s, error: %v", name, err)
 					failedApps[name] = err.Error()

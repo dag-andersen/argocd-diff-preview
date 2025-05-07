@@ -342,22 +342,15 @@ func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
 	return out, nil
 }
 
-func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
+// GetManifests returns the manifests for an application
+func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
 	out, err := a.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
-
 		exists, err := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
-		if err != nil {
-			log.Error().Msgf("❌ Failed to check if application exists: %s, error: %v", appName, err)
-		}
-		if !exists {
-			log.Error().Msgf("❌ Application %s did not exist! This should not happen, please report this issue", appName)
-		}
-
-		return "", fmt.Errorf("failed to get manifests for app: %w", err)
+		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
-	return out, nil
+	return out, true, nil
 }
 
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {
