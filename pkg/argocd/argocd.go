@@ -10,6 +10,7 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -17,6 +18,16 @@ import (
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
 	"helm.sh/helm/v3/pkg/repo"
+)
+
+// Common resource GVRs
+var (
+	// ApplicationGVR is the GroupVersionResource for ArgoCD applications
+	ApplicationGVR = schema.GroupVersionResource{
+		Group:    "argoproj.io",
+		Version:  "v1alpha1",
+		Resource: "applications",
+	}
 )
 
 type ArgoCDInstallation struct {
@@ -40,6 +51,7 @@ func New(client *utils.K8sClient, namespace string, version string, configPath s
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 
+	startTime := time.Now()
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
 	// Check if namespace exists
@@ -79,9 +91,12 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	if _, err := a.runArgocdCommand("proj", "add-source-namespace", "default", "*"); err != nil {
 		log.Error().Err(err).Msg("❌ Failed to add extra permissions to the default AppProject")
 		return fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
+	} else {
+		log.Debug().Msgf("Argo CD extra permissions added successfully")
 	}
 
-	log.Info().Msgf("🦑 Argo CD installed successfully")
+	duration := time.Since(startTime)
+	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
 	return nil
 }
@@ -267,8 +282,11 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	cmd := exec.Command("argocd", args...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.Output()
 	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("argocd command failed: %s: %w", string(exitErr.Stderr), err)
+		}
 		return "", fmt.Errorf("argocd command failed: %s: %w", string(output), err)
 	}
 	return string(output), nil
@@ -286,9 +304,12 @@ func (a *ArgoCDInstallation) login() error {
 	time.Sleep(5 * time.Second)
 
 	// Login to ArgoCD
-	if _, err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password); err != nil {
+	out, err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password)
+	if err != nil {
 		log.Error().Msgf("❌ Failed to login to argocd")
 		return fmt.Errorf("failed to login: %w", err)
+	} else {
+		log.Debug().Msgf("Login output: %s", out)
 	}
 
 	// Verify login by listing apps
@@ -313,45 +334,36 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
-	cmd := exec.Command("argocd", "appset", "generate", appSetPath, "-o", "yaml")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
-
-	output, err := cmd.Output()
+	out, err := a.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("argocd appset generate failed: %s: %w", string(exitErr.Stderr), err)
-		}
-		return "", fmt.Errorf("failed to run argocd appset generate: %s", string(output))
+		return "", fmt.Errorf("failed to run argocd appset generate: %w", err)
 	}
 
-	return string(output), nil
+	return out, nil
 }
 
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
-	cmd := exec.Command("argocd", "app", "manifests", appName)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
-
-	output, err := cmd.Output()
+	out, err := a.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("failed to get manifests: %s: %w", string(exitErr.Stderr), err)
+
+		exists, err := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
+		if err != nil {
+			log.Error().Msgf("❌ Failed to check if application exists: %s, error: %v", appName, err)
 		}
-		return "", fmt.Errorf("failed to get manifests: %s", string(output))
+		if !exists {
+			log.Error().Msgf("❌ Application %s did not exist! This should not happen, please report this issue", appName)
+		}
+
+		return "", fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
-	return string(output), nil
+	return out, nil
 }
 
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {
-	cmd := exec.Command("argocd", "app", "get", appName, "--refresh")
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
-
-	output, err := cmd.CombinedOutput()
+	_, err := a.runArgocdCommand("app", "get", appName, "--refresh")
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return fmt.Errorf("failed to refresh app: %s: %w", string(exitErr.Stderr), err)
-		}
-		return fmt.Errorf("failed to refresh app: %s", string(output))
+		return fmt.Errorf("failed to refresh app: %w", err)
 	}
 
 	return nil

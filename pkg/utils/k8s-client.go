@@ -55,6 +55,14 @@ func NewK8sClient() (*K8sClient, error) {
 	return &K8sClient{clientset: clientset}, nil
 }
 
+func (c *K8sClient) CheckIfResourceExists(gvr schema.GroupVersionResource, namespace string, name string) (bool, error) {
+	_, err := c.clientset.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
