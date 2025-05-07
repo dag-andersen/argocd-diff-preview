@@ -94,8 +94,31 @@ func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 			log.Error().Err(err).Msgf("❌ Failed to delete application %s", app.GetName())
 		}
 	}
-	log.Info().Msg("🧼 Deleted applications")
-	return nil
+
+	// ensure all applications are deleted
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for applications to be deleted")
+		default:
+			apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			if err != nil {
+				return err
+			}
+
+			if len(apps.Items) == 0 {
+				log.Info().Msg("🧼 Deleted applications")
+				return nil
+			}
+
+			log.Debug().Msgf("Waiting for applications to be deleted: %d", len(apps.Items))
+
+			time.Sleep(1 * time.Second)
+		}
+	}
 }
 
 // RemoveObstructiveFinalizers removes finalizers from applications that would prevent deletion
