@@ -113,4 +113,26 @@ If your ArgoCD Applications use SSH to access the private repositories, then you
         EOF
 ```
 
+Or if the formatting above creates incorrect YAML, you can use the following alternative:
+
+```yaml title=".github/workflows/generate-diff.yml" linenums="24"
+    - name: Prepare secrets
+      run: |
+        mkdir -p secrets
+        SSH_PRIVATE_KEY_B64=$(echo "${{ secrets.REPO_ACCESS_SSH_PRIVATE_KEY }}" | base64 -w 0)
+        URL_B64=$(echo "git@github.com/${{ github.repository }}" | base64 -w 0)
+        cat > secrets/secret.yaml <<-EOF
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: github-repo-ssh
+          namespace: argocd
+          labels:
+            argocd.argoproj.io/secret-type: repo-creds
+        data:
+          url: "${URL_B64}"
+          sshPrivateKey: "${SSH_PRIVATE_KEY_B64}"
+        EOF
+```
+
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
