@@ -161,7 +161,7 @@ func run(opts *Options) error {
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
 	baseManifests, targetManifests, err := extract.GetResourcesFromBothBranches(
-		argocd, baseBranch, targetBranch, opts.Timeout, baseManifest, targetManifest)
+		argocd, baseBranch, targetBranch, opts.Timeout, baseManifest, targetManifest, opts.Debug)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
 		return err

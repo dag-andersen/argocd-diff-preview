@@ -392,6 +392,12 @@ func ConvertAppSetsToApps(
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
 
+	if debug {
+		if err := argocd.EnsureArgoCdIsReady(); err != nil {
+			return nil, fmt.Errorf("failed to wait for deployments to be ready: %w", err)
+		}
+	}
+
 	for _, appSet := range appSets {
 		// Skip non-ApplicationSets
 		if appSet.Kind != ApplicationSet {

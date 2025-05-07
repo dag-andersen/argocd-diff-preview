@@ -57,6 +57,7 @@ func GetResourcesFromBothBranches(
 	timeout uint64,
 	baseManifest string,
 	targetManifest string,
+	debug bool,
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	// Apply base manifest directly from string with kubectl
 	if _, err := argocd.K8sClient.ApplyManifestFromString(baseManifest, argocd.Namespace); err != nil {
@@ -65,7 +66,7 @@ func GetResourcesFromBothBranches(
 
 	log.Debug().Str("branch", baseBranch.Name).Msg("Applied manifest")
 
-	baseApps, err := extractResourcesFromClusterAsApps(argocd, baseBranch, timeout)
+	baseApps, err := extractResourcesFromClusterAsApps(argocd, baseBranch, timeout, debug)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -83,7 +84,7 @@ func GetResourcesFromBothBranches(
 	}
 
 	log.Debug().Str("branch", targetBranch.Name).Msg("Applied manifest")
-	targetApps, err := extractResourcesFromClusterAsApps(argocd, targetBranch, timeout)
+	targetApps, err := extractResourcesFromClusterAsApps(argocd, targetBranch, timeout, debug)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -97,6 +98,7 @@ func extractResourcesFromClusterAsApps(
 	argocd *argocd.ArgoCDInstallation,
 	branch *git.Branch,
 	timeout uint64,
+	debug bool,
 ) ([]ExtractedApp, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")
 
@@ -142,6 +144,12 @@ func extractResourcesFromClusterAsApps(
 		var timedOutApps []string
 		var otherErrors []struct{ name, msg string }
 		appsLeft := 0
+
+		if debug {
+			if err := argocd.EnsureArgoCdIsReady(); err != nil {
+				return nil, fmt.Errorf("failed to wait for deployments to be ready: %w", err)
+			}
+		}
 
 		// Process each application
 		for _, item := range yamlOutput.Items {
