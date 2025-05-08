@@ -15,15 +15,18 @@ Modified (2):
 
 ```diff
 @@ Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml) @@
+ ---
  apiVersion: v1
  kind: Service
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: valid-manifest-generate-paths-example:/Service:default/super-app-name
++    argocd.argoproj.io/tracking-id: valid-manifest-generate-paths-example:/Service:default/super-duper-app-name
    labels:
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: valid-manifest-generate-paths-example
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: super-duper-app-name
@@ -44,12 +47,14 @@ Modified (2):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: valid-manifest-generate-paths-example:/ServiceAccount:default/super-app-name
++    argocd.argoproj.io/tracking-id: valid-manifest-generate-paths-example:/ServiceAccount:default/super-duper-app-name
    labels:
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: valid-manifest-generate-paths-example
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: super-duper-app-name
@@ -59,12 +64,14 @@ Modified (2):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: valid-manifest-generate-paths-example:apps/Deployment:default/super-app-name
++    argocd.argoproj.io/tracking-id: valid-manifest-generate-paths-example:apps/Deployment:default/super-duper-app-name
    labels:
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: valid-manifest-generate-paths-example
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: super-duper-app-name
@@ -78,7 +85,7 @@ Modified (2):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (64 -> 78) @@
+@@ skipped 15 lines (70 -> 84) @@
          - containerPort: 80
            name: http
            protocol: TCP
@@ -101,15 +108,18 @@ Modified (2):
 
 ```diff
 @@ Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml) @@
+ ---
  apiVersion: v1
  kind: Service
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: watch-pattern-valid-regex-example:/Service:default/super-app-name
++    argocd.argoproj.io/tracking-id: watch-pattern-valid-regex-example:/Service:default/super-duper-app-name
    labels:
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: watch-pattern-valid-regex-example
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: super-duper-app-name
@@ -130,12 +140,14 @@ Modified (2):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: watch-pattern-valid-regex-example:/ServiceAccount:default/super-app-name
++    argocd.argoproj.io/tracking-id: watch-pattern-valid-regex-example:/ServiceAccount:default/super-duper-app-name
    labels:
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: watch-pattern-valid-regex-example
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: super-duper-app-name
@@ -145,12 +157,14 @@ Modified (2):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: watch-pattern-valid-regex-example:apps/Deployment:default/super-app-name
++    argocd.argoproj.io/tracking-id: watch-pattern-valid-regex-example:apps/Deployment:default/super-duper-app-name
    labels:
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: watch-pattern-valid-regex-example
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: super-duper-app-name
@@ -164,7 +178,7 @@ Modified (2):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (64 -> 78) @@
+@@ skipped 15 lines (70 -> 84) @@
          - containerPort: 80
            name: http
            protocol: TCP
@@ -180,3 +194,5 @@ Modified (2):
 ```
 
 </details>
+
+Rendered x Applications in x

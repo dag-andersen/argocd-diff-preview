@@ -30,6 +30,7 @@ func GenerateDiff(
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
+	executionTime time.Duration,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -58,8 +59,11 @@ func GenerateDiff(
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
 
+	executionTimeString := executionTime.Round(time.Second).String()
+	appCount := fmt.Sprintf("%d", len(baseApps)+len(targetApps))
+
 	// Calculate the available space for the file sections
-	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary)
+	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(executionTimeString) - len(appCount)
 
 	// Warning message to be added if we need to truncate
 	warningMessage := fmt.Sprintf("\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",
@@ -113,7 +117,13 @@ func GenerateDiff(
 	}
 
 	// Generate and write markdown
-	markdown := printDiff(title, strings.TrimSpace(summary), strings.TrimSpace(combinedDiff.String()))
+	markdown := printDiff(
+		title,
+		strings.TrimSpace(summary),
+		strings.TrimSpace(combinedDiff.String()),
+		executionTimeString,
+		appCount,
+	)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
 		return fmt.Errorf("failed to write markdown: %w", err)

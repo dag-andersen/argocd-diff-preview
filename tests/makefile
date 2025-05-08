@@ -36,7 +36,8 @@ run-single-test-go: clean pull-base pull-target
 		--kind-options="$(kind_options)" \
 		--title="$(title)"
 	mkdir -p ./$(target_branch)$(suffix)/
-	diff ./output/diff.md ./$(target_branch)$(suffix)/output.md
+	cat ./output/diff.md | sed -E 's/Rendered [0-9]+ Applications in [0-9]+m?[0-9]*s?/Rendered x Applications in x/' > ./output/diff-2.md
+	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 docker-build:
@@ -65,7 +66,8 @@ run-single-test-docker: clean pull-base pull-target
 		-e TITLE="$(title)" \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
-	diff ./output/diff.md ./$(target_branch)$(suffix)/output.md
+	cat ./output/diff.md | sed -E 's/Rendered [0-9]+ Applications in [0-9]+m?[0-9]*s?/Rendered x Applications in x/' > ./output/diff-2.md 
+	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 run-test-all-with-%:

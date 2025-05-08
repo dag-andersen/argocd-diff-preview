@@ -39,6 +39,7 @@ func main() {
 }
 
 func run(opts *Options) error {
+	startTime := time.Now()
 
 	// Get the parsed values from the options
 	fileRegex := opts.GetFileRegex()
@@ -46,6 +47,9 @@ func run(opts *Options) error {
 	filesChanged := opts.GetFilesChanged()
 	redirectRevisions := opts.GetRedirectRevisions()
 	clusterProvider := opts.GetClusterProvider()
+
+	// Check if users limited the Application Selection
+	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
 
 	// Create branches
 	baseBranch := git.NewBranch(opts.BaseBranch, git.Base)
@@ -143,6 +147,12 @@ func run(opts *Options) error {
 		return err
 	}
 
+	// Advice the user to limit the Application Selection
+	if searchIsLimited && (len(baseApps) > 50 || len(targetApps) > 50) {
+		log.Warn().Msgf("💡 You are rendering %d Applications. You might want to limit the Application rendered on each run. Check out the documentation under section `Application Selection` for more information.", len(baseApps)+len(targetApps))
+		log.Warn().Msg("💡 Check out the documentation under section `Application Selection` for more information.")
+	}
+
 	// Generate application manifests as strings
 	baseManifest := argoapplication.ApplicationsToString(baseApps)
 	targetManifest := argoapplication.ApplicationsToString(targetApps)
@@ -178,6 +188,7 @@ func run(opts *Options) error {
 		&opts.DiffIgnore,
 		opts.LineCount,
 		opts.MaxDiffLength,
+		time.Since(startTime),
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err
