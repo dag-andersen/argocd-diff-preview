@@ -21,8 +21,8 @@ Modified (1):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  labels:
--    argocd.argoproj.io/instance: folder2
+-  annotations:
+-    argocd.argoproj.io/tracking-id: folder2:apps/Deployment:/deploy-from-folder-two
 -  name: deploy-from-folder-two
 -spec:
 -  replicas: 2
@@ -54,74 +54,68 @@ Modified (1):
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  
-@@ skipped 8 lines (20 -> 27) @@
+@@ skipped 9 lines (21 -> 29) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  spec:
-@@ skipped 27 lines (39 -> 65) @@
+@@ skipped 29 lines (40 -> 68) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx-controller-admission
    namespace: default
  spec:
-@@ skipped 19 lines (77 -> 95) @@
+@@ skipped 21 lines (79 -> 99) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx
    namespace: default
  
-@@ skipped 8 lines (107 -> 114) @@
+@@ skipped 9 lines (110 -> 118) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx-admission
  webhooks:
  - admissionReviewVersions:
-@@ skipped 28 lines (126 -> 153) @@
+@@ skipped 30 lines (129 -> 158) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  spec:
-@@ skipped 13 lines (165 -> 177) @@
+@@ skipped 13 lines (169 -> 181) @@
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: ingress-nginx
          app.kubernetes.io/part-of: ingress-nginx
@@ -132,62 +126,57 @@ Modified (1):
      spec:
        containers:
        - args:
-@@ skipped 97 lines (188 -> 284) @@
+@@ skipped 99 lines (192 -> 290) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx
  spec:
    controller: k8s.io/ingress-nginx
-@@ skipped 7 lines (296 -> 302) @@
+@@ skipped 9 lines (301 -> 309) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx
  rules:
  - apiGroups:
-@@ skipped 76 lines (314 -> 389) @@
+@@ skipped 78 lines (320 -> 397) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx
  roleRef:
    apiGroup: rbac.authorization.k8s.io
-@@ skipped 14 lines (401 -> 414) @@
+@@ skipped 16 lines (408 -> 423) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx
    namespace: default
  rules:
-@@ skipped 85 lines (426 -> 510) @@
+@@ skipped 87 lines (434 -> 520) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
-+    app.kubernetes.io/version: 1.11.1
-     argocd.argoproj.io/instance: nginx-ingress
 -    helm.sh/chart: ingress-nginx-4.10.0
++    app.kubernetes.io/version: 1.11.1
 +    helm.sh/chart: ingress-nginx-4.11.1
    name: nginx-ingress-ingress-nginx
    namespace: default
@@ -195,3 +184,5 @@ Modified (1):
 ```
 
 </details>
+
+Rendered x Applications in x

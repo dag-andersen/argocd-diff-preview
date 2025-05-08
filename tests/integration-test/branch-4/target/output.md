@@ -18,8 +18,8 @@ Added (1):
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
-+  labels:
-+    argocd.argoproj.io/instance: folder3
++  annotations:
++    argocd.argoproj.io/tracking-id: folder3:apps/Deployment:/deploy-from-folder-three
 +  name: deploy-from-folder-three
 +spec:
 +  replicas: 2
@@ -40,3 +40,5 @@ Added (1):
 ```
 
 </details>
+
+Rendered x Applications in x

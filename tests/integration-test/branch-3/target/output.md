@@ -14,13 +14,13 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
- ---
  apiVersion: apps/v1
  kind: Deployment
  metadata:
+   annotations:
+     argocd.argoproj.io/tracking-id: my-service-staging:apps/Deployment:default/staging-myapp
    labels:
      app: myapp
-     argocd.argoproj.io/instance: my-service-staging
    name: staging-myapp
    namespace: default
  spec:
@@ -39,3 +39,5 @@ Modified (1):
 ```
 
 </details>
+
+Rendered x Applications in x

@@ -112,14 +112,15 @@ Modified (7):
  apiVersion: v1
  kind: Service
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: my-app:/Service:default/super-app-name
++    argocd.argoproj.io/tracking-id: my-super-app:/Service:default/super-app-name
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
--    argocd.argoproj.io/instance: my-app
-+    argocd.argoproj.io/instance: my-super-app
      helm.sh/chart: myApp-0.1.0
    name: super-app-name
    namespace: default
@@ -140,14 +141,15 @@ Modified (7):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: my-app:/ServiceAccount:default/super-app-name
++    argocd.argoproj.io/tracking-id: my-super-app:/ServiceAccount:default/super-app-name
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
--    argocd.argoproj.io/instance: my-app
-+    argocd.argoproj.io/instance: my-super-app
      helm.sh/chart: myApp-0.1.0
    name: super-app-name
    namespace: default
@@ -156,14 +158,15 @@ Modified (7):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: my-app:apps/Deployment:default/super-app-name
++    argocd.argoproj.io/tracking-id: my-super-app:apps/Deployment:default/super-app-name
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
--    argocd.argoproj.io/instance: my-app
-+    argocd.argoproj.io/instance: my-super-app
      helm.sh/chart: myApp-0.1.0
    name: super-app-name
    namespace: default
@@ -246,3 +249,5 @@ Modified (7):
 ```
 
 </details>
+
+Rendered x Applications in x

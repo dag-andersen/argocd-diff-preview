@@ -14,15 +14,18 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml) @@
+ ---
  apiVersion: v1
  kind: Service
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/Service:default/super-app-name
++    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/Service:default/experiment
    labels:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: my-app-watch-pattern-valid-regex
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: experiment
@@ -43,12 +46,14 @@ Modified (1):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/ServiceAccount:default/super-app-name
++    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/ServiceAccount:default/experiment
    labels:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: my-app-watch-pattern-valid-regex
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: experiment
@@ -58,12 +63,14 @@ Modified (1):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
+   annotations:
+-    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:apps/Deployment:default/super-app-name
++    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:apps/Deployment:default/experiment
    labels:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
-     argocd.argoproj.io/instance: my-app-watch-pattern-valid-regex
      helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 +  name: experiment
@@ -77,7 +84,7 @@ Modified (1):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (64 -> 78) @@
+@@ skipped 15 lines (70 -> 84) @@
          - containerPort: 80
            name: http
            protocol: TCP
@@ -93,3 +100,5 @@ Modified (1):
 ```
 
 </details>
+
+Rendered x Applications in x
