@@ -14,23 +14,23 @@ Summary:
 
 %app_diffs%
 
-Ran in %execution_time%
+Rendered %app_count% Applications in %execution_time%
 `
 
 func markdownTemplateLength() int {
-	return len(strings.ReplaceAll(
-		strings.ReplaceAll(
-			strings.ReplaceAll(
-				strings.ReplaceAll(markdownTemplate, "%summary%", ""),
-				"%app_diffs%", ""),
-			"%title%", ""),
-		"%execution_time%", ""))
+	template := strings.ReplaceAll(markdownTemplate, "%summary%", "")
+	template = strings.ReplaceAll(template, "%app_diffs%", "")
+	template = strings.ReplaceAll(template, "%title%", "")
+	template = strings.ReplaceAll(template, "%execution_time%", "")
+	template = strings.ReplaceAll(template, "%app_count%", "")
+	return len(template)
 }
 
-func printDiff(title, summary, diff string, executionTime string) string {
+func printDiff(title, summary, diff string, executionTime string, appCount string) string {
 	markdown := strings.ReplaceAll(markdownTemplate, "%title%", title)
 	markdown = strings.ReplaceAll(markdown, "%summary%", summary)
 	markdown = strings.ReplaceAll(markdown, "%app_diffs%", diff)
 	markdown = strings.ReplaceAll(markdown, "%execution_time%", executionTime)
+	markdown = strings.ReplaceAll(markdown, "%app_count%", appCount)
 	return strings.TrimSpace(markdown) + "\n"
 }
