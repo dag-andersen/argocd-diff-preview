@@ -39,6 +39,7 @@ func main() {
 }
 
 func run(opts *Options) error {
+	startTime := time.Now()
 
 	// Get the parsed values from the options
 	fileRegex := opts.GetFileRegex()
@@ -178,6 +179,7 @@ func run(opts *Options) error {
 		&opts.DiffIgnore,
 		opts.LineCount,
 		opts.MaxDiffLength,
+		time.Since(startTime),
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err
