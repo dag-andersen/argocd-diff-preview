@@ -148,8 +148,8 @@ func run(opts *Options) error {
 	}
 
 	// Advice the user to limit the Application Selection
-	if searchIsLimited && (len(baseApps) > 50 || len(targetApps) > 50) {
-		log.Warn().Msgf("💡 You are rendering %d Applications. You might want to limit the Application rendered on each run. Check out the documentation under section `Application Selection` for more information.", len(baseApps)+len(targetApps))
+	if !searchIsLimited && (len(baseApps) > 50 || len(targetApps) > 50) {
+		log.Warn().Msgf("💡 You are rendering %d Applications. You might want to limit the Application rendered on each run.", len(baseApps)+len(targetApps))
 		log.Warn().Msg("💡 Check out the documentation under section `Application Selection` for more information.")
 	}
 
