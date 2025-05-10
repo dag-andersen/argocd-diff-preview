@@ -61,6 +61,7 @@ type Options struct {
 	ClusterType               string `mapstructure:"cluster"`
 	ClusterName               string `mapstructure:"cluster-name"`
 	KindOptions               string `mapstructure:"kind-options"`
+	KindInternal              bool   `mapstructure:"kind-internal"`
 	K3dOptions                string `mapstructure:"k3d-options"`
 	MaxDiffLength             uint   `mapstructure:"max-diff-length"`
 	Selector                  string `mapstructure:"selector"`
@@ -221,6 +222,7 @@ func Parse() *Options {
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
+	rootCmd.Flags().Bool("kind-internal", false, "kind internal kubeconfig mode (only for kind)")
 	rootCmd.Flags().String("k3d-options", DefaultK3dOptions, "k3d options (only for k3d)")
 	rootCmd.Flags().Bool("keep-cluster-alive", false, "Keep cluster alive after the tool finishes")
 
@@ -316,14 +318,14 @@ func (o *Options) ParseClusterType() (cluster.Provider, error) {
 
 	switch clusterType {
 	case "kind":
-		provider = kind.New(o.ClusterName, o.KindOptions)
+		provider = kind.New(o.ClusterName, o.KindOptions, o.KindInternal)
 	case "k3d":
 		provider = k3d.New(o.ClusterName, o.K3dOptions)
 	case "minikube":
 		provider = minikube.New()
 	case "auto":
 		if kind.IsInstalled() {
-			provider = kind.New(o.ClusterName, o.KindOptions)
+			provider = kind.New(o.ClusterName, o.KindOptions, o.KindInternal)
 			log.Debug().Msg("Using kind as cluster provider (auto-detected)")
 		} else if k3d.IsInstalled() {
 			provider = k3d.New(o.ClusterName, o.K3dOptions)

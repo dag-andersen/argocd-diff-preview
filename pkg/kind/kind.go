@@ -2,6 +2,8 @@ package kind
 
 import (
 	"fmt"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -20,8 +22,8 @@ func IsInstalled() bool {
 	return err == nil
 }
 
-// CreateCluster creates a new kind cluster with the given name, optional kindOptions
-func CreateCluster(clusterName string, kindOptions string) error {
+// CreateCluster creates a new kind cluster with the given name, optional kindOptions, optionally using internal IP
+func CreateCluster(clusterName string, kindOptions string, internal bool) error {
 	// Check if docker is running
 	if output, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
@@ -49,6 +51,22 @@ func CreateCluster(clusterName string, kindOptions string) error {
 			log.Error().Msgf("❌ Failed to create cluster with options: %s", kindOptions)
 		}
 		return fmt.Errorf("failed to create cluster: %s", output)
+	}
+
+	if internal {
+		log.Debug().Msg("Manually writing internal kubeconfig because --kind-internal flag is set")
+
+		var output string
+		var err error
+		if output, err = runCommand("kind", "get", "kubeconfig", "--internal", "--name", clusterName); err != nil {
+			return fmt.Errorf("failed to get cluster kubeconfig: %s", output)
+		}
+
+		kubeconfigPath := utils.GetKubeConfigPath()
+		err = os.WriteFile(kubeconfigPath, []byte(output), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write cluster kubeconfig: %s", kubeconfigPath)
+		}
 	}
 
 	log.Info().Msg("🚀 Cluster created successfully")
@@ -101,12 +119,13 @@ func runCommand(name string, args ...string) (string, error) {
 var _ cluster.Provider = (*Kind)(nil)
 
 type Kind struct {
-	clusterName string
-	kindOptions string
+	clusterName  string
+	kindOptions  string
+	kindInternal bool
 }
 
-func New(clusterName string, kindOptions string) *Kind {
-	return &Kind{clusterName: clusterName, kindOptions: kindOptions}
+func New(clusterName string, kindOptions string, kindInternal bool) *Kind {
+	return &Kind{clusterName: clusterName, kindOptions: kindOptions, kindInternal: kindInternal}
 }
 
 // Implement cluster.Provider interface
@@ -115,7 +134,7 @@ func (k *Kind) IsInstalled() bool {
 }
 
 func (k *Kind) CreateCluster() error {
-	return CreateCluster(k.clusterName, k.kindOptions)
+	return CreateCluster(k.clusterName, k.kindOptions, k.kindInternal)
 }
 
 func (k *Kind) ClusterExists() bool {
