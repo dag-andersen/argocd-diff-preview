@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -15,8 +13,8 @@ import (
 type ArgoResource struct {
 	Yaml     *unstructured.Unstructured
 	Kind     ApplicationKind
-	Id       string
-	Name     string
+	Id       string // The ID is the name of the k8s resource
+	Name     string // The name is the original name of the Application
 	FileName string
 }
 
@@ -31,6 +29,21 @@ func (a *ArgoResource) AsString() (string, error) {
 		return "", fmt.Errorf("failed to marshal yaml: %w", err)
 	}
 	return string(bytes), nil
+}
+
+// AsUnstructured returns the YAML representation of the resource as an unstructured object
+func (a *ArgoResource) AsUnstructured() (*unstructured.Unstructured, error) {
+	appAsString, err := a.AsString()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert app to YAML: %w", err)
+	}
+
+	obj := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(appAsString), &obj.Object); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest YAML: %w", err)
+	}
+
+	return obj, nil
 }
 
 // SetNamespace sets the namespace of the resource
@@ -350,22 +363,4 @@ func contains(slice []string, str string) bool {
 		}
 	}
 	return false
-}
-
-// WriteApplications writes applications to YAML files in the specified folder
-func WriteApplications(
-	apps []ArgoResource,
-	branch *git.Branch,
-	folder string,
-) error {
-	filePath := fmt.Sprintf("%s/%s.yaml", folder, branch.FolderName())
-	log.Info().Msgf("💾 Writing %d Applications from '%s' to ./%s",
-		len(apps), branch.Name, filePath)
-
-	yaml := ApplicationsToString(apps)
-	if err := utils.WriteFile(filePath, yaml); err != nil {
-		return fmt.Errorf("failed to write %s apps: %w", branch.Type(), err)
-	}
-
-	return nil
 }

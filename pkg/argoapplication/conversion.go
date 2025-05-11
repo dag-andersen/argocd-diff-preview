@@ -45,9 +45,6 @@ func FromK8sResource(resource k8s.Resource) *ArgoResource {
 
 // ApplicationsToString converts a slice of ArgoResource to a YAML string
 func ApplicationsToString(apps []ArgoResource) string {
-	// Enrich applications with source path and original application name so we can identify the application in the diff
-	enrichApplications(apps)
-
 	var yamlStrings []string
 	for _, app := range apps {
 		yamlStr, err := app.AsString()
