@@ -356,8 +356,11 @@ func (o *Options) LogOptions() {
 	}
 	log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
 	log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
-	if o.clusterProvider.GetName() == "kind" && o.KindOptions != "" {
-		log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+	if o.clusterProvider.GetName() == "kind" {
+		if o.KindOptions != "" {
+			log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+		}
+		log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
 	}
 	if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
 		log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
