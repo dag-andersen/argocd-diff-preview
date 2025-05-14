@@ -14,12 +14,10 @@ Added (1):
 
 ```diff
 @@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
-+---
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
-+  annotations:
-+    argocd.argoproj.io/tracking-id: folder3:apps/Deployment:/deploy-from-folder-three
++  annotations: {}
 +  name: deploy-from-folder-three
 +spec:
 +  replicas: 2
@@ -36,7 +34,6 @@ Added (1):
 +        name: myapp
 +        ports:
 +        - containerPort: 80
-+
 ```
 
 </details>

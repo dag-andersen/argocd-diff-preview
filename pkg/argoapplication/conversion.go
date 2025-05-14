@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
+	k8s "github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/rs/zerolog/log"
 )
 
@@ -40,6 +40,7 @@ func FromK8sResource(resource k8s.Resource) *ArgoResource {
 		Id:       name,
 		Name:     name,
 		FileName: resource.FileName,
+		Branch:   resource.Branch,
 	}
 }
 

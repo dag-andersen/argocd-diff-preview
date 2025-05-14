@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -16,6 +17,7 @@ type ArgoResource struct {
 	Id       string // The ID is the name of the k8s resource
 	Name     string // The name is the original name of the Application
 	FileName string
+	Branch   git.BranchType
 }
 
 func (a *ArgoResource) GetLongName() string {
@@ -32,9 +34,8 @@ func (a *ArgoResource) AsString() (string, error) {
 }
 
 // SetNamespace sets the namespace of the resource
-func (a *ArgoResource) SetNamespace(namespace string) error {
+func (a *ArgoResource) SetNamespace(namespace string) {
 	a.Yaml.SetNamespace(namespace)
-	return nil
 }
 
 // SetProjectToDefault sets the project to "default"

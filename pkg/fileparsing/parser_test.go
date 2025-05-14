@@ -1,10 +1,11 @@
-package k8s
+package fileparsing
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -55,7 +56,7 @@ metadata:
 
 	t.Run("ParseYaml", func(t *testing.T) {
 		files := []string{"test1.yaml", "test2.yaml"}
-		resources := ParseYaml(tempDir, files)
+		resources := ParseYaml(tempDir, files, git.BranchType(""))
 		assert.Len(t, resources, 2)
 	})
 
@@ -117,7 +118,7 @@ spec:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var resources []Resource
-			processYamlChunk(tt.filename, tt.chunk, &resources)
+			processYamlChunk(tt.filename, tt.chunk, &resources, git.BranchType(""))
 
 			if tt.want == nil {
 				assert.Empty(t, resources)

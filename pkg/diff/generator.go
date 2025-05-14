@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"sigs.k8s.io/yaml"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/rs/zerolog/log"
@@ -138,7 +139,16 @@ func writeManifestsToDisk(apps []extract.ExtractedApp, folder string) error {
 		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
 	}
 	for _, app := range apps {
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), app.Manifest); err != nil {
+		var manifestStrings []string
+		for _, manifest := range app.Manifest {
+			manifestString, err := yaml.Marshal(manifest.Object)
+			if err != nil {
+				return fmt.Errorf("failed to marshal unstructured object: %w", err)
+			}
+			manifestStrings = append(manifestStrings, string(manifestString))
+		}
+
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), strings.Join(manifestStrings, "\n---\n")); err != nil {
 			return fmt.Errorf("failed to write manifest %s: %w", app.Id, err)
 		}
 	}
