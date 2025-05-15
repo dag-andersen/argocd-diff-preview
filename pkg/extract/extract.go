@@ -14,19 +14,19 @@ import (
 )
 
 // Error and timeout messages that we look for in application status
-var errorMessages = []string{
-	"helm template .",
-	"authentication required",
-	"authentication failed",
-	"path does not exist",
-	"error converting YAML to JSON",
-	"Unknown desc = `helm template .",
-	"Unknown desc = `kustomize build",
-	"Unknown desc = Unable to resolve",
-	"is not a valid chart repository or cannot be reached",
-	"Unknown desc = repository not found",
-	"to a commit SHA",
-}
+// var errorMessages = []string{
+// 	"helm template .",
+// 	"authentication required",
+// 	"authentication failed",
+// 	"path does not exist",
+// 	"error converting YAML to JSON",
+// 	"Unknown desc = `helm template .",
+// 	"Unknown desc = `kustomize build",
+// 	"Unknown desc = Unable to resolve",
+// 	"is not a valid chart repository or cannot be reached",
+// 	"Unknown desc = repository not found",
+// 	"to a commit SHA",
+// }
 
 var timeoutMessages = []string{
 	"Client.Timeout",
@@ -86,6 +86,9 @@ func getResourcesFromApps(
 	apps []argoapplication.ArgoResource,
 	timeout uint64,
 ) ([]ExtractedApp, error) {
+
+	startTime := time.Now()
+
 	log.Info().Str("branch", branch.Name).Msg("🤖 Getting Applications from branch")
 
 	// ensure that no apps have the same name. Fail if they do
@@ -130,7 +133,8 @@ func getResourcesFromApps(
 		for {
 			select {
 			case <-ticker.C:
-				log.Info().Str("branch", branch.Name).Msgf("🤖 Rendered %d out of %d applications", renderedApps, totalApps)
+				remainingTimeSeconds := int(timeout) - int(time.Since(startTime).Seconds())
+				log.Info().Str("branch", branch.Name).Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTimeSeconds)
 			case <-progressDone:
 				return
 			}
@@ -157,7 +161,8 @@ func getResourcesFromApps(
 		return nil, firstError
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications", len(extractedApps))
+	duration := time.Since(startTime)
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications in %s", len(extractedApps), duration.Round(time.Second))
 
 	return extractedApps, nil
 }
