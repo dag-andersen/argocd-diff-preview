@@ -113,7 +113,20 @@ If your ArgoCD Applications use SSH to access the private repositories, then you
         EOF
 ```
 
-Or if the formatting above creates incorrect YAML, you can use the following alternative:
+If you get this type of error:
+
+```txt
+failed to apply secrets: failed to apply secret secret.yaml: failed to apply manifest: failed to convert new object (namespace/secret-name; /v1, Kind=Secret) to proper version: unable to convert unstructured object to /v1, Kind=Secret: error decoding from json: illegal base64 data at input byte 76 from folder: ./secrets
+```
+
+it is because `base64` wraps encoded lines after 76 characters [by default](https://linux.die.net/man/1/base64):
+
+```txt
+-w, --wrap=COLS
+    Wrap encoded lines after COLS character (default 76). Use 0 to disable line wrapping.
+```
+
+so you need to use the following alternative:
 
 ```yaml title=".github/workflows/generate-diff.yml" linenums="24"
     - name: Prepare secrets
