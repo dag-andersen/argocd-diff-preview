@@ -117,6 +117,26 @@ func getResourcesFromApps(
 	extractedApps := make([]ExtractedApp, 0, len(apps))
 	var firstError error
 
+	// Setup progress tracking
+	totalApps := len(apps)
+	renderedApps := 0
+	progressDone := make(chan bool)
+
+	// Start progress reporting goroutine
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				log.Info().Str("branch", branch.Name).Msgf("🤖 Rendered %d out of %d applications", renderedApps, totalApps)
+			case <-progressDone:
+				return
+			}
+		}
+	}()
+
 	for i := 0; i < len(apps); i++ {
 		result := <-results
 		if result.err != nil {
@@ -127,7 +147,11 @@ func getResourcesFromApps(
 			continue
 		}
 		extractedApps = append(extractedApps, result.app)
+		renderedApps++
 	}
+
+	// Signal progress reporting to stop
+	close(progressDone)
 
 	if firstError != nil {
 		return nil, firstError
@@ -204,9 +228,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			for _, condition := range appStatus.Status.Conditions {
 				if isErrorCondition(condition.Type) {
 					msg := condition.Message
-					if containsAny(msg, errorMessages) {
-						return result, fmt.Errorf("application %s failed: %s", app.Name, msg)
-					} else if containsAny(msg, timeoutMessages) {
+					if containsAny(msg, timeoutMessages) {
 						log.Warn().Str("App", app.GetLongName()).Msgf("⚠️ Application timed out with error: %s", msg)
 						if err := argocd.RefreshApp(app.Id); err != nil {
 							log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to refresh application")
