@@ -360,7 +360,9 @@ func (o *Options) LogOptions() {
 		if o.KindOptions != "" {
 			log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
 		}
-		log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+		if o.KindInternal {
+			log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+		}
 	}
 	if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
 		log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
