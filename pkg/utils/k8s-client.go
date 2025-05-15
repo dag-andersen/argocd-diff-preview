@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,11 +34,7 @@ type K8sClient struct {
 }
 
 func NewK8sClient() (*K8sClient, error) {
-
-	var kubeconfig string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = filepath.Join(home, ".kube", "config")
-	}
+	kubeconfig := GetKubeConfigPath()
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
