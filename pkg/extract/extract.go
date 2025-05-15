@@ -141,12 +141,8 @@ func getResourcesFromApps(
 // getResourcesFromApp extracts a single application from the cluster
 func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64) (ExtractedApp, error) {
 	// Apply the application manifest first
-	unstructured, err := app.AsUnstructured()
-	if err != nil {
-		return ExtractedApp{}, fmt.Errorf("failed to convert app to unstructured: %w", err)
-	}
 
-	if err := argocd.K8sClient.ApplyManifest(unstructured, "string", argocd.Namespace); err != nil {
+	if err := argocd.K8sClient.ApplyManifest(app.Yaml, "string", argocd.Namespace); err != nil {
 		return ExtractedApp{}, fmt.Errorf("failed to apply manifest for application %s: %w", app.GetLongName(), err)
 	}
 

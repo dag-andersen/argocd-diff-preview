@@ -31,21 +31,6 @@ func (a *ArgoResource) AsString() (string, error) {
 	return string(bytes), nil
 }
 
-// AsUnstructured returns the YAML representation of the resource as an unstructured object
-func (a *ArgoResource) AsUnstructured() (*unstructured.Unstructured, error) {
-	appAsString, err := a.AsString()
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert app to YAML: %w", err)
-	}
-
-	obj := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(appAsString), &obj.Object); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest YAML: %w", err)
-	}
-
-	return obj, nil
-}
-
 // SetNamespace sets the namespace of the resource
 func (a *ArgoResource) SetNamespace(namespace string) error {
 	a.Yaml.SetNamespace(namespace)
