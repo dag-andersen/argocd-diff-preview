@@ -56,9 +56,8 @@ func CreateCluster(clusterName string, kindOptions string, internal bool) error 
 	if internal {
 		log.Debug().Msg("Manually writing internal kubeconfig because --kind-internal flag is set")
 
-		var output string
-		var err error
-		if output, err = runCommand("kind", "get", "kubeconfig", "--internal", "--name", clusterName); err != nil {
+		output, err := runCommand("kind", "get", "kubeconfig", "--internal", "--name", clusterName)
+		if err != nil {
 			return fmt.Errorf("failed to get cluster kubeconfig: %s", output)
 		}
 
