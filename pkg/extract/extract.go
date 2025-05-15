@@ -8,26 +8,25 @@ import (
 	"github.com/rs/zerolog/log"
 	"sigs.k8s.io/yaml"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/annotations"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
 // Error and timeout messages that we look for in application status
-var errorMessages = []string{
-	"helm template .",
-	"authentication required",
-	"authentication failed",
-	"path does not exist",
-	"error converting YAML to JSON",
-	"Unknown desc = `helm template .",
-	"Unknown desc = `kustomize build",
-	"Unknown desc = Unable to resolve",
-	"is not a valid chart repository or cannot be reached",
-	"Unknown desc = repository not found",
-	"to a commit SHA",
-}
+// var errorMessages = []string{
+// 	"helm template .",
+// 	"authentication required",
+// 	"authentication failed",
+// 	"path does not exist",
+// 	"error converting YAML to JSON",
+// 	"Unknown desc = `helm template .",
+// 	"Unknown desc = `kustomize build",
+// 	"Unknown desc = Unable to resolve",
+// 	"is not a valid chart repository or cannot be reached",
+// 	"Unknown desc = repository not found",
+// 	"to a commit SHA",
+// }
 
 var timeoutMessages = []string{
 	"Client.Timeout",
@@ -55,22 +54,14 @@ func GetResourcesFromBothBranches(
 	baseBranch *git.Branch,
 	targetBranch *git.Branch,
 	timeout uint64,
-	baseManifest string,
-	targetManifest string,
-	debug bool,
+	baseApps []argoapplication.ArgoResource,
+	targetApps []argoapplication.ArgoResource,
 ) ([]ExtractedApp, []ExtractedApp, error) {
-	// Apply base manifest directly from string with kubectl
-	if _, err := argocd.K8sClient.ApplyManifestFromString(baseManifest, argocd.Namespace); err != nil {
-		return nil, nil, fmt.Errorf("failed to apply base apps: %w", err)
-	}
 
-	log.Debug().Str("branch", baseBranch.Name).Msg("Applied manifest")
-
-	baseApps, err := extractResourcesFromClusterAsApps(argocd, baseBranch, timeout, debug)
+	extractedBasedApps, err := getResourcesFromApps(argocd, baseBranch, baseApps, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
-
 	log.Debug().Str("branch", baseBranch.Name).Msg("Extracted manifests")
 
 	// delete applications
@@ -78,173 +69,181 @@ func GetResourcesFromBothBranches(
 		return nil, nil, fmt.Errorf("failed to delete applications: %w", err)
 	}
 
-	// apply target manifest
-	if _, err := argocd.K8sClient.ApplyManifestFromString(targetManifest, argocd.Namespace); err != nil {
-		return nil, nil, fmt.Errorf("failed to apply target apps: %w", err)
-	}
-
 	log.Debug().Str("branch", targetBranch.Name).Msg("Applied manifest")
-	targetApps, err := extractResourcesFromClusterAsApps(argocd, targetBranch, timeout, debug)
+	extractedTargetApps, err := getResourcesFromApps(argocd, targetBranch, targetApps, timeout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
-
 	log.Debug().Str("branch", targetBranch.Name).Msg("Extracted manifests")
-	return baseApps, targetApps, nil
+
+	return extractedBasedApps, extractedTargetApps, nil
 }
 
-// extractResourcesFromClusterAsApps extracts resources from Argo CD for a specific branch as ExtractedApp structs
-func extractResourcesFromClusterAsApps(
+// getResourcesFromApps extracts resources from Argo CD for a specific branch as ExtractedApp structs
+func getResourcesFromApps(
 	argocd *argocdPkg.ArgoCDInstallation,
 	branch *git.Branch,
+	apps []argoapplication.ArgoResource,
 	timeout uint64,
-	debug bool,
 ) ([]ExtractedApp, error) {
-	log.Info().Str("branch", branch.Name).Msg("🤖 Getting resources from branch")
 
-	// Create a slice to store all extracted apps
-	extractedApps := make([]ExtractedApp, 0)
-
-	processedApps := make(map[string]bool)
-	failedApps := make(map[string]string)
 	startTime := time.Now()
 
+	log.Info().Str("branch", branch.Name).Msg("🤖 Getting Applications from branch")
+
+	// ensure that no apps have the same name. Fail if they do
+	appNames := make(map[string]bool)
+	for _, app := range apps {
+		if appNames[app.Id] {
+			return nil, fmt.Errorf("duplicate app name: %s - Please open an issue on GitHub", app.Id)
+		}
+		appNames[app.Id] = true
+	}
+
+	// Process apps in parallel
+	results := make(chan struct {
+		app ExtractedApp
+		err error
+	}, len(apps))
+
+	for _, app := range apps {
+		go func(app argoapplication.ArgoResource) {
+			result, err := getResourcesFromApp(argocd, app, timeout)
+			results <- struct {
+				app ExtractedApp
+				err error
+			}{app: result, err: err}
+		}(app)
+	}
+
+	// Collect results
+	extractedApps := make([]ExtractedApp, 0, len(apps))
+	var firstError error
+
+	// Setup progress tracking
+	totalApps := len(apps)
+	renderedApps := 0
+	progressDone := make(chan bool)
+
+	// Start progress reporting goroutine
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				remainingTimeSeconds := int(timeout) - int(time.Since(startTime).Seconds())
+				log.Info().Str("branch", branch.Name).Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTimeSeconds)
+			case <-progressDone:
+				return
+			}
+		}
+	}()
+
+	for i := 0; i < len(apps); i++ {
+		result := <-results
+		if result.err != nil {
+			if firstError == nil {
+				firstError = result.err
+			}
+			log.Error().Err(result.err).Msg("Failed to extract app")
+			continue
+		}
+		extractedApps = append(extractedApps, result.app)
+		renderedApps++
+	}
+
+	// Signal progress reporting to stop
+	close(progressDone)
+
+	if firstError != nil {
+		return nil, firstError
+	}
+
+	duration := time.Since(startTime)
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications in %s", len(extractedApps), duration.Round(time.Second))
+
+	return extractedApps, nil
+}
+
+// getResourcesFromApp extracts a single application from the cluster
+func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64) (ExtractedApp, error) {
+	// Apply the application manifest first
+
+	if err := argocd.K8sClient.ApplyManifest(app.Yaml, "string", argocd.Namespace); err != nil {
+		return ExtractedApp{}, fmt.Errorf("failed to apply manifest for application %s: %w", app.GetLongName(), err)
+	}
+
+	log.Debug().Str("name", app.GetLongName()).Msg("Applied manifest for application")
+
+	startTime := time.Now()
+	var result ExtractedApp
+
 	for {
-		// Get all applications
-		var yamlOutput struct {
-			Items []struct {
-				Metadata struct {
-					Name string `yaml:"name"`
-				} `yaml:"metadata"`
-				Status struct {
-					Sync struct {
-						Status string `yaml:"status"`
-					} `yaml:"sync"`
-					Conditions []struct {
-						Type    string `yaml:"type"`
-						Message string `yaml:"message"`
-					} `yaml:"conditions"`
-				} `yaml:"status"`
-			} `yaml:"items"`
-		}
-
-		output, err := argocd.K8sClient.GetArgoCDApplications(argocd.Namespace)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get applications: %v", err)
-		}
-
-		if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-			return nil, fmt.Errorf("failed to parse applications yaml: %v", err)
-		}
-
-		if len(yamlOutput.Items) == 0 || len(yamlOutput.Items) == len(processedApps) {
-			break
-		}
-
-		var timedOutApps []string
-		var otherErrors []struct{ name, msg string }
-		appsLeft := 0
-
-		if debug {
-			if err := argocd.EnsureArgoCdIsReady(); err != nil {
-				return nil, fmt.Errorf("failed to wait for deployments to be ready: %w", err)
-			}
-		}
-
-		// Process each application
-		for _, item := range yamlOutput.Items {
-			name := item.Metadata.Name
-			if processedApps[name] {
-				continue
-			}
-
-			switch item.Status.Sync.Status {
-			case "OutOfSync", "Synced":
-				log.Debug().Str("name", name).Msg("Extracting manifests from Application")
-				manifests, exists, err := argocd.GetManifests(name)
-				if !exists {
-					log.Error().Msgf("❌ Application %s did not exist! This should not happen, please report this issue", name)
-				}
-				if err != nil {
-					log.Error().Msgf("❌ Failed to get manifests for application: %s, error: %v", name, err)
-					failedApps[name] = err.Error()
-					continue
-				}
-
-				sourcePath, err := getApplicationSourcePath(argocd.K8sClient, argocd.Namespace, name)
-				if err != nil {
-					log.Error().Msgf("❌ Failed to get source path for application: %s, error: %v", name, err)
-					sourcePath = "Unknown"
-				}
-
-				originalApplicationName, err := getOriginalApplicationName(argocd.K8sClient, argocd.Namespace, name)
-				if err != nil {
-					log.Error().Msgf("❌ Failed to get original application name for application: %s, error: %v", name, err)
-					originalApplicationName = "Unknown"
-				}
-
-				log.Debug().Str("branch", branch.Name).Str("name", originalApplicationName).Str("id", name).Str("path", sourcePath).Msg("Extracted manifests from Application")
-
-				// Create an ExtractedApp and add to our slice
-				app := ExtractedApp{
-					Id:         name,
-					Name:       originalApplicationName,
-					SourcePath: sourcePath,
-					Manifest:   manifests,
-				}
-				extractedApps = append(extractedApps, app)
-				processedApps[name] = true
-
-			case "Unknown":
-				for _, condition := range item.Status.Conditions {
-					if isErrorCondition(condition.Type) {
-						msg := condition.Message
-						if containsAny(msg, errorMessages) {
-							failedApps[name] = msg
-						} else if containsAny(msg, timeoutMessages) {
-							log.Warn().Msgf("⚠️ Application: %s timed out with error: %s", name, msg)
-							timedOutApps = append(timedOutApps, name)
-							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
-						} else {
-							log.Error().Msgf("❌ Application: %s failed with error: %s", name, msg)
-							otherErrors = append(otherErrors, struct{ name, msg string }{name, msg})
-						}
-					}
-				}
-			}
-			appsLeft++
-		}
-
-		// Handle errors
-		if len(failedApps) > 0 {
-			for name, msg := range failedApps {
-				log.Error().Msgf("❌ Failed to process application: %s with error: \n%s", name, msg)
-			}
-			return nil, fmt.Errorf("failed to process applications")
-		}
-
-		// Handle timeouts
+		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			log.Error().Msgf("❌ Timed out after %d seconds", timeout)
-			log.Info().Msgf("❌ Processed %d applications, but %d applications still remain",
-				len(processedApps), appsLeft)
-			if len(otherErrors) > 0 {
-				log.Error().Msg("❌ Applications with 'ComparisonError' errors:")
-				for _, err := range otherErrors {
-					log.Error().Msgf("❌ %s, %s", err.name, err.msg)
-				}
-			}
-			return nil, fmt.Errorf("timed out")
+			return result, fmt.Errorf("timed out waiting for application %s", app.GetLongName())
 		}
 
-		// Handle timed out apps
-		if len(timedOutApps) > 0 {
-			log.Info().Msgf("💤 %d Applications timed out", len(timedOutApps))
-			for _, app := range timedOutApps {
-				if err := argocd.RefreshApp(app); err != nil {
-					log.Error().Msgf("⚠️ Failed to refresh application: %s with %v", app, err)
-				} else {
-					log.Info().Msgf("🔄 Refreshing application: %s", app)
+		// Get application status
+		output, err := argocd.K8sClient.GetArgoCDApplication(argocd.Namespace, app.Id)
+		if err != nil {
+			return result, fmt.Errorf("failed to get application %s: %w", app.GetLongName(), err)
+		}
+
+		var appStatus struct {
+			Status struct {
+				Sync struct {
+					Status string `yaml:"status"`
+				} `yaml:"sync"`
+				Conditions []struct {
+					Type    string `yaml:"type"`
+					Message string `yaml:"message"`
+				} `yaml:"conditions"`
+			} `yaml:"status"`
+		}
+
+		if err := yaml.Unmarshal([]byte(output), &appStatus); err != nil {
+			return result, fmt.Errorf("failed to parse application yaml for %s: %w", app.GetLongName(), err)
+		}
+
+		switch appStatus.Status.Sync.Status {
+		case "OutOfSync", "Synced":
+			log.Debug().Str("name", app.GetLongName()).Msg("Extracting manifests from Application")
+			manifests, exists, err := argocd.GetManifests(app.Id)
+			if !exists {
+				return result, fmt.Errorf("application %s does not exist", app.GetLongName())
+			}
+
+			if err != nil {
+				return result, fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
+			}
+
+			log.Debug().Str("name", app.GetLongName()).Msg("Extracted manifests from Application")
+
+			return ExtractedApp{
+				Id:         app.Id,
+				Name:       app.Name,
+				SourcePath: app.FileName,
+				Manifest:   manifests,
+			}, nil
+
+		case "Unknown":
+			for _, condition := range appStatus.Status.Conditions {
+				if isErrorCondition(condition.Type) {
+					msg := condition.Message
+					if containsAny(msg, timeoutMessages) {
+						log.Warn().Str("App", app.GetLongName()).Msgf("⚠️ Application timed out with error: %s", msg)
+						if err := argocd.RefreshApp(app.Id); err != nil {
+							log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to refresh application")
+						} else {
+							log.Info().Str("App", app.GetLongName()).Msg("🔄 Refreshed application")
+						}
+					} else {
+						log.Error().Str("App", app.GetLongName()).Msgf("❌ Application failed with error: %s", msg)
+						return result, fmt.Errorf("application %s failed: %s", app.Name, msg)
+					}
 				}
 			}
 		}
@@ -252,18 +251,6 @@ func extractResourcesFromClusterAsApps(
 		// Sleep before next iteration
 		time.Sleep(5 * time.Second)
 	}
-
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications in %s", len(processedApps), time.Since(startTime).Round(time.Second))
-
-	return extractedApps, nil
-}
-
-func getApplicationSourcePath(k8sClient *utils.K8sClient, namespace string, appName string) (string, error) {
-	return k8sClient.GetResourceAnnotation(argocdPkg.ApplicationGVR, namespace, appName, annotations.SourcePathKey)
-}
-
-func getOriginalApplicationName(k8sClient *utils.K8sClient, namespace string, appName string) (string, error) {
-	return k8sClient.GetResourceAnnotation(argocdPkg.ApplicationGVR, namespace, appName, annotations.OriginalApplicationNameKey)
 }
 
 func isErrorCondition(condType string) bool {

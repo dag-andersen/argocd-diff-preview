@@ -74,6 +74,24 @@ func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
 	return string(resultString), nil
 }
 
+// GetArgoCDApplication gets a single ArgoCD application by name
+func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (string, error) {
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+
+	result, err := c.clientset.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	// convert result to string
+	resultString, err := json.Marshal(result)
+	if err != nil {
+		return "", err
+	}
+
+	return string(resultString), nil
+}
+
 func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 
 	log.Info().Msg("🧼 Deleting applications")
@@ -189,7 +207,7 @@ func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
 }
 
 // Helper function to apply a single manifest from an unstructured object
-func (c *K8sClient) applyManifest(obj *unstructured.Unstructured, source string, fallbackNamespace string) error {
+func (c *K8sClient) ApplyManifest(obj *unstructured.Unstructured, source string, fallbackNamespace string) error {
 	// Skip if the document doesn't have a kind or apiVersion
 	if obj.GetKind() == "" || obj.GetAPIVersion() == "" {
 		log.Debug().Msg("Skipping document with no kind or apiVersion")
@@ -276,7 +294,7 @@ func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace s
 			return count, fmt.Errorf("failed to parse manifest YAML: %w", err)
 		}
 
-		if err := c.applyManifest(obj, "string", fallbackNamespace); err != nil {
+		if err := c.ApplyManifest(obj, "string", fallbackNamespace); err != nil {
 			return count, err
 		}
 

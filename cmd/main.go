@@ -153,12 +153,11 @@ func run(opts *Options) error {
 		log.Warn().Msg("💡 Check out the documentation under section `Application Selection` for more information.")
 	}
 
-	// Generate application manifests as strings
-	baseManifest := argoapplication.ApplicationsToString(baseApps)
-	targetManifest := argoapplication.ApplicationsToString(targetApps)
-
 	// For debugging purposes, we can still write the manifests to files
 	if opts.Debug {
+		// Generate application manifests as strings
+		baseManifest := argoapplication.ApplicationsToString(baseApps)
+		targetManifest := argoapplication.ApplicationsToString(targetApps)
 		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", tempFolder, baseBranch.FolderName()), baseManifest); err != nil {
 			log.Error().Msg("❌ Failed to write base apps")
 			return err
@@ -171,7 +170,13 @@ func run(opts *Options) error {
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
 	baseManifests, targetManifests, err := extract.GetResourcesFromBothBranches(
-		argocd, baseBranch, targetBranch, opts.Timeout, baseManifest, targetManifest, opts.Debug)
+		argocd,
+		baseBranch,
+		targetBranch,
+		opts.Timeout,
+		baseApps,
+		targetApps,
+	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
 		return err

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -15,8 +13,8 @@ import (
 type ArgoResource struct {
 	Yaml     *unstructured.Unstructured
 	Kind     ApplicationKind
-	Id       string
-	Name     string
+	Id       string // The ID is the name of the k8s resource
+	Name     string // The name is the original name of the Application
 	FileName string
 }
 
@@ -99,6 +97,26 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	if err := unstructured.SetNestedMap(a.Yaml.Object, destMap, destPath...); err != nil {
 		return fmt.Errorf("failed to set destination field: %w", err)
 	}
+
+	return nil
+}
+
+// RemoveArgoCDFinalizers removes only the resources-finalizer.argocd.argoproj.io finalizer
+func (a *ArgoResource) RemoveArgoCDFinalizers() error {
+	finalizers := a.Yaml.GetFinalizers()
+	if finalizers == nil {
+		return nil
+	}
+
+	// Filter out Argo CD finalizer in a single operation
+	filteredFinalizers := finalizers[:0]
+	for _, f := range finalizers {
+		if f != "resources-finalizer.argocd.argoproj.io" {
+			filteredFinalizers = append(filteredFinalizers, f)
+		}
+	}
+
+	a.Yaml.SetFinalizers(filteredFinalizers)
 
 	return nil
 }
@@ -350,22 +368,4 @@ func contains(slice []string, str string) bool {
 		}
 	}
 	return false
-}
-
-// WriteApplications writes applications to YAML files in the specified folder
-func WriteApplications(
-	apps []ArgoResource,
-	branch *git.Branch,
-	folder string,
-) error {
-	filePath := fmt.Sprintf("%s/%s.yaml", folder, branch.FolderName())
-	log.Info().Msgf("💾 Writing %d Applications from '%s' to ./%s",
-		len(apps), branch.Name, filePath)
-
-	yaml := ApplicationsToString(apps)
-	if err := utils.WriteFile(filePath, yaml); err != nil {
-		return fmt.Errorf("failed to write %s apps: %w", branch.Type(), err)
-	}
-
-	return nil
 }
