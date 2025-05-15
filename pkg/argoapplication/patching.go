@@ -101,6 +101,26 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	return nil
 }
 
+// RemoveArgoCDFinalizers removes only the resources-finalizer.argocd.argoproj.io finalizer
+func (a *ArgoResource) RemoveArgoCDFinalizers() error {
+	finalizers := a.Yaml.GetFinalizers()
+	if finalizers == nil {
+		return nil
+	}
+
+	// Filter out Argo CD finalizer in a single operation
+	filteredFinalizers := finalizers[:0]
+	for _, f := range finalizers {
+		if f != "resources-finalizer.argocd.argoproj.io" {
+			filteredFinalizers = append(filteredFinalizers, f)
+		}
+	}
+
+	a.Yaml.SetFinalizers(filteredFinalizers)
+
+	return nil
+}
+
 // RemoveSyncPolicy removes the syncPolicy from the resource
 func (a *ArgoResource) RemoveSyncPolicy() error {
 	if a.Yaml == nil {

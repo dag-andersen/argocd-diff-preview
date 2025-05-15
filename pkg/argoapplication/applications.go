@@ -284,6 +284,12 @@ func PatchApplication(
 		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
 	}
 
+	err = app.RemoveArgoCDFinalizers()
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to remove Argo CD finalizers: %w", err)
+	}
+
 	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
