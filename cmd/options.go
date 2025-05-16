@@ -44,6 +44,7 @@ var (
 	DefaultLogFormat          = "human"
 	DefaultArgocdChartVersion = "latest"
 	DefaultTitle              = "Argo CD Diff Preview"
+	DefaultCreateCluster      = false
 )
 
 type Options struct {
@@ -58,6 +59,7 @@ type Options struct {
 	Repo                      string `mapstructure:"repo"`
 	OutputFolder              string `mapstructure:"output-folder"`
 	SecretsFolder             string `mapstructure:"secrets-folder"`
+	CreateCluster             bool   `mapstructure:"create-cluster"`
 	ClusterType               string `mapstructure:"cluster"`
 	ClusterName               string `mapstructure:"cluster-name"`
 	KindOptions               string `mapstructure:"kind-options"`
@@ -189,6 +191,7 @@ func Parse() *Options {
 	viper.SetDefault("base-branch", DefaultBaseBranch)
 	viper.SetDefault("output-folder", DefaultOutputFolder)
 	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
+	viper.SetDefault("create-cluster", DefaultCreateCluster)
 	viper.SetDefault("cluster", DefaultCluster)
 	viper.SetDefault("cluster-name", DefaultClusterName)
 	viper.SetDefault("max-diff-length", DefaultMaxDiffLength)
@@ -219,6 +222,7 @@ func Parse() *Options {
 	rootCmd.Flags().StringP("secrets-folder", "s", DefaultSecretsFolder, "Secrets folder where the secrets are read from")
 
 	// Cluster related
+	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")

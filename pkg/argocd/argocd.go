@@ -101,6 +101,18 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	return nil
 }
 
+func (a *ArgoCDInstallation) OnlyLogin() error {
+
+	// Login to ArgoCD
+	if err := a.login(); err != nil {
+		return fmt.Errorf("failed to login: %w", err)
+	}
+
+	log.Info().Msg("🦑 Logged in to Argo CD successfully")
+
+	return nil
+}
+
 // installWithHelm installs ArgoCD using Helm
 func (a *ArgoCDInstallation) installWithHelm() error {
 	installLatest := strings.TrimSpace(a.Version) == "" || strings.TrimSpace(a.Version) == "latest"
@@ -304,7 +316,7 @@ func (a *ArgoCDInstallation) login() error {
 	time.Sleep(5 * time.Second)
 
 	// Login to ArgoCD
-	out, err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password)
+	out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
 	if err != nil {
 		log.Error().Msgf("❌ Failed to login to argocd")
 		return fmt.Errorf("failed to login: %w", err)

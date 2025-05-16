@@ -92,16 +92,21 @@ func run(opts *Options) error {
 		return nil
 	}
 
-	// Create cluster and install Argo CD
-	if err := clusterProvider.CreateCluster(); err != nil {
-		log.Error().Msgf("❌ Failed to create cluster")
-		return err
+	if opts.CreateCluster {
+		// Create cluster and install Argo CD
+		if err := clusterProvider.CreateCluster(); err != nil {
+			log.Error().Msgf("❌ Failed to create cluster")
+			return err
+		}
 	}
+
 	defer func() {
-		if !opts.KeepClusterAlive {
-			clusterProvider.DeleteCluster(true)
-		} else {
-			log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+		if opts.CreateCluster {
+			if !opts.KeepClusterAlive {
+				clusterProvider.DeleteCluster(true)
+			} else {
+				log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+			}
 		}
 	}()
 
@@ -112,11 +117,18 @@ func run(opts *Options) error {
 		return err
 	}
 
-	// Install Argo CD
 	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
-	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
-		log.Error().Msgf("❌ Failed to install Argo CD")
-		return err
+	if opts.CreateCluster {
+		// Install Argo CD
+		if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
+			log.Error().Msgf("❌ Failed to install Argo CD")
+			return err
+		}
+	} else {
+		if err := argocd.OnlyLogin(); err != nil {
+			log.Error().Msgf("❌ Failed to login to Argo CD")
+			return err
+		}
 	}
 
 	tempFolder := "temp"
