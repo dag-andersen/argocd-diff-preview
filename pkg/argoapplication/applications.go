@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	k8s "github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"sigs.k8s.io/yaml"
 )
@@ -120,10 +120,10 @@ func GetApplications(
 ) ([]ArgoResource, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
 
-	yamlFiles := k8s.GetYamlFiles(branch.FolderName(), fileRegex)
+	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), fileRegex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
-	k8sResources := k8s.ParseYaml(branch.FolderName(), yamlFiles)
+	k8sResources := fileparsing.ParseYaml(branch.FolderName(), yamlFiles, branch.Type())
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d k8sResources", len(k8sResources))
 
 	applications := FromResourceToApplication(
@@ -177,7 +177,7 @@ func filterDuplicates(apps []ArgoResource, duplicates []*unstructured.Unstructur
 
 // FromResourceToApplication converts K8sResources to ArgoResources with filtering
 func FromResourceToApplication(
-	k8sResources []k8s.Resource,
+	k8sResources []fileparsing.Resource,
 	selector []selector.Selector,
 	filesChanged []string,
 	ignoreInvalidWatchPattern bool,
@@ -260,13 +260,9 @@ func PatchApplication(
 ) (*ArgoResource, error) {
 
 	// Chain the modifications
-	err := app.SetNamespace(argocdNamespace)
-	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
-		return nil, fmt.Errorf("failed to set namespace: %w", err)
-	}
+	app.SetNamespace(argocdNamespace)
 
-	err = app.RemoveSyncPolicy()
+	err := app.RemoveSyncPolicy()
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
@@ -511,6 +507,7 @@ func ConvertAppSetsToApps(
 				Id:       name,
 				Name:     name,
 				FileName: appSet.FileName,
+				Branch:   branch.Type(),
 			}
 
 			patchedApp, err := PatchApplication(

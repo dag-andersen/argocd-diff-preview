@@ -17,12 +17,10 @@ Modified (1):
 
 ```diff
 @@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
-----
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations:
--    argocd.argoproj.io/tracking-id: folder2:apps/Deployment:/deploy-from-folder-two
+-  annotations: {}
 -  name: deploy-from-folder-two
 -spec:
 -  replicas: 2
@@ -39,7 +37,6 @@ Modified (1):
 -        name: myapp
 -        ports:
 -        - containerPort: 80
--
 ```
 
 </details>
@@ -60,7 +57,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  
-@@ skipped 9 lines (21 -> 29) @@
+@@ skipped 8 lines (19 -> 26) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -71,7 +68,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  spec:
-@@ skipped 29 lines (40 -> 68) @@
+@@ skipped 28 lines (37 -> 64) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -82,7 +79,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx-controller-admission
    namespace: default
  spec:
-@@ skipped 21 lines (79 -> 99) @@
+@@ skipped 20 lines (75 -> 94) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -93,7 +90,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx
    namespace: default
  
-@@ skipped 9 lines (110 -> 118) @@
+@@ skipped 8 lines (105 -> 112) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -104,7 +101,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx-admission
  webhooks:
  - admissionReviewVersions:
-@@ skipped 30 lines (129 -> 158) @@
+@@ skipped 29 lines (123 -> 151) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -115,7 +112,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx-controller
    namespace: default
  spec:
-@@ skipped 13 lines (169 -> 181) @@
+@@ skipped 13 lines (162 -> 174) @@
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: ingress-nginx
          app.kubernetes.io/part-of: ingress-nginx
@@ -126,7 +123,7 @@ Modified (1):
      spec:
        containers:
        - args:
-@@ skipped 99 lines (192 -> 290) @@
+@@ skipped 98 lines (185 -> 282) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -137,7 +134,7 @@ Modified (1):
    name: nginx
  spec:
    controller: k8s.io/ingress-nginx
-@@ skipped 9 lines (301 -> 309) @@
+@@ skipped 8 lines (293 -> 300) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -148,7 +145,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx
  rules:
  - apiGroups:
-@@ skipped 78 lines (320 -> 397) @@
+@@ skipped 77 lines (311 -> 387) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -159,7 +156,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx
  roleRef:
    apiGroup: rbac.authorization.k8s.io
-@@ skipped 16 lines (408 -> 423) @@
+@@ skipped 15 lines (398 -> 412) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx
@@ -170,7 +167,7 @@ Modified (1):
    name: nginx-ingress-ingress-nginx
    namespace: default
  rules:
-@@ skipped 87 lines (434 -> 520) @@
+@@ skipped 86 lines (423 -> 508) @@
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: ingress-nginx
      app.kubernetes.io/part-of: ingress-nginx

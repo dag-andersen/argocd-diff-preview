@@ -14,13 +14,10 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/Service:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/Service:default/experiment
+   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/managed-by: Helm
@@ -46,9 +43,7 @@ Modified (1):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/ServiceAccount:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:/ServiceAccount:default/experiment
+   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/managed-by: Helm
@@ -63,9 +58,7 @@ Modified (1):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:apps/Deployment:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-app-watch-pattern-valid-regex:apps/Deployment:default/experiment
+   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/managed-by: Helm
@@ -84,7 +77,7 @@ Modified (1):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (70 -> 84) @@
+@@ skipped 15 lines (63 -> 77) @@
          - containerPort: 80
            name: http
            protocol: TCP

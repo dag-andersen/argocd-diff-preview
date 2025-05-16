@@ -14,13 +14,10 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app (examples/helm/applications/my-app.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app:/Service:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-app:/Service:default/new-app-name
+   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/managed-by: Helm
@@ -46,9 +43,7 @@ Modified (1):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app:/ServiceAccount:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-app:/ServiceAccount:default/new-app-name
+   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/managed-by: Helm
@@ -63,9 +58,7 @@ Modified (1):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app:apps/Deployment:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-app:apps/Deployment:default/new-app-name
+   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/managed-by: Helm
@@ -88,7 +81,7 @@ Modified (1):
          app.kubernetes.io/instance: my-app
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: myApp
-@@ skipped 12 lines (74 -> 85) @@
+@@ skipped 12 lines (67 -> 78) @@
          - containerPort: 80
            name: http
            protocol: TCP
