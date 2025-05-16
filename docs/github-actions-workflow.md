@@ -37,7 +37,7 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            -e TARGET_BRANCH=${{ github.head_ref }} \
+            -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
             dagandersen/argocd-diff-preview:v0.1.8
 
