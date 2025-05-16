@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 	"time"
@@ -56,6 +57,7 @@ func GetResourcesFromBothBranches(
 	timeout uint64,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
+	prefix string,
 ) ([]ExtractedApp, []ExtractedApp, error) {
 
 	if err := checkForDuplicateApps(baseApps); err != nil {
@@ -69,7 +71,7 @@ func GetResourcesFromBothBranches(
 	apps := append(baseApps, targetApps...)
 
 	log.Debug().Msg("Applied manifest for both branches")
-	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout)
+	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -94,6 +96,7 @@ func getResourcesFromApps(
 	argocd *argocdPkg.ArgoCDInstallation,
 	apps []argoapplication.ArgoResource,
 	timeout uint64,
+	prefix string,
 ) ([]ExtractedApp, []ExtractedApp, error) {
 
 	startTime := time.Now()
@@ -108,7 +111,7 @@ func getResourcesFromApps(
 
 	for _, app := range apps {
 		go func(app argoapplication.ArgoResource) {
-			result, err := getResourcesFromApp(argocd, app, timeout)
+			result, err := getResourcesFromApp(argocd, app, timeout, prefix)
 			results <- struct {
 				app ExtractedApp
 				err error
@@ -176,12 +179,17 @@ func getResourcesFromApps(
 }
 
 // getResourcesFromApp extracts a single application from the cluster
-func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64) (ExtractedApp, error) {
+func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string) (ExtractedApp, error) {
 	// Apply the application manifest first
 
-	err := SuffixApplicationsNameWithBranchType(&app)
+	err := prefixApplication(&app, prefix)
 	if err != nil {
-		return ExtractedApp{}, fmt.Errorf("failed to suffix application name with branch type: %w", err)
+		return ExtractedApp{}, fmt.Errorf("failed to prefix application name with prefix: %w", err)
+	}
+
+	err = labelApplicationWithRunID(&app, prefix)
+	if err != nil {
+		return ExtractedApp{}, fmt.Errorf("failed to label application with run ID: %w", err)
 	}
 
 	if err := argocd.K8sClient.ApplyManifest(app.Yaml, "string", argocd.Namespace); err != nil {
@@ -247,13 +255,20 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			}
 
 			// Parse the first non-empty manifest from the string
-			return ExtractedApp{
+			extractedApp := ExtractedApp{
 				Id:         app.Id,
 				Name:       app.Name,
 				SourcePath: app.FileName,
 				Manifest:   manifestsContent,
 				Branch:     app.Branch,
-			}, nil
+			}
+
+			// Delete Application from cluster
+			if err := argocd.K8sClient.DeleteArgoCDApplication(argocd.Namespace, app.Id); err != nil {
+				log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to delete application from cluster")
+			}
+
+			return extractedApp, nil
 
 		case "Unknown":
 			for _, condition := range appStatus.Status.Conditions {
@@ -325,17 +340,44 @@ func processYamlChunk(chunk string) ([]unstructured.Unstructured, error) {
 	return manifests, nil
 }
 
-// SuffixApplicationsNameWithBranchType suffixes the application name with the branch name
-func SuffixApplicationsNameWithBranchType(a *argoapplication.ArgoResource) error {
+// prefixApplication prefixes the application name with the branch name and a unique ID
+func prefixApplication(a *argoapplication.ArgoResource, prefix string) error {
 	if a.Branch == "" {
-		log.Warn().Str("patchType", "suffixApplicationsNameWithBranchType").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't suffix application name with branch type because branch is empty")
+		log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't prefix application name with prefix because branch is empty")
 		return nil
 	}
 
-	newId := fmt.Sprintf("%s-%s", a.Branch, a.Id)
+	var branchShortName string
+	switch a.Branch {
+	case git.Base:
+		branchShortName = "b"
+	case git.Target:
+		branchShortName = "t"
+	}
+
+	prefixSize := len(prefix) + len(branchShortName) + len("--")
+	var newId string
+	if prefixSize+len(a.Id) > 53 {
+		// hash id so it becomes shorter
+		hashedId := fmt.Sprintf("%x", sha256.Sum256([]byte(a.Id)))
+		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, hashedId[:53-prefixSize])
+	} else {
+		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, a.Id)
+	}
+
 	a.Id = newId
 	a.Yaml.SetName(newId)
 
+	return nil
+}
+
+func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) error {
+	labels := a.Yaml.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["argocd-diff-preview-run-id"] = runID
+	a.Yaml.SetLabels(labels)
 	return nil
 }
 

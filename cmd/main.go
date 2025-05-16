@@ -11,6 +11,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -47,6 +48,13 @@ func run(opts *Options) error {
 	filesChanged := opts.GetFilesChanged()
 	redirectRevisions := opts.GetRedirectRevisions()
 	clusterProvider := opts.GetClusterProvider()
+
+	// Create unique ID only consisting of lowercase letters of 5 characters
+	uniqueID := uuid.New().String()[:5]
+
+	if !opts.CreateCluster {
+		log.Info().Msgf("🔑 Unique ID for this run: %s", uniqueID)
+	}
 
 	// Check if users limited the Application Selection
 	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
@@ -186,6 +194,7 @@ func run(opts *Options) error {
 		opts.Timeout,
 		baseApps,
 		targetApps,
+		uniqueID,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
