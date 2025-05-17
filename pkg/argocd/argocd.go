@@ -304,7 +304,7 @@ func (a *ArgoCDInstallation) login() error {
 	time.Sleep(5 * time.Second)
 
 	// Login to ArgoCD
-	out, err := a.runArgocdCommand("login", "localhost:8080", "--insecure", "--username", "admin", "--password", password)
+	out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
 	if err != nil {
 		log.Error().Msgf("❌ Failed to login to argocd")
 		return fmt.Errorf("failed to login: %w", err)
