@@ -13,6 +13,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
 // Error and timeout messages that we look for in application status
@@ -376,7 +377,7 @@ func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) er
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	labels["argocd-diff-preview-run-id"] = runID
+	labels[vars.ArgoCDApplicationLabelKey] = runID
 	a.Yaml.SetLabels(labels)
 	return nil
 }

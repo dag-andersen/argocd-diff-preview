@@ -125,6 +125,15 @@ func run(opts *Options) error {
 		return err
 	}
 
+	// Delete old applications
+	if !opts.CreateCluster {
+		age := 20
+		if err := k8sClient.DeleteAllApplicationsOlderThan(opts.ArgocdNamespace, age); err != nil {
+			log.Error().Msgf("❌ Failed to delete old applications")
+			return err
+		}
+	}
+
 	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
 	if opts.CreateCluster {
 		// Install Argo CD
