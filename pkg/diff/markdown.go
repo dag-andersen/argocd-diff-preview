@@ -14,7 +14,6 @@ Summary:
 
 %app_diffs%
 
-
 %info_box%
 `
 
