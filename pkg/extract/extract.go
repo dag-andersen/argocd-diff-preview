@@ -59,14 +59,15 @@ func GetResourcesFromBothBranches(
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
 	prefix string,
-) ([]ExtractedApp, []ExtractedApp, error) {
+) ([]ExtractedApp, []ExtractedApp, time.Duration, error) {
+	startTime := time.Now()
 
 	if err := checkForDuplicateApps(baseApps); err != nil {
-		return nil, nil, err
+		return nil, nil, time.Since(startTime), err
 	}
 
 	if err := checkForDuplicateApps(targetApps); err != nil {
-		return nil, nil, err
+		return nil, nil, time.Since(startTime), err
 	}
 
 	apps := append(baseApps, targetApps...)
@@ -74,11 +75,11 @@ func GetResourcesFromBothBranches(
 	log.Debug().Msg("Applied manifest for both branches")
 	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
 	log.Debug().Msg("Extracted manifests for both branches")
 
-	return extractedBaseApps, extractedTargetApps, nil
+	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
 }
 
 func checkForDuplicateApps(apps []argoapplication.ArgoResource) error {

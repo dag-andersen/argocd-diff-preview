@@ -44,7 +44,7 @@ var (
 	DefaultLogFormat          = "human"
 	DefaultArgocdChartVersion = "latest"
 	DefaultTitle              = "Argo CD Diff Preview"
-	DefaultCreateCluster      = false
+	DefaultCreateCluster      = true
 )
 
 type Options struct {

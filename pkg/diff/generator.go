@@ -10,15 +10,20 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"sigs.k8s.io/yaml"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/rs/zerolog/log"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
+
+type AppInfo struct {
+	Id          string
+	Name        string
+	SourcePath  string
+	FileContent string
+}
 
 // GenerateDiff generates a diff between base and target branches
 func GenerateDiff(
@@ -26,12 +31,12 @@ func GenerateDiff(
 	outputFolder string,
 	baseBranch *gitt.Branch,
 	targetBranch *gitt.Branch,
-	baseApps []extract.ExtractedApp,
-	targetApps []extract.ExtractedApp,
+	baseApps []AppInfo,
+	targetApps []AppInfo,
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
-	executionTime time.Duration,
+	timeInfo InfoBox,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -60,11 +65,10 @@ func GenerateDiff(
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
 
-	executionTimeString := executionTime.Round(time.Second).String()
-	appCount := fmt.Sprintf("%d", len(baseApps)+len(targetApps))
+	infoBoxString := timeInfo.String()
 
 	// Calculate the available space for the file sections
-	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(executionTimeString) - len(appCount)
+	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
 
 	// Warning message to be added if we need to truncate
 	warningMessage := fmt.Sprintf("\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",
@@ -122,8 +126,7 @@ func GenerateDiff(
 		title,
 		strings.TrimSpace(summary),
 		strings.TrimSpace(combinedDiff.String()),
-		executionTimeString,
-		appCount,
+		infoBoxString,
 	)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
@@ -134,21 +137,12 @@ func GenerateDiff(
 	return nil
 }
 
-func writeManifestsToDisk(apps []extract.ExtractedApp, folder string) error {
+func writeManifestsToDisk(apps []AppInfo, folder string) error {
 	if err := utils.CreateFolder(folder, true); err != nil {
 		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
 	}
 	for _, app := range apps {
-		var manifestStrings []string
-		for _, manifest := range app.Manifest {
-			manifestString, err := yaml.Marshal(manifest.Object)
-			if err != nil {
-				return fmt.Errorf("failed to marshal unstructured object: %w", err)
-			}
-			manifestStrings = append(manifestStrings, string(manifestString))
-		}
-
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), strings.Join(manifestStrings, "\n---\n")); err != nil {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), app.FileContent); err != nil {
 			return fmt.Errorf("failed to write manifest %s: %w", app.Id, err)
 		}
 	}
@@ -160,28 +154,28 @@ func generateGitDiff(
 	basePath, targetPath string,
 	diffIgnore *string,
 	diffContextLines uint,
-	baseExtractedApps []extract.ExtractedApp,
-	targetExtractedApps []extract.ExtractedApp,
+	baseApps []AppInfo,
+	targetApps []AppInfo,
 ) (string, []string, error) {
 
 	// Write base manifests to disk
-	if err := writeManifestsToDisk(baseExtractedApps, basePath); err != nil {
+	if err := writeManifestsToDisk(baseApps, basePath); err != nil {
 		return "", nil, fmt.Errorf("failed to write base manifests: %w", err)
 	}
 
 	// Write target manifests to disk
-	if err := writeManifestsToDisk(targetExtractedApps, targetPath); err != nil {
+	if err := writeManifestsToDisk(targetApps, targetPath); err != nil {
 		return "", nil, fmt.Errorf("failed to write target manifests: %w", err)
 	}
 
-	baseExtractedAppsMap := make(map[string]extract.ExtractedApp)
-	for _, app := range baseExtractedApps {
-		baseExtractedAppsMap[app.Id] = app
+	baseAppsMap := make(map[string]AppInfo)
+	for _, app := range baseApps {
+		baseAppsMap[app.Id] = app
 	}
 
-	targetExtractedAppsMap := make(map[string]extract.ExtractedApp)
-	for _, app := range targetExtractedApps {
-		targetExtractedAppsMap[app.Id] = app
+	targetAppsMap := make(map[string]AppInfo)
+	for _, app := range targetApps {
+		targetAppsMap[app.Id] = app
 	}
 
 	// Create temporary directories for Git repositories
@@ -393,10 +387,10 @@ func generateGitDiff(
 		}
 
 		diff := Diff{
-			newName:       targetExtractedAppsMap[toName].Name,
-			oldName:       baseExtractedAppsMap[fromName].Name,
-			newSourcePath: targetExtractedAppsMap[toName].SourcePath,
-			oldSourcePath: baseExtractedAppsMap[fromName].SourcePath,
+			newName:       targetAppsMap[toName].Name,
+			oldName:       baseAppsMap[fromName].Name,
+			newSourcePath: targetAppsMap[toName].SourcePath,
+			oldSourcePath: baseAppsMap[fromName].SourcePath,
 			action:        action,
 			diffContent:   diffContent,
 		}
