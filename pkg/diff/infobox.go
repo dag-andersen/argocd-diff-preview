@@ -14,6 +14,6 @@ type InfoBox struct {
 }
 
 func (t InfoBox) String() string {
-	return fmt.Sprintf("_Stats_:\n [Applications: %d], [Execution Time: %s], [Cluster Setup: %s], [ArgoCD Installation: %s], [Rendering: %s]",
-		t.ApplicationCount, t.FullDuration.Round(time.Second), t.ClusterCreationDuration.Round(time.Second), t.ArgoCDInstallationDuration.Round(time.Second), t.ExtractDuration.Round(time.Second))
+	return fmt.Sprintf("_Stats_:\n[Applications: %d], [Execution Time: %s], [Rendering Time: %s], [Cluster Setup: %s], [ArgoCD Installation: %s]",
+		t.ApplicationCount, t.FullDuration.Round(time.Second), t.ExtractDuration.Round(time.Second), t.ClusterCreationDuration.Round(time.Second), t.ArgoCDInstallationDuration.Round(time.Second))
 }
