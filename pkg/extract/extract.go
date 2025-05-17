@@ -56,27 +56,28 @@ func GetResourcesFromBothBranches(
 	timeout uint64,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
-) ([]ExtractedApp, []ExtractedApp, error) {
+) ([]ExtractedApp, []ExtractedApp, time.Duration, error) {
+	startTime := time.Now()
 
 	extractedBasedApps, err := getResourcesFromApps(argocd, baseBranch, baseApps, timeout)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
 	log.Debug().Str("branch", baseBranch.Name).Msg("Extracted manifests")
 
 	// delete applications
 	if err := argocd.K8sClient.DeleteArgoCDApplications(argocd.Namespace); err != nil {
-		return nil, nil, fmt.Errorf("failed to delete applications: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to delete applications: %w", err)
 	}
 
 	log.Debug().Str("branch", targetBranch.Name).Msg("Applied manifest")
 	extractedTargetApps, err := getResourcesFromApps(argocd, targetBranch, targetApps, timeout)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get resources: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
 	log.Debug().Str("branch", targetBranch.Name).Msg("Extracted manifests")
 
-	return extractedBasedApps, extractedTargetApps, nil
+	return extractedBasedApps, extractedTargetApps, time.Since(startTime), nil
 }
 
 // getResourcesFromApps extracts resources from Argo CD for a specific branch as ExtractedApp structs

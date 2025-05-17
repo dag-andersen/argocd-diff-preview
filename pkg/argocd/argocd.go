@@ -49,7 +49,7 @@ func New(client *utils.K8sClient, namespace string, version string, configPath s
 	}
 }
 
-func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
+func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
 
 	startTime := time.Now()
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
@@ -57,24 +57,24 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	// Check if namespace exists
 	if err := a.K8sClient.CreateNamespace(a.Namespace); err != nil {
 		log.Error().Msgf("❌ Failed to create namespace %s", a.Namespace)
-		return fmt.Errorf("failed to create namespace: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to create namespace: %w", err)
 	}
 
 	log.Debug().Msgf("Created namespace: %s", a.Namespace)
 
 	// Apply secrets before installing ArgoCD
 	if err := ApplySecretsFromFolder(a.K8sClient, secretsFolder, a.Namespace); err != nil {
-		return fmt.Errorf("failed to apply secrets: %w from folder: %s", err, secretsFolder)
+		return time.Since(startTime), fmt.Errorf("failed to apply secrets: %w from folder: %s", err, secretsFolder)
 	}
 
 	// Install ArgoCD using Helm
 	if err := a.installWithHelm(); err != nil {
-		return err
+		return time.Since(startTime), err
 	}
 
 	// Login to ArgoCD
 	if err := a.login(); err != nil {
-		return fmt.Errorf("failed to login: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
 	if debug {
@@ -82,7 +82,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 		configMaps, err := a.K8sClient.GetConfigMaps(a.Namespace, "argocd-cmd-params-cm", "argocd-cm")
 		if err != nil {
 			log.Error().Err(err).Msg("❌ Failed to get ConfigMaps")
-			return fmt.Errorf("failed to get ConfigMaps: %w", err)
+			return time.Since(startTime), fmt.Errorf("failed to get ConfigMaps: %w", err)
 		}
 		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", configMaps)
 	}
@@ -90,7 +90,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	// Add extra permissions to the default AppProject
 	if _, err := a.runArgocdCommand("proj", "add-source-namespace", "default", "*"); err != nil {
 		log.Error().Err(err).Msg("❌ Failed to add extra permissions to the default AppProject")
-		return fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
 	} else {
 		log.Debug().Msgf("Argo CD extra permissions added successfully")
 	}
@@ -98,7 +98,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) error {
 	duration := time.Since(startTime)
 	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
-	return nil
+	return duration, nil
 }
 
 // installWithHelm installs ArgoCD using Helm
