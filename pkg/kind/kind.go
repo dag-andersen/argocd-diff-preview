@@ -2,10 +2,12 @@ package kind
 
 import (
 	"fmt"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
+
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 
 	"github.com/rs/zerolog/log"
 
@@ -23,18 +25,22 @@ func IsInstalled() bool {
 }
 
 // CreateCluster creates a new kind cluster with the given name, optional kindOptions, optionally using internal IP
-func CreateCluster(clusterName string, kindOptions string, internal bool) error {
+func CreateCluster(clusterName string, kindOptions string, internal bool) (time.Duration, error) {
+
+	// timer
+	start := time.Now()
+
 	// Check if docker is running
 	if output, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
-		return fmt.Errorf("docker is not running: %s", output)
+		return time.Since(start), fmt.Errorf("docker is not running: %s", output)
 	}
 
 	log.Info().Msg("🚀 Creating kind cluster...")
 
 	// Delete existing cluster if it exists
 	if output, err := runCommand("kind", "delete", "cluster", "--name", clusterName); err != nil {
-		return fmt.Errorf("failed to delete existing cluster: %s", output)
+		return time.Since(start), fmt.Errorf("failed to delete existing cluster: %s", output)
 	}
 
 	// Create new cluster
@@ -50,7 +56,7 @@ func CreateCluster(clusterName string, kindOptions string, internal bool) error 
 		} else {
 			log.Error().Msgf("❌ Failed to create cluster with options: %s", kindOptions)
 		}
-		return fmt.Errorf("failed to create cluster: %s", output)
+		return time.Since(start), fmt.Errorf("failed to create cluster: %s", output)
 	}
 
 	if internal {
@@ -58,18 +64,20 @@ func CreateCluster(clusterName string, kindOptions string, internal bool) error 
 
 		output, err := runCommand("kind", "get", "kubeconfig", "--internal", "--name", clusterName)
 		if err != nil {
-			return fmt.Errorf("failed to get cluster kubeconfig: %s", output)
+			return time.Since(start), fmt.Errorf("failed to get cluster kubeconfig: %s", output)
 		}
 
 		kubeconfigPath := utils.GetKubeConfigPath()
 		err = os.WriteFile(kubeconfigPath, []byte(output), 0644)
 		if err != nil {
-			return fmt.Errorf("failed to write cluster kubeconfig: %s", kubeconfigPath)
+			return time.Since(start), fmt.Errorf("failed to write cluster kubeconfig: %s", kubeconfigPath)
 		}
 	}
 
-	log.Info().Msg("🚀 Cluster created successfully")
-	return nil
+	duration := time.Since(start)
+
+	log.Info().Msgf("🚀 Cluster created successfully in %s", duration.Round(time.Second))
+	return duration, nil
 }
 
 // ClusterExists checks if a cluster with the given name exists
@@ -132,7 +140,7 @@ func (k *Kind) IsInstalled() bool {
 	return IsInstalled()
 }
 
-func (k *Kind) CreateCluster() error {
+func (k *Kind) CreateCluster() (time.Duration, error) {
 	return CreateCluster(k.clusterName, k.kindOptions, k.kindInternal)
 }
 

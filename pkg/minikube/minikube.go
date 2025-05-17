@@ -3,6 +3,7 @@ package minikube
 import (
 	"fmt"
 	"os/exec"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -20,28 +21,33 @@ func IsInstalled() bool {
 }
 
 // CreateCluster creates a new minikube cluster
-func CreateCluster() error {
+func CreateCluster() (time.Duration, error) {
+
+	startTime := time.Now()
+
 	// Check if docker is running
 	if output, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
-		return fmt.Errorf("docker is not running: %s", output)
+		return time.Since(startTime), fmt.Errorf("docker is not running: %s", output)
 	}
 
 	log.Info().Msg("🚀 Creating minikube cluster...")
 
 	// Delete existing cluster if it exists
 	if output, err := runCommand("minikube", "delete"); err != nil {
-		return fmt.Errorf("failed to delete existing cluster: %s", output)
+		return time.Since(startTime), fmt.Errorf("failed to delete existing cluster: %s", output)
 	}
 
 	// Create new cluster
 	if output, err := runCommand("minikube", "start"); err != nil {
 		log.Error().Msg("❌ Failed to create cluster")
-		return fmt.Errorf("failed to create cluster: %s", output)
+		return time.Since(startTime), fmt.Errorf("failed to create cluster: %s", output)
 	}
 
-	log.Info().Msg("🚀 Cluster created successfully")
-	return nil
+	duration := time.Since(startTime)
+
+	log.Info().Msgf("🚀 Cluster created successfully in %s", duration.Round(time.Second))
+	return duration, nil
 }
 
 // ClusterExists checks if a minikube cluster exists
@@ -90,7 +96,7 @@ func (m *Minikube) IsInstalled() bool {
 	return IsInstalled()
 }
 
-func (m *Minikube) CreateCluster() error {
+func (m *Minikube) CreateCluster() (time.Duration, error) {
 	return CreateCluster()
 }
 
