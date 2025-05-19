@@ -223,6 +223,12 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 
 			log.Debug().Str("name", app.GetLongName()).Msg("Extracted manifests from Application")
 
+			// trim first or last ---
+			manifests = strings.TrimSpace(manifests)
+			manifests = strings.TrimPrefix(manifests, "---")
+			manifests = strings.TrimSuffix(manifests, "---")
+			manifests = strings.TrimSpace(manifests)
+
 			return ExtractedApp{
 				Id:         app.Id,
 				Name:       app.Name,

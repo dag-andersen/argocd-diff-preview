@@ -193,16 +193,20 @@ func run(opts *Options) error {
 		var baseAppCombinedYaml []string
 		var targetAppCombinedYaml []string
 		for _, app := range baseAppInfos {
-			baseAppCombinedYaml = append(baseAppCombinedYaml, app.FileContent)
+			if app.FileContent != "" {
+				baseAppCombinedYaml = append(baseAppCombinedYaml, app.FileContent)
+			}
 		}
 		for _, app := range targetAppInfos {
-			targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
+			if app.FileContent != "" {
+				targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
+			}
 		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n---\n")); err != nil {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n")); err != nil {
 			log.Error().Msg("❌ Failed to write base manifests")
 			return err
 		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, targetBranch.FolderName()), strings.Join(targetAppCombinedYaml, "\n---\n")); err != nil {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, targetBranch.FolderName()), strings.Join(targetAppCombinedYaml, "\n")); err != nil {
 			log.Error().Msg("❌ Failed to write target manifests")
 			return err
 		}
