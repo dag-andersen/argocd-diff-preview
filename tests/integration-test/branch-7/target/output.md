@@ -15,7 +15,6 @@ Modified (2):
 
 ```diff
 @@ Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -85,7 +84,7 @@ Modified (2):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (70 -> 84) @@
+@@ skipped 15 lines (69 -> 83) @@
          - containerPort: 80
            name: http
            protocol: TCP
@@ -108,7 +107,6 @@ Modified (2):
 
 ```diff
 @@ Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -178,7 +176,7 @@ Modified (2):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (70 -> 84) @@
+@@ skipped 15 lines (69 -> 83) @@
          - containerPort: 80
            name: http
            protocol: TCP

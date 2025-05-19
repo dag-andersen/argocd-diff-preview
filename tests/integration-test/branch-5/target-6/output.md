@@ -14,7 +14,6 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -84,7 +83,7 @@ Modified (1):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (70 -> 84) @@
+@@ skipped 15 lines (69 -> 83) @@
          - containerPort: 80
            name: http
            protocol: TCP

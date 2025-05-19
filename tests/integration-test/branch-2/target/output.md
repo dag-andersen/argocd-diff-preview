@@ -14,7 +14,6 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app (examples/helm/applications/my-app.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -88,7 +87,7 @@ Modified (1):
          app.kubernetes.io/instance: my-app
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: myApp
-@@ skipped 12 lines (74 -> 85) @@
+@@ skipped 12 lines (73 -> 84) @@
          - containerPort: 80
            name: http
            protocol: TCP

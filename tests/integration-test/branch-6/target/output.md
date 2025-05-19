@@ -108,7 +108,6 @@ Modified (7):
 
 ```diff
 @@ Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
