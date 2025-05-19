@@ -1,4 +1,4 @@
-## Self hosted Github Actions Runners on kubernetes
+# Self-hosted Github Actions Runners on kubernetes
 
 When using Action Runner Controller (ARC) to run self-host your GitHub Actions Runners. You need to ensure that the Service and Pod CIDRs of the kind cluster created by `argocd-diff-preview` don't overlap with your host cluster's CIDRs.
 
