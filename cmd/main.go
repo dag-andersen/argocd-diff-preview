@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
@@ -93,7 +94,8 @@ func run(opts *Options) error {
 	}
 
 	// Create cluster and install Argo CD
-	if err := clusterProvider.CreateCluster(); err != nil {
+	clusterCreationDuration, err := clusterProvider.CreateCluster()
+	if err != nil {
 		log.Error().Msgf("❌ Failed to create cluster")
 		return err
 	}
@@ -114,7 +116,8 @@ func run(opts *Options) error {
 
 	// Install Argo CD
 	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
-	if err := argocd.Install(opts.Debug, opts.SecretsFolder); err != nil {
+	argocdInstallationDuration, err := argocd.Install(opts.Debug, opts.SecretsFolder)
+	if err != nil {
 		log.Error().Msgf("❌ Failed to install Argo CD")
 		return err
 	}
@@ -169,7 +172,7 @@ func run(opts *Options) error {
 	}
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
-	baseManifests, targetManifests, err := extract.GetResourcesFromBothBranches(
+	baseManifests, targetManifests, extractDuration, err := extract.GetResourcesFromBothBranches(
 		argocd,
 		baseBranch,
 		targetBranch,
@@ -182,22 +185,77 @@ func run(opts *Options) error {
 		return err
 	}
 
+	baseAppInfos := convertExtractedAppsToAppInfos(baseManifests)
+	targetAppInfos := convertExtractedAppsToAppInfos(targetManifests)
+
+	// Print manifests output
+	{
+		var baseAppCombinedYaml []string
+		var targetAppCombinedYaml []string
+		for _, app := range baseAppInfos {
+			if app.FileContent != "" {
+				baseAppCombinedYaml = append(baseAppCombinedYaml, app.FileContent)
+			}
+		}
+		for _, app := range targetAppInfos {
+			if app.FileContent != "" {
+				targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
+			}
+		}
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n---\n")); err != nil {
+			log.Error().Msg("❌ Failed to write base manifests")
+			return err
+		}
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, targetBranch.FolderName()), strings.Join(targetAppCombinedYaml, "\n---\n")); err != nil {
+			log.Error().Msg("❌ Failed to write target manifests")
+			return err
+		}
+	}
+
+	// Create info box for storing run time information
+	infoBox := diff.InfoBox{
+		ExtractDuration:            extractDuration,
+		ArgoCDInstallationDuration: argocdInstallationDuration,
+		ClusterCreationDuration:    clusterCreationDuration,
+		FullDuration:               time.Since(startTime),
+		ApplicationCount:           len(baseApps) + len(targetApps),
+	}
+
 	// Generate diff between base and target branches
 	if err := diff.GenerateDiff(
 		opts.Title,
 		opts.OutputFolder,
 		baseBranch,
 		targetBranch,
-		baseManifests,
-		targetManifests,
+		baseAppInfos,
+		targetAppInfos,
 		&opts.DiffIgnore,
 		opts.LineCount,
 		opts.MaxDiffLength,
-		time.Since(startTime),
+		infoBox,
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err
 	}
 
 	return nil
+}
+
+// convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) []diff.AppInfo {
+	appInfos := make([]diff.AppInfo, len(extractedApps))
+	for i, extractedApp := range extractedApps {
+		appInfos[i] = convertExtractedAppToAppInfo(extractedApp)
+	}
+	return appInfos
+}
+
+// convertExtractedAppToAppInfo converts an ExtractedApp to an AppInfo
+func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) diff.AppInfo {
+	return diff.AppInfo{
+		Id:          extractedApp.Id,
+		Name:        extractedApp.Name,
+		SourcePath:  extractedApp.SourcePath,
+		FileContent: extractedApp.Manifest,
+	}
 }

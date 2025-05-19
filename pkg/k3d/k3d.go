@@ -26,18 +26,20 @@ func IsInstalled() bool {
 }
 
 // CreateCluster creates a new k3d cluster with the given name and options.
-func CreateCluster(clusterName, k3dOptions string, wait time.Duration) error {
+func CreateCluster(clusterName, k3dOptions string, wait time.Duration) (time.Duration, error) {
+	startTime := time.Now()
+
 	// Check if docker is running
 	if output, err := runCommand("docker", "ps"); err != nil {
 		log.Error().Msg("❌ Docker is not running")
-		return fmt.Errorf("docker is not running: %s", output)
+		return time.Since(startTime), fmt.Errorf("docker is not running: %s", output)
 	}
 
 	log.Info().Msg("🚀 Creating k3d cluster...")
 
 	// Delete existing cluster if it exists
 	if output, err := runCommand("k3d", "cluster", "delete", clusterName); err != nil {
-		return fmt.Errorf("failed to delete existing cluster: %s", output)
+		return time.Since(startTime), fmt.Errorf("failed to delete existing cluster: %s", output)
 	}
 
 	// Create new cluster
@@ -53,11 +55,13 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) error {
 		} else {
 			log.Error().Msgf("❌ Failed to create cluster with options: %s", k3dOptions)
 		}
-		return fmt.Errorf("failed to create cluster: %s", output)
+		return time.Since(startTime), fmt.Errorf("failed to create cluster: %s", output)
 	}
 
-	log.Info().Msg("🚀 Cluster created successfully")
-	return nil
+	duration := time.Since(startTime)
+
+	log.Info().Msgf("🚀 Cluster created successfully in %s", duration.Round(time.Second))
+	return duration, nil
 }
 
 // ClusterExists checks if a cluster with the given name exists by parsing JSON output.
@@ -133,7 +137,7 @@ func (k *K3d) IsInstalled() bool {
 	return IsInstalled()
 }
 
-func (k *K3d) CreateCluster() error {
+func (k *K3d) CreateCluster() (time.Duration, error) {
 	return CreateCluster(k.clusterName, k.k3dOptions, 120*time.Second)
 }
 

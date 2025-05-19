@@ -40,4 +40,5 @@ Modified (1):
 
 </details>
 
-Rendered x Applications in x
+_Stats_:
+[], [], [], [], []

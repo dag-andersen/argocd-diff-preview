@@ -14,7 +14,6 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml) @@
- ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -84,7 +83,7 @@ Modified (1):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (70 -> 84) @@
+@@ skipped 15 lines (69 -> 83) @@
          - containerPort: 80
            name: http
            protocol: TCP
@@ -101,4 +100,5 @@ Modified (1):
 
 </details>
 
-Rendered x Applications in x
+_Stats_:
+[], [], [], [], []

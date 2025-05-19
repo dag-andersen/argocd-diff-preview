@@ -14,7 +14,6 @@ Added (1):
 
 ```diff
 @@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
-+---
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
@@ -36,9 +35,9 @@ Added (1):
 +        name: myapp
 +        ports:
 +        - containerPort: 80
-+
 ```
 
 </details>
 
-Rendered x Applications in x
+_Stats_:
+[], [], [], [], []
