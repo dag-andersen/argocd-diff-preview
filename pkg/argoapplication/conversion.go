@@ -8,8 +8,24 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// FromK8sResource creates an ArgoResource from a K8sResource
-func FromK8sResource(resource k8s.Resource) *ArgoResource {
+// FromResourceToApplication converts K8sResources to ArgoResources with filtering
+func FromResourceToApplication(
+	k8sResources []k8s.Resource,
+) []ArgoResource {
+	var apps []ArgoResource
+
+	// Convert K8sResources to ArgoResources
+	for _, r := range k8sResources {
+		if app := fromK8sResource(r); app != nil {
+			apps = append(apps, *app)
+		}
+	}
+
+	return apps
+}
+
+// fromK8sResource creates an ArgoResource from a K8sResource
+func fromK8sResource(resource k8s.Resource) *ArgoResource {
 
 	kind := resource.Yaml.GetKind()
 	if kind == "" {

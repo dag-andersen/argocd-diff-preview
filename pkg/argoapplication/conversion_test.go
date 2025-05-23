@@ -147,7 +147,7 @@ spec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FromK8sResource(*tt.resource)
+			got := fromK8sResource(*tt.resource)
 
 			if tt.wantErr {
 				assert.Nil(t, got)
@@ -166,4 +166,18 @@ spec:
 			assert.True(t, yamlEqual(&tt.resource.Yaml, got.Yaml))
 		})
 	}
+}
+
+func yamlEqual(a, b *unstructured.Unstructured) bool {
+
+	aStr, err := yaml.Marshal(a)
+	if err != nil {
+		return false
+	}
+	bStr, err := yaml.Marshal(b)
+	if err != nil {
+		return false
+	}
+
+	return string(aStr) == string(bStr)
 }
