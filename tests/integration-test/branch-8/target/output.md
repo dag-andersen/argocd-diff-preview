@@ -43,8 +43,8 @@ Modified (1):
 +kind: Deployment
 +metadata:
 +  annotations:
-+    argocd.argoproj.io/tracking-id: folder3:apps/Deployment:/deploy-from-folder-two
-+  name: deploy-from-folder-two
++    argocd.argoproj.io/tracking-id: folder3:apps/Deployment:/deploy-from-folder-three
++  name: deploy-from-folder-three
 +spec:
 +  replicas: 2
 +  selector:
