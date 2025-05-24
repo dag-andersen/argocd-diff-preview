@@ -89,9 +89,9 @@ func run(opts *Options) error {
 
 	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
 
+	// Return if no applications are found
 	foundBaseApps := len(baseApps) > 0
 	foundTargetApps := len(targetApps) > 0
-
 	if !foundBaseApps && !foundTargetApps {
 		log.Info().Msg("👀 Found no applications to process in either branch")
 
@@ -192,6 +192,26 @@ func run(opts *Options) error {
 
 	// Check for duplicates again
 	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
+
+	// Return if no applications are found
+	foundBaseApps = len(baseApps) > 0
+	foundTargetApps = len(targetApps) > 0
+	if !foundBaseApps && !foundTargetApps {
+		log.Info().Msg("👀 Found no applications to render")
+
+		// Write a message to the output file when no applications are found
+		if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
+			log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
+			return err
+		}
+
+		if err := diff.WriteNoAppsFoundMessage(opts.Title, opts.OutputFolder, selectors, filesChanged); err != nil {
+			log.Error().Msgf("❌ Failed to write no apps found message")
+			return err
+		}
+
+		return nil
+	}
 
 	// enure unique ids
 	baseApps = argoapplication.UniqueIds(baseApps, baseBranch)

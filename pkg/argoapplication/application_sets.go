@@ -86,8 +86,19 @@ func processAppSets(
 		return nil, err
 	}
 
+	if len(baseApps) == 0 {
+		return baseApps, nil
+	}
+
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(baseApps))
 	baseApps = FilterAll(baseApps, filterOptions)
 
+	if len(baseApps) == 0 {
+		log.Info().Str("branch", branch.Name).Msg("🤖 No applications left after filtering")
+		return baseApps, nil
+	}
+
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(baseApps))
 	baseApps, err = patchApplications(
 		argocd.Namespace,
 		baseApps,

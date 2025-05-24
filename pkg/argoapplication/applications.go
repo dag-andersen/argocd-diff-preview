@@ -102,7 +102,12 @@ func getApplications(
 
 	applications := FromResourceToApplication(k8sResources)
 
+	if len(applications) == 0 {
+		return []ArgoResource{}, nil
+	}
+
 	// filter applications
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Application[Sets]", len(applications))
 	applications = FilterAllWithLogging(applications, filterOptions, branch)
 
 	if len(applications) == 0 {
