@@ -413,6 +413,10 @@ func generateGitDiff(
 	// Create array of formatted file sections
 	fileSections := make([]string, 0, len(changedFiles))
 	for _, diff := range changedFiles {
+		// skips empty diffs
+		if diff.content == "" {
+			continue
+		}
 		// Get source path for this file, or use empty string if not found
 		fileSection := diff.buildSection()
 		fileSections = append(fileSections, fileSection)
