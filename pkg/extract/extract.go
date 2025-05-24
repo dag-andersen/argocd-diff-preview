@@ -78,11 +78,11 @@ func GetResourcesFromBothBranches(
 ) ([]ExtractedApp, []ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
-	if err := checkForDuplicateApps(baseApps); err != nil {
+	if err := verifyNoDuplicateAppIds(baseApps); err != nil {
 		return nil, nil, time.Since(startTime), err
 	}
 
-	if err := checkForDuplicateApps(targetApps); err != nil {
+	if err := verifyNoDuplicateAppIds(targetApps); err != nil {
 		return nil, nil, time.Since(startTime), err
 	}
 
@@ -98,7 +98,7 @@ func GetResourcesFromBothBranches(
 	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
 }
 
-func checkForDuplicateApps(apps []argoapplication.ArgoResource) error {
+func verifyNoDuplicateAppIds(apps []argoapplication.ArgoResource) error {
 	appNames := make(map[string]bool)
 	for _, app := range apps {
 		if appNames[app.Id] {

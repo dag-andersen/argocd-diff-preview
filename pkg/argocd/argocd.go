@@ -337,7 +337,7 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 
 	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
 	if err != nil {
-		log.Error().Msgf("❌ Failed to get secret %s", err)
+		log.Error().Msgf("❌ Failed to get secret: %s", err)
 		return "", fmt.Errorf("failed to get secret: %w", err)
 	}
 

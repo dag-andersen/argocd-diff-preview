@@ -139,8 +139,8 @@ func run(opts *Options) error {
 
 	// Delete old applications
 	if !opts.CreateCluster {
-		age := 20
-		if err := k8sClient.DeleteAllApplicationsOlderThan(opts.ArgocdNamespace, age); err != nil {
+		ageInMinutes := 20
+		if err := k8sClient.DeleteAllApplicationsOlderThan(opts.ArgocdNamespace, ageInMinutes); err != nil {
 			log.Error().Msgf("❌ Failed to delete old applications")
 			return err
 		}
@@ -238,18 +238,30 @@ func run(opts *Options) error {
 		return err
 	}
 
-	baseAppInfos := convertExtractedAppsToAppInfos(baseManifests)
-	targetAppInfos := convertExtractedAppsToAppInfos(targetManifests)
+	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests)
+	if err != nil {
+		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
+		return err
+	}
+	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests)
+	if err != nil {
+		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
+		return err
+	}
 
 	// Print manifests output
 	{
 		var baseAppCombinedYaml []string
 		var targetAppCombinedYaml []string
 		for _, app := range baseAppInfos {
-			baseAppCombinedYaml = append(baseAppCombinedYaml, app.FileContent)
+			if app.FileContent != "" {
+				baseAppCombinedYaml = append(baseAppCombinedYaml, app.FileContent)
+			}
 		}
 		for _, app := range targetAppInfos {
-			targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
+			if app.FileContent != "" {
+				targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
+			}
 		}
 		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n---\n")); err != nil {
 			log.Error().Msg("❌ Failed to write base manifests")
@@ -291,20 +303,24 @@ func run(opts *Options) error {
 }
 
 // convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
-func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) []diff.AppInfo {
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) ([]diff.AppInfo, error) {
 	appInfos := make([]diff.AppInfo, len(extractedApps))
 	for i, extractedApp := range extractedApps {
-		appInfos[i] = convertExtractedAppToAppInfo(extractedApp)
+		appInfo, err := convertExtractedAppToAppInfo(extractedApp)
+		if err != nil {
+			return nil, err
+		}
+		appInfos[i] = appInfo
 	}
-	return appInfos
+	return appInfos, nil
 }
 
 // convertExtractedAppToAppInfo converts an ExtractedApp to an AppInfo
-func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) diff.AppInfo {
+func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) (diff.AppInfo, error) {
 	yamlString, err := convertToYamlString(&extractedApp)
 	if err != nil {
 		log.Error().Msgf("❌ Failed to convert extracted app to yaml string: %s", err)
-		return diff.AppInfo{}
+		return diff.AppInfo{}, err
 	}
 
 	return diff.AppInfo{
@@ -312,7 +328,7 @@ func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) diff.AppInf
 		Name:        extractedApp.Name,
 		SourcePath:  extractedApp.SourcePath,
 		FileContent: yamlString,
-	}
+	}, nil
 }
 
 // convertToYamlString converts a list of ExtractedApp to a single YAML string
