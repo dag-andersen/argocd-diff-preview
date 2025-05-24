@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: deploy-from-folder-two
+  name: deploy-from-folder-three
 spec:
   replicas: 2
   selector:
@@ -16,4 +16,4 @@ spec:
         - name: myapp
           image: dag-andersen/myapp:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 80
