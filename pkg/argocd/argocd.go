@@ -50,7 +50,6 @@ func New(client *utils.K8sClient, namespace string, version string, configPath s
 }
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
-
 	startTime := time.Now()
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
@@ -101,16 +100,17 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	return duration, nil
 }
 
-func (a *ArgoCDInstallation) OnlyLogin() error {
+func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
+	startTime := time.Now()
 
 	// Login to ArgoCD
 	if err := a.login(); err != nil {
-		return fmt.Errorf("failed to login: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 
-	return nil
+	return time.Since(startTime), nil
 }
 
 // installWithHelm installs ArgoCD using Helm

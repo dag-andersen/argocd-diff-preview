@@ -7,30 +7,83 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 )
 
-// ArgoResource represents an Argo CD Application or ApplicationSet
-type ArgoResource struct {
-	Yaml     *unstructured.Unstructured
-	Kind     ApplicationKind
-	Id       string // The ID is the name of the k8s resource
-	Name     string // The name is the original name of the Application
-	FileName string
-	Branch   git.BranchType
-}
+func patchApplications(
+	argocdNamespace string,
+	applications []ArgoResource,
+	branch *git.Branch,
+	repo string,
+	redirectRevisions []string,
+) ([]ArgoResource, error) {
+	var patchedApps []ArgoResource
 
-func (a *ArgoResource) GetLongName() string {
-	return fmt.Sprintf("%s [%s]", a.Name, a.FileName)
-}
-
-// AsString returns the YAML representation of the resource
-func (a *ArgoResource) AsString() (string, error) {
-	bytes, err := yaml.Marshal(a.Yaml)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal yaml: %w", err)
+	for _, app := range applications {
+		patchedApp, err := patchApplication(
+			argocdNamespace,
+			app,
+			branch,
+			repo,
+			redirectRevisions,
+		)
+		if err != nil {
+			return nil, err
+		}
+		patchedApps = append(patchedApps, *patchedApp)
 	}
-	return string(bytes), nil
+
+	return patchedApps, nil
+}
+
+// patchApplication patches a single ArgoResource
+func patchApplication(
+	argocdNamespace string,
+	app ArgoResource,
+	branch *git.Branch,
+	repo string,
+	redirectRevisions []string,
+) (*ArgoResource, error) {
+
+	// Chain the modifications
+	app.SetNamespace(argocdNamespace)
+
+	err := app.RemoveSyncPolicy()
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
+	}
+
+	err = app.SetProjectToDefault()
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to set project to default: %w", err)
+	}
+
+	err = app.PointDestinationToInCluster()
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
+	}
+
+	err = app.RemoveArgoCDFinalizers()
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to remove Argo CD finalizers: %w", err)
+	}
+
+	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to redirect sources: %w", err)
+	}
+
+	err = app.RedirectGenerators(repo, branch.Name, redirectRevisions)
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to redirect generators: %w", err)
+	}
+
+	return &app, nil
 }
 
 // SetNamespace sets the namespace of the resource

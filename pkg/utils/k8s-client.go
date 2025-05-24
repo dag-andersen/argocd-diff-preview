@@ -122,7 +122,7 @@ func (c *K8sClient) DeleteAllApplicationsOlderThan(namespace string, minutes int
 	if deletedCount > 0 {
 		log.Info().Msgf("🧼 Deleted %d applications", deletedCount)
 	} else {
-		log.Info().Msgf("🧼 No applications with the label '%s' were found", vars.ArgoCDApplicationLabelKey)
+		log.Info().Msgf("🧼 No applications with the label '%s' were found older than %d minutes", vars.ArgoCDApplicationLabelKey, minutes)
 	}
 
 	return nil

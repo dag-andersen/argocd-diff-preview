@@ -22,6 +22,7 @@ nav:
   - github-actions-workflow.md
   - gitlab-cicd.md
   - Local Installation: installation.md
+  - Self-hosted Github Runners: self-hosted-gh-runner.md
   - custom-argo-cd-installation.md
 - Developer Guide: 
   - generated-applications.md

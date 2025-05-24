@@ -9,6 +9,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/diff"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/duplicates"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
@@ -65,22 +66,28 @@ func run(opts *Options) error {
 	baseBranch := git.NewBranch(opts.BaseBranch, git.Base)
 	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
+	filterOptions := argoapplication.FilterOptions{
+		Selector:                  selectors,
+		FilesChanged:              filesChanged,
+		IgnoreInvalidWatchPattern: opts.IgnoreInvalidWatchPattern,
+	}
+
 	// Get applications for both branches
 	baseApps, targetApps, err := argoapplication.GetApplicationsForBranches(
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
 		fileRegex,
-		selectors,
-		filesChanged,
+		filterOptions,
 		opts.Repo,
-		opts.IgnoreInvalidWatchPattern,
 		redirectRevisions,
 	)
 	if err != nil {
 		log.Error().Msgf("❌ Failed to get applications")
 		return err
 	}
+
+	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
 
 	foundBaseApps := len(baseApps) > 0
 	foundTargetApps := len(targetApps) > 0
@@ -151,10 +158,12 @@ func run(opts *Options) error {
 		}
 		argocdInstallationDuration = duration
 	} else {
-		if err := argocd.OnlyLogin(); err != nil {
+		duration, err := argocd.OnlyLogin()
+		if err != nil {
 			log.Error().Msgf("❌ Failed to login to Argo CD")
 			return err
 		}
+		argocdInstallationDuration = duration
 	}
 
 	tempFolder := "temp"
@@ -174,11 +183,19 @@ func run(opts *Options) error {
 		tempFolder,
 		redirectRevisions,
 		opts.Debug,
+		filterOptions,
 	)
 	if err != nil {
 		log.Error().Msgf("❌ Failed to generate apps from ApplicationSets")
 		return err
 	}
+
+	// Check for duplicates again
+	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
+
+	// enure unique ids
+	baseApps = argoapplication.UniqueIds(baseApps, baseBranch)
+	targetApps = argoapplication.UniqueIds(targetApps, targetBranch)
 
 	if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
 		log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
@@ -207,12 +224,14 @@ func run(opts *Options) error {
 	}
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
+	deleteAfterProcessing := !opts.CreateCluster
 	baseManifests, targetManifests, extractDuration, err := extract.GetResourcesFromBothBranches(
 		argocd,
 		opts.Timeout,
 		baseApps,
 		targetApps,
 		uniqueID,
+		deleteAfterProcessing,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -42,6 +43,9 @@ var timeoutMessages = []string{
 	"=git-upload-pack",
 }
 
+// const worker count
+const maxWorkers = 40
+
 // contains a app name, source path, and extracted manifest
 type ExtractedApp struct {
 	Id         string
@@ -49,6 +53,17 @@ type ExtractedApp struct {
 	SourcePath string
 	Manifest   []unstructured.Unstructured
 	Branch     git.BranchType
+}
+
+// CreateExtractedApp creates an ExtractedApp from an ArgoResource
+func CreateExtractedApp(id string, name string, sourcePath string, manifest []unstructured.Unstructured, branch git.BranchType) ExtractedApp {
+	return ExtractedApp{
+		Id:         id,
+		Name:       name,
+		SourcePath: sourcePath,
+		Manifest:   manifest,
+		Branch:     branch,
+	}
 }
 
 // GetResourcesFromBothBranches extracts resources from both base and target branches
@@ -59,6 +74,7 @@ func GetResourcesFromBothBranches(
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
 	prefix string,
+	deleteAfterProcessing bool,
 ) ([]ExtractedApp, []ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
@@ -73,7 +89,7 @@ func GetResourcesFromBothBranches(
 	apps := append(baseApps, targetApps...)
 
 	log.Debug().Msg("Applied manifest for both branches")
-	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix)
+	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix, deleteAfterProcessing)
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -99,25 +115,46 @@ func getResourcesFromApps(
 	apps []argoapplication.ArgoResource,
 	timeout uint64,
 	prefix string,
+	deleteAfterProcessing bool,
 ) ([]ExtractedApp, []ExtractedApp, error) {
-
 	startTime := time.Now()
 
 	log.Info().Msg("🤖 Getting Applications")
 
-	// Process apps in parallel
+	// Process apps in parallel with a worker pool
 	results := make(chan struct {
 		app ExtractedApp
 		err error
 	}, len(apps))
 
+	// Create a semaphore channel to limit concurrent workers
+	sem := make(chan struct{}, maxWorkers)
+
+	// Use WaitGroup to wait for all goroutines to complete (including deletions)
+	var wg sync.WaitGroup
+
 	for _, app := range apps {
+		sem <- struct{}{} // Acquire semaphore
+		wg.Add(1)         // Add to wait group
 		go func(app argoapplication.ArgoResource) {
+			defer wg.Done() // Signal completion when goroutine ends
 			result, err := getResourcesFromApp(argocd, app, timeout, prefix)
 			results <- struct {
 				app ExtractedApp
 				err error
 			}{app: result, err: err}
+
+			// release semaphore
+			<-sem
+
+			if deleteAfterProcessing {
+				// Delete Application from cluster
+				log.Debug().Str("App", app.GetLongName()).Msg("Deleting application from cluster")
+				if err := argocd.K8sClient.DeleteArgoCDApplication(argocd.Namespace, result.Id); err != nil {
+					log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to delete application from cluster")
+				}
+				log.Debug().Str("App", app.GetLongName()).Msg("Deleted application from cluster")
+			}
 		}(app)
 	}
 
@@ -162,7 +199,7 @@ func getResourcesFromApps(
 		case git.Target:
 			extractedTargetApps = append(extractedTargetApps, result.app)
 		default:
-			return nil, nil, fmt.Errorf("unknown branch type: %s", result.app.Branch)
+			return nil, nil, fmt.Errorf("unknown branch type: '%s'", result.app.Branch)
 		}
 		renderedApps++
 	}
@@ -173,6 +210,11 @@ func getResourcesFromApps(
 	if firstError != nil {
 		return nil, nil, firstError
 	}
+
+	// Wait for all goroutines to complete (including deletions)
+	log.Info().Msg("🧼 Waiting for all application deletions to complete...")
+	wg.Wait()
+	log.Info().Msg("🧼 All application deletions completed")
 
 	duration := time.Since(startTime)
 	log.Info().Msgf("🤖 Got all resources from %d applications from %s-branch and got %d from %s-branch in %s", len(extractedBaseApps), git.Base, len(extractedTargetApps), git.Target, duration.Round(time.Second))
@@ -257,18 +299,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			}
 
 			// Parse the first non-empty manifest from the string
-			extractedApp := ExtractedApp{
-				Id:         app.Id,
-				Name:       app.Name,
-				SourcePath: app.FileName,
-				Manifest:   manifestsContent,
-				Branch:     app.Branch,
-			}
-
-			// Delete Application from cluster
-			if err := argocd.K8sClient.DeleteArgoCDApplication(argocd.Namespace, app.Id); err != nil {
-				log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to delete application from cluster")
-			}
+			extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
 
 			return extractedApp, nil
 
