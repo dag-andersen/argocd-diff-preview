@@ -141,7 +141,7 @@ func TestDiff_buildSection(t *testing.T) {
 				newName:       "new-app",
 				newSourcePath: "/path/new",
 				action:        merkletrie.Insert,
-				diffContent:   "+ line 1\n+ line 2",
+				content:       "+ line 1\n+ line 2",
 			},
 			expectedFmt: "<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n",
 		},
@@ -153,7 +153,7 @@ func TestDiff_buildSection(t *testing.T) {
 				newSourcePath: "/path/app",
 				oldSourcePath: "/path/app",
 				action:        merkletrie.Modify,
-				diffContent:   "- line 1\n+ line 1 mod",
+				content:       "- line 1\n+ line 1 mod",
 			},
 			expectedFmt: "<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n",
 		},
@@ -163,7 +163,7 @@ func TestDiff_buildSection(t *testing.T) {
 				oldName:       "old-app",
 				oldSourcePath: "/path/old",
 				action:        merkletrie.Delete,
-				diffContent:   "- line 1\n- line 2",
+				content:       "- line 1\n- line 2",
 			},
 			expectedFmt: "<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n",
 		},
@@ -172,7 +172,7 @@ func TestDiff_buildSection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			header := fmt.Sprintf("%s (%s)", tt.diff.prettyName(), tt.diff.prettyPath())
-			content := strings.TrimSpace(fmt.Sprintf("%s%s", tt.diff.commentHeader(), tt.diff.diffContent))
+			content := strings.TrimSpace(fmt.Sprintf("%s%s", tt.diff.commentHeader(), tt.diff.content))
 			expected := fmt.Sprintf(tt.expectedFmt, header, content)
 			if got := tt.diff.buildSection(); got != expected {
 				t.Errorf("buildSection() got =\n%v\nwant =\n%v", got, expected)
