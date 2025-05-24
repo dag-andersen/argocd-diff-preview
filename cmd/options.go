@@ -393,9 +393,6 @@ func (o *Options) LogOptions() {
 	if o.LineCount != DefaultLineCount {
 		log.Info().Msgf("✨ - line-count: %d", o.LineCount)
 	}
-	if o.ArgocdChartVersion != "" {
-		log.Info().Msgf("✨ - argocd-version: %s", o.ArgocdChartVersion)
-	}
 	if o.MaxDiffLength != DefaultMaxDiffLength {
 		log.Info().Msgf("✨ - max-diff-length: %d", o.MaxDiffLength)
 	}

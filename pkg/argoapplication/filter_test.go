@@ -669,7 +669,11 @@ metadata:
 			}
 
 			// Run filter
-			got := app.Filter(tt.selectors, tt.filesChanged, tt.ignoreInvalidWatchPattern)
+			got := app.Filter(FilterOptions{
+				Selector:                  tt.selectors,
+				FilesChanged:              tt.filesChanged,
+				IgnoreInvalidWatchPattern: tt.ignoreInvalidWatchPattern,
+			})
 
 			// Check result
 			assert.Equal(t, tt.want, got)

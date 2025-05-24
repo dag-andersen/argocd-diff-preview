@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	argocdsecurity "github.com/argoproj/argo-cd/v2/util/security"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -19,11 +20,82 @@ const (
 	annotationArgoCDManifestGeneratePaths = "argocd.argoproj.io/manifest-generate-paths"
 )
 
+type FilterOptions struct {
+	Selector                  []selector.Selector
+	FilesChanged              []string
+	IgnoreInvalidWatchPattern bool
+}
+
+func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) []ArgoResource {
+	// Log selector and files changed info
+	switch {
+	case len(filterOptions.Selector) > 0 && len(filterOptions.FilesChanged) > 0:
+		var selectorStrs []string
+		for _, s := range filterOptions.Selector {
+			selectorStrs = append(selectorStrs, s.String())
+		}
+		log.Info().Msgf(
+			"🤖 Will only run on Applications that match '%s' and watch these files: '%s'",
+			strings.Join(selectorStrs, ","),
+			strings.Join(filterOptions.FilesChanged, "', '"),
+		)
+	case len(filterOptions.Selector) > 0:
+		var selectorStrs []string
+		for _, s := range filterOptions.Selector {
+			selectorStrs = append(selectorStrs, s.String())
+		}
+		log.Info().Msgf(
+			"🤖 Will only run on Applications that match '%s'",
+			strings.Join(selectorStrs, ","),
+		)
+	case len(filterOptions.FilesChanged) > 0:
+		log.Info().Msgf(
+			"🤖 Will only run on Applications that watch these files: '%s'",
+			strings.Join(filterOptions.FilesChanged, "', '"),
+		)
+	}
+
+	numberOfAppsBeforeFiltering := len(apps)
+
+	// Filter applications
+	filteredApps := FilterAll(apps, filterOptions)
+
+	// Log filtering results
+	if numberOfAppsBeforeFiltering != len(filteredApps) {
+		log.Info().Str("branch", branch.Name).Msgf(
+			"🤖 Found %d Application[Sets] before filtering",
+			numberOfAppsBeforeFiltering,
+		)
+		log.Info().Str("branch", branch.Name).Msgf(
+			"🤖 Found %d Application[Sets] after filtering",
+			len(filteredApps),
+		)
+	} else {
+		log.Info().Str("branch", branch.Name).Msgf(
+			"🤖 Found %d Application[Sets]",
+			numberOfAppsBeforeFiltering,
+		)
+	}
+
+	return filteredApps
+}
+
+func FilterAll(
+	apps []ArgoResource,
+	filterOptions FilterOptions,
+) []ArgoResource {
+	var filteredApps []ArgoResource
+	for _, app := range apps {
+		if app.Filter(filterOptions) {
+			filteredApps = append(filteredApps, app)
+		}
+	}
+	return filteredApps
+}
+
 // Filter checks if the application matches the given selectors and watches the given files
 func (a *ArgoResource) Filter(
-	selectors []selector.Selector,
-	filesChanged []string,
-	ignoreInvalidWatchPattern bool,
+	filterOptions FilterOptions,
 ) bool {
 
 	// First check ignore annotation
@@ -32,15 +104,15 @@ func (a *ArgoResource) Filter(
 	}
 
 	// Then check selectors
-	if len(selectors) > 0 {
-		if !a.filterBySelectors(selectors) {
+	if len(filterOptions.Selector) > 0 {
+		if !a.filterBySelectors(filterOptions.Selector) {
 			return false
 		}
 	}
 
 	// Then check files changed
-	if len(filesChanged) > 0 {
-		if !a.filterByFilesChanged(filesChanged, ignoreInvalidWatchPattern) {
+	if len(filterOptions.FilesChanged) > 0 {
+		if !a.filterByFilesChanged(filterOptions.FilesChanged, filterOptions.IgnoreInvalidWatchPattern) {
 			return false
 		}
 	}
