@@ -182,6 +182,7 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 	// Get annotations directly from unstructured
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
 	if err != nil || !found || len(annotations) == 0 {
+		log.Debug().Str("patchType", "filter").Err(err).Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no annotations found")
 		return false
 	}
 
