@@ -42,8 +42,7 @@ Modified (1):
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
-+  annotations:
-+    argocd.argoproj.io/tracking-id: folder3:apps/Deployment:/deploy-from-folder-three
++  annotations: {}
 +  name: deploy-from-folder-three
 +spec:
 +  replicas: 2

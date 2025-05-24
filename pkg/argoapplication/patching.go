@@ -45,13 +45,9 @@ func patchApplication(
 ) (*ArgoResource, error) {
 
 	// Chain the modifications
-	err := app.SetNamespace(argocdNamespace)
-	if err != nil {
-		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
-		return nil, fmt.Errorf("failed to set namespace: %w", err)
-	}
+	app.SetNamespace(argocdNamespace)
 
-	err = app.RemoveSyncPolicy()
+	err := app.RemoveSyncPolicy()
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
@@ -91,9 +87,8 @@ func patchApplication(
 }
 
 // SetNamespace sets the namespace of the resource
-func (a *ArgoResource) SetNamespace(namespace string) error {
+func (a *ArgoResource) SetNamespace(namespace string) {
 	a.Yaml.SetNamespace(namespace)
-	return nil
 }
 
 // SetProjectToDefault sets the project to "default"

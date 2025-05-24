@@ -1,16 +1,20 @@
 package extract
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
 // Error and timeout messages that we look for in application status
@@ -39,86 +43,124 @@ var timeoutMessages = []string{
 	"=git-upload-pack",
 }
 
+// const worker count
+const maxWorkers = 40
+
 // contains a app name, source path, and extracted manifest
 type ExtractedApp struct {
 	Id         string
 	Name       string
 	SourcePath string
-	Manifest   string
+	Manifest   []unstructured.Unstructured
+	Branch     git.BranchType
+}
+
+// CreateExtractedApp creates an ExtractedApp from an ArgoResource
+func CreateExtractedApp(id string, name string, sourcePath string, manifest []unstructured.Unstructured, branch git.BranchType) ExtractedApp {
+	return ExtractedApp{
+		Id:         id,
+		Name:       name,
+		SourcePath: sourcePath,
+		Manifest:   manifest,
+		Branch:     branch,
+	}
 }
 
 // GetResourcesFromBothBranches extracts resources from both base and target branches
 // by applying their manifests to the cluster and capturing the resulting resources
 func GetResourcesFromBothBranches(
 	argocd *argocdPkg.ArgoCDInstallation,
-	baseBranch *git.Branch,
-	targetBranch *git.Branch,
 	timeout uint64,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
+	prefix string,
+	deleteAfterProcessing bool,
 ) ([]ExtractedApp, []ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
-	extractedBasedApps, err := getResourcesFromApps(argocd, baseBranch, baseApps, timeout)
+	if err := verifyNoDuplicateAppIds(baseApps); err != nil {
+		return nil, nil, time.Since(startTime), err
+	}
+
+	if err := verifyNoDuplicateAppIds(targetApps); err != nil {
+		return nil, nil, time.Since(startTime), err
+	}
+
+	apps := append(baseApps, targetApps...)
+
+	log.Debug().Msg("Applied manifest for both branches")
+	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix, deleteAfterProcessing)
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
-	log.Debug().Str("branch", baseBranch.Name).Msg("Extracted manifests")
+	log.Debug().Msg("Extracted manifests for both branches")
 
-	// delete applications
-	if err := argocd.K8sClient.DeleteArgoCDApplications(argocd.Namespace); err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to delete applications: %w", err)
+	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
+}
+
+func verifyNoDuplicateAppIds(apps []argoapplication.ArgoResource) error {
+	appNames := make(map[string]bool)
+	for _, app := range apps {
+		if appNames[app.Id] {
+			return fmt.Errorf("duplicate app name: %s", app.Id)
+		}
+		appNames[app.Id] = true
 	}
-
-	log.Debug().Str("branch", targetBranch.Name).Msg("Applied manifest")
-	extractedTargetApps, err := getResourcesFromApps(argocd, targetBranch, targetApps, timeout)
-	if err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
-	}
-	log.Debug().Str("branch", targetBranch.Name).Msg("Extracted manifests")
-
-	return extractedBasedApps, extractedTargetApps, time.Since(startTime), nil
+	return nil
 }
 
 // getResourcesFromApps extracts resources from Argo CD for a specific branch as ExtractedApp structs
 func getResourcesFromApps(
 	argocd *argocdPkg.ArgoCDInstallation,
-	branch *git.Branch,
 	apps []argoapplication.ArgoResource,
 	timeout uint64,
-) ([]ExtractedApp, error) {
-
+	prefix string,
+	deleteAfterProcessing bool,
+) ([]ExtractedApp, []ExtractedApp, error) {
 	startTime := time.Now()
 
-	log.Info().Str("branch", branch.Name).Msg("🤖 Getting Applications from branch")
+	log.Info().Msg("🤖 Getting Applications")
 
-	// ensure that no apps have the same name. Fail if they do
-	appNames := make(map[string]bool)
-	for _, app := range apps {
-		if appNames[app.Id] {
-			return nil, fmt.Errorf("duplicate app name: %s - Please open an issue on GitHub", app.Id)
-		}
-		appNames[app.Id] = true
-	}
-
-	// Process apps in parallel
+	// Process apps in parallel with a worker pool
 	results := make(chan struct {
 		app ExtractedApp
 		err error
 	}, len(apps))
 
+	// Create a semaphore channel to limit concurrent workers
+	sem := make(chan struct{}, maxWorkers)
+
+	// Use WaitGroup to wait for all goroutines to complete (including deletions)
+	var wg sync.WaitGroup
+
 	for _, app := range apps {
+		sem <- struct{}{} // Acquire semaphore
+		wg.Add(1)         // Add to wait group
 		go func(app argoapplication.ArgoResource) {
-			result, err := getResourcesFromApp(argocd, app, timeout)
+			defer wg.Done() // Signal completion when goroutine ends
+			result, err := getResourcesFromApp(argocd, app, timeout, prefix)
 			results <- struct {
 				app ExtractedApp
 				err error
 			}{app: result, err: err}
+
+			// release semaphore
+			<-sem
+
+			if deleteAfterProcessing {
+				// Delete Application from cluster
+				log.Debug().Str("App", app.GetLongName()).Msg("Deleting application from cluster")
+				if err := argocd.K8sClient.DeleteArgoCDApplication(argocd.Namespace, result.Id); err != nil {
+					log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to delete application from cluster")
+				}
+				log.Debug().Str("App", app.GetLongName()).Msg("Deleted application from cluster")
+			}
 		}(app)
 	}
 
 	// Collect results
-	extractedApps := make([]ExtractedApp, 0, len(apps))
+	extractedBaseApps := make([]ExtractedApp, 0, len(apps))
+	extractedTargetApps := make([]ExtractedApp, 0, len(apps))
 	var firstError error
 
 	// Setup progress tracking
@@ -135,7 +177,7 @@ func getResourcesFromApps(
 			select {
 			case <-ticker.C:
 				remainingTimeSeconds := int(timeout) - int(time.Since(startTime).Seconds())
-				log.Info().Str("branch", branch.Name).Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTimeSeconds)
+				log.Info().Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTimeSeconds)
 			case <-progressDone:
 				return
 			}
@@ -151,7 +193,14 @@ func getResourcesFromApps(
 			log.Error().Err(result.err).Msg("Failed to extract app")
 			continue
 		}
-		extractedApps = append(extractedApps, result.app)
+		switch result.app.Branch {
+		case git.Base:
+			extractedBaseApps = append(extractedBaseApps, result.app)
+		case git.Target:
+			extractedTargetApps = append(extractedTargetApps, result.app)
+		default:
+			return nil, nil, fmt.Errorf("unknown branch type: '%s'", result.app.Branch)
+		}
 		renderedApps++
 	}
 
@@ -159,18 +208,33 @@ func getResourcesFromApps(
 	close(progressDone)
 
 	if firstError != nil {
-		return nil, firstError
+		return nil, nil, firstError
 	}
 
-	duration := time.Since(startTime)
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Got all resources from %d applications in %s", len(extractedApps), duration.Round(time.Second))
+	// Wait for all goroutines to complete (including deletions)
+	log.Info().Msg("🧼 Waiting for all application deletions to complete...")
+	wg.Wait()
+	log.Info().Msg("🧼 All application deletions completed")
 
-	return extractedApps, nil
+	duration := time.Since(startTime)
+	log.Info().Msgf("🤖 Got all resources from %d applications from %s-branch and got %d from %s-branch in %s", len(extractedBaseApps), git.Base, len(extractedTargetApps), git.Target, duration.Round(time.Second))
+
+	return extractedBaseApps, extractedTargetApps, nil
 }
 
 // getResourcesFromApp extracts a single application from the cluster
-func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64) (ExtractedApp, error) {
+func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string) (ExtractedApp, error) {
 	// Apply the application manifest first
+
+	err := prefixApplication(&app, prefix)
+	if err != nil {
+		return ExtractedApp{}, fmt.Errorf("failed to prefix application name with prefix: %w", err)
+	}
+
+	err = labelApplicationWithRunID(&app, prefix)
+	if err != nil {
+		return ExtractedApp{}, fmt.Errorf("failed to label application with run ID: %w", err)
+	}
 
 	if err := argocd.K8sClient.ApplyManifest(app.Yaml, "string", argocd.Namespace); err != nil {
 		return ExtractedApp{}, fmt.Errorf("failed to apply manifest for application %s: %w", app.GetLongName(), err)
@@ -223,18 +287,21 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 
 			log.Debug().Str("name", app.GetLongName()).Msg("Extracted manifests from Application")
 
-			// trim first or last ---
-			manifests = strings.TrimSpace(manifests)
-			manifests = strings.TrimPrefix(manifests, "---")
-			manifests = strings.TrimSuffix(manifests, "---")
-			manifests = strings.TrimSpace(manifests)
+			manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
+			manifestsContent, err := processYamlChunk(manifests)
+			if err != nil {
+				return result, fmt.Errorf("failed to process YAML: %w", err)
+			}
 
-			return ExtractedApp{
-				Id:         app.Id,
-				Name:       app.Name,
-				SourcePath: app.FileName,
-				Manifest:   manifests,
-			}, nil
+			err = removeArgoCDTrackingID(manifestsContent)
+			if err != nil {
+				return result, fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
+			}
+
+			// Parse the first non-empty manifest from the string
+			extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
+
+			return extractedApp, nil
 
 		case "Unknown":
 			for _, condition := range appStatus.Status.Conditions {
@@ -258,6 +325,113 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		// Sleep before next iteration
 		time.Sleep(5 * time.Second)
 	}
+}
+
+// processYamlChunk parses a YAML chunk into an unstructured.Unstructured
+// A chunk is a single YAML object, e.g. a Deployment, Service, etc.
+func processYamlChunk(chunk string) ([]unstructured.Unstructured, error) {
+
+	// split
+	documents := strings.Split(chunk, "---")
+
+	manifests := make([]unstructured.Unstructured, 0)
+
+	for _, doc := range documents {
+		// Skip empty documents
+		trimmedDoc := strings.TrimSpace(doc)
+
+		if trimmedDoc == "" {
+			continue
+		}
+
+		// Create a new map to hold the parsed YAML
+		var yamlObj map[string]interface{}
+		err := yaml.Unmarshal([]byte(trimmedDoc), &yamlObj)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		}
+
+		// Skip empty objects
+		if len(yamlObj) == 0 {
+			continue
+		}
+
+		// Check if this is a valid Kubernetes resource
+		apiVersion, found, _ := unstructured.NestedString(yamlObj, "apiVersion")
+		kind, kindFound, _ := unstructured.NestedString(yamlObj, "kind")
+
+		if !found || !kindFound || apiVersion == "" || kind == "" {
+			log.Debug().Msgf("Found manifest with no apiVersion or kind: %s", trimmedDoc)
+			continue
+		}
+
+		manifests = append(manifests, unstructured.Unstructured{Object: yamlObj})
+	}
+
+	log.Debug().Msgf("Parsed %d manifests", len(manifests))
+
+	return manifests, nil
+}
+
+// prefixApplication prefixes the application name with the branch name and a unique ID
+func prefixApplication(a *argoapplication.ArgoResource, prefix string) error {
+	if a.Branch == "" {
+		log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't prefix application name with prefix because branch is empty")
+		return nil
+	}
+
+	var branchShortName string
+	switch a.Branch {
+	case git.Base:
+		branchShortName = "b"
+	case git.Target:
+		branchShortName = "t"
+	}
+
+	prefixSize := len(prefix) + len(branchShortName) + len("--")
+	var newId string
+	if prefixSize+len(a.Id) > 53 {
+		// hash id so it becomes shorter
+		hashedId := fmt.Sprintf("%x", sha256.Sum256([]byte(a.Id)))
+		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, hashedId[:53-prefixSize])
+	} else {
+		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, a.Id)
+	}
+
+	a.Id = newId
+	a.Yaml.SetName(newId)
+
+	return nil
+}
+
+func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) error {
+	labels := a.Yaml.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels[vars.ArgoCDApplicationLabelKey] = runID
+	a.Yaml.SetLabels(labels)
+	return nil
+}
+
+// removeArgoCDTrackingID removes the "argocd.argoproj.io/tracking-id" annotation from the application
+func removeArgoCDTrackingID(a []unstructured.Unstructured) error {
+	for _, obj := range a {
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			continue
+		}
+
+		for key := range annotations {
+			if key == "argocd.argoproj.io/tracking-id" {
+				delete(annotations, key)
+			}
+		}
+
+		obj.SetAnnotations(annotations)
+	}
+
+	return nil
 }
 
 func isErrorCondition(condType string) bool {

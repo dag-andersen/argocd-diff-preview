@@ -1,4 +1,4 @@
-package k8s
+package fileparsing
 
 import (
 	"bufio"
@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -66,7 +67,7 @@ func GetYamlFiles(directory string, fileRegex *string) []string {
 }
 
 // ParseYaml parses YAML files into Resources
-func ParseYaml(dir string, files []string) []Resource {
+func ParseYaml(dir string, files []string, branch git.BranchType) []Resource {
 	var resources []Resource
 
 	for _, file := range files {
@@ -94,7 +95,7 @@ func ParseYaml(dir string, files []string) []Resource {
 			if line == "---" {
 				// Process the current chunk if it's not empty
 				if currentChunk.Len() > 0 {
-					processYamlChunk(file, currentChunk.String(), &resources)
+					processYamlChunk(file, currentChunk.String(), &resources, branch)
 				}
 				currentChunk.Reset()
 			} else {
@@ -105,7 +106,7 @@ func ParseYaml(dir string, files []string) []Resource {
 
 		// Process the last chunk
 		if currentChunk.Len() > 0 {
-			processYamlChunk(file, currentChunk.String(), &resources)
+			processYamlChunk(file, currentChunk.String(), &resources, branch)
 		}
 	}
 
@@ -114,7 +115,7 @@ func ParseYaml(dir string, files []string) []Resource {
 
 // processYamlChunk parses a YAML chunk into an unstructured.Unstructured
 // A chunk is a single YAML object, e.g. a Deployment, Service, etc.
-func processYamlChunk(filename, chunk string, resources *[]Resource) {
+func processYamlChunk(filename, chunk string, resources *[]Resource, branch git.BranchType) {
 	// Skip empty chunks or chunks with only whitespace
 	if strings.TrimSpace(chunk) == "" {
 		return
@@ -148,5 +149,6 @@ func processYamlChunk(filename, chunk string, resources *[]Resource) {
 	*resources = append(*resources, Resource{
 		FileName: filename,
 		Yaml:     yamlData,
+		Branch:   branch,
 	})
 }

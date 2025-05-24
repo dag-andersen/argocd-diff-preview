@@ -50,7 +50,6 @@ func New(client *utils.K8sClient, namespace string, version string, configPath s
 }
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
-
 	startTime := time.Now()
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
@@ -99,6 +98,19 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
 	return duration, nil
+}
+
+func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
+	startTime := time.Now()
+
+	// Login to ArgoCD
+	if err := a.login(); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
+	}
+
+	log.Info().Msg("🦑 Logged in to Argo CD successfully")
+
+	return time.Since(startTime), nil
 }
 
 // installWithHelm installs ArgoCD using Helm
@@ -325,7 +337,7 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 
 	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
 	if err != nil {
-		log.Error().Msgf("❌ Failed to get secret %s", err)
+		log.Error().Msgf("❌ Failed to get secret: %s", err)
 		return "", fmt.Errorf("failed to get secret: %w", err)
 	}
 

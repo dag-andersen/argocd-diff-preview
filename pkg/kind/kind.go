@@ -26,8 +26,6 @@ func IsInstalled() bool {
 
 // CreateCluster creates a new kind cluster with the given name, optional kindOptions, optionally using internal IP
 func CreateCluster(clusterName string, kindOptions string, internal bool) (time.Duration, error) {
-
-	// timer
 	start := time.Now()
 
 	// Check if docker is running
