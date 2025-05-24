@@ -13,7 +13,7 @@ type Diff struct {
 	newSourcePath string
 	oldSourcePath string
 	action        merkletrie.Action
-	diffContent   string
+	content       string
 }
 
 func (d *Diff) prettyName() string {
@@ -58,7 +58,7 @@ func (d *Diff) commentHeader() string {
 func (d *Diff) buildSection() string {
 	header := fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath())
 
-	content := strings.TrimSpace(fmt.Sprintf("%s%s", d.commentHeader(), d.diffContent))
+	content := strings.TrimSpace(fmt.Sprintf("%s%s", d.commentHeader(), d.content))
 
 	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n", header, content)
 }
