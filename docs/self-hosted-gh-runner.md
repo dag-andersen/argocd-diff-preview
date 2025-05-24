@@ -31,5 +31,5 @@ networking:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=${{ github.head_ref }} \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.8 --kind-options '--config /base-branch/hack/kind.yaml'
+            dagandersen/argocd-diff-preview:v0.1.9 --kind-options '--config /base-branch/hack/kind.yaml'
 ```
