@@ -373,10 +373,6 @@ func generateGitDiff(
 			diffContent = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
 		}
 
-		if diffContent == "" {
-			continue
-		}
-
 		toName := ""
 		fromName := ""
 		if to != nil {
@@ -392,7 +388,12 @@ func generateGitDiff(
 			newSourcePath: targetAppsMap[toName].SourcePath,
 			oldSourcePath: baseAppsMap[fromName].SourcePath,
 			action:        action,
-			diffContent:   diffContent,
+			content:       diffContent,
+		}
+
+		// If the diff didn't change and the names are the same, skip it
+		if diff.content == "" && diff.oldName == diff.newName && diff.oldSourcePath == diff.newSourcePath {
+			continue
 		}
 
 		// print diff
@@ -413,10 +414,12 @@ func generateGitDiff(
 	// Create array of formatted file sections
 	fileSections := make([]string, 0, len(changedFiles))
 	for _, diff := range changedFiles {
+
 		// skips empty diffs
 		if diff.content == "" {
 			continue
 		}
+
 		// Get source path for this file, or use empty string if not found
 		fileSection := diff.buildSection()
 		fileSections = append(fileSections, fileSection)
