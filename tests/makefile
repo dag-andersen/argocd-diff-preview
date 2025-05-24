@@ -6,6 +6,7 @@ argocd_namespace := argocd
 timeout := 90
 line_count := 10
 title := Argo CD Diff Preview
+create_cluster := false
 
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
@@ -34,7 +35,9 @@ run-single-test-go: clean pull-base pull-target
 		--line-count="$(line_count)" \
 		--timeout=$(timeout) \
 		--kind-options="$(kind_options)" \
-		--title="$(title)"
+		--title="$(title)" \
+		--create-cluster="$(create_cluster)" \
+		--keep-cluster-alive
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
 	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
@@ -45,6 +48,7 @@ docker-build:
 
 run-single-test-docker: clean pull-base pull-target
 	docker run --network=host \
+		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(PWD)/base-branch:/base-branch \
 		-v $(PWD)/target-branch:/target-branch \
@@ -64,6 +68,8 @@ run-single-test-docker: clean pull-base pull-target
 		-e TIMEOUT="$(timeout)" \
 		-e KIND_OPTIONS="$(kind_options)" \
 		-e TITLE="$(title)" \
+		-e CREATE_CLUSTER="$(create_cluster)" \
+		-e KEEP_CLUSTER_ALIVE=true \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md 
@@ -71,7 +77,7 @@ run-single-test-docker: clean pull-base pull-target
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 run-test-all-with-%:
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" line_count=3 kind_options="--name tests"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" line_count=3 kind_options="--name tests" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base kind_options="--config=./kind-config/options.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base kind_options="--config ./kind-config/options.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base title="integration-test/branch-4"
