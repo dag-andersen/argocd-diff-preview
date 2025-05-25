@@ -298,24 +298,43 @@ func (a *ArgoCDInstallation) login() error {
 	// Get initial admin password
 	password, err := a.getInitialPassword()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get initial admin password: %w", err)
 	}
 
-	time.Sleep(5 * time.Second)
+	var loginOutput string
+	var loginErr error
+	maxAttempts := 4
 
-	// Login to ArgoCD
-	out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
-	if err != nil {
-		log.Error().Msgf("❌ Failed to login to argocd")
-		return fmt.Errorf("failed to login: %w", err)
-	} else {
-		log.Debug().Msgf("Login output: %s", out)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
+		out, cmdErr := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+
+		if cmdErr == nil {
+			loginOutput = out
+			loginErr = nil
+			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, loginOutput)
+			break
+		}
+
+		loginErr = cmdErr
+		log.Warn().Err(loginErr).Msgf("Login attempt %d/%d failed.", attempt, maxAttempts)
+
+		if attempt < maxAttempts {
+			sleepDuration := time.Duration(attempt) * time.Second
+			log.Info().Msgf("Waiting %v before next login attempt (%d/%d)...", sleepDuration, attempt+1, maxAttempts)
+			time.Sleep(sleepDuration)
+		}
 	}
 
-	// Verify login by listing apps
-	if _, err := a.runArgocdCommand("app", "list"); err != nil {
-		log.Error().Msgf("❌ Failed to list applications")
-		return fmt.Errorf("failed to list applications: %w", err)
+	if loginErr != nil {
+		log.Error().Err(loginErr).Msgf("❌ Failed to login to Argo CD after %d attempts", maxAttempts)
+		return fmt.Errorf("failed to login after %d attempts: %w", maxAttempts, loginErr)
+	}
+
+	log.Debug().Msg("Verifying login by listing applications...")
+	if _, errList := a.runArgocdCommand("app", "list"); errList != nil {
+		log.Error().Err(errList).Msg("❌ Failed to list applications after login (verification step).")
+		return fmt.Errorf("login verification failed (unable to list applications): %w", errList)
 	}
 
 	return nil
