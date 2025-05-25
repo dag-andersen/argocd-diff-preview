@@ -17,13 +17,6 @@ controller:
     successThreshold: 1
     timeoutSeconds: 1
     failureThreshold: 40
-redis:
-  readinessProbe:
-    initialDelaySeconds: 0
-    periodSeconds: 1
-    successThreshold: 1
-    timeoutSeconds: 1
-    failureThreshold: 105
 server:
   readinessProbe:
     initialDelaySeconds: 0
