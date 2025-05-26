@@ -298,7 +298,7 @@ func (a *ArgoCDInstallation) login() error {
 	// Get initial admin password
 	password, err := a.getInitialPassword()
 	if err != nil {
-		return fmt.Errorf("failed to get initial admin password: %w", err)
+		return err
 	}
 
 	var loginOutput string
