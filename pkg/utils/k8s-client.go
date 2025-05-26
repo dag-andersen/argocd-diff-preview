@@ -85,6 +85,13 @@ func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (string,
 
 // DeleteArgoCDApplication deletes a single ArgoCD application by name
 func (c *K8sClient) DeleteArgoCDApplication(namespace string, name string) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("no application name provided")
+	}
+	if strings.TrimSpace(namespace) == "" {
+		return fmt.Errorf("no namespace provided")
+	}
+
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 	return c.clientset.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }

@@ -176,7 +176,7 @@ func getResourcesFromApps(
 		for {
 			select {
 			case <-ticker.C:
-				remainingTimeSeconds := int(timeout) - int(time.Since(startTime).Seconds())
+				remainingTimeSeconds := max(0, int(timeout)-int(time.Since(startTime).Seconds()))
 				log.Info().Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTimeSeconds)
 			case <-progressDone:
 				return
@@ -190,7 +190,7 @@ func getResourcesFromApps(
 			if firstError == nil {
 				firstError = result.err
 			}
-			log.Error().Err(result.err).Msg("Failed to extract app")
+			log.Error().Err(result.err).Msg("Failed to extract app:")
 			continue
 		}
 		switch result.app.Branch {
@@ -288,8 +288,9 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			log.Debug().Str("name", app.GetLongName()).Msg("Extracted manifests from Application")
 
 			manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
-			manifestsContent, err := processYamlChunk(manifests)
+			manifestsContent, err := processYamlOutput(manifests)
 			if err != nil {
+				log.Error().Err(err).Str("App", app.GetLongName()).Msg("Failed to process YAML")
 				return result, fmt.Errorf("failed to process YAML: %w", err)
 			}
 
@@ -325,52 +326,6 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		// Sleep before next iteration
 		time.Sleep(5 * time.Second)
 	}
-}
-
-// processYamlChunk parses a YAML chunk into an unstructured.Unstructured
-// A chunk is a single YAML object, e.g. a Deployment, Service, etc.
-func processYamlChunk(chunk string) ([]unstructured.Unstructured, error) {
-
-	// split
-	documents := strings.Split(chunk, "---")
-
-	manifests := make([]unstructured.Unstructured, 0)
-
-	for _, doc := range documents {
-		// Skip empty documents
-		trimmedDoc := strings.TrimSpace(doc)
-
-		if trimmedDoc == "" {
-			continue
-		}
-
-		// Create a new map to hold the parsed YAML
-		var yamlObj map[string]interface{}
-		err := yaml.Unmarshal([]byte(trimmedDoc), &yamlObj)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse YAML: %w", err)
-		}
-
-		// Skip empty objects
-		if len(yamlObj) == 0 {
-			continue
-		}
-
-		// Check if this is a valid Kubernetes resource
-		apiVersion, found, _ := unstructured.NestedString(yamlObj, "apiVersion")
-		kind, kindFound, _ := unstructured.NestedString(yamlObj, "kind")
-
-		if !found || !kindFound || apiVersion == "" || kind == "" {
-			log.Debug().Msgf("Found manifest with no apiVersion or kind: %s", trimmedDoc)
-			continue
-		}
-
-		manifests = append(manifests, unstructured.Unstructured{Object: yamlObj})
-	}
-
-	log.Debug().Msgf("Parsed %d manifests", len(manifests))
-
-	return manifests, nil
 }
 
 // prefixApplication prefixes the application name with the branch name and a unique ID
