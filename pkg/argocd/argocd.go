@@ -303,7 +303,7 @@ func (a *ArgoCDInstallation) login() error {
 
 	var loginOutput string
 	var loginErr error
-	maxAttempts := 4
+	maxAttempts := 5
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
@@ -320,9 +320,8 @@ func (a *ArgoCDInstallation) login() error {
 		log.Warn().Err(loginErr).Msgf("Login attempt %d/%d failed.", attempt, maxAttempts)
 
 		if attempt < maxAttempts {
-			sleepDuration := time.Duration(attempt) * time.Second
-			log.Info().Msgf("Waiting %v before next login attempt (%d/%d)...", sleepDuration, attempt+1, maxAttempts)
-			time.Sleep(sleepDuration)
+			log.Debug().Msgf("Waiting 1s before next login attempt (%d/%d)...", attempt+1, maxAttempts)
+			time.Sleep(1 * time.Second)
 		}
 	}
 
