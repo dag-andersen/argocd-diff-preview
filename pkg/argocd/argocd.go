@@ -301,21 +301,28 @@ func (a *ArgoCDInstallation) login() error {
 		return err
 	}
 
-	time.Sleep(5 * time.Second)
+	maxAttempts := 10
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
+		if out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password); err == nil {
+			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
+			break
+		}
 
-	// Login to ArgoCD
-	out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
-	if err != nil {
-		log.Error().Msgf("❌ Failed to login to argocd")
-		return fmt.Errorf("failed to login: %w", err)
-	} else {
-		log.Debug().Msgf("Login output: %s", out)
+		if attempt >= maxAttempts {
+			log.Error().Err(err).Msgf("❌ Failed to login to Argo CD after %d attempts", maxAttempts)
+			return fmt.Errorf("failed to login after %d attempts", maxAttempts)
+		}
+
+		log.Debug().Msgf("Waiting 1s before next login attempt (%d/%d)...", attempt+1, maxAttempts)
+		log.Warn().Err(err).Msgf("Argo CD login attempt %d/%d failed.", attempt, maxAttempts)
+		time.Sleep(1 * time.Second)
 	}
 
-	// Verify login by listing apps
-	if _, err := a.runArgocdCommand("app", "list"); err != nil {
-		log.Error().Msgf("❌ Failed to list applications")
-		return fmt.Errorf("failed to list applications: %w", err)
+	log.Debug().Msg("Verifying login by listing applications...")
+	if _, errList := a.runArgocdCommand("app", "list"); errList != nil {
+		log.Error().Err(errList).Msg("❌ Failed to list applications after login (verification step).")
+		return fmt.Errorf("login verification failed (unable to list applications): %w", errList)
 	}
 
 	return nil
