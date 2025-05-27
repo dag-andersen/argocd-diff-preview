@@ -239,6 +239,66 @@ spec:
 			expectedError: false,
 			expectedKinds: []string{"Deployment"},
 		},
+		{
+			name: "manifest with triple dash in string value",
+			input: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+data:
+  description: "This contains --- in the middle of a string"
+  separator: "---"`,
+			expectedCount: 1,
+			expectedError: false,
+			expectedKinds: []string{"ConfigMap"},
+		},
+		{
+			name: "multiple manifests with triple dash in string values",
+			input: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config1
+data:
+  note: "Contains --- in string"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret1
+data:
+  password: "my---password"`,
+			expectedCount: 2,
+			expectedError: false,
+			expectedKinds: []string{"ConfigMap", "Secret"},
+		},
+		{
+			name: "document separator with trailing whitespace",
+			input: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config1
+---   
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret1`,
+			expectedCount: 2,
+			expectedError: false,
+			expectedKinds: []string{"ConfigMap", "Secret"},
+		},
+		{
+			name: "document separator not at line start should not split",
+			input: `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config1
+data:
+  text: "some text --- more text"
+  another: "line with --- in middle"`,
+			expectedCount: 1,
+			expectedError: false,
+			expectedKinds: []string{"ConfigMap"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -2,6 +2,7 @@ package extract
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -13,8 +14,10 @@ import (
 // A chunk is a single YAML object, e.g. a Deployment, Service, etc.
 func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
 
-	// split
-	documents := strings.Split(chunk, "---")
+	// Split on YAML document separator (--- at the beginning of a line)
+	// This regex matches --- at the start of a line, optionally followed by whitespace
+	documentSeparator := regexp.MustCompile(`(?m)^---\s*$`)
+	documents := documentSeparator.Split(chunk, -1)
 
 	manifests := make([]unstructured.Unstructured, 0)
 
