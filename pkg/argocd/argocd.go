@@ -301,33 +301,22 @@ func (a *ArgoCDInstallation) login() error {
 		return err
 	}
 
-	var loginOutput string
-	var loginErr error
-	maxAttempts := 5
-
+	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, cmdErr := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
-
-		if cmdErr == nil {
-			loginOutput = out
-			loginErr = nil
-			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, loginOutput)
+		if out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password); err == nil {
+			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
 		}
 
-		loginErr = cmdErr
-		log.Warn().Err(loginErr).Msgf("Login attempt %d/%d failed.", attempt, maxAttempts)
-
-		if attempt < maxAttempts {
-			log.Debug().Msgf("Waiting 1s before next login attempt (%d/%d)...", attempt+1, maxAttempts)
-			time.Sleep(1 * time.Second)
+		if attempt >= maxAttempts {
+			log.Error().Err(err).Msgf("❌ Failed to login to Argo CD after %d attempts", maxAttempts)
+			return fmt.Errorf("failed to login after %d attempts", maxAttempts)
 		}
-	}
 
-	if loginErr != nil {
-		log.Error().Err(loginErr).Msgf("❌ Failed to login to Argo CD after %d attempts", maxAttempts)
-		return fmt.Errorf("failed to login after %d attempts: %w", maxAttempts, loginErr)
+		log.Debug().Msgf("Waiting 1s before next login attempt (%d/%d)...", attempt+1, maxAttempts)
+		log.Warn().Err(err).Msgf("Argo CD login attempt %d/%d failed.", attempt, maxAttempts)
+		time.Sleep(1 * time.Second)
 	}
 
 	log.Debug().Msg("Verifying login by listing applications...")
