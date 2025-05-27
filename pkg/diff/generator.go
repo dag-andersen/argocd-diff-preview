@@ -68,12 +68,16 @@ func GenerateDiff(
 
 	infoBoxString := timeInfo.String()
 
-	// Calculate the available space for the file sections
-	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
-
+	remainingMaxChars := 99999999
 	// Warning message to be added if we need to truncate
 	warningMessage := fmt.Sprintf("\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
+
+	// For "html" diff format max length is ignored
+	if diffFormat != "html" {
+		// Calculate the available space for the file sections
+		remainingMaxChars = int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
+	}
 
 	// Concatenate file sections up to the max character limit
 	var combinedDiff strings.Builder

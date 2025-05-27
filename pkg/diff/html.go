@@ -79,14 +79,6 @@ const htmlSection = `
 
 const htmlLine = `<tr class="%s"><td><pre>%s</pre></td></tr>`
 
-func htmlTemplateLength() int {
-	template := strings.ReplaceAll(htmlTemplate, "%summary%", "")
-	template = strings.ReplaceAll(template, "%app_diffs%", "")
-	template = strings.ReplaceAll(template, "%title%", "")
-	template = strings.ReplaceAll(template, "%info_box%", "")
-	return len(template)
-}
-
 func printHTMLDiff(title, summary, diff string, infoBox string) string {
 	htmlDiff := strings.ReplaceAll(htmlTemplate, "%title%", title)
 	htmlDiff = strings.ReplaceAll(htmlDiff, "%summary%", summary)
