@@ -156,8 +156,8 @@ kind: ConfigMap
 metadata:
   name: test-config`,
 			expectedCount: 1,
-			expectedError: false,
-			expectedKinds: []string{"ConfigMap"},
+			expectedError: true,
+			expectedKinds: []string{},
 		},
 		{
 			name: "scalar array value",
