@@ -37,6 +37,7 @@ func GenerateDiff(
 	lineCount uint,
 	maxCharCount uint,
 	timeInfo InfoBox,
+	diffFormat string,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -60,7 +61,7 @@ func GenerateDiff(
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, fileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps)
+	summary, fileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps, diffFormat)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -121,19 +122,35 @@ func GenerateDiff(
 		}
 	}
 
-	// Generate and write markdown
-	markdown := printDiff(
-		title,
-		strings.TrimSpace(summary),
-		strings.TrimSpace(combinedDiff.String()),
-		infoBoxString,
-	)
-	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
-	if err := utils.WriteFile(markdownPath, markdown); err != nil {
-		return fmt.Errorf("failed to write markdown: %w", err)
+	var diffPath string
+	switch diffFormat {
+	case "html":
+		// Generate HTML
+		htmlDiff := printHTMLDiff(
+			title,
+			strings.TrimSpace(summary),
+			strings.TrimSpace(combinedDiff.String()),
+			infoBoxString,
+		)
+		diffPath = fmt.Sprintf("%s/diff.html", outputFolder)
+		if err := utils.WriteFile(diffPath, htmlDiff); err != nil {
+			return fmt.Errorf("failed to write html: %w", err)
+		}
+	default:
+		// Generate and write markdown
+		markdown := printMarkdownDiff(
+			title,
+			strings.TrimSpace(summary),
+			strings.TrimSpace(combinedDiff.String()),
+			infoBoxString,
+		)
+		diffPath = fmt.Sprintf("%s/diff.md", outputFolder)
+		if err := utils.WriteFile(diffPath, markdown); err != nil {
+			return fmt.Errorf("failed to write markdown: %w", err)
+		}
 	}
 
-	log.Info().Msgf("🙏 Please check the %s file for differences", markdownPath)
+	log.Info().Msgf("🙏 Please check the %s file for differences", diffPath)
 	return nil
 }
 
@@ -156,6 +173,7 @@ func generateGitDiff(
 	diffContextLines uint,
 	baseApps []AppInfo,
 	targetApps []AppInfo,
+	diffFormat string,
 ) (string, []string, error) {
 
 	// Write base manifests to disk
@@ -421,7 +439,13 @@ func generateGitDiff(
 		}
 
 		// Get source path for this file, or use empty string if not found
-		fileSection := diff.buildSection()
+		var fileSection string
+		switch (diffFormat) {
+		case "html":
+			fileSection = diff.buildHTMLSection()
+		default:
+			fileSection = diff.buildSection()
+		}
 		fileSections = append(fileSections, fileSection)
 	}
 

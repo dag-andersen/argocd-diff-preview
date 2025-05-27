@@ -44,6 +44,7 @@ var (
 	DefaultLogFormat          = "human"
 	DefaultArgocdChartVersion = "latest"
 	DefaultTitle              = "Argo CD Diff Preview"
+	DefaultDiffFormat         = "markdown"
 )
 
 type Options struct {
@@ -72,6 +73,7 @@ type Options struct {
 	RedirectTargetRevisions   string `mapstructure:"redirect-target-revisions"`
 	LogFormat                 string `mapstructure:"log-format"`
 	Title                     string `mapstructure:"title"`
+	DiffFormat                string `mapstructure:"diff-format"`
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
@@ -195,6 +197,7 @@ func Parse() *Options {
 	viper.SetDefault("argocd-namespace", DefaultArgocdNamespace)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
+	viper.SetDefault("diff-format", DefaultDiffFormat)
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
 	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
@@ -233,6 +236,7 @@ func Parse() *Options {
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
+	rootCmd.Flags().String("diff-format", DefaultDiffFormat, "Diff format (markdown or html)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -418,6 +422,9 @@ func (o *Options) LogOptions() {
 	}
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)
+	}
+	if o.DiffFormat != DefaultDiffFormat {
+		log.Info().Msgf("✨ - diff-format: %s", o.DiffFormat)
 	}
 }
 
