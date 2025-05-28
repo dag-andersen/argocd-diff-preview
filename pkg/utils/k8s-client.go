@@ -32,6 +32,10 @@ func NewK8sClient() (*K8sClient, error) {
 		return nil, err
 	}
 
+	// Increase QPS and Burst to mitigate client-side throttling on the CI
+	config.QPS = 20   // Default is 5
+	config.Burst = 40 // Default is 10
+
 	clientset, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, err
