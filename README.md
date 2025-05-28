@@ -131,6 +131,10 @@ jobs:
 ### Helm/Kustomize generated ArgoCD applications
 `argocd-diff-preview` will only look for YAML files in the repository with `kind: Application` or `kind: ApplicationSet`. If your applications are generated from a Helm chart or Kustomize template, you will have to add a step in the pipeline that renders the chart/template. Refer to the [full documentation](https://dag-andersen.github.io/argocd-diff-preview/generated-applications/) to learn how to do this.
 
+### Other VCS Providers
+
+If you’re using GitLab, Bitbucket, Jenkins, CircleCI, or any other tool – it should still work. However, there might not be documentation available for it, since everything beyond the GitHub docs is community-contributed. If you get it working with a tool that isn’t mentioned in the documentation, we’d really appreciate it if you shared your setup with the community ❤️
+
 ## Full Documentation
 
 [Link to docs](https://dag-andersen.github.io/argocd-diff-preview/)
