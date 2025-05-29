@@ -16,6 +16,8 @@ spec:
   template:
     metadata:
       name: "{{ .name }}"
+      annotations:
+        test: "hi"
       finalizers:
       - resources-finalizer.argocd.argoproj.io
     spec:
