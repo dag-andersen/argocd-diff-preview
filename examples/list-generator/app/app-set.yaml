@@ -15,9 +15,10 @@ spec:
             path: examples/list-generator/resources
   template:
     metadata:
-      name: "{{ .name }}-test"
+      name: "{{ .name }}"
       finalizers:
       - resources-finalizer.argocd.argoproj.io
+      - test
     spec:
       project: default
       source:
