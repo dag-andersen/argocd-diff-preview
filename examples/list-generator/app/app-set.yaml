@@ -19,7 +19,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        repoURL: https://github.com/jumbosushi/argocd-diff-preview.git
         path: "{{ .path }}"
       destination:
         name: in-cluster
