@@ -11,6 +11,8 @@ spec:
         elements:
           - name: app1
             path: examples/list-generator/resources
+          - name: app2
+            path: examples/list-generator/resources
   template:
     metadata:
       name: "{{ .name }}"
