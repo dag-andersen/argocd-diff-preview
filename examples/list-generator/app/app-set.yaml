@@ -13,13 +13,9 @@ spec:
             path: examples/list-generator/resources
           - name: app2
             path: examples/list-generator/resources
-          - name: app3
-            path: examples/list-generator/resources
   template:
     metadata:
-      name: "{{ .name }}"
-      annotations:
-        test: "hi"
+      name: "{{ .name }}-test"
       finalizers:
       - resources-finalizer.argocd.argoproj.io
     spec:
