@@ -18,7 +18,6 @@ spec:
       name: "{{ .name }}"
       finalizers:
       - resources-finalizer.argocd.argoproj.io
-      - test
     spec:
       project: default
       source:
@@ -28,4 +27,4 @@ spec:
         name: in-cluster
       syncPolicy:
         syncOptions:
-          - CreateNamespace=true
+          - CreateNamespace=false
