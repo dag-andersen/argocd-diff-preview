@@ -37,7 +37,7 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            -e TARGET_BRANCH=${{ github.head_ref }} \
+            -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
             dagandersen/argocd-diff-preview:v0.1.9
 
@@ -48,6 +48,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+Instead of using `refs/pull/${{ github.event.number }}/merge`, you could also use `${{ github.head_ref }}` or simply specify the branch name manually.  
+
+More information about this can be found in [this blog post](https://fluffyandflakey.blog/2022/12/21/what-is-a-github-pull-request-merge-branch/)
 
 ## Private repositories and Helm Charts
 
@@ -86,7 +90,7 @@ In the simple code examples above, we do not provide the cluster with any creden
           -v $(pwd)/pull-request:/target-branch \
           -v $(pwd)/output:/output \
           -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
-          -e TARGET_BRANCH=${{ github.head_ref }} \
+          -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
           -e REPO=${{ github.repository }} \
           dagandersen/argocd-diff-preview:v0.1.9
 ```
