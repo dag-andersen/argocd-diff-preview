@@ -28,6 +28,7 @@ table {
 	font-family: monospace;
 	border: solid 1px rgb(53, 44, 47);
 	border-spacing: 0px;
+	width: 100%;
 }
 tr.normal_line {
 	background:rgb(239, 239, 239);
