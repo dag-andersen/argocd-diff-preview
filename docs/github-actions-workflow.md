@@ -152,4 +152,28 @@ so you need to use the following alternative:
         EOF
 ```
 
+If Helm Charts are stored as OCI images in a Docker registry (such as AWS ECR), additional fields must be added to the `stringData` section as shown below.
+```yaml title=".github/workflows/generate-diff.yml" linenums="24"
+    - name: Prepare secrets
+      run: |
+        mkdir secrets
+        cat > secrets/secret.yaml << "EOF"
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: private-registry
+          namespace: argocd
+          labels:
+            argocd.argoproj.io/secret-type: repository
+        stringData:
+          name: privateRegistry
+          url: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+          type: helm
+          enableOCI: "true"
+          forceHttpBasicAuth: "true"
+        EOF
+```
+
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
