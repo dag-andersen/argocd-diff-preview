@@ -25,7 +25,7 @@ func markdownTemplateLength() int {
 	return len(template)
 }
 
-func printDiff(title, summary, diff string, infoBox string) string {
+func printMarkdownDiff(title, summary, diff string, infoBox string) string {
 	markdown := strings.ReplaceAll(markdownTemplate, "%title%", title)
 	markdown = strings.ReplaceAll(markdown, "%summary%", summary)
 	markdown = strings.ReplaceAll(markdown, "%app_diffs%", diff)

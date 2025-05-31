@@ -41,7 +41,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--files-changed <files>` | `FILES_CHANGED` | - | List of files changed between branches (comma, space or newline separated) |
 | `--line-count <count>`, `-c` | `LINE_COUNT` | `10` | Generate diffs with \<n\> lines of context |
 | `--log-format <format>` | `LOG_FORMAT` | `human` | Log format. Options: human, json |
-| `--max-diff-length <length>` | `MAX_DIFF_LENGTH` | `65536` | Max diff message character count |
+| `--max-diff-length <length>` | `MAX_DIFF_LENGTH` | `65536` | Max diff message character count. It only limits the generated Markdown file |
 | `--output-folder <folder>`, `-o` | `OUTPUT_FOLDER` | `./output` | Output folder where the diff will be saved |
 | `--redirect-target-revisions <revs>` | `REDIRECT_TARGET_REVISIONS` | - | List of target revisions to redirect |
 | `--secrets-folder <folder>`, `-s` | `SECRETS_FOLDER` | `./secrets` | Secrets folder where the secrets are read from |
