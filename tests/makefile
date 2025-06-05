@@ -45,6 +45,7 @@ docker-build:
 
 run-single-test-docker: clean pull-base pull-target
 	docker run --network=host \
+		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v $(PWD)/base-branch:/base-branch \
 		-v $(PWD)/target-branch:/target-branch \

@@ -349,15 +349,67 @@ func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
 	return out, nil
 }
 
+// AppsetGenerateWithRetry runs 'argocd appset generate' on a file and returns the output with retry
+func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttempts int) (string, error) {
+
+	var e error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		log.Debug().Msgf("AppsetGenerateWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
+		out, err := a.AppsetGenerate(appSetPath)
+		if err == nil {
+			return out, nil
+		}
+
+		if attempt >= maxAttempts {
+			e = fmt.Errorf("failed to run argocd appset generate: %w", err)
+			break
+		}
+
+		log.Debug().Msgf("Waiting 1s before next appset generate attempt (%d/%d)...", attempt+1, maxAttempts)
+		log.Warn().Err(err).Msgf("Appset generate attempt %d/%d failed.", attempt, maxAttempts)
+		time.Sleep(1 * time.Second)
+	}
+
+	return "", e
+}
+
 // GetManifests returns the manifests for an application
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
 	out, err := a.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
-		exists, err := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
+		exists, _ := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
+		if !exists {
+			log.Warn().Msgf("⚠️ App %s does not exist", appName)
+		}
+
 		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
 	return out, true, nil
+}
+
+// GetManifestsWithRetry returns the manifests for an application with retry
+func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts int) (string, bool, error) {
+
+	var e error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		log.Debug().Msgf("GetManifestsWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
+		out, exists, err := a.GetManifests(appName)
+		if err == nil {
+			return out, exists, nil
+		}
+
+		if attempt >= maxAttempts {
+			e = err
+			break
+		}
+
+		log.Debug().Msgf("Waiting 1s before next get manifests attempt (%d/%d)...", attempt+1, maxAttempts)
+		log.Warn().Err(err).Msgf("⚠️ Get manifests attempt %d/%d failed.", attempt, maxAttempts)
+		time.Sleep(1 * time.Second)
+	}
+
+	return "", false, e
 }
 
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {
