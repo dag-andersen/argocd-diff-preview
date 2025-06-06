@@ -212,7 +212,9 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		switch appStatus.Status.Sync.Status {
 		case "OutOfSync", "Synced":
 			log.Debug().Str("name", app.GetLongName()).Msg("Extracting manifests from Application")
-			manifests, exists, err := argocd.GetManifests(app.Id)
+
+			retryCount := 5
+			manifests, exists, err := argocd.GetManifestsWithRetry(app.Id, retryCount)
 			if !exists {
 				return result, fmt.Errorf("application %s does not exist", app.GetLongName())
 			}
