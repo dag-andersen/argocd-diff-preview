@@ -170,7 +170,8 @@ func convertAppSetsToApps(
 		}
 
 		// Generate applications using argocd appset generate
-		output, err := argocd.AppsetGenerate(randomFileName)
+		retryCount := 5
+		output, err := argocd.AppsetGenerateWithRetry(randomFileName, retryCount)
 		if err != nil {
 			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
 			return nil, err

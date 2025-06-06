@@ -62,3 +62,8 @@ func (d *Diff) buildSection() string {
 
 	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n", header, content)
 }
+
+func (d *Diff) buildHTMLSection() string {
+	header := fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath())
+	return printHTMLSection(header, d.commentHeader(), d.content)
+}
