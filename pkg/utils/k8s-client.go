@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -17,16 +18,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	//
-	// Uncomment to load all auth plugins
-	//
-	// Uncomment to load all auth plugins
-	// _ "k8s.io/client-go/plugin/pkg/client/auth"
-	//
-	// Or uncomment to load specific auth plugins
-	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
-	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 )
 
 type K8sClient struct {
@@ -94,6 +85,58 @@ func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (string,
 	}
 
 	return string(resultString), nil
+}
+
+// DeleteArgoCDApplication deletes a single ArgoCD application by name
+func (c *K8sClient) DeleteArgoCDApplication(namespace string, name string) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("no application name provided")
+	}
+	if strings.TrimSpace(namespace) == "" {
+		return fmt.Errorf("no namespace provided")
+	}
+
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+	return c.clientset.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+}
+
+// DeleteAllApplicationsOlderThan deletes all ArgoCD applications older than a given number of minutes
+// and matching the given label key
+func (c *K8sClient) DeleteAllApplicationsOlderThan(namespace string, minutes int) error {
+
+	log.Info().Msgf("🧼 Deleting applications older than %d minutes", minutes)
+
+	deletedCount := 0
+
+	listOptions := metav1.ListOptions{
+		LabelSelector: vars.ArgoCDApplicationLabelKey,
+	}
+
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+	apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), listOptions)
+	if err != nil {
+		return err
+	}
+
+	for _, app := range apps.Items {
+		creationTimestamp := app.GetCreationTimestamp()
+		timeDiff := time.Since(creationTimestamp.Time)
+		if timeDiff.Minutes() > float64(minutes) {
+			err := c.clientset.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), app.GetName(), metav1.DeleteOptions{})
+			if err != nil {
+				return err
+			}
+			deletedCount++
+		}
+	}
+
+	if deletedCount > 0 {
+		log.Info().Msgf("🧼 Deleted %d applications", deletedCount)
+	} else {
+		log.Info().Msgf("🧼 No applications with the label '%s' were found older than %d minutes", vars.ArgoCDApplicationLabelKey, minutes)
+	}
+
+	return nil
 }
 
 func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
