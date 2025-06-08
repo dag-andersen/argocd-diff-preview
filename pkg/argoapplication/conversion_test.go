@@ -3,7 +3,7 @@ package argoapplication
 import (
 	"testing"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -12,13 +12,13 @@ import (
 func TestFromK8sResource(t *testing.T) {
 	tests := []struct {
 		name     string
-		resource *k8s.Resource
+		resource *fileparsing.Resource
 		want     *ArgoResource
 		wantErr  bool
 	}{
 		{
 			name: "valid application",
-			resource: &k8s.Resource{
+			resource: &fileparsing.Resource{
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
@@ -46,7 +46,7 @@ spec:
 		},
 		{
 			name: "valid application set",
-			resource: &k8s.Resource{
+			resource: &fileparsing.Resource{
 				FileName: "test-set.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
@@ -75,7 +75,7 @@ spec:
 		},
 		{
 			name: "invalid kind",
-			resource: &k8s.Resource{
+			resource: &fileparsing.Resource{
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
@@ -94,7 +94,7 @@ metadata:
 		},
 		{
 			name: "missing metadata",
-			resource: &k8s.Resource{
+			resource: &fileparsing.Resource{
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
@@ -114,7 +114,7 @@ spec:
 		},
 		{
 			name: "missing name",
-			resource: &k8s.Resource{
+			resource: &fileparsing.Resource{
 				FileName: "test.yaml",
 				Yaml: func() unstructured.Unstructured {
 					var obj unstructured.Unstructured
@@ -136,7 +136,7 @@ spec:
 		},
 		{
 			name: "nil yaml",
-			resource: &k8s.Resource{
+			resource: &fileparsing.Resource{
 				FileName: "test.yaml",
 				Yaml:     unstructured.Unstructured{},
 			},

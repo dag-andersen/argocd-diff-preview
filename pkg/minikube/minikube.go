@@ -22,7 +22,6 @@ func IsInstalled() bool {
 
 // CreateCluster creates a new minikube cluster
 func CreateCluster() (time.Duration, error) {
-
 	startTime := time.Now()
 
 	// Check if docker is running

@@ -111,9 +111,7 @@ Modified (7):
  apiVersion: v1
  kind: Service
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app:/Service:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-super-app:/Service:default/super-app-name
+   annotations: {}
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
@@ -140,9 +138,7 @@ Modified (7):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app:/ServiceAccount:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-super-app:/ServiceAccount:default/super-app-name
+   annotations: {}
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
@@ -157,9 +153,7 @@ Modified (7):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
-   annotations:
--    argocd.argoproj.io/tracking-id: my-app:apps/Deployment:default/super-app-name
-+    argocd.argoproj.io/tracking-id: my-super-app:apps/Deployment:default/super-app-name
+   annotations: {}
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app

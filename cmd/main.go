@@ -13,7 +13,9 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
+	"sigs.k8s.io/yaml"
 )
 
 func main() {
@@ -49,6 +51,13 @@ func run(opts *Options) error {
 	filesChanged := opts.GetFilesChanged()
 	redirectRevisions := opts.GetRedirectRevisions()
 	clusterProvider := opts.GetClusterProvider()
+
+	// Create unique ID only consisting of lowercase letters of 5 characters
+	uniqueID := uuid.New().String()[:5]
+
+	if !opts.CreateCluster {
+		log.Info().Msgf("🔑 Unique ID for this run: %s", uniqueID)
+	}
 
 	// Check if users limited the Application Selection
 	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
@@ -100,17 +109,24 @@ func run(opts *Options) error {
 		return nil
 	}
 
-	// Create cluster and install Argo CD
-	clusterCreationDuration, err := clusterProvider.CreateCluster()
-	if err != nil {
-		log.Error().Msgf("❌ Failed to create cluster")
-		return err
+	var clusterCreationDuration time.Duration
+	if opts.CreateCluster {
+		// Create cluster and install Argo CD
+		duration, err := clusterProvider.CreateCluster()
+		if err != nil {
+			log.Error().Msgf("❌ Failed to create cluster")
+			return err
+		}
+		clusterCreationDuration = duration
 	}
+
 	defer func() {
-		if !opts.KeepClusterAlive {
-			clusterProvider.DeleteCluster(true)
-		} else {
-			log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+		if opts.CreateCluster {
+			if !opts.KeepClusterAlive {
+				clusterProvider.DeleteCluster(true)
+			} else {
+				log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+			}
 		}
 	}()
 
@@ -121,12 +137,33 @@ func run(opts *Options) error {
 		return err
 	}
 
-	// Install Argo CD
+	// Delete old applications
+	if !opts.CreateCluster {
+		ageInMinutes := 20
+		if err := k8sClient.DeleteAllApplicationsOlderThan(opts.ArgocdNamespace, ageInMinutes); err != nil {
+			log.Error().Msgf("❌ Failed to delete old applications")
+			return err
+		}
+	}
+
 	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
-	argocdInstallationDuration, err := argocd.Install(opts.Debug, opts.SecretsFolder)
-	if err != nil {
-		log.Error().Msgf("❌ Failed to install Argo CD")
-		return err
+
+	var argocdInstallationDuration time.Duration
+	if opts.CreateCluster {
+		// Install Argo CD
+		duration, err := argocd.Install(opts.Debug, opts.SecretsFolder)
+		if err != nil {
+			log.Error().Msgf("❌ Failed to install Argo CD")
+			return err
+		}
+		argocdInstallationDuration = duration
+	} else {
+		duration, err := argocd.OnlyLogin()
+		if err != nil {
+			log.Error().Msgf("❌ Failed to login to Argo CD")
+			return err
+		}
+		argocdInstallationDuration = duration
 	}
 
 	tempFolder := "temp"
@@ -207,21 +244,30 @@ func run(opts *Options) error {
 	}
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
+	deleteAfterProcessing := !opts.CreateCluster
 	baseManifests, targetManifests, extractDuration, err := extract.GetResourcesFromBothBranches(
 		argocd,
-		baseBranch,
-		targetBranch,
 		opts.Timeout,
 		baseApps,
 		targetApps,
+		uniqueID,
+		deleteAfterProcessing,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
 		return err
 	}
 
-	baseAppInfos := convertExtractedAppsToAppInfos(baseManifests)
-	targetAppInfos := convertExtractedAppsToAppInfos(targetManifests)
+	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests)
+	if err != nil {
+		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
+		return err
+	}
+	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests)
+	if err != nil {
+		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
+		return err
+	}
 
 	// Print manifests output
 	{
@@ -277,20 +323,43 @@ func run(opts *Options) error {
 }
 
 // convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
-func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) []diff.AppInfo {
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) ([]diff.AppInfo, error) {
 	appInfos := make([]diff.AppInfo, len(extractedApps))
 	for i, extractedApp := range extractedApps {
-		appInfos[i] = convertExtractedAppToAppInfo(extractedApp)
+		appInfo, err := convertExtractedAppToAppInfo(extractedApp)
+		if err != nil {
+			return nil, err
+		}
+		appInfos[i] = appInfo
 	}
-	return appInfos
+	return appInfos, nil
 }
 
 // convertExtractedAppToAppInfo converts an ExtractedApp to an AppInfo
-func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) diff.AppInfo {
+func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) (diff.AppInfo, error) {
+	yamlString, err := convertToYamlString(&extractedApp)
+	if err != nil {
+		log.Error().Msgf("❌ Failed to convert extracted app to yaml string: %s", err)
+		return diff.AppInfo{}, err
+	}
+
 	return diff.AppInfo{
 		Id:          extractedApp.Id,
 		Name:        extractedApp.Name,
 		SourcePath:  extractedApp.SourcePath,
-		FileContent: extractedApp.Manifest,
+		FileContent: yamlString,
+	}, nil
+}
+
+// convertToYamlString converts a list of ExtractedApp to a single YAML string
+func convertToYamlString(apps *extract.ExtractedApp) (string, error) {
+	var manifestStrings []string
+	for _, manifest := range apps.Manifest {
+		manifestString, err := yaml.Marshal(manifest.Object)
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal unstructured object: %w", err)
+		}
+		manifestStrings = append(manifestStrings, string(manifestString))
 	}
+	return strings.Join(manifestStrings, "\n---\n"), nil
 }
