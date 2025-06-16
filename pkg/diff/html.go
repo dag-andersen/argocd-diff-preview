@@ -23,10 +23,13 @@ body {
 .diff_container {
 	width: 910px;
 	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
 }
 table {
 	font-family: monospace;
-	border: solid 1px rgb(53, 44, 47);
 	border-spacing: 0px;
 	width: 100%;
 }
@@ -44,7 +47,8 @@ tr.comment_line {
 }
 pre {
 	margin: 0;
-	padding: 0;
+	padding-left: 15px;
+	padding-right: 15px;
 }
 </style>
 </head>
@@ -97,7 +101,7 @@ func printHTMLSection(header string, commentHeader string, content string) strin
 			rows += fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line))
 			continue
 		}
-		switch (line[0]) {
+		switch line[0] {
 		case '@':
 			rows += fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(line))
 		case '-':
@@ -106,7 +110,7 @@ func printHTMLSection(header string, commentHeader string, content string) strin
 			rows += fmt.Sprintf(htmlLine, "added_line", html.EscapeString(line))
 		default:
 			rows += fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line))
-		}	
+		}
 	}
 	s = strings.ReplaceAll(s, "%rows%", rows)
 
