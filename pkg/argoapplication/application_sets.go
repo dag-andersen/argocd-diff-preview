@@ -235,17 +235,11 @@ func convertAppSetsToApps(
 			// Create a deep copy of the YAML node to avoid reference issues
 			docCopy := doc.DeepCopy()
 
-			app := ArgoResource{
-				Yaml:     docCopy,
-				Kind:     Application,
-				Id:       name,
-				Name:     name,
-				FileName: appSet.FileName,
-			}
+			app := NewArgoResource(docCopy, Application, name, name, appSet.FileName, branch.Type())
 
 			localGeneratedAppsCounter++
 			generatedAppsCounter++
-			appsNew = append(appsNew, app)
+			appsNew = append(appsNew, *app)
 		}
 
 		log.Debug().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf(

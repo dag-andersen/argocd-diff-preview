@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/rs/zerolog/log"
 )
 
 // FromResourceToApplication converts K8sResources to ArgoResources with filtering
 func FromResourceToApplication(
-	k8sResources []k8s.Resource,
+	k8sResources []fileparsing.Resource,
 ) []ArgoResource {
 	var apps []ArgoResource
 
@@ -25,7 +25,7 @@ func FromResourceToApplication(
 }
 
 // fromK8sResource creates an ArgoResource from a K8sResource
-func fromK8sResource(resource k8s.Resource) *ArgoResource {
+func fromK8sResource(resource fileparsing.Resource) *ArgoResource {
 
 	kind := resource.Yaml.GetKind()
 	if kind == "" {
@@ -50,13 +50,7 @@ func fromK8sResource(resource k8s.Resource) *ArgoResource {
 		return nil
 	}
 
-	return &ArgoResource{
-		Yaml:     &resource.Yaml,
-		Kind:     ApplicationKind(appKind),
-		Id:       name,
-		Name:     name,
-		FileName: resource.FileName,
-	}
+	return NewArgoResource(&resource.Yaml, ApplicationKind(appKind), name, name, resource.FileName, resource.Branch)
 }
 
 // ApplicationsToString converts a slice of ArgoResource to a YAML string

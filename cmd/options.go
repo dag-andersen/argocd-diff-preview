@@ -38,12 +38,15 @@ var (
 	DefaultCluster            = "auto"
 	DefaultClusterName        = "argocd-diff-preview"
 	DefaultKindOptions        = ""
+	DefaultKindInternal       = false
 	DefaultK3dOptions         = ""
 	DefaultMaxDiffLength      = uint(65536)
 	DefaultArgocdNamespace    = "argocd"
 	DefaultLogFormat          = "human"
 	DefaultArgocdChartVersion = "latest"
 	DefaultTitle              = "Argo CD Diff Preview"
+	DefaultCreateCluster      = true
+	DefaultKeepClusterAlive   = false
 )
 
 type Options struct {
@@ -58,6 +61,7 @@ type Options struct {
 	Repo                      string `mapstructure:"repo"`
 	OutputFolder              string `mapstructure:"output-folder"`
 	SecretsFolder             string `mapstructure:"secrets-folder"`
+	CreateCluster             bool   `mapstructure:"create-cluster"`
 	ClusterType               string `mapstructure:"cluster"`
 	ClusterName               string `mapstructure:"cluster-name"`
 	KindOptions               string `mapstructure:"kind-options"`
@@ -189,12 +193,15 @@ func Parse() *Options {
 	viper.SetDefault("base-branch", DefaultBaseBranch)
 	viper.SetDefault("output-folder", DefaultOutputFolder)
 	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
+	viper.SetDefault("create-cluster", DefaultCreateCluster)
+	viper.SetDefault("keep-cluster-alive", DefaultKeepClusterAlive)
 	viper.SetDefault("cluster", DefaultCluster)
 	viper.SetDefault("cluster-name", DefaultClusterName)
 	viper.SetDefault("max-diff-length", DefaultMaxDiffLength)
 	viper.SetDefault("argocd-namespace", DefaultArgocdNamespace)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
+
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
 	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
@@ -219,12 +226,13 @@ func Parse() *Options {
 	rootCmd.Flags().StringP("secrets-folder", "s", DefaultSecretsFolder, "Secrets folder where the secrets are read from")
 
 	// Cluster related
+	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
-	rootCmd.Flags().Bool("kind-internal", false, "kind internal kubeconfig mode (only for kind)")
+	rootCmd.Flags().Bool("kind-internal", DefaultKindInternal, "kind internal kubeconfig mode (only for kind)")
 	rootCmd.Flags().String("k3d-options", DefaultK3dOptions, "k3d options (only for k3d)")
-	rootCmd.Flags().Bool("keep-cluster-alive", false, "Keep cluster alive after the tool finishes")
+	rootCmd.Flags().Bool("keep-cluster-alive", DefaultKeepClusterAlive, "Keep cluster alive after the tool finishes")
 
 	// Other options
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
@@ -354,18 +362,22 @@ func (o *Options) LogOptions() {
 	} else {
 		log.Info().Msg("✨ Running with:")
 	}
-	log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
-	log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
-	if o.clusterProvider.GetName() == "kind" {
-		if o.KindOptions != "" {
-			log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+	if !o.CreateCluster {
+		log.Info().Msgf("✨ - reusing existing cluster")
+	} else {
+		log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
+		log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
+		if o.clusterProvider.GetName() == "kind" {
+			if o.KindOptions != "" {
+				log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+			}
+			if o.KindInternal {
+				log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+			}
 		}
-		if o.KindInternal {
-			log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+		if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
+			log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 		}
-	}
-	if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
-		log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 	}
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)

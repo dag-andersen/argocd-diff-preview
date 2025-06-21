@@ -4,10 +4,10 @@ When using Action Runner Controller (ARC) to run self-host your GitHub Actions R
 
 The default CIDRs are:
 
-| Service | CIDR        |
-|---------|-------------|
-| Service | 10.96.0.0/16|
-| Pod     | 10.244.0.0/16|
+| Service | CIDR          |
+| ------- | ------------- |
+| Service | 10.96.0.0/16  |
+| Pod     | 10.244.0.0/16 |
 
 To configure kind:
 
