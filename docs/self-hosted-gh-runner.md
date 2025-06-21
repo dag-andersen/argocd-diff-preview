@@ -31,5 +31,5 @@ networking:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.10 --kind-options '--config /base-branch/hack/kind.yaml'
+            dagandersen/argocd-diff-preview:v0.1.11 --kind-options '--config /base-branch/hack/kind.yaml'
 ```
