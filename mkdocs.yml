@@ -24,6 +24,7 @@ nav:
   - Local Installation: installation.md
   - Self-hosted Github Runners: self-hosted-gh-runner.md
   - custom-argo-cd-installation.md
+- Connecting to existing cluster: existing-cluster.md
 - generated-applications.md
 - Ignore Lines: ignoring-lines.md
 - application-selection.md
