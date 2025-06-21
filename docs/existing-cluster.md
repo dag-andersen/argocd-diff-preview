@@ -1,6 +1,6 @@
-# BETA: Connect to an Existing Cluster
+# 🚧 BETA 🚧: Connecting to an existing cluster
 
-> This feature is new and not well tested. You're more than welcome to try it out and share feedback.
+> This feature is new and not well tested. You're more than welcome to try it out and share feedback. Please open an issue on GitHub if you have any questions. 
 
 Instead of spinning up an ephemeral cluster, you can connect to an existing one. This saves about `60`–`90` seconds per run.
 
@@ -40,9 +40,9 @@ git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --de
 ### _Step 3_: Run the tool
 
 Make sure you:
-- mount the KubeConfig to the container (`-v ~/.kube:/root/.kube`)
+- Mount the KubeConfig to the container (`-v ~/.kube:/root/.kube`)
 - Disable cluster creation (`--create-cluster=false`)
-- Specify the Argo CD namespace (`--argocd-namespace=default`)
+- Specify the Argo CD namespace (`--argocd-namespace=<ns>`)
 
 ```bash
 docker run \
@@ -54,7 +54,7 @@ docker run \
   -v $(pwd)/target-branch:/target-branch \
   -e TARGET_BRANCH=helm-example-3 \
   -e REPO=dag-andersen/argocd-diff-preview \
-  dagandersen/argocd-diff-preview:v0.1.8 \
+  dagandersen/argocd-diff-preview:v0.1.11 \
   --argocd-namespace=default \
   --create-cluster=false
 ```
@@ -92,4 +92,12 @@ And then the output will look something like this:
 ✨ Total execution time: 10s
 ```
 
+## Authenticate with Cloud Providers
 
+If you're connecting to a cluster on a cloud provider, you often use a plugin or [ExecConfig](https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/#ExecConfig) to authenticate (e.g. `kubelogin` for Azure AKS or `aws eks get-token` for AWS EKS).
+
+You can check this by running `kubectl config view --minify -o jsonpath='{.users[*].user}'` and look for the `command` field.
+
+These plugins/binaries are **not** available inside the Docker image, so you'll need to run `argocd-diff-preview` as a standalone binary.
+
+You can find installation instructions in the [docs](https://dag-andersen.github.io/argocd-diff-preview/installation/#__tabbed_1_2).
