@@ -5,6 +5,7 @@ on:
     tags:
       - "v*.*.*"
       - "!v*.*.*-pre-release"
+      - "!v*.*.*-pre-release-*"
 
 jobs:
   build:
