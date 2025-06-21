@@ -8,7 +8,7 @@ We highly recommend **not** using your production Argo CD instance for rendering
 
 The Argo CD instance does **not** need to be exposed to the internet, since `argocd-diff-preview` connects through a KubeConfig file.
 
-To use this feature, simply mount a valid KubeConfig with access to the cluster, and pass these options: `–create-cluster false –argocd-namespace `
+To use this feature, simply mount a valid KubeConfig with access to the cluster, and provide these options: `--create-cluster false --argocd-namespace <namespace>`
 
 This will skip creating a new cluster and connect to Argo CD via port-forwarding in the specified namespace.
 
