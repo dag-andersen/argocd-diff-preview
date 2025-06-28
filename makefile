@@ -63,8 +63,7 @@ mkdocs:
 	python3 -m venv venv \
 	&& source venv/bin/activate \
 	&& pip3 install mkdocs-material \
-	&& open http://localhost:8000 \
-	&& mkdocs serve
+	&& mkdocs serve --watch-theme --open
 
 run-lint:
 	golangci-lint run

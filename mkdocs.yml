@@ -2,9 +2,10 @@ site_name: Argo CD Diff Preview
 repo_url: https://github.com/dag-andersen/argocd-diff-preview
 edit_uri: edit/main/docs/
 theme:
+  name: material
+  custom_dir: docs/overrides
   icon:
     repo: fontawesome/brands/github
-  name: material
   logo: assets/logo-head.png
   favicon: assets/logo-head.png
   features:
