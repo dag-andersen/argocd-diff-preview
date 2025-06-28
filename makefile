@@ -64,7 +64,7 @@ mkdocs:
 	&& source venv/bin/activate \
 	&& pip3 install mkdocs-material \
 	&& open http://localhost:8000 \
-	&& mkdocs serve
+	&& mkdocs serve --watch-theme
 
 run-lint:
 	golangci-lint run
