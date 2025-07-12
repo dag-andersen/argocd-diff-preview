@@ -351,17 +351,31 @@ func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace s
 	return count, nil
 }
 
-// create namespace
-func (c *K8sClient) CreateNamespace(namespace string) error {
+// create namespace. Returns true if the namespace was created, false if it already existed.
+func (c *K8sClient) CreateNamespace(namespace string) (bool, error) {
 	namespaceRes := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
-	_, err := c.clientset.Resource(namespaceRes).Create(context.Background(), &unstructured.Unstructured{
+
+	// First, check if the namespace already exists
+	_, err := c.clientset.Resource(namespaceRes).Get(context.Background(), namespace, metav1.GetOptions{})
+	if err == nil {
+		// Namespace already exists, no need to create
+		return false, nil
+	}
+
+	// If the error is not "not found", return the error
+	if !strings.Contains(err.Error(), "not found") {
+		return false, fmt.Errorf("failed to check if namespace exists: %w", err)
+	}
+
+	// Namespace doesn't exist, create it
+	_, err = c.clientset.Resource(namespaceRes).Create(context.Background(), &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"name": namespace,
 			},
 		},
 	}, metav1.CreateOptions{})
-	return err
+	return true, err
 }
 
 func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, error) {
