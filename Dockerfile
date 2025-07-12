@@ -30,7 +30,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 # install kind
 RUN apt-get update && apt-get install -y curl
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.28.0/kind-linux-${TARGETARCH} && \
+RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.29.0/kind-linux-${TARGETARCH} && \
     chmod +x ./kind
 
 # Install Argo CD
