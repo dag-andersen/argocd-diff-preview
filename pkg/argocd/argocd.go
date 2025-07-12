@@ -295,7 +295,6 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 
 func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	cmd := exec.Command("argocd", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -309,16 +308,16 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 func (a *ArgoCDInstallation) login() error {
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
-	// Get initial admin password
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return err
+	// set namespace - kubectl config set-context --current --namespace=argocd
+	if err := utils.SetNamespaceInKubeConfig(utils.GetKubeConfigPath(), a.Namespace); err != nil {
+		log.Error().Err(err).Msgf("❌ Failed to set namespace in kubeconfig: %s", a.Namespace)
+		return fmt.Errorf("failed to set namespace: %w", err)
 	}
 
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+		out, err := a.runArgocdCommand("login", "--core")
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
@@ -341,17 +340,6 @@ func (a *ArgoCDInstallation) login() error {
 	}
 
 	return nil
-}
-
-func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
-
-	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
-	if err != nil {
-		log.Error().Msgf("❌ Failed to get secret: %s", err)
-		return "", fmt.Errorf("failed to get secret: %w", err)
-	}
-
-	return secret, nil
 }
 
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
