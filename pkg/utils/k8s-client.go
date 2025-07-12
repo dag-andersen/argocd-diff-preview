@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -436,35 +435,6 @@ func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, er
 		return "", err
 	}
 	return string(resultString), nil
-}
-
-// get secret value from key. e.g. key: "password"
-func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (string, error) {
-	secretRes := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
-	result, err := c.clientset.Resource(secretRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	// get value from path
-	value, ok := result.Object["data"].(map[string]interface{})[key]
-	if !ok {
-		return "", fmt.Errorf("key %s not found in secret %s", key, name)
-	}
-
-	// convert value to string
-	valueString, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("value is not a string")
-	}
-
-	// decode
-	decoded, err := base64.StdEncoding.DecodeString(valueString)
-	if err != nil {
-		return "", fmt.Errorf("failed to decode value: %w", err)
-	}
-
-	return string(decoded), nil
 }
 
 // WaitForDeploymentReady waits for a deployment to be available
