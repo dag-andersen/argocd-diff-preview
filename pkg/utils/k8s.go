@@ -26,7 +26,22 @@ func GetKubeConfigPath() string {
 //   name: context_1
 
 // Set namespace by editing the kubeconfig file
-func SetNamespaceInKubeConfig(path, namespace string) error {
+func SetNamespaceInKubeConfig(inCluster bool, namespace string) error {
+
+	if inCluster {
+		namespacePath := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
+
+		// override KUBERNETES_NAMESPACE
+		os.Setenv("KUBERNETES_NAMESPACE", namespace)
+
+		// override file in namespacePath
+		os.WriteFile(namespacePath, []byte(namespace), 0644)
+
+		return nil
+	}
+
+	path := GetKubeConfigPath()
+
 	// read kubeconfig file
 	content, err := os.ReadFile(path)
 	if err != nil {
