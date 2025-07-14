@@ -244,7 +244,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	go func() {
 		_, err = helmClient.Run(chart, chartValues)
 		if err != nil {
-			log.Error().Msgf("❌ Failed to install chart")
+			log.Error().Err(err).Msgf("❌ Failed to install chart")
 		}
 	}()
 
