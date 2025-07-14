@@ -31,7 +31,7 @@ var (
 // defaults
 var (
 	DefaultTimeout            = uint64(180)
-	DefaultLineCount          = uint(10)
+	DefaultLineCount          = uint(7)
 	DefaultBaseBranch         = "main"
 	DefaultOutputFolder       = "./output"
 	DefaultSecretsFolder      = "./secrets"
