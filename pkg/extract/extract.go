@@ -152,8 +152,9 @@ func getResourcesFromApps(
 				log.Debug().Str("App", app.GetLongName()).Msg("Deleting application from cluster")
 				if err := argocd.K8sClient.DeleteArgoCDApplication(argocd.Namespace, result.Id); err != nil {
 					log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to delete application from cluster")
+				} else {
+					log.Debug().Str("App", app.GetLongName()).Msg("Deleted application from cluster")
 				}
-				log.Debug().Str("App", app.GetLongName()).Msg("Deleted application from cluster")
 			}
 		}(app)
 	}
@@ -240,7 +241,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		return ExtractedApp{}, fmt.Errorf("failed to apply manifest for application %s: %w", app.GetLongName(), err)
 	}
 
-	log.Debug().Str("name", app.GetLongName()).Msg("Applied manifest for application")
+	log.Debug().Str("App", app.GetLongName()).Msg("Applied manifest for application")
 
 	startTime := time.Now()
 	var result ExtractedApp
@@ -275,7 +276,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 
 		switch appStatus.Status.Sync.Status {
 		case "OutOfSync", "Synced":
-			log.Debug().Str("name", app.GetLongName()).Msg("Extracting manifests from Application")
+			log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
 			retryCount := 5
 			manifests, exists, err := argocd.GetManifestsWithRetry(app.Id, retryCount)
@@ -287,7 +288,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 				return result, fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
 			}
 
-			log.Debug().Str("name", app.GetLongName()).Msg("Extracted manifests from Application")
+			log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")
 
 			manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
 			manifestsContent, err := processYamlOutput(manifests)
