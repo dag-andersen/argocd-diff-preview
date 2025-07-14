@@ -309,6 +309,12 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 func (a *ArgoCDInstallation) login() error {
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
+	// set namespace - kubectl config set-context --current --namespace=argocd
+	if err := utils.SetNamespaceInKubeConfig(a.K8sClient.InCluster, a.Namespace); err != nil {
+		log.Error().Err(err).Msgf("❌ Failed to set namespace in kubeconfig: %s", a.Namespace)
+		return fmt.Errorf("failed to set namespace: %w", err)
+	}
+
 	// Get initial admin password
 	password, err := a.getInitialPassword()
 	if err != nil {
