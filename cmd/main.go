@@ -146,7 +146,7 @@ func run(opts *Options) error {
 		}
 	}
 
-	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, "")
+	argocd := argocd.New(k8sClient, opts.ArgocdNamespace, opts.ArgocdChartVersion, opts.ArgocdChartName, opts.ArgocdChartURL)
 
 	var argocdInstallationDuration time.Duration
 	if opts.CreateCluster {

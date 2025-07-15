@@ -63,6 +63,8 @@ run-single-test-docker: clean pull-base pull-target
 		-e LINE_COUNT="$(line_count)" \
 		-e REPO="$(github_org)/$(gitops_repo)" \
 		-e ARGOCD_NAMESPACE="$(argocd_namespace)" \
+		-e ARGOCD_CHART_NAME="$(argocd_chart_name)" \
+		-e ARGOCD_CHART_URL="$(argocd_chart_url)" \
 		-e FILES_CHANGED="$(files_changed)" \
 		-e SELECTOR="$(selector)" \
 		-e TIMEOUT="$(timeout)" \

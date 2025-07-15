@@ -35,17 +35,18 @@ type ArgoCDInstallation struct {
 	Namespace  string
 	Version    string
 	ConfigPath string
+	ChartName  string
+	ChartURL   string
 }
 
-func New(client *utils.K8sClient, namespace string, version string, configPath string) *ArgoCDInstallation {
-	if configPath == "" {
-		configPath = "argocd-config"
-	}
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:  client,
 		Namespace:  namespace,
 		Version:    version,
-		ConfigPath: configPath,
+		ConfigPath: "argocd-config",
+		ChartName:  repoName,
+		ChartURL:   repoURL,
 	}
 }
 
@@ -138,10 +139,6 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	// Initialize Helm client settings
 	settings := cli.New()
 
-	// Setup repository
-	repoName := "argo"
-	repoURL := "https://argoproj.github.io/argo-helm"
-
 	// Try to add the repo first
 	repoFile := settings.RepositoryConfig
 
@@ -154,8 +151,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		// Create a new repository file
 		r := repo.NewFile()
 		r.Add(&repo.Entry{
-			Name: repoName,
-			URL:  repoURL,
+			Name: a.ChartName,
+			URL:  a.ChartURL,
 		})
 
 		if err := r.WriteFile(repoFile, 0644); err != nil {
@@ -168,10 +165,10 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 			return fmt.Errorf("failed to load repository file: %w", err)
 		}
 
-		if !r.Has(repoName) {
+		if !r.Has(a.ChartName) {
 			r.Add(&repo.Entry{
-				Name: repoName,
-				URL:  repoURL,
+				Name: a.ChartName,
+				URL:  a.ChartURL,
 			})
 
 			if err := r.WriteFile(repoFile, 0644); err != nil {
@@ -182,8 +179,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Update repository
 	repoEntry := &repo.Entry{
-		Name: repoName,
-		URL:  repoURL,
+		Name: a.ChartName,
+		URL:  a.ChartURL,
 	}
 
 	chartRepo, err := repo.NewChartRepository(repoEntry, getter.All(settings))
@@ -217,7 +214,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}
 
 	// Locate chart
-	chartName := fmt.Sprintf("%s/argo-cd", repoName)
+	chartName := fmt.Sprintf("%s/argo-cd", a.ChartName)
 	chartPath, err := helmClient.LocateChart(chartName, settings)
 	if err != nil {
 		return fmt.Errorf("failed to locate chart: %w", err)
