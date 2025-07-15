@@ -54,12 +54,17 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
 	// Check if namespace exists
-	if err := a.K8sClient.CreateNamespace(a.Namespace); err != nil {
+	created, err := a.K8sClient.CreateNamespace(a.Namespace)
+	if err != nil {
 		log.Error().Msgf("❌ Failed to create namespace %s", a.Namespace)
 		return time.Since(startTime), fmt.Errorf("failed to create namespace: %w", err)
 	}
 
-	log.Debug().Msgf("Created namespace: %s", a.Namespace)
+	if created {
+		log.Debug().Msgf("Created namespace: %s", a.Namespace)
+	} else {
+		log.Debug().Msgf("Namespace already exists: %s", a.Namespace)
+	}
 
 	// Apply secrets before installing ArgoCD
 	if err := ApplySecretsFromFolder(a.K8sClient, secretsFolder, a.Namespace); err != nil {
@@ -239,7 +244,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	go func() {
 		_, err = helmClient.Run(chart, chartValues)
 		if err != nil {
-			log.Error().Msgf("❌ Failed to install chart")
+			log.Error().Err(err).Msgf("❌ Failed to install chart")
 		}
 	}()
 

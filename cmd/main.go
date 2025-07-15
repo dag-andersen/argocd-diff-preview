@@ -133,7 +133,7 @@ func run(opts *Options) error {
 	// create k8s client
 	k8sClient, err := utils.NewK8sClient()
 	if err != nil {
-		log.Error().Msgf("❌ Failed to create k8s client")
+		log.Error().Err(err).Msgf("❌ Failed to create k8s client")
 		return err
 	}
 
