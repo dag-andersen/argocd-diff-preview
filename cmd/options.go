@@ -42,8 +42,10 @@ var (
 	DefaultK3dOptions         = ""
 	DefaultMaxDiffLength      = uint(65536)
 	DefaultArgocdNamespace    = "argocd"
-	DefaultLogFormat          = "human"
 	DefaultArgocdChartVersion = "latest"
+	DefaultArgocdChartName    = "argo"
+	DefaultArgocdChartURL     = "https://argoproj.github.io/argo-helm"
+	DefaultLogFormat          = "human"
 	DefaultTitle              = "Argo CD Diff Preview"
 	DefaultCreateCluster      = true
 	DefaultKeepClusterAlive   = false
@@ -55,7 +57,6 @@ type Options struct {
 	FileRegex                 string `mapstructure:"file-regex"`
 	DiffIgnore                string `mapstructure:"diff-ignore"`
 	LineCount                 uint   `mapstructure:"line-count"`
-	ArgocdChartVersion        string `mapstructure:"argocd-chart-version"`
 	BaseBranch                string `mapstructure:"base-branch"`
 	TargetBranch              string `mapstructure:"target-branch"`
 	Repo                      string `mapstructure:"repo"`
@@ -73,6 +74,9 @@ type Options struct {
 	IgnoreInvalidWatchPattern bool   `mapstructure:"ignore-invalid-watch-pattern"`
 	KeepClusterAlive          bool   `mapstructure:"keep-cluster-alive"`
 	ArgocdNamespace           string `mapstructure:"argocd-namespace"`
+	ArgocdChartVersion        string `mapstructure:"argocd-chart-version"`
+	ArgocdChartName           string `mapstructure:"argocd-chart-name"`
+	ArgocdChartURL            string `mapstructure:"argocd-chart-url"`
 	RedirectTargetRevisions   string `mapstructure:"redirect-target-revisions"`
 	LogFormat                 string `mapstructure:"log-format"`
 	Title                     string `mapstructure:"title"`
@@ -199,6 +203,9 @@ func Parse() *Options {
 	viper.SetDefault("cluster-name", DefaultClusterName)
 	viper.SetDefault("max-diff-length", DefaultMaxDiffLength)
 	viper.SetDefault("argocd-namespace", DefaultArgocdNamespace)
+	viper.SetDefault("argocd-chart-version", DefaultArgocdChartVersion)
+	viper.SetDefault("argocd-chart-name", DefaultArgocdChartName)
+	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 
@@ -215,6 +222,8 @@ func Parse() *Options {
 	// Argo CD related
 	rootCmd.Flags().String("argocd-chart-version", "", "Argo CD Helm Chart version")
 	rootCmd.Flags().String("argocd-namespace", DefaultArgocdNamespace, "Namespace to use for Argo CD")
+	rootCmd.Flags().String("argocd-chart-name", DefaultArgocdChartName, "Argo CD Helm Chart name")
+	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
 
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
@@ -427,6 +436,12 @@ func (o *Options) LogOptions() {
 	}
 	if o.ArgocdChartVersion != DefaultArgocdChartVersion && o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)
+	}
+	if o.ArgocdChartName != DefaultArgocdChartName {
+		log.Info().Msgf("✨ - argocd-chart-name: %s", o.ArgocdChartName)
+	}
+	if o.ArgocdChartURL != DefaultArgocdChartURL {
+		log.Info().Msgf("✨ - argocd-chart-url: %s", o.ArgocdChartURL)
 	}
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)

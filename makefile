@@ -54,6 +54,8 @@ run-with-docker: pull-repository docker-build
 		-e TIMEOUT=$(timeout) \
 		-e SELECTOR="$(selector)" \
 		-e FILES_CHANGED="$(files_changed)" \
+		-e ARGOCD_CHART_NAME="$(argocd_chart_name)" \
+		-e ARGOCD_CHART_URL="$(argocd_chart_url)" \
 		-e LINE_COUNT="$(line_count)" \
 		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		image \
