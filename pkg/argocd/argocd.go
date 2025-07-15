@@ -321,7 +321,8 @@ func (a *ArgoCDInstallation) login() error {
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		if out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password); err == nil {
+		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
 		}

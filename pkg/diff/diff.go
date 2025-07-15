@@ -55,7 +55,7 @@ func (d *Diff) commentHeader() string {
 	}
 }
 
-func (d *Diff) buildSection() string {
+func (d *Diff) buildMarkdownSection() string {
 	header := fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath())
 
 	content := strings.TrimSpace(fmt.Sprintf("%s%s", d.commentHeader(), d.content))

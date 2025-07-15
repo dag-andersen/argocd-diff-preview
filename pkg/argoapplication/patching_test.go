@@ -243,6 +243,307 @@ func TestRedirectGenerators(t *testing.T) {
 			redirectRevisions: []string{},
 			expectErr:         fmt.Errorf("only 2 child generators are allowed for matrix generator '%s' in ApplicationSet: %s", "spec.generators[0].matrix", "test-set"),
 		},
+		{
+			name: "application set with complex nested structure - matrix with clusters and merge generators",
+			yaml: applicationSetSpec(`
+    generators:
+        - matrix:
+            generators:
+                - clusters:
+                    selector:
+                        matchLabels:
+                            fleet: test
+                - merge:
+                    mergeKeys:
+                        - app
+                    generators:
+                        - list:
+                            elements:
+                                - app: test-app
+                                  repoURL: https://github.com/org/test-app
+                                  namespace: system
+                        - git:
+                            repoURL: https://github.com/org/repo.git
+                            files:
+                                - path: development.yaml
+                            revision: main
+`),
+			want: applicationSetSpec(`
+    generators:
+        - matrix:
+            generators:
+                - clusters:
+                    selector:
+                        matchLabels:
+                            fleet: test
+                - merge:
+                    mergeKeys:
+                        - app
+                    generators:
+                        - list:
+                            elements:
+                                - app: test-app
+                                  repoURL: https://github.com/org/test-app
+                                  namespace: system
+                        - git:
+                            repoURL: https://github.com/org/repo.git
+                            files:
+                                - path: development.yaml
+                            revision: target
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application set with basic merge generator and redirect all revisions",
+			yaml: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: HEAD
+                    files:
+                        - path: config.yaml
+`),
+			want: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: target
+                    files:
+                        - path: config.yaml
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application set with basic merge generator and redirect only specific revisions",
+			yaml: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: main
+                    files:
+                        - path: config.yaml
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: v1.0.0
+                    files:
+                        - path: versions.yaml
+`),
+			want: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: target
+                    files:
+                        - path: config.yaml
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: v1.0.0
+                    files:
+                        - path: versions.yaml
+`),
+			redirectRevisions: []string{"main", "HEAD"},
+			expectErr:         nil,
+		},
+		{
+			name: "application set with merge generator containing multiple git generators",
+			yaml: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: HEAD
+                    files:
+                        - path: apps.yaml
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: main
+                    files:
+                        - path: config.yaml
+`),
+			want: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: target
+                    files:
+                        - path: apps.yaml
+                - git:
+                    repoURL: https://github.com/org/repo.git
+                    revision: target
+                    files:
+                        - path: config.yaml
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application set with nested merge generators",
+			yaml: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - merge:
+                    mergeKeys:
+                        - version
+                    generators:
+                        - git:
+                            repoURL: https://github.com/org/repo.git
+                            revision: HEAD
+                            files:
+                                - path: versions.yaml
+                        - git:
+                            repoURL: https://github.com/org/repo.git
+                            revision: main
+                            files:
+                                - path: config.yaml
+`),
+			want: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - merge:
+                    mergeKeys:
+                        - version
+                    generators:
+                        - git:
+                            repoURL: https://github.com/org/repo.git
+                            revision: target
+                            files:
+                                - path: versions.yaml
+                        - git:
+                            repoURL: https://github.com/org/repo.git
+                            revision: target
+                            files:
+                                - path: config.yaml
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application set with merge generator and non-matching repoURL",
+			yaml: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - git:
+                    repoURL: https://github.com/other/repo.git
+                    revision: HEAD
+                    files:
+                        - path: config.yaml
+`),
+			want: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - git:
+                    repoURL: https://github.com/other/repo.git
+                    revision: HEAD
+                    files:
+                        - path: config.yaml
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application set with merge generator containing only non-git generators",
+			yaml: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - clusters:
+                    selector:
+                        matchLabels:
+                            env: production
+`),
+			want: applicationSetSpec(`
+    generators:
+        - merge:
+            mergeKeys:
+                - app
+            generators:
+                - list:
+                    elements:
+                        - app: app1
+                          namespace: default
+                - clusters:
+                    selector:
+                        matchLabels:
+                            env: production
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
 	}
 
 	for _, tt := range tests {

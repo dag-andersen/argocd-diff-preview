@@ -24,9 +24,10 @@ func buildSummary(changedFiles []Diff) string {
 			modifiedCount++
 		}
 	}
+
 	summaryBuilder.WriteString(fmt.Sprintf("Total: %d files changed\n", addedCount+deletedCount+modifiedCount))
 
-	if addedCount > 0 {
+	if 0 < addedCount {
 		summaryBuilder.WriteString(fmt.Sprintf("\nAdded (%d):\n", addedCount))
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Insert {
@@ -35,7 +36,7 @@ func buildSummary(changedFiles []Diff) string {
 		}
 	}
 
-	if deletedCount > 0 {
+	if 0 < deletedCount {
 		summaryBuilder.WriteString(fmt.Sprintf("\nDeleted (%d):\n", deletedCount))
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Delete {
@@ -44,7 +45,7 @@ func buildSummary(changedFiles []Diff) string {
 		}
 	}
 
-	if modifiedCount > 0 {
+	if 0 < modifiedCount {
 		summaryBuilder.WriteString(fmt.Sprintf("\nModified (%d):\n", modifiedCount))
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Modify {

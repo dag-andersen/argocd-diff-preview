@@ -376,6 +376,37 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 			continue
 		}
 
+		// Check for merge generator
+		if mergeGen, hasMerge := gen["merge"]; hasMerge {
+			mergeMap, ok := mergeGen.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Merge generator found")
+
+			// Get nested generators
+			nestedGens, hasNestedGens := mergeMap["generators"]
+			if !hasNestedGens {
+				continue
+			}
+
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Nested generators found in merge")
+
+			nestedGenSlice, ok := nestedGens.([]interface{})
+			if !ok {
+				continue
+			}
+
+			// Process nested generators
+			mergeParent := fmt.Sprintf("%s[%d].merge.generators", parent, i)
+			if err := a.processGenerators(nestedGenSlice, repo, branch, redirectRevisions, mergeParent, level+1); err != nil {
+				return err
+			}
+
+			continue
+		}
+
 		// Check for git generator
 		if gitGen, hasGit := gen["git"]; hasGit {
 			gitMap, ok := gitGen.(map[string]interface{})

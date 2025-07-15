@@ -426,6 +426,10 @@ func generateGitDiff(
 		changedFiles = append(changedFiles, diff)
 	}
 
+	if len(changedFiles) == 0 {
+		return "No changes found", []string{"No changes found"}, []string{"No changes found"}, nil
+	}
+
 	// Build summary
 	summary := buildSummary(changedFiles)
 
@@ -440,14 +444,11 @@ func generateGitDiff(
 		}
 
 		// Get source path for this file, or use empty string if not found
-		markdownFileSection := diff.buildSection()
-		htmlFileSection := diff.buildHTMLSection()
+		markdownFileSection := diff.buildMarkdownSection()
 		markdownFileSections = append(markdownFileSections, markdownFileSection)
-		htmlFileSections = append(htmlFileSections, htmlFileSection)
-	}
 
-	if len(changedFiles) == 0 {
-		return "No changes found", []string{"No changes found"}, []string{"No changes found"}, nil
+		htmlFileSection := diff.buildHTMLSection()
+		htmlFileSections = append(htmlFileSections, htmlFileSection)
 	}
 
 	return summary, markdownFileSections, htmlFileSections, nil

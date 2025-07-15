@@ -174,7 +174,7 @@ func TestDiff_buildSection(t *testing.T) {
 			header := fmt.Sprintf("%s (%s)", tt.diff.prettyName(), tt.diff.prettyPath())
 			content := strings.TrimSpace(fmt.Sprintf("%s%s", tt.diff.commentHeader(), tt.diff.content))
 			expected := fmt.Sprintf(tt.expectedFmt, header, content)
-			if got := tt.diff.buildSection(); got != expected {
+			if got := tt.diff.buildMarkdownSection(); got != expected {
 				t.Errorf("buildSection() got =\n%v\nwant =\n%v", got, expected)
 			}
 		})
