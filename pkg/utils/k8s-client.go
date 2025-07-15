@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
 
@@ -22,14 +23,33 @@ import (
 
 type K8sClient struct {
 	clientset *dynamic.DynamicClient
+	InCluster bool
 }
 
 func NewK8sClient() (*K8sClient, error) {
-	kubeconfig := GetKubeConfigPath()
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		return nil, err
+	inCluster := false
+	// First try to use the in-cluster config
+	config, err := rest.InClusterConfig()
+	if err == nil {
+		inCluster = true
+		log.Info().Msgf("✅ Using service account to connect to cluster")
+	} else {
+		log.Debug().Err(err).Msgf("Failed to get in-cluster config")
+
+		// fallback to kubeconfig
+		kubeconfig := GetKubeConfigPath()
+		if kubeconfig == "" {
+			return nil, fmt.Errorf("no kubeconfig found, and no in-cluster config")
+		}
+
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build config from flags: %w", err)
+		}
+
+		log.Debug().Msgf("using kubeconfig: %s", kubeconfig)
+
 	}
 
 	// Increase QPS and Burst to mitigate client-side throttling on the CI
@@ -38,10 +58,10 @@ func NewK8sClient() (*K8sClient, error) {
 
 	clientset, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 
-	return &K8sClient{clientset: clientset}, nil
+	return &K8sClient{clientset: clientset, InCluster: inCluster}, nil
 }
 
 func (c *K8sClient) CheckIfResourceExists(gvr schema.GroupVersionResource, namespace string, name string) (bool, error) {
