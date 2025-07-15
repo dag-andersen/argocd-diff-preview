@@ -32,10 +32,16 @@ func SetNamespaceInKubeConfig(inCluster bool, namespace string) error {
 		namespacePath := "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 
 		// override KUBERNETES_NAMESPACE
-		os.Setenv("KUBERNETES_NAMESPACE", namespace)
+		err := os.Setenv("KUBERNETES_NAMESPACE", namespace)
+		if err != nil {
+			return fmt.Errorf("failed to set KUBERNETES_NAMESPACE: %w", err)
+		}
 
 		// override file in namespacePath
-		os.WriteFile(namespacePath, []byte(namespace), 0644)
+		err = os.WriteFile(namespacePath, []byte(namespace), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write namespace to file %s: %w", namespacePath, err)
+		}
 
 		return nil
 	}
