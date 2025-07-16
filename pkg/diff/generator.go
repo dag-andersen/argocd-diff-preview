@@ -52,11 +52,6 @@ func GenerateDiff(
 		lineCount = 3 // Default to 3 context lines if not specified
 	}
 
-	// Set default context line count if not provided
-	if lineCount == 0 {
-		lineCount = 10
-	}
-
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
@@ -69,6 +64,9 @@ func GenerateDiff(
 
 	// Calculate the available space for the file sections
 	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
+	if remainingMaxChars < 0 {
+		remainingMaxChars = 0
+	}
 
 	// Warning message to be added if we need to truncate
 	warningMessage := fmt.Sprintf("\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",

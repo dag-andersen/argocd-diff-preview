@@ -166,6 +166,14 @@ func Parse() *Options {
 				return fmt.Errorf("failed to parse cluster type: %w", err)
 			}
 
+			if opts.LineCount <= 0 {
+				opts.LineCount = DefaultLineCount
+			}
+
+			if opts.MaxDiffLength <= 0 {
+				opts.MaxDiffLength = DefaultMaxDiffLength
+			}
+
 			// Log options
 			opts.LogOptions()
 

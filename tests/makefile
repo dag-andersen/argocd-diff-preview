@@ -7,6 +7,7 @@ timeout := 90
 line_count := 10
 title := Argo CD Diff Preview
 create_cluster := false
+max_diff_length := 65536
 
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
@@ -37,6 +38,7 @@ run-single-test-go: clean pull-base pull-target
 		--kind-options="$(kind_options)" \
 		--title="$(title)" \
 		--create-cluster="$(create_cluster)" \
+		--max-diff-length="$(max_diff_length)" \
 		--keep-cluster-alive
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
@@ -71,6 +73,7 @@ run-single-test-docker: clean pull-base pull-target
 		-e KIND_OPTIONS="$(kind_options)" \
 		-e TITLE="$(title)" \
 		-e CREATE_CLUSTER="$(create_cluster)" \
+		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		-e KEEP_CLUSTER_ALIVE=true \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
@@ -93,6 +96,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target base_branch=integration-test/branch-6/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-7/target base_branch=integration-test/branch-7/base files_changed="examples/helm/values/filtered.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target base_branch=integration-test/branch-8/base files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base max_diff_length=10000
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker
