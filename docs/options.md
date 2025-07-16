@@ -30,6 +30,8 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | Option | Environment Variable | Default | Description |
 |--------|---------------------|---------|-------------|
 | `--argocd-chart-version <version>` | `ARGOCD_CHART_VERSION` | `latest` | Argo CD Helm Chart version |
+| `--argocd-chart-name <name>` | `ARGOCD_CHART_NAME` | `argo` | Argo CD Helm Chart name |
+| `--argocd-chart-url <url>` | `ARGOCD_CHART_URL` | `https://argoproj.github.io/argo-helm` | Argo CD Helm Chart URL |
 | `--argocd-namespace <namespace>` | `ARGOCD_NAMESPACE` | `argocd` | Namespace to use for Argo CD |
 | `--base-branch <branch>`, `-b` | `BASE_BRANCH` | `main` | Base branch name |
 | `--cluster <tool>` | `CLUSTER` | `auto` | Local cluster tool. Options: kind, minikube, auto |
@@ -39,7 +41,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--diff-ignore <pattern>`, `-i` | `DIFF_IGNORE` | - | Ignore lines in diff. Example: `v[1,9]+.[1,9]+.[1,9]+` for ignoring version changes |
 | `--file-regex <regex>`, `-r` | `FILE_REGEX` | - | Regex to filter files. Example: `/apps_.*\.yaml` |
 | `--files-changed <files>` | `FILES_CHANGED` | - | List of files changed between branches (comma, space or newline separated) |
-| `--line-count <count>`, `-c` | `LINE_COUNT` | `10` | Generate diffs with \<n\> lines of context |
+| `--line-count <count>`, `-c` | `LINE_COUNT` | `7` | Generate diffs with \<n\> lines of context |
 | `--log-format <format>` | `LOG_FORMAT` | `human` | Log format. Options: human, json |
 | `--max-diff-length <length>` | `MAX_DIFF_LENGTH` | `65536` | Max diff message character count. It only limits the generated Markdown file |
 | `--output-folder <folder>`, `-o` | `OUTPUT_FOLDER` | `./output` | Output folder where the diff will be saved |
