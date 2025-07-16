@@ -64,6 +64,9 @@ func GenerateDiff(
 
 	// Calculate the available space for the file sections
 	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
+	if remainingMaxChars < 0 {
+		remainingMaxChars = 0
+	}
 
 	// Warning message to be added if we need to truncate
 	warningMessage := fmt.Sprintf("\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",

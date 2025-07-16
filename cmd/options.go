@@ -170,6 +170,10 @@ func Parse() *Options {
 				opts.LineCount = DefaultLineCount
 			}
 
+			if opts.MaxDiffLength <= 0 {
+				opts.MaxDiffLength = DefaultMaxDiffLength
+			}
+
 			// Log options
 			opts.LogOptions()
 
