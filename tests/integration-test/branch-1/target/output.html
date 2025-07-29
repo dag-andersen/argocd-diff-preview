@@ -1,0 +1,89 @@
+<html>
+<head>
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Total: 2 files changed
+
+Deleted (1):
+- folder2
+
+Modified (1):
+± nginx-ingress</pre>
+
+<div class="diffs">
+<details>
+<summary>
+folder2 (examples/git-generator/app/app-set.yaml)
+</summary>
+<div class="diff_container">
+<table>
+	<tr class="comment_line"><td><pre>@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
+</pre></td></tr><tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr><tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr><tr class="removed_line"><td><pre>-metadata:</pre></td></tr><tr class="removed_line"><td><pre>-  annotations: {}</pre></td></tr><tr class="removed_line"><td><pre>-  name: deploy-from-folder-two</pre></td></tr><tr class="removed_line"><td><pre>-spec:</pre></td></tr><tr class="removed_line"><td><pre>-  replicas: 2</pre></td></tr><tr class="removed_line"><td><pre>-  selector:</pre></td></tr><tr class="removed_line"><td><pre>-    matchLabels:</pre></td></tr><tr class="removed_line"><td><pre>-      app: myapp</pre></td></tr><tr class="removed_line"><td><pre>-  template:</pre></td></tr><tr class="removed_line"><td><pre>-    metadata:</pre></td></tr><tr class="removed_line"><td><pre>-      labels:</pre></td></tr><tr class="removed_line"><td><pre>-        app: myapp</pre></td></tr><tr class="removed_line"><td><pre>-    spec:</pre></td></tr><tr class="removed_line"><td><pre>-      containers:</pre></td></tr><tr class="removed_line"><td><pre>-      - image: dag-andersen/myapp:latest</pre></td></tr><tr class="removed_line"><td><pre>-        name: myapp</pre></td></tr><tr class="removed_line"><td><pre>-        ports:</pre></td></tr><tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr><tr class="normal_line"><td><pre></pre></td></tr>
+</table>
+</div>
+</details>
+
+<details>
+<summary>
+nginx-ingress (examples/helm/applications/nginx.yaml)
+</summary>
+<div class="diff_container">
+<table>
+	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx-controller</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> </pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 8 lines (19 -&gt; 26) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx-controller</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> spec:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 28 lines (37 -&gt; 64) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx-controller-admission</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> spec:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 20 lines (75 -&gt; 94) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> </pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 8 lines (105 -&gt; 112) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx-admission</pre></td></tr><tr class="normal_line"><td><pre> webhooks:</pre></td></tr><tr class="normal_line"><td><pre> - admissionReviewVersions:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 29 lines (123 -&gt; 151) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx-controller</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> spec:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 13 lines (162 -&gt; 174) @@</pre></td></tr><tr class="normal_line"><td><pre>         app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>         app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>         app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-        app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-        helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+        app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+        helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>     spec:</pre></td></tr><tr class="normal_line"><td><pre>       containers:</pre></td></tr><tr class="normal_line"><td><pre>       - args:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 98 lines (185 -&gt; 282) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx</pre></td></tr><tr class="normal_line"><td><pre> spec:</pre></td></tr><tr class="normal_line"><td><pre>   controller: k8s.io/ingress-nginx</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 8 lines (293 -&gt; 300) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre> rules:</pre></td></tr><tr class="normal_line"><td><pre> - apiGroups:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 77 lines (311 -&gt; 387) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre> roleRef:</pre></td></tr><tr class="normal_line"><td><pre>   apiGroup: rbac.authorization.k8s.io</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 15 lines (398 -&gt; 412) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> rules:</pre></td></tr><tr class="comment_line"><td><pre>@@ skipped 86 lines (423 -&gt; 508) @@</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/name: ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: ingress-nginx</pre></td></tr><tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr><tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr><tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.11.1</pre></td></tr><tr class="added_line"><td><pre>+    helm.sh/chart: ingress-nginx-4.11.1</pre></td></tr><tr class="normal_line"><td><pre>   name: nginx-ingress-ingress-nginx</pre></td></tr><tr class="normal_line"><td><pre>   namespace: default</pre></td></tr><tr class="normal_line"><td><pre> roleRef:</pre></td></tr><tr class="normal_line"><td><pre></pre></td></tr>
+</table>
+</div>
+</details>
+</div>
+
+<pre>_Stats_:
+[], [], [], [], []</pre>
+</div>
+</body>
+</html>
