@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: duplicate-names-example-2
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - name: app-1
+          - name: app-2
+          - name: app-3
+          - name: app-4
+          - name: app-5
+          - name: app-6
+          - name: app-7
+          - name: app-8
+          - name: app-9
+          - name: app-10
+  template:
+    metadata:
+      name: "{{ .name }}"
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        path: examples/duplicate-names-2/resources
+      destination:
+        name: in-cluster
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
