@@ -40,7 +40,7 @@ func GenerateDiff(
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
-	if maxDiffMessageCharCount == 0 {
+	if maxDiffMessageCharCount <= 0 {
 		maxDiffMessageCharCount = 65536
 	}
 

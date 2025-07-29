@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
@@ -346,12 +346,13 @@ func prefixApplication(a *argoapplication.ArgoResource, prefix string) error {
 		branchShortName = "t"
 	}
 
+	maxKubernetesNameLength := 53
 	prefixSize := len(prefix) + len(branchShortName) + len("--")
 	var newId string
-	if prefixSize+len(a.Id) > 53 {
-		// hash id so it becomes shorter
-		hashedId := fmt.Sprintf("%x", sha256.Sum256([]byte(a.Id)))
-		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, hashedId[:53-prefixSize])
+	if prefixSize+len(a.Id) > maxKubernetesNameLength {
+		// unique id so it becomes shorter
+		unique := utils.UniqueId()
+		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, unique)
 	} else {
 		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, a.Id)
 	}

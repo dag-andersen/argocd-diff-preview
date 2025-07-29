@@ -2,15 +2,14 @@ package argoapplication
 
 import (
 	"fmt"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"sigs.k8s.io/yaml"
 )
 
@@ -29,11 +28,14 @@ func ConvertAppSetsToAppsInBothBranches(
 
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
 
+	baseTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Base)
+	targetTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Target)
+
 	baseApps, err := processAppSets(
 		argocd,
 		baseApps,
 		baseBranch,
-		tempFolder,
+		baseTempFolder,
 		debug,
 		filterOptions,
 		repo,
@@ -49,7 +51,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		targetApps,
 		targetBranch,
-		tempFolder,
+		targetTempFolder,
 		debug,
 		filterOptions,
 		repo,
@@ -74,11 +76,17 @@ func processAppSets(
 	redirectRevisions []string,
 ) ([]ArgoResource, error) {
 
-	baseApps, err := convertAppSetsToApps(
+	appSetTempFolder := fmt.Sprintf("%s/app-sets", tempFolder)
+	if err := utils.CreateFolder(appSetTempFolder, true); err != nil {
+		log.Error().Msgf("❌ Failed to create temp folder: %s", appSetTempFolder)
+		return nil, err
+	}
+
+	apps, err := convertAppSetsToApps(
 		argocd,
 		appSets,
 		branch,
-		tempFolder,
+		appSetTempFolder,
 		debug,
 	)
 	if err != nil {
@@ -86,22 +94,22 @@ func processAppSets(
 		return nil, err
 	}
 
-	if len(baseApps) == 0 {
-		return baseApps, nil
+	if len(apps) == 0 {
+		return apps, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(baseApps))
-	baseApps = FilterAll(baseApps, filterOptions)
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(apps))
+	apps = FilterAll(apps, filterOptions)
 
-	if len(baseApps) == 0 {
+	if len(apps) == 0 {
 		log.Info().Str("branch", branch.Name).Msg("🤖 No applications left after filtering")
-		return baseApps, nil
+		return apps, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(baseApps))
-	baseApps, err = patchApplications(
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(apps))
+	apps, err = patchApplications(
 		argocd.Namespace,
-		baseApps,
+		apps,
 		branch,
 		repo,
 		redirectRevisions,
@@ -111,7 +119,21 @@ func processAppSets(
 		return nil, err
 	}
 
-	return baseApps, nil
+	if debug {
+		appTempFolder := fmt.Sprintf("%s/apps", tempFolder)
+		if err := utils.CreateFolder(appTempFolder, true); err != nil {
+			log.Error().Msgf("❌ Failed to create temp folder: %s", appTempFolder)
+		}
+
+		for _, app := range apps {
+			if _, err := app.WriteToFolder(appTempFolder); err != nil {
+				log.Error().Err(err).Str("branch", branch.Name).Str(app.Kind.ShortName(), app.GetLongName()).Msgf("❌ Failed to write Application to file")
+				break
+			}
+		}
+	}
+
+	return apps, nil
 }
 
 func convertAppSetsToApps(
@@ -143,30 +165,10 @@ func convertAppSetsToApps(
 		appSetCounter++
 		localGeneratedAppsCounter := 0
 
-		// Generate random filename for the patched ApplicationSet
-		randomFileName := fmt.Sprintf("%s/%s-%d.yaml",
-			tempFolder,
-			appSet.Id,
-			time.Now().UnixNano(),
-		)
-
-		// Write patched ApplicationSet to file
-		yamlStr, err := appSet.AsString()
+		randomFileName, err := appSet.WriteToFolder(tempFolder)
 		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("❌ Failed to convert ApplicationSet to YAML")
-			continue
-		}
-
-		if err := os.WriteFile(randomFileName, []byte(yamlStr), 0644); err != nil {
 			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("❌ Failed to write ApplicationSet to file")
 			continue
-		}
-		if !debug {
-			defer func() {
-				if err := os.Remove(randomFileName); err != nil {
-					log.Warn().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("⚠️ Failed to remove temporary file")
-				}
-			}()
 		}
 
 		// Generate applications using argocd appset generate

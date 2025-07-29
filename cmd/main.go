@@ -168,7 +168,7 @@ func run(opts *Options) error {
 
 	tempFolder := "temp"
 	if err := utils.CreateFolder(tempFolder, true); err != nil {
-		log.Error().Msgf("❌ Failed to create temp folder: %s", tempFolder)
+		log.Error().Msgf("❌ Failed to clear temp folder: ./%s", tempFolder)
 		return err
 	}
 

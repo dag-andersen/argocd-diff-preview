@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/rs/zerolog/log"
 )
@@ -46,4 +47,14 @@ func CreateFolder(path string, override bool) error {
 		log.Debug().Str("path", path).Msgf("❌ Failed to create folder: %s", err)
 	}
 	return err
+}
+
+var uniqueNumber uint64
+
+func UniqueNumber() uint64 {
+	return atomic.AddUint64(&uniqueNumber, 1)
+}
+
+func UniqueId() string {
+	return fmt.Sprintf("uid-%d", UniqueNumber())
 }
