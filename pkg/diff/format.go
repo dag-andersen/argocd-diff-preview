@@ -34,7 +34,12 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	}
 
 	for _, d := range diffs {
-		lines := strings.Split(d.Text, "\n")
+
+		// remove identifier lines
+		content := removeIdentifierLines(d.Text)
+
+		lines := strings.Split(content, "\n")
+
 		// If the last element is empty (due to trailing newline), remove it
 		if len(lines) > 0 && lines[len(lines)-1] == "" {
 			lines = lines[:len(lines)-1]
