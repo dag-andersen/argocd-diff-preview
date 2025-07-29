@@ -13,7 +13,7 @@ func addIdentifierLine(app AppInfo, content string) string {
 	return fmt.Sprintf("%s App Name: %s\n%s Source Path: %s\n%s", metaCommentPrefix, app.Name, metaCommentPrefix, app.SourcePath, content)
 }
 
-// removeIdentifierLines removes lines from the beginning of content as long as they contain "# app-name"
+// removeIdentifierLines removes lines from the beginning of content as long as they contain metaCommentPrefix
 func removeIdentifierLines(content string) string {
 	if content == "" {
 		return content
@@ -25,7 +25,7 @@ func removeIdentifierLines(content string) string {
 		// Find the next newline
 		newlineIndex := strings.IndexByte(remainingContent, '\n')
 		if newlineIndex == -1 {
-			// No more newlines, check if the remaining content contains "# app-name"
+			// No more newlines, check if the remaining content contains metaCommentPrefix
 			if strings.Contains(remainingContent, metaCommentPrefix) {
 				return ""
 			}
@@ -35,9 +35,9 @@ func removeIdentifierLines(content string) string {
 		// Get the current line
 		currentLine := remainingContent[:newlineIndex]
 
-		// Check if the current line contains "# app-name"
+		// Check if the current line contains metaCommentPrefix
 		if !strings.Contains(currentLine, metaCommentPrefix) {
-			// Found a line that doesn't contain "# app-name", return the remaining content
+			// Found a line that doesn't contain metaCommentPrefix, return the remaining content
 			return remainingContent
 		}
 
