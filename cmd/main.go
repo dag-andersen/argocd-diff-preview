@@ -167,10 +167,9 @@ func run(opts *Options) error {
 	}
 
 	tempFolder := "temp"
-	// delete temp folder if it exists
-	if err := os.RemoveAll(tempFolder); err != nil {
-		log.Error().Msgf("❌ Failed to delete temp folder '%s': %s", tempFolder, err)
-		// ignore error
+	if err := utils.CreateFolder(tempFolder, true); err != nil {
+		log.Error().Msgf("❌ Failed to clear temp folder: ./%s", tempFolder)
+		return err
 	}
 
 	// Generate applications from ApplicationSets

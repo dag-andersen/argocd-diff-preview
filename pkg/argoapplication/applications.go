@@ -3,13 +3,13 @@ package argoapplication
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"sigs.k8s.io/yaml"
 )
 
@@ -49,11 +49,11 @@ func (a *ArgoResource) AsString() (string, error) {
 }
 
 // Write to file and return filename
-func (a *ArgoResource) WriteToFile(folder string) (string, error) {
-	randomFileName := fmt.Sprintf("%s/%s-%d.yaml",
+func (a *ArgoResource) WriteToFolder(folder string) (string, error) {
+	randomFileName := fmt.Sprintf("%s/%s-%s.yaml",
 		folder,
 		a.Id,
-		time.Now().UnixNano(),
+		utils.UniqueId(),
 	)
 
 	yamlStr, err := a.AsString()

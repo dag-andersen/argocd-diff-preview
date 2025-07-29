@@ -123,11 +123,13 @@ func processAppSets(
 		appTempFolder := fmt.Sprintf("%s/apps", tempFolder)
 		if err := utils.CreateFolder(appTempFolder, true); err != nil {
 			log.Error().Msgf("❌ Failed to create temp folder: %s", appTempFolder)
-			return nil, err
 		}
 
 		for _, app := range apps {
-			app.WriteToFile(appTempFolder)
+			if _, err := app.WriteToFolder(appTempFolder); err != nil {
+				log.Error().Err(err).Str("branch", branch.Name).Str(app.Kind.ShortName(), app.GetLongName()).Msgf("❌ Failed to write Application to file")
+				break
+			}
 		}
 	}
 
@@ -163,7 +165,7 @@ func convertAppSetsToApps(
 		appSetCounter++
 		localGeneratedAppsCounter := 0
 
-		randomFileName, err := appSet.WriteToFile(tempFolder)
+		randomFileName, err := appSet.WriteToFolder(tempFolder)
 		if err != nil {
 			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("❌ Failed to write ApplicationSet to file")
 			continue
