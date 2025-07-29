@@ -2,6 +2,8 @@ package argoapplication
 
 import (
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,6 +46,26 @@ func (a *ArgoResource) AsString() (string, error) {
 		return "", fmt.Errorf("failed to marshal yaml: %w", err)
 	}
 	return string(bytes), nil
+}
+
+// Write to file and return filename
+func (a *ArgoResource) WriteToFile(folder string) (string, error) {
+	randomFileName := fmt.Sprintf("%s/%s-%d.yaml",
+		folder,
+		a.Id,
+		time.Now().UnixNano(),
+	)
+
+	yamlStr, err := a.AsString()
+	if err != nil {
+		return "", fmt.Errorf("failed to convert to yaml: %w", err)
+	}
+
+	if err := os.WriteFile(randomFileName, []byte(yamlStr), 0644); err != nil {
+		return "", fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	return randomFileName, nil
 }
 
 // GetApplicationsForBranches gets applications for both base and target branches
