@@ -42,7 +42,9 @@ run-single-test-go: clean pull-base pull-target
 		--keep-cluster-alive
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
+	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
 	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
+	diff ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 docker-build:
@@ -77,8 +79,10 @@ run-single-test-docker: clean pull-base pull-target
 		-e KEEP_CLUSTER_ALIVE=true \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
-	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md 
+	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
+	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
 	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
+	diff ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
 
 run-test-all-with-%:
