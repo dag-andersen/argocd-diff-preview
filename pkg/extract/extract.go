@@ -13,7 +13,6 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
@@ -227,7 +226,7 @@ func getResourcesFromApps(
 func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string) (ExtractedApp, error) {
 	// Apply the application manifest first
 
-	err := prefixApplication(&app, prefix)
+	err := addApplicationPrefix(&app, prefix)
 	if err != nil {
 		return ExtractedApp{}, fmt.Errorf("failed to prefix application name with prefix: %w", err)
 	}
@@ -302,6 +301,12 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 				return result, fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
 			}
 
+			// remove the prefix from the application name
+			err = removeApplicationPrefix(&app, prefix)
+			if err != nil {
+				return result, fmt.Errorf("failed to remove application prefix: %w", err)
+			}
+
 			// Parse the first non-empty manifest from the string
 			extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
 
@@ -329,38 +334,6 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		// Sleep before next iteration
 		time.Sleep(5 * time.Second)
 	}
-}
-
-// prefixApplication prefixes the application name with the branch name and a unique ID
-func prefixApplication(a *argoapplication.ArgoResource, prefix string) error {
-	if a.Branch == "" {
-		log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't prefix application name with prefix because branch is empty")
-		return nil
-	}
-
-	var branchShortName string
-	switch a.Branch {
-	case git.Base:
-		branchShortName = "b"
-	case git.Target:
-		branchShortName = "t"
-	}
-
-	maxKubernetesNameLength := 53
-	prefixSize := len(prefix) + len(branchShortName) + len("--")
-	var newId string
-	if prefixSize+len(a.Id) > maxKubernetesNameLength {
-		// unique id so it becomes shorter
-		unique := utils.UniqueId()
-		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, unique)
-	} else {
-		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, a.Id)
-	}
-
-	a.Id = newId
-	a.Yaml.SetName(newId)
-
-	return nil
 }
 
 func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) error {
