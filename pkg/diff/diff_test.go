@@ -190,7 +190,7 @@ func TestGenerateGitDiff_FileNameMatching(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	basePath := filepath.Join(tempDir, "base")
 	targetPath := filepath.Join(tempDir, "target")
@@ -311,7 +311,7 @@ func TestGenerateGitDiff_ChangingFilenames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	basePath := filepath.Join(tempDir, "base")
 	targetPath := filepath.Join(tempDir, "target")
