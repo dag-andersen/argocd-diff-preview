@@ -199,98 +199,80 @@ func generateGitDiff(
 		targetAppsMap[app.Id] = app
 	}
 
-	// Create temporary directories for Git repositories
-	baseRepoPath, err := os.MkdirTemp("", "base-repo-*")
+	// Create temporary directory for single Git repository
+	repoPath, err := os.MkdirTemp("", "diff-repo-*")
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to create temp dir for base repo: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to create temp dir for repo: %w", err)
 	}
 	defer func() {
-		if err := os.RemoveAll(baseRepoPath); err != nil {
-			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary base repo path")
+		if err := os.RemoveAll(repoPath); err != nil {
+			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary repo path")
 		}
 	}()
 
-	targetRepoPath, err := os.MkdirTemp("", "target-repo-*")
+	// Initialize single Git repository
+	repo, err := git.PlainInit(repoPath, false)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to create temp dir for target repo: %w", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(targetRepoPath); err != nil {
-			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary target repo path")
-		}
-	}()
-
-	// Initialize Git repositories
-	baseRepo, err := git.PlainInit(baseRepoPath, false)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to init base repo: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to init repo: %w", err)
 	}
 
-	targetRepo, err := git.PlainInit(targetRepoPath, false)
+	// Get worktree
+	worktree, err := repo.Worktree()
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to init target repo: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	// Copy files to Git repositories
-	if err := copyFilesToRepo(basePath, baseRepoPath); err != nil {
+	// Copy base files to repository and commit
+	if err := copyFilesToRepo(basePath, repoPath); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to copy base files: %w", err)
 	}
 
-	if err := copyFilesToRepo(targetPath, targetRepoPath); err != nil {
+	if err := worktree.AddGlob("."); err != nil {
+		return "", nil, nil, fmt.Errorf("failed to add base files to repo: %w", err)
+	}
+
+	author := &object.Signature{
+		Name:  "ArgoCD Diff Preview",
+		Email: "noreply@example.com",
+		When:  time.Now(),
+	}
+
+	baseCommitHash, err := worktree.Commit("Base state", &git.CommitOptions{
+		Author:            author,
+		AllowEmptyCommits: true,
+	})
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to commit base state: %w", err)
+	}
+
+	// Clear the working directory and copy target files
+	if err := clearWorkingDirectory(repoPath); err != nil {
+		return "", nil, nil, fmt.Errorf("failed to clear working directory: %w", err)
+	}
+
+	if err := copyFilesToRepo(targetPath, repoPath); err != nil {
 		return "", nil, nil, fmt.Errorf("failed to copy target files: %w", err)
 	}
 
-	// Add all files and commit in base repo
-	baseWorktree, err := baseRepo.Worktree()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get base worktree: %w", err)
+	if err := worktree.AddGlob("."); err != nil {
+		return "", nil, nil, fmt.Errorf("failed to add target files to repo: %w", err)
 	}
 
-	if err := baseWorktree.AddGlob("."); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to add files to base repo: %w", err)
-	}
-
-	baseCommitHash, err := baseWorktree.Commit("Base state", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "ArgoCD Diff Preview",
-			Email: "noreply@example.com",
-			When:  time.Now(),
-		},
+	targetCommitHash, err := worktree.Commit("Target state", &git.CommitOptions{
+		Author:            author,
 		AllowEmptyCommits: true,
 	})
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to commit to base repo: %w", err)
-	}
-
-	// Add all files and commit in target repo
-	targetWorktree, err := targetRepo.Worktree()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get target worktree: %w", err)
-	}
-
-	if err := targetWorktree.AddGlob("."); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to add files to target repo: %w", err)
-	}
-
-	targetCommitHash, err := targetWorktree.Commit("Target state", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "ArgoCD Diff Preview",
-			Email: "noreply@example.com",
-			When:  time.Now(),
-		},
-		AllowEmptyCommits: true,
-	})
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to commit to target repo: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to commit target state: %w", err)
 	}
 
 	// Retrieve commits
-	baseCommit, err := baseRepo.CommitObject(baseCommitHash)
+	baseCommit, err := repo.CommitObject(baseCommitHash)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to get base commit: %w", err)
 	}
 
-	targetCommit, err := targetRepo.CommitObject(targetCommitHash)
+	targetCommit, err := repo.CommitObject(targetCommitHash)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to get target commit: %w", err)
 	}
@@ -332,7 +314,7 @@ func generateGitDiff(
 		case merkletrie.Insert:
 
 			if to != nil {
-				blob, err := targetRepo.BlobObject(to.Hash)
+				blob, err := repo.BlobObject(to.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
 				}
@@ -348,7 +330,7 @@ func generateGitDiff(
 		case merkletrie.Delete:
 
 			if from != nil {
-				blob, err := baseRepo.BlobObject(from.Hash)
+				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
 				}
@@ -367,7 +349,7 @@ func generateGitDiff(
 			var oldContent, newContent string
 
 			if from != nil {
-				blob, err := baseRepo.BlobObject(from.Hash)
+				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
 				}
@@ -379,7 +361,7 @@ func generateGitDiff(
 			}
 
 			if to != nil {
-				blob, err := targetRepo.BlobObject(to.Hash)
+				blob, err := repo.BlobObject(to.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
 				}
@@ -501,4 +483,26 @@ func copyFilesToRepo(srcDir, destDir string) error {
 
 		return os.WriteFile(destPath, data, 0644)
 	})
+}
+
+// clearWorkingDirectory removes all files and directories from the given path, but keeps the directory itself
+func clearWorkingDirectory(path string) error {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		// Skip .git directory to preserve Git repository structure
+		if entry.Name() == ".git" {
+			continue
+		}
+
+		entryPath := filepath.Join(path, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

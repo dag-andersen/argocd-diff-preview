@@ -2,6 +2,8 @@ package diff
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -179,4 +181,259 @@ func TestDiff_buildSection(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGenerateGitDiff_FileNameMatching tests that files are matched by name, not content
+func TestGenerateGitDiff_FileNameMatching(t *testing.T) {
+	// Create temporary directory for test
+	tempDir, err := os.MkdirTemp("", "diff-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	// Create identical content for both files
+	identicalContentBefore := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  replicas: 1`
+
+	identicalContentAfter := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  replicas: 2`
+
+	// Create base apps with identical content but different names
+	baseApps := []AppInfo{
+		{
+			Id:          "A-before.yaml",
+			Name:        "app-a",
+			SourcePath:  "/path/to/app-a",
+			FileContent: identicalContentBefore,
+		},
+		{
+			Id:          "B-before.yaml",
+			Name:        "app-b",
+			SourcePath:  "/path/to/app-b",
+			FileContent: identicalContentBefore, // Same content as A
+		},
+	}
+
+	// Create target apps with same filenames, same content modification
+	targetApps := []AppInfo{
+		{
+			Id:          "A-before.yaml", // Same filename as base
+			Name:        "app-a",
+			SourcePath:  "/path/to/app-a",
+			FileContent: identicalContentAfter,
+		},
+		{
+			Id:          "B-before.yaml", // Same filename as base
+			Name:        "app-b",
+			SourcePath:  "/path/to/app-b",
+			FileContent: identicalContentAfter, // Same content modification as A
+		},
+	}
+
+	// Run the diff generation
+	summary, markdownSections, htmlSections, err := generateGitDiff(
+		basePath, targetPath, nil, 3, baseApps, targetApps,
+	)
+
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	// We should get exactly 2 changes (one for each file)
+	if len(markdownSections) != 2 {
+		t.Errorf("Expected 2 file changes, got %d", len(markdownSections))
+	}
+
+	if len(htmlSections) != 2 {
+		t.Errorf("Expected 2 HTML sections, got %d", len(htmlSections))
+	}
+
+	// Verify summary contains both apps
+	if !strings.Contains(summary, "Modified") {
+		t.Errorf("Summary should indicate modifications, got: %s", summary)
+	}
+
+	// Check that each section contains the correct app name
+	foundAppA := false
+	foundAppB := false
+
+	for _, section := range markdownSections {
+		if strings.Contains(section, "app-a") {
+			foundAppA = true
+			// Verify it contains the expected change (replicas: 1 -> 2)
+			if !strings.Contains(section, "replicas: 1") || !strings.Contains(section, "replicas: 2") {
+				t.Errorf("App-A section should contain replica change, got: %s", section)
+			}
+		}
+		if strings.Contains(section, "app-b") {
+			foundAppB = true
+			// Verify it contains the expected change (replicas: 1 -> 2)
+			if !strings.Contains(section, "replicas: 1") || !strings.Contains(section, "replicas: 2") {
+				t.Errorf("App-B section should contain replica change, got: %s", section)
+			}
+		}
+	}
+
+	if !foundAppA {
+		t.Error("Should find app-a in the diff sections")
+	}
+	if !foundAppB {
+		t.Error("Should find app-b in the diff sections")
+	}
+
+	// Most importantly: verify that files are matched by name, not mixed up
+	// Both apps should show the same content change (replicas 1->2)
+	// This proves files were matched by filename, not by content similarity
+	for i, section := range markdownSections {
+		if !strings.Contains(section, "-  replicas: 1") ||
+			!strings.Contains(section, "+  replicas: 2") {
+			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, section)
+		}
+	}
+}
+
+// TestGenerateGitDiff_ChangingFilenames tests that files are matched by app identity when filenames change
+func TestGenerateGitDiff_ChangingFilenames(t *testing.T) {
+	// Create temporary directory for test
+	tempDir, err := os.MkdirTemp("", "diff-test-changing-filenames-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	// Create identical content for both files
+	identicalContentBefore := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  replicas: 1`
+
+	identicalContentAfter := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+spec:
+  replicas: 2`
+
+	// Base apps with "-before.yaml" filenames
+	baseApps := []AppInfo{
+		{
+			Id:          "A-before.yaml",  // Filename will change
+			Name:        "app-a",          // Identity stays same
+			SourcePath:  "/path/to/app-a", // Identity stays same
+			FileContent: identicalContentBefore,
+		},
+		{
+			Id:          "B-before.yaml",        // Filename will change
+			Name:        "app-b",                // Identity stays same
+			SourcePath:  "/path/to/app-b",       // Identity stays same
+			FileContent: identicalContentBefore, // Same content as A
+		},
+	}
+
+	// Target apps with "-after.yaml" filenames (changed!) but same identities
+	targetApps := []AppInfo{
+		{
+			Id:          "A-after.yaml",   // Filename changed!
+			Name:        "app-a",          // Same identity
+			SourcePath:  "/path/to/app-a", // Same identity
+			FileContent: identicalContentAfter,
+		},
+		{
+			Id:          "B-after.yaml",        // Filename changed!
+			Name:        "app-b",               // Same identity
+			SourcePath:  "/path/to/app-b",      // Same identity
+			FileContent: identicalContentAfter, // Same content modification as A
+		},
+	}
+
+	// Run the diff generation
+	summary, markdownSections, htmlSections, err := generateGitDiff(
+		basePath, targetPath, nil, 3, baseApps, targetApps,
+	)
+
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	// We should get exactly 2 changes (one for each app identity)
+	if len(markdownSections) != 2 {
+		t.Errorf("Expected 2 app changes, got %d", len(markdownSections))
+	}
+
+	if len(htmlSections) != 2 {
+		t.Errorf("Expected 2 HTML sections, got %d", len(htmlSections))
+	}
+
+	// Verify summary contains modifications
+	if !strings.Contains(summary, "Modified") {
+		t.Errorf("Summary should indicate modifications, got: %s", summary)
+	}
+
+	// Check that each section contains the correct app name and shows modifications
+	foundAppA := false
+	foundAppB := false
+
+	for _, section := range markdownSections {
+		if strings.Contains(section, "app-a") {
+			foundAppA = true
+			// Should show as modification, not delete+add
+			if !strings.Contains(section, "Application modified") {
+				t.Errorf("App-A should show as modified, got: %s", section)
+			}
+			// Should show the content change
+			if !strings.Contains(section, "-  replicas: 1") || !strings.Contains(section, "+  replicas: 2") {
+				t.Errorf("App-A should show replica change from 1 to 2, got: %s", section)
+			}
+		}
+		if strings.Contains(section, "app-b") {
+			foundAppB = true
+			// Should show as modification, not delete+add
+			if !strings.Contains(section, "Application modified") {
+				t.Errorf("App-B should show as modified, got: %s", section)
+			}
+			// Should show the content change
+			if !strings.Contains(section, "-  replicas: 1") || !strings.Contains(section, "+  replicas: 2") {
+				t.Errorf("App-B should show replica change from 1 to 2, got: %s", section)
+			}
+		}
+	}
+
+	if !foundAppA {
+		t.Error("Should find app-a in the diff sections")
+	}
+	if !foundAppB {
+		t.Error("Should find app-b in the diff sections")
+	}
+
+	// Critical test: verify that despite different filenames, both apps show the same consistent changes
+	// This proves they were matched by identity (Name+SourcePath), not by filename
+	for i, section := range markdownSections {
+		// Both should show as modifications
+		if !strings.Contains(section, "Application modified") {
+			t.Errorf("Section %d should show modification, not deletion/addition, got: %s", i, section)
+		}
+		// Both should show the same content change
+		if !strings.Contains(section, "-  replicas: 1") || !strings.Contains(section, "+  replicas: 2") {
+			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, section)
+		}
+	}
+
+	t.Logf("✅ Success: Files with changing names (A-before.yaml -> A-after.yaml) were correctly matched by app identity!")
 }
