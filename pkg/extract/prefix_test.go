@@ -160,7 +160,7 @@ func TestRemoveApplicationPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := removeApplicationPrefix(tt.app, tt.prefix)
+			_, err := removeApplicationPrefix(tt.app, tt.prefix)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -206,7 +206,7 @@ func TestAddAndRemoveApplicationPrefix_RoundTrip(t *testing.T) {
 			assert.Equal(t, tt.app.Id, tt.app.Yaml.GetName(), "YAML name should match struct ID")
 
 			// Remove prefix
-			err = removeApplicationPrefix(tt.app, tt.prefix)
+			_, err = removeApplicationPrefix(tt.app, tt.prefix)
 			assert.NoError(t, err)
 
 			// Verify it's back to original (for short names)
