@@ -8,6 +8,7 @@ line_count := 10
 title := Argo CD Diff Preview
 create_cluster := false
 max_diff_length := 65536
+update_expected ?= false
 
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
@@ -43,9 +44,15 @@ run-single-test-go: clean pull-base pull-target
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
 	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
+ifeq ($(update_expected),true)
+	mv ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
+	mv ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
+	@echo "UPDATED EXPECTED FILES: $(target_branch)$(suffix) 📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝"
+else
 	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	diff ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
+endif
 
 docker-build:
 	docker build -f ../$(docker_file) -t argocd-diff-preview ..
@@ -81,9 +88,15 @@ run-single-test-docker: clean pull-base pull-target
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
 	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
+ifeq ($(update_expected),true)
+	mv ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
+	mv ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
+	@echo "UPDATED EXPECTED FILES: $(target_branch)$(suffix) 📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝📝"
+else
 	diff ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	diff ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
 	@echo "COMPLETED TEST: $(target_branch)$(suffix) ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅"
+endif
 
 run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
