@@ -158,13 +158,8 @@ func writeManifestsToDisk(apps []AppInfo, folder string) error {
 		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
 	}
 	for _, app := range apps {
-
-		// add comment in the top of the file
-		content := addIdentifierLine(app, app.FileContent)
-		path := fmt.Sprintf("%s/%s", folder, app.Id)
-
-		if err := utils.WriteFile(path, content); err != nil {
-			return fmt.Errorf("failed to write manifest from file '%s' - error: %w", app.Id, err)
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), app.FileContent); err != nil {
+			return fmt.Errorf("failed to write manifest %s: %w", app.Id, err)
 		}
 	}
 	return nil
