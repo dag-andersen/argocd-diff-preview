@@ -5,6 +5,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // RemoveDuplicates finds and filters out duplicate applications between base and target branches
@@ -57,18 +58,33 @@ func RemoveDuplicates(baseApps, targetApps []argoapplication.ArgoResource) ([]ar
 }
 
 func filterDuplicates(apps []argoapplication.ArgoResource, duplicates []*unstructured.Unstructured) []argoapplication.ArgoResource {
+	log.Debug().Msgf("filtering %d Applications for duplicates", len(apps))
+
+	// Create a set of duplicate YAML strings for O(1) lookup
+	duplicateSet := make(map[string]bool)
+	for _, dup := range duplicates {
+		dupStr, err := yaml.Marshal(dup)
+		if err != nil {
+			log.Debug().Err(err).Msg("failed to marshal duplicate YAML, skipping")
+			continue
+		}
+		duplicateSet[string(dupStr)] = true
+	}
+
 	var filtered []argoapplication.ArgoResource
 	for _, app := range apps {
-		isDuplicate := false
-		for _, dup := range duplicates {
-			if yamlEqual(app.Yaml, dup) {
-				isDuplicate = true
-				break
-			}
+		appStr, err := yaml.Marshal(app.Yaml)
+		if err != nil {
+			log.Debug().Err(err).Str("app", app.Name).Msg("failed to marshal app YAML, including in results")
+			filtered = append(filtered, app)
+			continue
 		}
-		if !isDuplicate {
+
+		if !duplicateSet[string(appStr)] {
 			filtered = append(filtered, app)
 		}
 	}
+
+	log.Debug().Msgf("removed %d duplicates", len(apps)-len(filtered))
 	return filtered
 }
