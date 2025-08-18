@@ -56,11 +56,11 @@ func (d *Diff) commentHeader() string {
 }
 
 func (d *Diff) buildMarkdownSection() string {
-	header := fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath())
-
+	header := markdownSectionHeader(fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()))
 	content := strings.TrimSpace(fmt.Sprintf("%s%s", d.commentHeader(), d.content))
+	footer := markdownSectionFooter()
 
-	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n", header, content)
+	return fmt.Sprintf("%s%s%s", header, content, footer)
 }
 
 func (d *Diff) buildHTMLSection() string {

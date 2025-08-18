@@ -27,15 +27,12 @@ Deleted (1):
 -    app.kubernetes.io/name: ingress-nginx
 -    app.kubernetes.io/part-of: ingress-nginx
 -    app.kubernetes.io/version: 1.10.0
--    helm.sh/chart: ingress-nginx-4.10.0
--  name: nginx-ingress-ingress-nginx-controller
--  namespace: default
--
-----
--apiVersio
+-    helm.sh/char
 ```
 
-⚠️⚠️⚠️ Diff is too long. Truncated to 1000 characters. This can be adjusted with the `--max-diff-length` flag
+</details>
+
+⚠️⚠️⚠️ Diff is too long. Truncated to 900 characters. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
 [], [], [], [], []

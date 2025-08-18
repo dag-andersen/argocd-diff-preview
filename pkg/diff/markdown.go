@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -16,6 +17,14 @@ Summary:
 
 %info_box%
 `
+
+func markdownSectionHeader(title string) string {
+	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", title)
+}
+
+func markdownSectionFooter() string {
+	return "\n```\n\n</details>\n\n"
+}
 
 func markdownTemplateLength() int {
 	template := strings.ReplaceAll(markdownTemplate, "%summary%", "")

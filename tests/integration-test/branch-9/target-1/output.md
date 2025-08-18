@@ -353,8 +353,6 @@ Deleted (9):
 
 </details>
 
-
-
 ⚠️⚠️⚠️ Diff is too long. Truncated to 10000 characters. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
