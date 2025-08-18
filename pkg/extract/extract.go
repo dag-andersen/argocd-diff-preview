@@ -40,6 +40,7 @@ var timeoutMessages = []string{
 	":8081: connect: connection refused",
 	"Temporary failure in name resolution",
 	"=git-upload-pack",
+	"DeadlineExceeded",
 }
 
 // const worker count
