@@ -69,7 +69,7 @@ func GenerateDiff(
 	}
 
 	// Warning message to be added if we need to truncate
-	warningMessage := fmt.Sprintf("\n\n ⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",
+	warningMessage := fmt.Sprintf("\n\n⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
 
 	// Concatenate file sections up to the max character limit
@@ -94,6 +94,9 @@ func GenerateDiff(
 		// Truncation needed
 		log.Warn().Msgf("🚨 Diff is too long. Truncating message to %d characters", maxDiffMessageCharCount)
 
+		// code Block escape
+		mkCodeBlockEscape := "\n```"
+
 		currentSize := 0
 		for i, section := range markdownFileSections {
 			// Check if adding this section would exceed the limit (accounting for warning message)
@@ -101,10 +104,12 @@ func GenerateDiff(
 				// We can't add this full section
 				// If this is the first section and empty builder, add a partial section
 				if i == 0 && markdownCombinedDiff.Len() == 0 {
+
 					// Add as much of the section as possible
-					availableSpace := remainingMaxChars - len(warningMessage) - currentSize
+					availableSpace := remainingMaxChars - len(warningMessage) - len(mkCodeBlockEscape) - currentSize
 					if availableSpace > 0 {
 						markdownCombinedDiff.WriteString(section[:availableSpace])
+						markdownCombinedDiff.WriteString(mkCodeBlockEscape)
 					}
 				}
 
