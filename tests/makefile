@@ -113,7 +113,8 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target base_branch=integration-test/branch-6/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-7/target base_branch=integration-test/branch-7/base files_changed="examples/helm/values/filtered.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target base_branch=integration-test/branch-8/base files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base max_diff_length=10000
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base max_diff_length=10000 suffix="-1"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base files_changed="examples/external-chart/nginx.yaml" max_diff_length=1000 suffix="-2"
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker

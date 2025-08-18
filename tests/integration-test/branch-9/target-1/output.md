@@ -355,7 +355,7 @@ Deleted (9):
 
 
 
- ⚠️⚠️⚠️ Diff is too long. Truncated to 10000 characters. This can be adjusted with the `--max-diff-length` flag
+⚠️⚠️⚠️ Diff is too long. Truncated to 10000 characters. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
 [], [], [], [], []

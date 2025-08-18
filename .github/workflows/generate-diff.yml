@@ -8,6 +8,10 @@ on:
       - ".github/workflows/generate-diff.yml"
       - "examples/**"
 
+concurrency:
+  group: pr-diff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   render-diff:
     runs-on: ubuntu-latest

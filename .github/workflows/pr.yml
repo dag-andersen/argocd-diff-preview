@@ -12,6 +12,10 @@ on:
       - Dockerfile
       - .github/workflows/pr.yml
 
+concurrency:
+  group: pr-build-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
