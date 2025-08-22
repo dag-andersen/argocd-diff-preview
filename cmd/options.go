@@ -160,10 +160,12 @@ func Parse() *Options {
 			// Parse redirect revisions
 			opts.parsedRedirectRevisions = opts.ParseRedirectRevisions()
 
-			// Parse cluster type
-			opts.clusterProvider, err = opts.ParseClusterType()
-			if err != nil {
-				return fmt.Errorf("failed to parse cluster type: %w", err)
+			// Parse cluster type if we are creating a new cluster
+			if opts.CreateCluster {
+				opts.clusterProvider, err = opts.ParseClusterType()
+				if err != nil {
+					return fmt.Errorf("failed to parse cluster type: %w", err)
+				}
 			}
 
 			if opts.LineCount <= 0 {
@@ -359,7 +361,7 @@ func (o *Options) ParseClusterType() (cluster.Provider, error) {
 			provider = minikube.New()
 			log.Debug().Msg("Using minikube as cluster provider (auto-detected)")
 		} else {
-			return nil, fmt.Errorf("no local cluster tool found. Please install kind or minikube")
+			return nil, fmt.Errorf("no local cluster tool found. Please install kind, k3d or minikube")
 		}
 	default:
 		return nil, fmt.Errorf("unsupported cluster type: %s", o.ClusterType)
