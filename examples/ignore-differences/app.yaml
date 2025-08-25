@@ -20,7 +20,7 @@ spec:
       kind: ValidatingWebhookConfiguration
       name: example-webhook-validations
       jsonPointers:
-        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/0/clientConfig/caBundles
     - group: ""
       kind: Secret
       name: example-webhook-ca-keypair
