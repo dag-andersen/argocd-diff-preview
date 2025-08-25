@@ -15,12 +15,15 @@ WORKDIR /argocd-diff-preview
 # Copy go mod and sum files
 COPY go.mod go.sum ./
 
-# Download dependencies
+# Download dependencies (base cache)
 RUN go mod download
 
 # Copy source code - only what's needed
 COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
+
+# Ensure go.sum is up to date for all imports
+RUN go mod tidy
 
 # Build the application with version information
 RUN CGO_ENABLED=0 GOOS=linux go build \
