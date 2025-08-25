@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/itchyny/gojq"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -11,13 +12,14 @@ import (
 )
 
 // ignoreDifferenceRule represents a subset of Argo CD's ignoreDifferences entry that we support.
-// We currently implement jsonPointers. jqPathExpressions are not supported yet.
+// We support jsonPointers and jqPathExpressions.
 type ignoreDifferenceRule struct {
 	Group        string
 	Kind         string
 	Name         string
 	Namespace    string
 	JSONPointers []string
+	JQPathExpressions []string
 }
 
 const maskedValue = "<argocd-diff-preview:ignored>"
@@ -81,9 +83,16 @@ func parseSingleIgnoreRule(item interface{}) (ignoreDifferenceRule, bool) {
 			}
 		}
 	}
+	if v, ok := m["jqPathExpressions"].([]interface{}); ok {
+		for _, p := range v {
+			if s, ok := p.(string); ok {
+				rule.JQPathExpressions = append(rule.JQPathExpressions, s)
+			}
+		}
+	}
 
-	// We require at least Kind and one jsonPointer to be useful
-	if rule.Kind == "" || len(rule.JSONPointers) == 0 {
+	// We require at least Kind and one jsonPointer or jqPathExpression to be useful
+	if rule.Kind == "" || (len(rule.JSONPointers) == 0 && len(rule.JQPathExpressions) == 0) {
 		return ignoreDifferenceRule{}, false
 	}
 	return rule, true
@@ -112,8 +121,100 @@ func applyIgnoreDifferencesToManifests(manifests []unstructured.Unstructured, ru
 			for _, ptr := range r.JSONPointers {
 				deleteOrMaskAtJSONPointer(m.Object, ptr)
 			}
+			for _, expr := range r.JQPathExpressions {
+				applyJQPathExpression(m.Object, expr)
+			}
 		}
 	}
+}
+
+// applyJQPathExpression evaluates a jq expression and deletes/masks values at returned paths.
+// The provided expression is wrapped with jq's path(<expr>) helper to obtain token arrays.
+func applyJQPathExpression(obj map[string]interface{}, expr string) {
+	if expr == "" {
+		return
+	}
+	q, err := gojq.Parse("path(" + expr + ")")
+	if err != nil {
+		log.Debug().Err(err).Msgf("ignoreDifferences: invalid jqPathExpression: %s", expr)
+		return
+	}
+	code, err := gojq.Compile(q)
+	if err != nil {
+		log.Debug().Err(err).Msgf("ignoreDifferences: failed to compile jqPathExpression: %s", expr)
+		return
+	}
+	iter := code.Run(obj)
+	for {
+		v, ok := iter.Next()
+		if !ok {
+			break
+		}
+		if err, ok := v.(error); ok {
+			log.Debug().Err(err).Msg("ignoreDifferences: jq evaluation error")
+			continue
+		}
+ 
+ 		// Expect a single path (array of tokens). If it's an array of arrays, handle each.
+ 		if arr, ok := v.([]interface{}); ok {
+ 			applyTokens(obj, arr)
+ 			continue
+ 		}
+ 		if arrs, ok := v.([][]interface{}); ok {
+ 			for _, tokens := range arrs {
+ 				applyTokens(obj, tokens)
+ 			}
+ 		}
+ 	}
+}
+
+// applyTokens traverses obj following jq path tokens and removes the final map key
+// or masks the final array element.
+func applyTokens(obj map[string]interface{}, tokens []interface{}) {
+	var parent interface{} = obj
+	for i, tok := range tokens {
+		last := i == len(tokens)-1
+ 		switch cur := parent.(type) {
+ 		case map[string]interface{}:
+ 			key, ok := tok.(string)
+ 			if !ok {
+ 				return
+ 			}
+ 			if last {
+ 				if _, exists := cur[key]; exists {
+ 					delete(cur, key)
+ 				}
+ 				return
+ 			}
+ 			next, ok := cur[key]
+ 			if !ok {
+ 				return
+ 			}
+ 			parent = next
+ 		case []interface{}:
+ 			var idx int
+ 			switch n := tok.(type) {
+ 			case int:
+ 				idx = n
+ 			case int64:
+ 				idx = int(n)
+ 			case float64:
+ 				idx = int(n)
+ 			default:
+ 				return
+ 			}
+ 			if idx < 0 || idx >= len(cur) {
+ 				return
+ 			}
+ 			if last {
+ 				cur[idx] = maskedValue
+ 				return
+ 			}
+ 			parent = cur[idx]
+ 		default:
+ 			return
+ 		}
+ 	}
 }
 
 func ruleMatches(r ignoreDifferenceRule, group, kind, name, namespace string) bool {

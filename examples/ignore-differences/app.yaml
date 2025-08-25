@@ -19,8 +19,9 @@ spec:
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
       name: example-webhook-validations
-      jsonPointers:
-        - /webhooks/0/clientConfig/caBundle
+      jqPathExpressions:
+        # Ignore changes in the first webhook's clientConfig.caBundle
+        - .webhooks[0].clientConfig.caBundle
     - group: ""
       kind: Secret
       name: example-webhook-ca-keypair
