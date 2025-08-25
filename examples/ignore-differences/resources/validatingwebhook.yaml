@@ -1,0 +1,15 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: example-webhook-validations
+webhooks:
+  - name: example-validate.example.com
+    clientConfig:
+      caBundle: "BASE64CERT_WILL_BE_DIFFERENT"
+    rules:
+      - apiGroups: ["*"]
+        apiVersions: ["*"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["deployments"]
+
+

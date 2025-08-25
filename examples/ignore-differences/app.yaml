@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ignore-differences-example
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  source:
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview
+    targetRevision: HEAD
+    path: examples/ignore-differences/resources
+  syncPolicy:
+    syncOptions:
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: example-webhook-validations
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+    - group: ""
+      kind: Secret
+      name: example-webhook-ca-keypair
+      namespace: example-system
+      jsonPointers:
+        - /data
+
+
