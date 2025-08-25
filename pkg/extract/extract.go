@@ -298,6 +298,12 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 				return result, "", fmt.Errorf("failed to process YAML: %w", err)
 			}
 
+			// Apply Application-level ignoreDifferences (jsonPointers) before comparing diffs
+			rules := parseIgnoreDifferencesFromApp(app)
+			if len(rules) > 0 {
+				applyIgnoreDifferencesToManifests(manifestsContent, rules)
+			}
+			
 			err = removeArgoCDTrackingID(manifestsContent)
 			if err != nil {
 				return result, "", fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
