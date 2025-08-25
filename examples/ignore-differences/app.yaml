@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ignore-differences-example
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[].clientConfig.caBundle
+  sources:
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      ref: local-files
+    - chart: rabbitmq-cluster-operator
+      targetRevision: "4.6.81"
+      repoURL: https://adeptia.github.io/rabbitmq-cluster-operator-helm-package/charts/
