@@ -14,11 +14,11 @@ import (
 // ignoreDifferenceRule represents a subset of Argo CD's ignoreDifferences entry that we support.
 // We support jsonPointers and jqPathExpressions.
 type ignoreDifferenceRule struct {
-	Group        string
-	Kind         string
-	Name         string
-	Namespace    string
-	JSONPointers []string
+	Group             string
+	Kind              string
+	Name              string
+	Namespace         string
+	JSONPointers      []string
 	JQPathExpressions []string
 }
 
@@ -34,17 +34,16 @@ func parseIgnoreDifferencesFromApp(app argoapplication.ArgoResource) []ignoreDif
 		return rules
 	}
 
-	// Try Application path
-	if list, found, err := unstructured.NestedSlice(app.Yaml.Object, "spec", "ignoreDifferences"); err == nil && found {
-		for _, item := range list {
-			if rule, ok := parseSingleIgnoreRule(item); ok {
-				rules = append(rules, rule)
+	switch app.Kind {
+	case argoapplication.Application:
+		if list, found, err := unstructured.NestedSlice(app.Yaml.Object, "spec", "ignoreDifferences"); err == nil && found {
+			for _, item := range list {
+				if rule, ok := parseSingleIgnoreRule(item); ok {
+					rules = append(rules, rule)
+				}
 			}
 		}
-	}
-
-	// Try ApplicationSet template path as fallback
-	if len(rules) == 0 {
+	case argoapplication.ApplicationSet:
 		if list, found, err := unstructured.NestedSlice(app.Yaml.Object, "spec", "template", "spec", "ignoreDifferences"); err == nil && found {
 			for _, item := range list {
 				if rule, ok := parseSingleIgnoreRule(item); ok {
@@ -154,18 +153,18 @@ func applyJQPathExpression(obj map[string]interface{}, expr string) {
 			log.Debug().Err(err).Msg("ignoreDifferences: jq evaluation error")
 			continue
 		}
- 
- 		// Expect a single path (array of tokens). If it's an array of arrays, handle each.
- 		if arr, ok := v.([]interface{}); ok {
- 			applyTokens(obj, arr)
- 			continue
- 		}
- 		if arrs, ok := v.([][]interface{}); ok {
- 			for _, tokens := range arrs {
- 				applyTokens(obj, tokens)
- 			}
- 		}
- 	}
+
+		// Expect a single path (array of tokens). If it's an array of arrays, handle each.
+		if arr, ok := v.([]interface{}); ok {
+			applyTokens(obj, arr)
+			continue
+		}
+		if arrs, ok := v.([][]interface{}); ok {
+			for _, tokens := range arrs {
+				applyTokens(obj, tokens)
+			}
+		}
+	}
 }
 
 // applyTokens traverses obj following jq path tokens and removes the final map key
@@ -174,47 +173,45 @@ func applyTokens(obj map[string]interface{}, tokens []interface{}) {
 	var parent interface{} = obj
 	for i, tok := range tokens {
 		last := i == len(tokens)-1
- 		switch cur := parent.(type) {
- 		case map[string]interface{}:
- 			key, ok := tok.(string)
- 			if !ok {
- 				return
- 			}
- 			if last {
- 				if _, exists := cur[key]; exists {
- 					delete(cur, key)
- 				}
- 				return
- 			}
- 			next, ok := cur[key]
- 			if !ok {
- 				return
- 			}
- 			parent = next
- 		case []interface{}:
- 			var idx int
- 			switch n := tok.(type) {
- 			case int:
- 				idx = n
- 			case int64:
- 				idx = int(n)
- 			case float64:
- 				idx = int(n)
- 			default:
- 				return
- 			}
- 			if idx < 0 || idx >= len(cur) {
- 				return
- 			}
- 			if last {
- 				cur[idx] = maskedValue
- 				return
- 			}
- 			parent = cur[idx]
- 		default:
- 			return
- 		}
- 	}
+		switch cur := parent.(type) {
+		case map[string]interface{}:
+			key, ok := tok.(string)
+			if !ok {
+				return
+			}
+			if last {
+				delete(cur, key)
+				return
+			}
+			next, ok := cur[key]
+			if !ok {
+				return
+			}
+			parent = next
+		case []interface{}:
+			var idx int
+			switch n := tok.(type) {
+			case int:
+				idx = n
+			case int64:
+				idx = int(n)
+			case float64:
+				idx = int(n)
+			default:
+				return
+			}
+			if idx < 0 || idx >= len(cur) {
+				return
+			}
+			if last {
+				cur[idx] = maskedValue
+				return
+			}
+			parent = cur[idx]
+		default:
+			return
+		}
+	}
 }
 
 func ruleMatches(r ignoreDifferenceRule, group, kind, name, namespace string) bool {
@@ -266,9 +263,7 @@ func deleteOrMaskAtJSONPointer(obj map[string]interface{}, pointer string) {
 		switch cur := parent.(type) {
 		case map[string]interface{}:
 			if last {
-				if _, exists := cur[tok]; exists {
-					delete(cur, tok)
-				}
+				delete(cur, tok)
 				return
 			}
 			next, ok := cur[tok]
@@ -304,5 +299,3 @@ func decodeJSONPointerToken(s string) string {
 	s = strings.ReplaceAll(s, "~0", "~")
 	return s
 }
-
-
