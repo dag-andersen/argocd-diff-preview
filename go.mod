@@ -4,9 +4,9 @@ go 1.24.4
 
 require (
 	github.com/argoproj/argo-cd/v2 v2.14.15
-	github.com/itchyny/gojq v0.12.15
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/google/uuid v1.6.0
+	github.com/itchyny/gojq v0.12.17
 	github.com/rs/zerolog v1.34.0
 	github.com/sergi/go-diff v1.4.0
 	github.com/spf13/cobra v1.9.1
@@ -72,6 +72,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

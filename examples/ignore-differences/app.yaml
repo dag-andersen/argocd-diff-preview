@@ -9,7 +9,7 @@ spec:
     name: in-cluster
     namespace: default
   source:
-    repoURL: https://github.com/ben-shaver/argocd-diff-preview
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview
     targetRevision: HEAD
     path: examples/ignore-differences/resources
   syncPolicy:
@@ -28,5 +28,3 @@ spec:
       namespace: example-system
       jsonPointers:
         - /data
-
-

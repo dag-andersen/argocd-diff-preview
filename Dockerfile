@@ -22,9 +22,6 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
 
-# Ensure go.sum is up to date for all imports
-RUN go mod tidy
-
 # Build the application with version information
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" \

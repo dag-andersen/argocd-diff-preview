@@ -11,5 +11,3 @@ webhooks:
         apiVersions: ["*"]
         operations: ["CREATE", "UPDATE"]
         resources: ["deployments"]
-
-
