@@ -115,6 +115,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target base_branch=integration-test/branch-8/base files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base max_diff_length=10000 suffix="-1"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base files_changed="examples/external-chart/nginx.yaml" max_diff_length=900 suffix="-2"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-10/target base_branch=integration-test/branch-10/base files_changed="examples/ignore-differences/app.yaml" suffix="-1"
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker
