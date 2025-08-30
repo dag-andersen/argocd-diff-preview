@@ -499,6 +499,94 @@ func TestMixedChangesWithRegex(t *testing.T) {
 	}
 }
 
+// Test hardcoded Kubernetes/Helm metadata filtering
+func TestKubernetesHelmMetadataFiltering(t *testing.T) {
+	tests := []struct {
+		name           string
+		oldContent     string
+		newContent     string
+		contextLines   uint
+		ignorePattern  *string
+		expectedOutput string
+		description    string
+	}{
+		{
+			name: "Ignoring version and helm chart",
+			oldContent: `metadata:
+  app.kubernetes.io/version: 1.0.0
+  helm.sh/chart: my-chart-1.0.0
+  app.kubernetes.io/name: test-app
+data:
+  test: test-value
+  config: value1`,
+			newContent: `metadata:
+  app.kubernetes.io/version: 2.0.0
+  helm.sh/chart: my-chart-2.0.0
+  app.kubernetes.io/name: test-app
+data:
+  test: test-value
+  config: value2`,
+			contextLines:  2,
+			ignorePattern: nil,
+			expectedOutput: ` data:
+   test: test-value
+-  config: value1
++  config: value2
+`,
+			description: "Ignore pattern is not applied to version and helm chart",
+		},
+		{
+			name: "Ignoring but still include version and helm chart when the line count is large",
+			oldContent: `metadata:
+  app.kubernetes.io/version: 1.0.0
+  helm.sh/chart: my-chart-1.0.0
+  app.kubernetes.io/name: test-app
+data:
+  test: test-value
+  config: value1`,
+			newContent: `metadata:
+  app.kubernetes.io/version: 2.0.0
+  helm.sh/chart: my-chart-2.0.0
+  app.kubernetes.io/name: test-app
+data:
+  test: test-value
+  config: value2
+`,
+			contextLines:  10,
+			ignorePattern: nil,
+			expectedOutput: ` metadata:
+-  app.kubernetes.io/version: 1.0.0
+-  helm.sh/chart: my-chart-1.0.0
++  app.kubernetes.io/version: 2.0.0
++  helm.sh/chart: my-chart-2.0.0
+   app.kubernetes.io/name: test-app
+ data:
+   test: test-value
+-  config: value1
++  config: value2
+`,
+			description: "Ignore pattern is not applied to version and helm chart when the line count is large",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output string
+			if tt.oldContent == "" {
+				output = formatNewFileDiff(tt.newContent, tt.contextLines, tt.ignorePattern)
+			} else if tt.newContent == "" {
+				output = formatDeletedFileDiff(tt.oldContent, tt.contextLines, tt.ignorePattern)
+			} else {
+				output = formatModifiedFileDiff(tt.oldContent, tt.newContent, tt.contextLines, tt.ignorePattern)
+			}
+
+			if output != tt.expectedOutput {
+				t.Errorf("%s\nExpected:\n%s\nGot:\n%s", tt.description, tt.expectedOutput, output)
+			}
+		})
+	}
+}
+
 // Test invalid regex patterns
 func TestInvalidRegexPatterns(t *testing.T) {
 	invalidPatterns := []string{
