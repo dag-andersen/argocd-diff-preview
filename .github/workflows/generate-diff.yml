@@ -20,6 +20,10 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v45
+      
       - uses: actions/checkout@v4
         with:
           path: pull-request
@@ -38,8 +42,10 @@ jobs:
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
+            -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}" \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.16
+            dagandersen/argocd-diff-preview:v0.1.16 \
+            --debug
 
       - name: Post diff as comment
         run: |
