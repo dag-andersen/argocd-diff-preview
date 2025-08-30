@@ -50,6 +50,10 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				show = !shouldIgnoreLine(line, *ignorePattern)
 			}
 
+			if show && (strings.Contains(line, "  app.kubernetes.io/version: ") || strings.Contains(line, "  helm.sh/chart: ")) {
+				show = false
+			}
+
 			prefix := " "
 			switch d.Type {
 			case diffmatchpatch.DiffDelete:
