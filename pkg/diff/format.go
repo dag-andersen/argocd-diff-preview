@@ -50,6 +50,11 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				show = !shouldIgnoreLine(line, *ignorePattern)
 			}
 
+			// Ignore lines that change when Helm Charts are upgraded
+			if show && isChange && (strings.Contains(line, "  app.kubernetes.io/version: ") || strings.Contains(line, "  helm.sh/chart: ")) {
+				show = false
+			}
+
 			prefix := " "
 			switch d.Type {
 			case diffmatchpatch.DiffDelete:

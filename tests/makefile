@@ -99,7 +99,8 @@ else
 endif
 
 run-test-all-with-%:
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true suffix="-1"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base diff_ignore="image" suffix="-2"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base title="integration-test/branch-4"
