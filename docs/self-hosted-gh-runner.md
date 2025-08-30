@@ -93,7 +93,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.15
+            dagandersen/argocd-diff-preview:v0.1.16
 
       - name: Post diff as comment
         run: |
@@ -136,6 +136,6 @@ networking:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.15 \
+            dagandersen/argocd-diff-preview:v0.1.16 \
             --kind-options '--config /base-branch/hack/kind.yaml'
 ```

@@ -17,7 +17,7 @@ docker run \
    -v $(pwd)/target-branch:/target-branch \
    -e TARGET_BRANCH=helm-example-3 \
    -e REPO=dag-andersen/argocd-diff-preview \
-   dagandersen/argocd-diff-preview:v0.1.15
+   dagandersen/argocd-diff-preview:v0.1.16
 ```
 
 and the output would be something like this:
