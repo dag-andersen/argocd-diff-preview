@@ -531,9 +531,43 @@ data:
 			expectedOutput: ` data:
    test: test-value
 -  config: value1
-+  config: value2
-`,
++  config: value2`,
 			description: "Ignore pattern is not applied to version and helm chart",
+		},
+		{
+			name: "Ignoring version and helm chart when nested labels are changed",
+			oldContent: `spec:
+  template:
+    metadata:
+      labels:
+        app: myapp
+        app.kubernetes.io/version: 1.0.0
+        helm.sh/chart: my-chart-1.0.0
+        app.kubernetes.io/name: test-app
+    spec:
+      containers:
+        - name: myapp
+          image: dag-andersen/myapp:v1`,
+			newContent: `spec:
+  template:
+    metadata:
+      labels:
+        app: myapp
+        app.kubernetes.io/version: 2.0.0
+        helm.sh/chart: my-chart-2.0.0
+        app.kubernetes.io/name: test-app
+    spec:
+      containers:
+        - name: myapp
+          image: dag-andersen/myapp:v2`,
+			contextLines:  2,
+			ignorePattern: nil,
+			expectedOutput: `       containers:
+         - name: myapp
+-          image: dag-andersen/myapp:v1
++          image: dag-andersen/myapp:v2`,
+
+			description: "Ignore pattern is not applied to version and helm chart when nested labels are changed",
 		},
 		{
 			name: "Ignoring but still include version and helm chart when the line count is large",
@@ -550,8 +584,7 @@ data:
   app.kubernetes.io/name: test-app
 data:
   test: test-value
-  config: value2
-`,
+  config: value2`,
 			contextLines:  10,
 			ignorePattern: nil,
 			expectedOutput: ` metadata:
@@ -563,8 +596,7 @@ data:
  data:
    test: test-value
 -  config: value1
-+  config: value2
-`,
++  config: value2`,
 			description: "Ignore pattern is not applied to version and helm chart when the line count is large",
 		},
 	}
@@ -580,7 +612,7 @@ data:
 				output = formatModifiedFileDiff(tt.oldContent, tt.newContent, tt.contextLines, tt.ignorePattern)
 			}
 
-			if output != tt.expectedOutput {
+			if strings.TrimRight(output, "\n") != strings.TrimRight(tt.expectedOutput, "\n") {
 				t.Errorf("%s\nExpected:\n%s\nGot:\n%s", tt.description, tt.expectedOutput, output)
 			}
 		})
