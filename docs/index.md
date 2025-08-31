@@ -13,7 +13,7 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 
 ---
 
-![](./assets/example-1.png)
+![](./assets/example-4.png)
 
 ## Overview
 

@@ -9,7 +9,7 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 - [Helm example | External Chart: Nginx](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
 - [Kustomize Example](https://github.com/dag-andersen/argocd-diff-preview/pull/12)
 
-![](./docs/assets/example-1.png)
+![](./docs/assets/example-4.png)
 
 
 ## Why do we need this?
