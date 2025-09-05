@@ -1,0 +1,103 @@
+name: Docker Integration Performance Test
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # This job generates the matrix dynamically. It's a clean way to define a large number of runs.
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate-matrix.outputs.matrix }}
+    steps:
+      - name: Generate Matrix
+        id: generate-matrix
+        run: |
+          # Generates a JSON array like [1, 2, ..., 100]
+          echo "matrix=$(node -e 'console.log(JSON.stringify(Array.from({length: 100}, (_, i) => i + 1)))')" >> $GITHUB_OUTPUT
+
+  run-tests:
+    needs: setup
+    runs-on: ubuntu-latest
+    # Run a job for each number in the generated matrix [1, 2, ..., 100]
+    strategy:
+      fail-fast: false # IMPORTANT: Allow all tests to run even if some fail
+      matrix:
+        run_id: ${{ fromJson(needs.setup.outputs.matrix) }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Time the integration test run
+        id: test-run
+        run: |
+          echo "--- Starting test run #${{ matrix.run_id }} ---"
+          start_time=$(date +%s)
+
+          # Run the test suite
+          # Using "if ! command; then ...; fi" to ensure we capture the end time even on failure
+          if ! make run-integration-tests-docker; then
+            echo "Test run #${{ matrix.run_id }} failed."
+            # The job will fail here, but we still record the duration
+          fi
+
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+
+          echo "Test run #${{ matrix.run_id }} took $duration seconds."
+          echo $duration > duration-${{ matrix.run_id }}.txt
+
+      - name: Upload duration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: durations
+          path: duration-${{ matrix.run_id }}.txt
+          retention-days: 1
+
+  summarize-results:
+    # This job runs only after all matrix jobs in 'run-tests' have completed
+    if: always() # IMPORTANT: Run this job even if some test jobs failed
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install numpy
+
+      - name: Download all duration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: durations
+          path: ./durations
+
+      - name: Calculate and format statistics
+        id: calculate-stats
+        run: |
+          echo "Analyzing performance data..."
+          # The python script reads all .txt files and prints a markdown summary
+          summary_markdown=$(python .github/scripts/summarize.py ./durations)
+
+          # Use multiline output for the summary
+          echo "summary_markdown<<EOF" >> $GITHUB_OUTPUT
+          echo "$summary_markdown" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Add job summary
+        run: |
+          # This posts the markdown table to the main summary page of the workflow run
+          echo "${{ steps.calculate-stats.outputs.summary_markdown }}" >> $GITHUB_STEP_SUMMARY
