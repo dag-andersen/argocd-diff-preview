@@ -10,6 +10,16 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
+// Patterns that should always be ignored
+var ignorePatterns = []string{
+	"  app.kubernetes.io/version: ",
+	"  helm.sh/chart: ",
+	"  checksum/config: ",
+	"  checksum/rules: ",
+	"  checksum/certs: ",
+	"  caBundle: ",
+}
+
 // shouldIgnoreLine checks if a line should be ignored based on regex pattern
 func shouldIgnoreLine(line, pattern string) bool {
 	matched, err := regexp.MatchString(pattern, line)
@@ -50,9 +60,14 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				show = !shouldIgnoreLine(line, *ignorePattern)
 			}
 
-			// Ignore lines that change when Helm Charts are upgraded
-			if show && isChange && (strings.Contains(line, "  app.kubernetes.io/version: ") || strings.Contains(line, "  helm.sh/chart: ")) {
-				show = false
+			// Ignore specific hardcoded lines.
+			if show && isChange {
+				for _, pattern := range ignorePatterns {
+					if strings.Contains(line, pattern) {
+						show = false
+						break
+					}
+				}
 			}
 
 			prefix := " "
