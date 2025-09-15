@@ -26,7 +26,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version-file: './go.mod'
 
       - name: Install golangci-lint
         run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.5
@@ -44,7 +44,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24.0'
+          go-version-file: './go.mod'
 
       - name: Run unit tests
         run: make run-unit-tests GO_TEST_FLAGS="-mod=readonly"
