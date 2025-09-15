@@ -228,6 +228,7 @@ func Parse() *Options {
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
+	rootCmd.Flags().BoolP("dry-run", "n", DefaultDryRun, "Show which applications would be processed without creating a cluster or generating a diff")
 	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
 	rootCmd.Flags().String("timeout", fmt.Sprintf("%d", DefaultTimeout), "Set timeout in seconds")
 
@@ -261,7 +262,6 @@ func Parse() *Options {
 	rootCmd.Flags().Bool("keep-cluster-alive", DefaultKeepClusterAlive, "Keep cluster alive after the tool finishes")
 
 	// Other options
-	rootCmd.Flags().BoolP("dry-run", "n", DefaultDryRun, "Show which applications would be processed without creating a cluster or generating a diff")
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
