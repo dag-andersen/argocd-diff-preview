@@ -49,10 +49,12 @@ var (
 	DefaultTitle              = "Argo CD Diff Preview"
 	DefaultCreateCluster      = true
 	DefaultKeepClusterAlive   = false
+	DefaultDryRun             = false
 )
 
 type Options struct {
 	Debug                     bool   `mapstructure:"debug"`
+	DryRun                    bool   `mapstructure:"dry-run"`
 	Timeout                   uint64 `mapstructure:"timeout"`
 	FileRegex                 string `mapstructure:"file-regex"`
 	DiffIgnore                string `mapstructure:"diff-ignore"`
@@ -142,6 +144,10 @@ func Parse() *Options {
 			}
 			log.Logger = log.Output(consoleWriter)
 
+			if opts.DryRun {
+				return nil
+			}
+
 			// Parse all dependent options
 			var err error
 
@@ -218,6 +224,7 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
+	viper.SetDefault("dry-run", DefaultDryRun)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -254,6 +261,7 @@ func Parse() *Options {
 	rootCmd.Flags().Bool("keep-cluster-alive", DefaultKeepClusterAlive, "Keep cluster alive after the tool finishes")
 
 	// Other options
+	rootCmd.Flags().BoolP("dry-run", "n", DefaultDryRun, "Show which applications would be processed without creating a cluster or generating a diff")
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
@@ -381,9 +389,12 @@ func (o *Options) LogOptions() {
 	} else {
 		log.Info().Msg("✨ Running with:")
 	}
+	if o.DryRun {
+		log.Info().Msgf("✨ - dry-run: %t", o.DryRun)
+	}
 	if !o.CreateCluster {
 		log.Info().Msgf("✨ - reusing existing cluster")
-	} else {
+	} else if !o.DryRun {
 		log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
 		log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
 		if o.clusterProvider.GetName() == "kind" {

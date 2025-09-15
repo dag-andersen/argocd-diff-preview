@@ -89,6 +89,31 @@ func run(opts *Options) error {
 
 	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
 
+	// If dry-run is enabled, show which applications would be processed and exit
+	if opts.DryRun {
+		log.Info().Msg("💨 This is a dry run. The following applications would be processed:")
+		if len(baseApps) > 0 {
+			log.Info().Msgf("👇 Base Branch ('%s'):", baseBranch.Name)
+			for _, app := range baseApps {
+				log.Info().Msgf("  - %s (%s)", app.Name, app.FileName)
+			}
+		} else {
+			log.Info().Msgf("🤷 No applications selected for the base branch ('%s').", baseBranch.Name)
+		}
+
+		if len(targetApps) > 0 {
+			log.Info().Msgf("👇 Target Branch ('%s'):", targetBranch.Name)
+			for _, app := range targetApps {
+				log.Info().Msgf("  - %s (%s)", app.Name, app.FileName)
+			}
+		} else {
+			log.Info().Msgf("🤷 No applications selected for the target branch ('%s').", targetBranch.Name)
+		}
+
+		log.Info().Msg("✅ Dry run complete. No cluster was created and no diff was generated.")
+		return nil
+	}
+
 	// Return if no applications are found
 	foundBaseApps := len(baseApps) > 0
 	foundTargetApps := len(targetApps) > 0
