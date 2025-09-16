@@ -385,26 +385,29 @@ func (o *Options) LogOptions() {
 	} else {
 		log.Info().Msg("✨ Running with:")
 	}
+
 	if o.DryRun {
 		log.Info().Msgf("✨ - dry-run: %t", o.DryRun)
-	}
-	if !o.CreateCluster {
-		log.Info().Msgf("✨ - reusing existing cluster")
-	} else if !o.DryRun {
-		log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
-		log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
-		if o.clusterProvider.GetName() == "kind" {
-			if o.KindOptions != "" {
-				log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+	} else {
+		if !o.CreateCluster {
+			log.Info().Msgf("✨ - reusing existing cluster")
+		} else {
+			log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
+			log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
+			if o.clusterProvider.GetName() == "kind" {
+				if o.KindOptions != "" {
+					log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+				}
+				if o.KindInternal {
+					log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+				}
 			}
-			if o.KindInternal {
-				log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+			if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
+				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
 		}
-		if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
-			log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
-		}
 	}
+
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
