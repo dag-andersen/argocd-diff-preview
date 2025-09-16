@@ -228,7 +228,7 @@ func Parse() *Options {
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
-	rootCmd.Flags().BoolP("dry-run", "n", DefaultDryRun, "Show which applications would be processed without creating a cluster or generating a diff")
+	rootCmd.Flags().Bool("dry-run", DefaultDryRun, "Show which applications would be processed without creating a cluster or generating a diff")
 	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
 	rootCmd.Flags().String("timeout", fmt.Sprintf("%d", DefaultTimeout), "Set timeout in seconds")
 
