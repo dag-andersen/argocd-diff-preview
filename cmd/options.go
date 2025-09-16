@@ -144,10 +144,6 @@ func Parse() *Options {
 			}
 			log.Logger = log.Output(consoleWriter)
 
-			if opts.DryRun {
-				return nil
-			}
-
 			// Parse all dependent options
 			var err error
 
