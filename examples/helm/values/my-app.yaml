@@ -1,1 +1,6 @@
 fullnameOverride: super-app-name
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
