@@ -77,4 +77,4 @@ jobs:
           docker buildx imagetools create -t \
             dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }} \
             dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-amd64 \
-            dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-arm64 
+            dagandersen/argocd-diff-preview:${{ env.VERSION }}-${{ env.SHA }}-arm64
