@@ -8,3 +8,4 @@ base-branch/
 target-branch/
 temp/
 bin/
+.idea

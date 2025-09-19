@@ -49,10 +49,12 @@ var (
 	DefaultTitle              = "Argo CD Diff Preview"
 	DefaultCreateCluster      = true
 	DefaultKeepClusterAlive   = false
+	DefaultDryRun             = false
 )
 
 type Options struct {
 	Debug                     bool   `mapstructure:"debug"`
+	DryRun                    bool   `mapstructure:"dry-run"`
 	Timeout                   uint64 `mapstructure:"timeout"`
 	FileRegex                 string `mapstructure:"file-regex"`
 	DiffIgnore                string `mapstructure:"diff-ignore"`
@@ -218,9 +220,11 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
+	viper.SetDefault("dry-run", DefaultDryRun)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
+	rootCmd.Flags().Bool("dry-run", DefaultDryRun, "Show which applications would be processed without creating a cluster or generating a diff")
 	rootCmd.Flags().String("log-format", DefaultLogFormat, "Log format (human or json)")
 	rootCmd.Flags().String("timeout", fmt.Sprintf("%d", DefaultTimeout), "Set timeout in seconds")
 
@@ -381,23 +385,29 @@ func (o *Options) LogOptions() {
 	} else {
 		log.Info().Msg("✨ Running with:")
 	}
-	if !o.CreateCluster {
-		log.Info().Msgf("✨ - reusing existing cluster")
+
+	if o.DryRun {
+		log.Info().Msgf("✨ - dry-run: %t", o.DryRun)
 	} else {
-		log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
-		log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
-		if o.clusterProvider.GetName() == "kind" {
-			if o.KindOptions != "" {
-				log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+		if !o.CreateCluster {
+			log.Info().Msgf("✨ - reusing existing cluster")
+		} else {
+			log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
+			log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)
+			if o.clusterProvider.GetName() == "kind" {
+				if o.KindOptions != "" {
+					log.Info().Msgf("✨ - kind-options: %s", o.KindOptions)
+				}
+				if o.KindInternal {
+					log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+				}
 			}
-			if o.KindInternal {
-				log.Info().Msgf("✨ - kind-internal: %t", o.KindInternal)
+			if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
+				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
-		}
-		if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
-			log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 		}
 	}
+
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
