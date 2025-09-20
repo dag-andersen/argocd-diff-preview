@@ -30,26 +30,28 @@ var (
 
 // defaults
 var (
-	DefaultTimeout            = uint64(180)
-	DefaultLineCount          = uint(7)
-	DefaultBaseBranch         = "main"
-	DefaultOutputFolder       = "./output"
-	DefaultSecretsFolder      = "./secrets"
-	DefaultCluster            = "auto"
-	DefaultClusterName        = "argocd-diff-preview"
-	DefaultKindOptions        = ""
-	DefaultKindInternal       = false
-	DefaultK3dOptions         = ""
-	DefaultMaxDiffLength      = uint(65536)
-	DefaultArgocdNamespace    = "argocd"
-	DefaultArgocdChartVersion = "latest"
-	DefaultArgocdChartName    = "argo"
-	DefaultArgocdChartURL     = "https://argoproj.github.io/argo-helm"
-	DefaultLogFormat          = "human"
-	DefaultTitle              = "Argo CD Diff Preview"
-	DefaultCreateCluster      = true
-	DefaultKeepClusterAlive   = false
-	DefaultDryRun             = false
+	DefaultTimeout                    = uint64(180)
+	DefaultLineCount                  = uint(7)
+	DefaultBaseBranch                 = "main"
+	DefaultOutputFolder               = "./output"
+	DefaultSecretsFolder              = "./secrets"
+	DefaultCluster                    = "auto"
+	DefaultClusterName                = "argocd-diff-preview"
+	DefaultKindOptions                = ""
+	DefaultKindInternal               = false
+	DefaultK3dOptions                 = ""
+	DefaultMaxDiffLength              = uint(65536)
+	DefaultArgocdNamespace            = "argocd"
+	DefaultArgocdChartVersion         = "latest"
+	DefaultArgocdChartName            = "argo"
+	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
+	DefaultLogFormat                  = "human"
+	DefaultTitle                      = "Argo CD Diff Preview"
+	DefaultCreateCluster              = true
+	DefaultKeepClusterAlive           = false
+	DefaultDryRun                     = false
+	DefaultWatchIfNoWatchPatternFound = false
+	DefaultIgnoreInvalidWatchPattern  = false
 )
 
 type Options struct {
@@ -74,7 +76,7 @@ type Options struct {
 	Selector                   string `mapstructure:"selector"`
 	FilesChanged               string `mapstructure:"files-changed"`
 	IgnoreInvalidWatchPattern  bool   `mapstructure:"ignore-invalid-watch-pattern"`
-	watchIfNoWatchPatternFound bool   `mapstructure:"watch-if-no-watch-pattern-found"`
+	WatchIfNoWatchPatternFound bool   `mapstructure:"watch-if-no-watch-pattern-found"`
 	KeepClusterAlive           bool   `mapstructure:"keep-cluster-alive"`
 	ArgocdNamespace            string `mapstructure:"argocd-namespace"`
 	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
@@ -211,6 +213,8 @@ func Parse() *Options {
 	viper.SetDefault("output-folder", DefaultOutputFolder)
 	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
 	viper.SetDefault("create-cluster", DefaultCreateCluster)
+	viper.SetDefault("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound)
+	viper.SetDefault("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern)
 	viper.SetDefault("keep-cluster-alive", DefaultKeepClusterAlive)
 	viper.SetDefault("cluster", DefaultCluster)
 	viper.SetDefault("cluster-name", DefaultClusterName)
@@ -262,7 +266,8 @@ func Parse() *Options {
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
-	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
+	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern, "Ignore invalid watch pattern Regex on Applications")
+	rootCmd.Flags().Bool("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound, "Render applications without watch pattern")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 
@@ -440,6 +445,12 @@ func (o *Options) LogOptions() {
 	}
 	if len(o.parsedFilesChanged) > 0 {
 		log.Info().Msgf("✨ - files-changed: %s", o.FilesChanged)
+		if DefaultIgnoreInvalidWatchPattern != o.IgnoreInvalidWatchPattern {
+			log.Info().Msg("✨ --- Ignoring applications with invalid watch-pattern annotation")
+		}
+		if DefaultWatchIfNoWatchPatternFound != o.WatchIfNoWatchPatternFound {
+			log.Info().Msgf("✨ --- Rendering applications with no watch-pattern annotation")
+		}
 	}
 	if len(o.parsedSelectors) > 0 {
 		// Convert each selector to string and join with commas
@@ -451,9 +462,6 @@ func (o *Options) LogOptions() {
 	}
 	if len(o.parsedRedirectRevisions) > 0 {
 		log.Info().Msgf("✨ - redirect-target-revisions: %s", o.parsedRedirectRevisions)
-	}
-	if o.IgnoreInvalidWatchPattern {
-		log.Info().Msg("✨ Ignoring invalid watch patterns Regex on Applications")
 	}
 	if o.ArgocdChartVersion != DefaultArgocdChartVersion && o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)

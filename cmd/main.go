@@ -70,7 +70,7 @@ func run(opts *Options) error {
 		Selector:                   selectors,
 		FilesChanged:               filesChanged,
 		IgnoreInvalidWatchPattern:  opts.IgnoreInvalidWatchPattern,
-		WatchIfNoWatchPatternFound: opts.watchIfNoWatchPatternFound,
+		WatchIfNoWatchPatternFound: opts.WatchIfNoWatchPatternFound,
 	}
 
 	// Get applications for both branches
