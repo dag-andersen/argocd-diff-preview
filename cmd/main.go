@@ -67,9 +67,10 @@ func run(opts *Options) error {
 	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
 	filterOptions := argoapplication.FilterOptions{
-		Selector:                  selectors,
-		FilesChanged:              filesChanged,
-		IgnoreInvalidWatchPattern: opts.IgnoreInvalidWatchPattern,
+		Selector:                   selectors,
+		FilesChanged:               filesChanged,
+		IgnoreInvalidWatchPattern:  opts.IgnoreInvalidWatchPattern,
+		WatchIfNoWatchPatternFound: opts.watchIfNoWatchPatternFound,
 	}
 
 	// Get applications for both branches

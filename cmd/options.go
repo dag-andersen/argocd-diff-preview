@@ -53,35 +53,36 @@ var (
 )
 
 type Options struct {
-	Debug                     bool   `mapstructure:"debug"`
-	DryRun                    bool   `mapstructure:"dry-run"`
-	Timeout                   uint64 `mapstructure:"timeout"`
-	FileRegex                 string `mapstructure:"file-regex"`
-	DiffIgnore                string `mapstructure:"diff-ignore"`
-	LineCount                 uint   `mapstructure:"line-count"`
-	BaseBranch                string `mapstructure:"base-branch"`
-	TargetBranch              string `mapstructure:"target-branch"`
-	Repo                      string `mapstructure:"repo"`
-	OutputFolder              string `mapstructure:"output-folder"`
-	SecretsFolder             string `mapstructure:"secrets-folder"`
-	CreateCluster             bool   `mapstructure:"create-cluster"`
-	ClusterType               string `mapstructure:"cluster"`
-	ClusterName               string `mapstructure:"cluster-name"`
-	KindOptions               string `mapstructure:"kind-options"`
-	KindInternal              bool   `mapstructure:"kind-internal"`
-	K3dOptions                string `mapstructure:"k3d-options"`
-	MaxDiffLength             uint   `mapstructure:"max-diff-length"`
-	Selector                  string `mapstructure:"selector"`
-	FilesChanged              string `mapstructure:"files-changed"`
-	IgnoreInvalidWatchPattern bool   `mapstructure:"ignore-invalid-watch-pattern"`
-	KeepClusterAlive          bool   `mapstructure:"keep-cluster-alive"`
-	ArgocdNamespace           string `mapstructure:"argocd-namespace"`
-	ArgocdChartVersion        string `mapstructure:"argocd-chart-version"`
-	ArgocdChartName           string `mapstructure:"argocd-chart-name"`
-	ArgocdChartURL            string `mapstructure:"argocd-chart-url"`
-	RedirectTargetRevisions   string `mapstructure:"redirect-target-revisions"`
-	LogFormat                 string `mapstructure:"log-format"`
-	Title                     string `mapstructure:"title"`
+	Debug                      bool   `mapstructure:"debug"`
+	DryRun                     bool   `mapstructure:"dry-run"`
+	Timeout                    uint64 `mapstructure:"timeout"`
+	FileRegex                  string `mapstructure:"file-regex"`
+	DiffIgnore                 string `mapstructure:"diff-ignore"`
+	LineCount                  uint   `mapstructure:"line-count"`
+	BaseBranch                 string `mapstructure:"base-branch"`
+	TargetBranch               string `mapstructure:"target-branch"`
+	Repo                       string `mapstructure:"repo"`
+	OutputFolder               string `mapstructure:"output-folder"`
+	SecretsFolder              string `mapstructure:"secrets-folder"`
+	CreateCluster              bool   `mapstructure:"create-cluster"`
+	ClusterType                string `mapstructure:"cluster"`
+	ClusterName                string `mapstructure:"cluster-name"`
+	KindOptions                string `mapstructure:"kind-options"`
+	KindInternal               bool   `mapstructure:"kind-internal"`
+	K3dOptions                 string `mapstructure:"k3d-options"`
+	MaxDiffLength              uint   `mapstructure:"max-diff-length"`
+	Selector                   string `mapstructure:"selector"`
+	FilesChanged               string `mapstructure:"files-changed"`
+	IgnoreInvalidWatchPattern  bool   `mapstructure:"ignore-invalid-watch-pattern"`
+	watchIfNoWatchPatternFound bool   `mapstructure:"watch-if-no-watch-pattern-found"`
+	KeepClusterAlive           bool   `mapstructure:"keep-cluster-alive"`
+	ArgocdNamespace            string `mapstructure:"argocd-namespace"`
+	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
+	ArgocdChartName            string `mapstructure:"argocd-chart-name"`
+	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
+	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
+	LogFormat                  string `mapstructure:"log-format"`
+	Title                      string `mapstructure:"title"`
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
