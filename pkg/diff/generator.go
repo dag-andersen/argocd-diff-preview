@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -63,92 +62,38 @@ func GenerateDiff(
 	infoBoxString := timeInfo.String()
 
 	// Calculate the available space for the file sections
-	remainingMaxChars := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
-	if remainingMaxChars < 0 {
-		remainingMaxChars = 0
+	availableSpaceAfterOverhead := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
+	if availableSpaceAfterOverhead < 0 {
+		availableSpaceAfterOverhead = 0
 	}
 
-	// Warning message to be added if we need to truncate
-	warningMessage := fmt.Sprintf("⚠️⚠️⚠️ Diff is too long. Truncated to %d characters. This can be adjusted with the `--max-diff-length` flag",
-		maxDiffMessageCharCount)
-
-	// Concatenate file sections up to the max character limit
-	var markdownCombinedDiff strings.Builder
-	var htmlCombinedDiff strings.Builder
-	var includedSections int
-
-	// Calculate total size of all sections
-	totalSize := 0
-	for _, section := range markdownFileSections {
-		totalSize += len(section)
+	// Markdown
+	MarkdownOutput := MarkdownOutput{
+		title:    title,
+		summary:  summary,
+		sections: markdownFileSections,
+		infoBox:  timeInfo,
 	}
+	markdown := MarkdownOutput.printDiff(availableSpaceAfterOverhead, maxDiffMessageCharCount)
 
-	// Check if truncation is needed
-	if totalSize <= remainingMaxChars {
-		// No truncation needed, include all sections
-		for _, section := range markdownFileSections {
-			markdownCombinedDiff.WriteString(section)
-			includedSections++
-		}
-	} else {
-		// Truncation needed
-		log.Warn().Msgf("🚨 Diff is too long. Truncating message to %d characters", maxDiffMessageCharCount)
-
-		// code Block escape
-		mkCodeBlockEscape := markdownSectionFooter()
-
-		currentSize := 0
-		for i, section := range markdownFileSections {
-			// Check if adding this section would exceed the limit (accounting for warning message)
-			if currentSize+len(section) > remainingMaxChars-len(warningMessage) {
-				// We can't add this full section
-				// If this is the first section and empty builder, add a partial section
-				if i == 0 && markdownCombinedDiff.Len() == 0 {
-
-					// Add as much of the section as possible
-					availableSpace := remainingMaxChars - len(warningMessage) - len(mkCodeBlockEscape) - currentSize
-					if availableSpace > 0 {
-						markdownCombinedDiff.WriteString(section[:availableSpace])
-						markdownCombinedDiff.WriteString(mkCodeBlockEscape)
-					}
-				}
-
-				// Add warning and break
-				markdownCombinedDiff.WriteString(warningMessage)
-				break
-			}
-
-			// This section fits, add it
-			markdownCombinedDiff.WriteString(section)
-			includedSections++
-			currentSize += len(section)
-		}
-	}
-
-	// For HTML, all sections are included and the 'max-diff-length' option is ignored
-	for _, section := range htmlFileSections {
-		htmlCombinedDiff.WriteString(section)
-	}
-
-	// Generate and write markdown
-	markdown := printMarkdownDiff(
-		title,
-		strings.TrimSpace(summary),
-		strings.TrimSpace(markdownCombinedDiff.String()),
-		infoBoxString,
-	)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
 		return fmt.Errorf("failed to write markdown: %w", err)
+
+	}
+
+	// HTML
+
+	HTMLOutput := HTMLOutput{
+		title:    title,
+		summary:  summary,
+		sections: htmlFileSections,
+		infoBox:  timeInfo,
 	}
 
 	// Generate HTML
-	htmlDiff := printHTMLDiff(
-		title,
-		strings.TrimSpace(summary),
-		strings.TrimSpace(htmlCombinedDiff.String()),
-		infoBoxString,
-	)
+	htmlDiff := HTMLOutput.printDiff()
+
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
 	if err := utils.WriteFile(htmlPath, htmlDiff); err != nil {
 		return fmt.Errorf("failed to write html: %w", err)
@@ -177,7 +122,7 @@ func generateGitDiff(
 	diffContextLines uint,
 	baseApps []AppInfo,
 	targetApps []AppInfo,
-) (string, []string, []string, error) {
+) (string, []MarkdownSection, []HTMLSection, error) {
 
 	// Write base manifests to disk
 	if err := writeManifestsToDisk(baseApps, basePath); err != nil {
@@ -412,15 +357,15 @@ func generateGitDiff(
 	}
 
 	if len(changedFiles) == 0 {
-		return "No changes found", []string{"No changes found"}, []string{"No changes found"}, nil
+		return "No changes found", nil, nil, nil
 	}
 
 	// Build summary
 	summary := buildSummary(changedFiles)
 
 	// Create arrays of formatted file sections
-	markdownFileSections := make([]string, 0, len(changedFiles))
-	htmlFileSections := make([]string, 0, len(changedFiles))
+	markdownFileSections := make([]MarkdownSection, 0, len(changedFiles))
+	htmlFileSections := make([]HTMLSection, 0, len(changedFiles))
 	for _, diff := range changedFiles {
 
 		// skips empty diffs
@@ -429,11 +374,8 @@ func generateGitDiff(
 		}
 
 		// Get source path for this file, or use empty string if not found
-		markdownFileSection := diff.buildMarkdownSection()
-		markdownFileSections = append(markdownFileSections, markdownFileSection)
-
-		htmlFileSection := diff.buildHTMLSection()
-		htmlFileSections = append(htmlFileSections, htmlFileSection)
+		markdownFileSections = append(markdownFileSections, diff.buildMarkdownSection())
+		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection())
 	}
 
 	return summary, markdownFileSections, htmlFileSections, nil

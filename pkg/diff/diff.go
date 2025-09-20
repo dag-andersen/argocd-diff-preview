@@ -2,7 +2,6 @@ package diff
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 )
@@ -55,15 +54,18 @@ func (d *Diff) commentHeader() string {
 	}
 }
 
-func (d *Diff) buildMarkdownSection() string {
-	header := markdownSectionHeader(fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()))
-	content := strings.TrimSpace(fmt.Sprintf("%s%s", d.commentHeader(), d.content))
-	footer := markdownSectionFooter()
-
-	return fmt.Sprintf("%s%s%s", header, content, footer)
+func (d *Diff) buildMarkdownSection() MarkdownSection {
+	return MarkdownSection{
+		title:   fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()),
+		comment: d.commentHeader(),
+		content: d.content,
+	}
 }
 
-func (d *Diff) buildHTMLSection() string {
-	header := fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath())
-	return printHTMLSection(header, d.commentHeader(), d.content)
+func (d *Diff) buildHTMLSection() HTMLSection {
+	return HTMLSection{
+		header:        fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()),
+		commentHeader: d.commentHeader(),
+		content:       d.content,
+	}
 }

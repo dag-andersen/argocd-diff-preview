@@ -353,7 +353,96 @@ Deleted (9):
 
 </details>
 
-⚠️⚠️⚠️ Diff is too long. Truncated to 10000 characters. This can be adjusted with the `--max-diff-length` flag
+<details>
+<summary>my-app-set-staging (examples/basic-appset/my-app-set.yaml)</summary>
+<br>
+
+```diff
+@@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  annotations: {}
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-spec:
+-  ports:
+-  - name: http
+-    port: 80
+-    protocol: TCP
+-    targetPort: http
+-  selector:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/name: myApp
+-  type: ClusterIP
+-
+----
+-apiVersion: v1
+-automountServiceAccountToken: true
+-kind: ServiceAccount
+-metadata:
+-  annotations: {}
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-
+----
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  annotations: {}
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-spec:
+-  replicas: 1
+-  selector:
+-    matchLabels:
+-      app.kubernetes.io/instance: my-app-set-staging
+-      app.kubernetes.io/name: myApp
+-  template:
+-    metadata:
+-      labels:
+-        app.kubernetes.io/instance: my-app-set-staging
+-        app.kubernetes.io/managed-by: Helm
+-        app.kubernetes.io/name: myApp
+-        app.kubernetes.io/version: 1.16.0
+-        helm.sh/chart: myApp-0.1.0
+-    spec:
+-      containers:
+-      - image: nginx:1.16.0
+-        imagePullPolicy: IfNotPresent
+-        livenessProbe:
+-          httpGet:
+-            path: /
+-            port: http
+-        name: myApp
+-        ports:
+-        - containerPort: 80
+-          name: http
+-          
+🚨 Diff is too long
+```
+
+</details>
+
+⚠️⚠️⚠️ Diff exceeds max length of 10000 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
 [], [], [], [], []
