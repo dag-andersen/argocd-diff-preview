@@ -131,11 +131,13 @@ func TestDiff_commentHeader(t *testing.T) {
 	}
 }
 
-func TestDiff_buildSection(t *testing.T) {
+func TestDiff_buildMarkdownSection(t *testing.T) {
 	tests := []struct {
-		name        string
-		diff        Diff
-		expectedFmt string // Use fmt string for easier comparison of structure
+		name            string
+		diff            Diff
+		expectedTitle   string
+		expectedComment string
+		expectedContent string
 	}{
 		{
 			name: "Insert",
@@ -145,7 +147,9 @@ func TestDiff_buildSection(t *testing.T) {
 				action:        merkletrie.Insert,
 				content:       "+ line 1\n+ line 2",
 			},
-			expectedFmt: "<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n",
+			expectedTitle:   "new-app (/path/new)",
+			expectedComment: "@@ Application added: new-app (/path/new) @@\n",
+			expectedContent: "+ line 1\n+ line 2",
 		},
 		{
 			name: "Modify with name change",
@@ -157,7 +161,9 @@ func TestDiff_buildSection(t *testing.T) {
 				action:        merkletrie.Modify,
 				content:       "- line 1\n+ line 1 mod",
 			},
-			expectedFmt: "<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n",
+			expectedTitle:   "app-v1 -> app-v2 (/path/app)",
+			expectedComment: "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
+			expectedContent: "- line 1\n+ line 1 mod",
 		},
 		{
 			name: "Delete",
@@ -167,17 +173,36 @@ func TestDiff_buildSection(t *testing.T) {
 				action:        merkletrie.Delete,
 				content:       "- line 1\n- line 2",
 			},
-			expectedFmt: "<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s\n```\n\n</details>\n\n",
+			expectedTitle:   "old-app (/path/old)",
+			expectedComment: "@@ Application deleted: old-app (/path/old) @@\n",
+			expectedContent: "- line 1\n- line 2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			header := fmt.Sprintf("%s (%s)", tt.diff.prettyName(), tt.diff.prettyPath())
-			content := strings.TrimSpace(fmt.Sprintf("%s%s", tt.diff.commentHeader(), tt.diff.content))
-			expected := fmt.Sprintf(tt.expectedFmt, header, content)
-			if got := tt.diff.buildMarkdownSection(); got != expected {
-				t.Errorf("buildSection() got =\n%v\nwant =\n%v", got, expected)
+			got := tt.diff.buildMarkdownSection()
+
+			if got.title != tt.expectedTitle {
+				t.Errorf("buildMarkdownSection().title = %q, want %q", got.title, tt.expectedTitle)
+			}
+			if got.comment != tt.expectedComment {
+				t.Errorf("buildMarkdownSection().comment = %q, want %q", got.comment, tt.expectedComment)
+			}
+			if got.content != tt.expectedContent {
+				t.Errorf("buildMarkdownSection().content = %q, want %q", got.content, tt.expectedContent)
+			}
+
+			// Test that the build method works correctly
+			builtSection, truncated := got.build(10000) // Use large max size to get full content
+			if truncated {
+				t.Errorf("buildMarkdownSection().build() should not be truncated with large max size")
+			}
+			expectedBuiltSection := fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+				tt.expectedTitle, tt.expectedComment, tt.expectedContent)
+
+			if builtSection != expectedBuiltSection {
+				t.Errorf("buildMarkdownSection().build() got =\n%q\nwant =\n%q", builtSection, expectedBuiltSection)
 			}
 		})
 	}
@@ -270,18 +295,19 @@ spec:
 	foundAppB := false
 
 	for _, section := range markdownSections {
-		if strings.Contains(section, "app-a") {
+		sectionContent, _ := section.build(10000) // Use large max size to get full content
+		if strings.Contains(sectionContent, "app-a") {
 			foundAppA = true
 			// Verify it contains the expected change (replicas: 1 -> 2)
-			if !strings.Contains(section, "replicas: 1") || !strings.Contains(section, "replicas: 2") {
-				t.Errorf("App-A section should contain replica change, got: %s", section)
+			if !strings.Contains(sectionContent, "replicas: 1") || !strings.Contains(sectionContent, "replicas: 2") {
+				t.Errorf("App-A section should contain replica change, got: %s", sectionContent)
 			}
 		}
-		if strings.Contains(section, "app-b") {
+		if strings.Contains(sectionContent, "app-b") {
 			foundAppB = true
 			// Verify it contains the expected change (replicas: 1 -> 2)
-			if !strings.Contains(section, "replicas: 1") || !strings.Contains(section, "replicas: 2") {
-				t.Errorf("App-B section should contain replica change, got: %s", section)
+			if !strings.Contains(sectionContent, "replicas: 1") || !strings.Contains(sectionContent, "replicas: 2") {
+				t.Errorf("App-B section should contain replica change, got: %s", sectionContent)
 			}
 		}
 	}
@@ -297,9 +323,10 @@ spec:
 	// Both apps should show the same content change (replicas 1->2)
 	// This proves files were matched by filename, not by content similarity
 	for i, section := range markdownSections {
-		if !strings.Contains(section, "-  replicas: 1") ||
-			!strings.Contains(section, "+  replicas: 2") {
-			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, section)
+		sectionContent, _ := section.build(10000) // Use large max size to get full content
+		if !strings.Contains(sectionContent, "-  replicas: 1") ||
+			!strings.Contains(sectionContent, "+  replicas: 2") {
+			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, sectionContent)
 		}
 	}
 }
@@ -391,26 +418,27 @@ spec:
 	foundAppB := false
 
 	for _, section := range markdownSections {
-		if strings.Contains(section, "app-a") {
+		sectionContent, _ := section.build(10000) // Use large max size to get full content
+		if strings.Contains(sectionContent, "app-a") {
 			foundAppA = true
 			// Should show as modification, not delete+add
-			if !strings.Contains(section, "Application modified") {
-				t.Errorf("App-A should show as modified, got: %s", section)
+			if !strings.Contains(sectionContent, "Application modified") {
+				t.Errorf("App-A should show as modified, got: %s", sectionContent)
 			}
 			// Should show the content change
-			if !strings.Contains(section, "-  replicas: 1") || !strings.Contains(section, "+  replicas: 2") {
-				t.Errorf("App-A should show replica change from 1 to 2, got: %s", section)
+			if !strings.Contains(sectionContent, "-  replicas: 1") || !strings.Contains(sectionContent, "+  replicas: 2") {
+				t.Errorf("App-A should show replica change from 1 to 2, got: %s", sectionContent)
 			}
 		}
-		if strings.Contains(section, "app-b") {
+		if strings.Contains(sectionContent, "app-b") {
 			foundAppB = true
 			// Should show as modification, not delete+add
-			if !strings.Contains(section, "Application modified") {
-				t.Errorf("App-B should show as modified, got: %s", section)
+			if !strings.Contains(sectionContent, "Application modified") {
+				t.Errorf("App-B should show as modified, got: %s", sectionContent)
 			}
 			// Should show the content change
-			if !strings.Contains(section, "-  replicas: 1") || !strings.Contains(section, "+  replicas: 2") {
-				t.Errorf("App-B should show replica change from 1 to 2, got: %s", section)
+			if !strings.Contains(sectionContent, "-  replicas: 1") || !strings.Contains(sectionContent, "+  replicas: 2") {
+				t.Errorf("App-B should show replica change from 1 to 2, got: %s", sectionContent)
 			}
 		}
 	}
@@ -425,13 +453,14 @@ spec:
 	// Critical test: verify that despite different filenames, both apps show the same consistent changes
 	// This proves they were matched by identity (Name+SourcePath), not by filename
 	for i, section := range markdownSections {
+		sectionContent, _ := section.build(10000) // Use large max size to get full content
 		// Both should show as modifications
-		if !strings.Contains(section, "Application modified") {
-			t.Errorf("Section %d should show modification, not deletion/addition, got: %s", i, section)
+		if !strings.Contains(sectionContent, "Application modified") {
+			t.Errorf("Section %d should show modification, not deletion/addition, got: %s", i, sectionContent)
 		}
 		// Both should show the same content change
-		if !strings.Contains(section, "-  replicas: 1") || !strings.Contains(section, "+  replicas: 2") {
-			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, section)
+		if !strings.Contains(sectionContent, "-  replicas: 1") || !strings.Contains(sectionContent, "+  replicas: 2") {
+			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, sectionContent)
 		}
 	}
 

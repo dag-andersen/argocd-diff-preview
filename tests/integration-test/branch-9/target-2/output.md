@@ -26,13 +26,13 @@ Deleted (1):
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: ingress-nginx
 -    app.kubernetes.io/part-of: ingress-nginx
--    app.kubernetes.io/version: 1.10.0
--    helm.sh/char
+-    app.kubernetes
+🚨 Diff is too long
 ```
 
 </details>
 
-⚠️⚠️⚠️ Diff is too long. Truncated to 900 characters. This can be adjusted with the `--max-diff-length` flag
+⚠️⚠️⚠️ Diff exceeds max length of 900 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
 [], [], [], [], []

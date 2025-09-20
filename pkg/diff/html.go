@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+type HTMLOutput struct {
+	title    string
+	summary  string
+	sections []HTMLSection
+	infoBox  InfoBox
+}
+
 const htmlTemplate = `
 <html>
 <head>
@@ -69,6 +76,12 @@ pre {
 </html>
 `
 
+type HTMLSection struct {
+	header        string
+	commentHeader string
+	content       string
+}
+
 const htmlSection = `
 <details>
 <summary>
@@ -84,19 +97,11 @@ const htmlSection = `
 
 const htmlLine = `<tr class="%s"><td><pre>%s</pre></td></tr>`
 
-func printHTMLDiff(title, summary, diff string, infoBox string) string {
-	htmlDiff := strings.ReplaceAll(htmlTemplate, "%title%", title)
-	htmlDiff = strings.ReplaceAll(htmlDiff, "%summary%", summary)
-	htmlDiff = strings.ReplaceAll(htmlDiff, "%app_diffs%", diff)
-	htmlDiff = strings.ReplaceAll(htmlDiff, "%info_box%", infoBox)
-	return strings.TrimSpace(htmlDiff) + "\n"
-}
+func (h *HTMLSection) printHTMLSection() string {
+	s := strings.ReplaceAll(htmlSection, "%header%", html.EscapeString(h.header))
 
-func printHTMLSection(header string, commentHeader string, content string) string {
-	s := strings.ReplaceAll(htmlSection, "%header%", html.EscapeString(header))
-
-	rows := fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(commentHeader))
-	for _, line := range strings.Split(content, "\n") {
+	rows := fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(h.commentHeader))
+	for _, line := range strings.Split(h.content, "\n") {
 		if len(line) == 0 {
 			rows += fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line))
 			continue
@@ -115,4 +120,23 @@ func printHTMLSection(header string, commentHeader string, content string) strin
 	s = strings.ReplaceAll(s, "%rows%", rows)
 
 	return s
+}
+
+func (h *HTMLOutput) printDiff() string {
+
+	var sectionsDiff strings.Builder
+
+	for _, section := range h.sections {
+		sectionsDiff.WriteString(section.printHTMLSection())
+	}
+
+	if sectionsDiff.Len() == 0 {
+		sectionsDiff.WriteString("No changes found")
+	}
+
+	output := strings.ReplaceAll(htmlTemplate, "%title%", h.title)
+	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(h.summary))
+	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
+	output = strings.ReplaceAll(output, "%info_box%", h.infoBox.String())
+	return strings.TrimSpace(output) + "\n"
 }

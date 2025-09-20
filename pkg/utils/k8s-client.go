@@ -599,38 +599,3 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 		}
 	}
 }
-
-// GetResourceAnnotation retrieves a specific annotation from any Kubernetes resource
-func (c *K8sClient) GetResourceAnnotation(gvr schema.GroupVersionResource, namespace string, name string, annotationKey string) (string, error) {
-	// Get the resource
-	result, err := c.clientset.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to get %s '%s' in namespace '%s': %w", gvr.Resource, name, namespace, err)
-	}
-
-	// Extract metadata
-	metadata, ok := result.Object["metadata"].(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("failed to extract metadata from %s '%s'", gvr.Resource, name)
-	}
-
-	// Extract annotations
-	annotations, ok := metadata["annotations"].(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("no annotations found in %s '%s'", gvr.Resource, name)
-	}
-
-	// Get the specific annotation
-	value, ok := annotations[annotationKey]
-	if !ok {
-		return "", fmt.Errorf("annotation '%s' not found in %s '%s'", annotationKey, gvr.Resource, name)
-	}
-
-	// Convert to string
-	valueStr, ok := value.(string)
-	if !ok {
-		return "", fmt.Errorf("annotation value is not a string")
-	}
-
-	return valueStr, nil
-}
