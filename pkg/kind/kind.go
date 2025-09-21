@@ -65,7 +65,7 @@ func CreateCluster(clusterName string, kindOptions string, internal bool) (time.
 			return time.Since(start), fmt.Errorf("failed to get cluster kubeconfig: %s", output)
 		}
 
-		kubeconfigPath := utils.GetKubeConfigPath()
+		kubeconfigPath, _ := utils.GetKubeConfigPath()
 		err = os.WriteFile(kubeconfigPath, []byte(output), 0644)
 		if err != nil {
 			return time.Since(start), fmt.Errorf("failed to write cluster kubeconfig: %s", kubeconfigPath)
