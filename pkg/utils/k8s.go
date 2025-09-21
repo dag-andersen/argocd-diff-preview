@@ -1,13 +1,25 @@
 package utils
 
 import (
-	"k8s.io/client-go/util/homedir"
+	"os"
 	"path/filepath"
+
+	"k8s.io/client-go/util/homedir"
 )
 
-func GetKubeConfigPath() string {
-	if home := homedir.HomeDir(); home != "" {
-		return filepath.Join(home, ".kube", "config")
+// GetKubeConfigPath returns the path to the kubeconfig file and a boolean indicating if the file exists
+func GetKubeConfigPath() (string, bool) {
+	// Check KUBECONFIG environment variable first
+	if kubeconfigPath := os.Getenv("KUBECONFIG"); kubeconfigPath != "" {
+		_, err := os.Stat(kubeconfigPath)
+		return kubeconfigPath, err == nil
 	}
-	return ""
+
+	// Fall back to default kubeconfig location
+	if home := homedir.HomeDir(); home != "" {
+		path := filepath.Join(home, ".kube", "config")
+		_, err := os.Stat(path)
+		return path, err == nil
+	}
+	return "", false
 }

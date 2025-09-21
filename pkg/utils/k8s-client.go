@@ -22,50 +22,57 @@ import (
 )
 
 type K8sClient struct {
-	clientset *dynamic.DynamicClient
-	InCluster bool
+	clientSet *dynamic.DynamicClient
 }
 
 func NewK8sClient() (*K8sClient, error) {
 
-	inCluster := false
-	// First try to use the in-cluster config
-	config, err := rest.InClusterConfig()
-	if err == nil {
-		inCluster = true
-		log.Info().Msgf("✅ Using service account to connect to cluster")
-	} else {
-		log.Debug().Err(err).Msgf("Failed to get in-cluster config")
+	var config *rest.Config
 
-		// fallback to kubeconfig
-		kubeconfig := GetKubeConfigPath()
-		if kubeconfig == "" {
-			return nil, fmt.Errorf("no kubeconfig found, and no in-cluster config")
-		}
-
-		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	// try to use kubeconfig
+	kubeConfigPath, exists := GetKubeConfigPath()
+	if exists {
+		log.Debug().Msgf("Using kubeconfig: %s", kubeConfigPath)
+		c, err := clientcmd.BuildConfigFromFlags("", kubeConfigPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build config from flags: %w", err)
+			log.Debug().Err(err).Msg("Failed to create k8s client from kubeconfig")
+		} else {
+			config = c
+			log.Debug().Msg("Using kubeconfig to connect to cluster")
 		}
+	} else {
+		log.Debug().Msgf("No kubeconfig file found at path '%s'", kubeConfigPath)
+	}
 
-		log.Debug().Msgf("using kubeconfig: %s", kubeconfig)
+	// fall back to service account
+	if config == nil {
+		c, err := rest.InClusterConfig()
+		if err != nil {
+			log.Debug().Err(err).Msg("Failed to create k8s client from service account")
+		} else {
+			config = c
+			log.Info().Msg("📡 Using service account and environment variables to connect to cluster")
+		}
+	}
 
+	if config == nil {
+		return nil, fmt.Errorf("failed to connect to cluster. No kubeconfig file found at '%s' and no service account credentials detected", kubeConfigPath)
 	}
 
 	// Increase QPS and Burst to mitigate client-side throttling on the CI
 	config.QPS = 20   // Default is 5
 	config.Burst = 40 // Default is 10
 
-	clientset, err := dynamic.NewForConfig(config)
+	clientSet, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 
-	return &K8sClient{clientset: clientset, InCluster: inCluster}, nil
+	return &K8sClient{clientSet: clientSet}, nil
 }
 
 func (c *K8sClient) CheckIfResourceExists(gvr schema.GroupVersionResource, namespace string, name string) (bool, error) {
-	_, err := c.clientset.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	_, err := c.clientSet.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -75,7 +82,7 @@ func (c *K8sClient) CheckIfResourceExists(gvr schema.GroupVersionResource, names
 func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
-	result, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
+	result, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +100,7 @@ func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
 func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (string, error) {
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
-	result, err := c.clientset.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	result, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +124,7 @@ func (c *K8sClient) DeleteArgoCDApplication(namespace string, name string) error
 	}
 
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-	return c.clientset.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+	return c.clientSet.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 
 // DeleteAllApplicationsOlderThan deletes all ArgoCD applications older than a given number of minutes
@@ -133,7 +140,7 @@ func (c *K8sClient) DeleteAllApplicationsOlderThan(namespace string, minutes int
 	}
 
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-	apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), listOptions)
+	apps, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(context.Background(), listOptions)
 	if err != nil {
 		return err
 	}
@@ -142,7 +149,7 @@ func (c *K8sClient) DeleteAllApplicationsOlderThan(namespace string, minutes int
 		creationTimestamp := app.GetCreationTimestamp()
 		timeDiff := time.Since(creationTimestamp.Time)
 		if timeDiff.Minutes() > float64(minutes) {
-			err := c.clientset.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), app.GetName(), metav1.DeleteOptions{})
+			err := c.clientSet.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), app.GetName(), metav1.DeleteOptions{})
 			if err != nil {
 				return err
 			}
@@ -170,13 +177,13 @@ func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
-	apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
+	apps, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for _, app := range apps.Items {
-		err := c.clientset.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), app.GetName(), metav1.DeleteOptions{})
+		err := c.clientSet.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), app.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			log.Error().Err(err).Msgf("❌ Failed to delete application %s", app.GetName())
 		}
@@ -191,7 +198,7 @@ func (c *K8sClient) DeleteArgoCDApplications(namespace string) error {
 		case <-ctx.Done():
 			return fmt.Errorf("timeout waiting for applications to be deleted")
 		default:
-			apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(ctx, metav1.ListOptions{})
+			apps, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(ctx, metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
@@ -221,7 +228,7 @@ func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
 
 	// Get ArgoCD applications
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-	apps, err := c.clientset.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
+	apps, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list applications: %w", err)
 	}
@@ -256,7 +263,7 @@ func (c *K8sClient) RemoveObstructiveFinalizers(namespace string) error {
 		log.Info().Msgf("🧹 Removing obstructive finalizers from application %s", appName)
 
 		app.SetFinalizers(nil)
-		_, err := c.clientset.Resource(applicationRes).Namespace(namespace).Update(
+		_, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Update(
 			context.Background(),
 			&app,
 			metav1.UpdateOptions{},
@@ -306,7 +313,7 @@ func (c *K8sClient) ApplyManifest(obj *unstructured.Unstructured, source string,
 		Str("source", source).
 		Msg("Applying manifest")
 
-	_, err = c.clientset.Resource(gvr).Namespace(namespace).Apply(
+	_, err = c.clientSet.Resource(gvr).Namespace(namespace).Apply(
 		context.Background(),
 		obj.GetName(),
 		obj,
@@ -376,7 +383,7 @@ func (c *K8sClient) CreateNamespace(namespace string) (bool, error) {
 	namespaceRes := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
 
 	// First, check if the namespace already exists
-	_, err := c.clientset.Resource(namespaceRes).Get(context.Background(), namespace, metav1.GetOptions{})
+	_, err := c.clientSet.Resource(namespaceRes).Get(context.Background(), namespace, metav1.GetOptions{})
 	if err == nil {
 		// Namespace already exists, no need to create
 		return false, nil
@@ -388,7 +395,7 @@ func (c *K8sClient) CreateNamespace(namespace string) (bool, error) {
 	}
 
 	// Namespace doesn't exist, create it
-	_, err = c.clientset.Resource(namespaceRes).Create(context.Background(), &unstructured.Unstructured{
+	_, err = c.clientSet.Resource(namespaceRes).Create(context.Background(), &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
 				"name": namespace,
@@ -403,7 +410,7 @@ func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, er
 
 	// If no specific names are provided, get all ConfigMaps in the namespace
 	if len(names) == 0 {
-		result, err := c.clientset.Resource(configMapRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
+		result, err := c.clientSet.Resource(configMapRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return "", err
 		}
@@ -419,7 +426,7 @@ func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, er
 	var items []unstructured.Unstructured
 
 	for _, name := range names {
-		obj, err := c.clientset.Resource(configMapRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		obj, err := c.clientSet.Resource(configMapRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to get ConfigMap %s: %w", name, err)
 		}
@@ -441,7 +448,7 @@ func (c *K8sClient) GetConfigMaps(namespace string, names ...string) (string, er
 // get secret value from key. e.g. key: "password"
 func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (string, error) {
 	secretRes := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}
-	result, err := c.clientset.Resource(secretRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	result, err := c.clientSet.Resource(secretRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -494,7 +501,7 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 			return fmt.Errorf("timeout waiting for deployment with label app.kubernetes.io/name=%s to be ready", name)
 		default:
 			// List deployments with the label selector
-			deploymentList, err := c.clientset.Resource(deploymentRes).Namespace(namespace).List(ctx, metav1.ListOptions{
+			deploymentList, err := c.clientSet.Resource(deploymentRes).Namespace(namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
 			if err != nil {
