@@ -1054,7 +1054,8 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 
 			annotations, _, err := unstructured.NestedStringMap(ttc.app.Object, "metadata", "annotations")
 			assert.NoError(t, err)
-			assert.Equal(t, ttc.changeExpected, app.filterByManifestGeneratePaths(annotations, ttc.files))
+			manifestGeneratePaths := annotations["argocd.argoproj.io/manifest-generate-paths"]
+			assert.Equal(t, ttc.changeExpected, app.filterByManifestGeneratePaths(manifestGeneratePaths, ttc.files))
 		})
 	}
 }
