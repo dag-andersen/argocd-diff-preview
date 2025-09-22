@@ -20,6 +20,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | Flag | Environment Variable | Default | Description |
 |------|---------------------|---------|-------------|
 | `--debug`, `-d` | `DEBUG` | `false` | Activate debug mode |
+| `--dry-run` | `DRY_RUN` | `false` | Perform a trial run listing the applications that would be processed |
 | `--ignore-invalid-watch-pattern` | `IGNORE_INVALID_WATCH_PATTERN` | `false` | Ignore invalid watch pattern Regex on Applications |
 | `--keep-cluster-alive` | `KEEP_CLUSTER_ALIVE` | `false` | Keep cluster alive after the tool finishes |
 | `--help`, `-h` | - | - | Prints help information |
