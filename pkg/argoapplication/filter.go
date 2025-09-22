@@ -21,9 +21,10 @@ const (
 )
 
 type FilterOptions struct {
-	Selector                  []selector.Selector
-	FilesChanged              []string
-	IgnoreInvalidWatchPattern bool
+	Selector                   []selector.Selector
+	FilesChanged               []string
+	IgnoreInvalidWatchPattern  bool
+	WatchIfNoWatchPatternFound bool
 }
 
 func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) []ArgoResource {
@@ -112,7 +113,7 @@ func (a *ArgoResource) Filter(
 
 	// Then check files changed
 	if len(filterOptions.FilesChanged) > 0 {
-		if !a.filterByFilesChanged(filterOptions.FilesChanged, filterOptions.IgnoreInvalidWatchPattern) {
+		if !a.filterByFilesChanged(filterOptions.FilesChanged, filterOptions.IgnoreInvalidWatchPattern, filterOptions.WatchIfNoWatchPatternFound) {
 			return false
 		}
 	}
@@ -165,7 +166,7 @@ func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) bool {
 }
 
 // filterByFilesChanged checks if the application watches any of the changed files
-func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalidWatchPattern bool) bool {
+func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalidWatchPattern bool, watchIfNoWatchPatternFound bool) bool {
 	if len(filesChanged) == 0 {
 		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no files changed. Skipping")
 		return false
@@ -183,32 +184,39 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
 	if err != nil || !found || len(annotations) == 0 {
 		log.Debug().Str("patchType", "filter").Err(err).Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no annotations found")
-		return false
+		return watchIfNoWatchPatternFound
 	}
 
-	filter := a.filterByAnnotationWatchPattern(annotations, filesChanged, ignoreInvalidWatchPattern) || a.filterByManifestGeneratePaths(annotations, filesChanged)
+	watchPattern, watchPatternExists := annotations[annotationWatchPattern]
+	manifestGeneratePaths, manifestGeneratePathsExists := annotations[annotationArgoCDManifestGeneratePaths]
+
+	// Check if we effectively have no watch patterns (either no annotation or empty/whitespace-only values)
+	effectiveWatchPattern := strings.TrimSpace(watchPattern)
+	effectiveManifestGeneratePaths := strings.TrimSpace(manifestGeneratePaths)
+
+	if (!watchPatternExists || effectiveWatchPattern == "") && (!manifestGeneratePathsExists || effectiveManifestGeneratePaths == "") {
+		if watchIfNoWatchPatternFound {
+			log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no effective watch pattern or manifest-generate-paths annotation found. Selecting Application")
+		} else {
+			log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no effective watch pattern or manifest-generate-paths annotation found. Skipping application")
+		}
+		return watchIfNoWatchPatternFound
+	}
+
+	filter := a.filterByAnnotationWatchPattern(effectiveWatchPattern, filesChanged, ignoreInvalidWatchPattern, watchIfNoWatchPatternFound) ||
+		a.filterByManifestGeneratePaths(effectiveManifestGeneratePaths, filesChanged)
+
 	if !filter {
 		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Skipping application. Does not match watch pattern or manifest-generate-paths")
 	}
 	return filter
 }
 
-func (a *ArgoResource) filterByAnnotationWatchPattern(annotations map[string]string, filesChanged []string, ignoreInvalidWatchPattern bool) bool {
-	watchPattern, exists := annotations[annotationWatchPattern]
-	if !exists || strings.TrimSpace(watchPattern) == "" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern annotation found")
-		return false
-	}
+func (a *ArgoResource) filterByAnnotationWatchPattern(watchPattern string, filesChanged []string, ignoreInvalidWatchPattern bool, watchIfNoWatchPatternFound bool) bool {
 
-	patternList := strings.TrimSpace(watchPattern)
-	if patternList == "" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no watch pattern value found")
-		return false
-	}
+	patternsList := strings.Split(watchPattern, ",")
 
-	patterns := strings.Split(patternList, ",")
-
-	for _, pattern := range patterns {
+	for _, pattern := range patternsList {
 		pattern = strings.TrimSpace(pattern)
 
 		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("checking watch pattern: %s", pattern)
@@ -244,13 +252,7 @@ func (a *ArgoResource) filterByAnnotationWatchPattern(annotations map[string]str
 
 // filterByManifestGeneratePaths checks if the application manifest-generate-paths matches any of the changed files
 // Mimics the behavior of the watch pattern from ArgoCD: https://github.com/argoproj/argo-cd/blob/master/util/app/path/path.go#L122-L151
-func (a *ArgoResource) filterByManifestGeneratePaths(annotations map[string]string, filesChanged []string) bool {
-	// Get manifest-generate-paths annotation
-	manifestGeneratePaths, exists := annotations[annotationArgoCDManifestGeneratePaths]
-	if !exists || strings.TrimSpace(manifestGeneratePaths) == "" {
-		log.Debug().Str("patchType", "filter").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("no manifest-generate-paths annotation found")
-		return false
-	}
+func (a *ArgoResource) filterByManifestGeneratePaths(manifestGeneratePaths string, filesChanged []string) bool {
 
 	// Split the manifest paths by semicolon
 	paths := strings.Split(manifestGeneratePaths, ";")

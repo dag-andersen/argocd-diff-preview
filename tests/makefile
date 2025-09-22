@@ -8,6 +8,8 @@ line_count := 10
 title := Argo CD Diff Preview
 create_cluster := false
 max_diff_length := 65536
+watch_if_no_watch_pattern_found := false
+ignore_invalid_watch_pattern := false
 update_expected ?= false
 
 pull-base:
@@ -39,6 +41,8 @@ run-single-test-go: clean pull-base pull-target
 		--kind-options="$(kind_options)" \
 		--title="$(title)" \
 		--create-cluster="$(create_cluster)" \
+		--watch-if-no-watch-pattern-found="$(watch_if_no_watch_pattern_found)" \
+		--ignore-invalid-watch-pattern="$(ignore_invalid_watch_pattern)" \
 		--max-diff-length="$(max_diff_length)" \
 		--keep-cluster-alive
 	mkdir -p ./$(target_branch)$(suffix)/
@@ -73,6 +77,8 @@ run-single-test-docker: clean pull-base pull-target
 		-e DIFF_IGNORE="$(diff_ignore)" \
 		-e LINE_COUNT="$(line_count)" \
 		-e REPO="$(github_org)/$(gitops_repo)" \
+		-e WATCH_IF_NO_WATCH_PATTERN_FOUND="$(watch_if_no_watch_pattern_found)" \
+		-e IGNORE_INVALID_WATCH_PATTERN="$(ignore_invalid_watch_pattern)" \
 		-e ARGOCD_NAMESPACE="$(argocd_namespace)" \
 		-e ARGOCD_CHART_NAME="$(argocd_chart_name)" \
 		-e ARGOCD_CHART_URL="$(argocd_chart_url)" \
@@ -111,6 +117,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base selector="team=other-team" suffix="-5" title="integration-test/branch-5"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base file_regex=".*labels\.yaml" suffix="-6"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base file_regex="this-does-not-exist\.yaml" suffix="-7"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base files_changed="something/else.yaml" watch_if_no_watch_pattern_found="true" suffix="-8"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target base_branch=integration-test/branch-6/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-7/target base_branch=integration-test/branch-7/base files_changed="examples/helm/values/filtered.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target base_branch=integration-test/branch-8/base files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
