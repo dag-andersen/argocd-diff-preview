@@ -11,6 +11,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/diff"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/duplicates"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
@@ -59,15 +60,25 @@ func run(opts *Options) error {
 		log.Info().Msgf("🔑 Unique ID for this run: %s", uniqueID)
 	}
 
-	// Check if users limited the Application Selection
-	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
-
 	// Create branches
 	baseBranch := git.NewBranch(opts.BaseBranch, git.Base)
 	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
+	if opts.AutoDetectFilesChanged && len(filesChanged) == 0 {
+		cf, err := fileparsing.ListChangedFiles(baseBranch.FolderName(), targetBranch.FolderName())
+		if err != nil {
+			log.Error().Msgf("❌ Failed to list changed files: %s", err)
+			return err
+		}
+		filesChanged = cf
+	}
+
+	// Check if users limited the Application Selection
+	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
+
 	filterOptions := argoapplication.FilterOptions{
 		Selector:                   selectors,
+		FileRegex:                  fileRegex,
 		FilesChanged:               filesChanged,
 		IgnoreInvalidWatchPattern:  opts.IgnoreInvalidWatchPattern,
 		WatchIfNoWatchPatternFound: opts.WatchIfNoWatchPatternFound,
@@ -78,7 +89,6 @@ func run(opts *Options) error {
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
-		fileRegex,
 		filterOptions,
 		opts.Repo,
 		redirectRevisions,

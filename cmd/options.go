@@ -50,6 +50,7 @@ var (
 	DefaultCreateCluster              = true
 	DefaultKeepClusterAlive           = false
 	DefaultDryRun                     = false
+	DefaultAutoDetectFilesChanged     = false
 	DefaultWatchIfNoWatchPatternFound = false
 	DefaultIgnoreInvalidWatchPattern  = false
 )
@@ -77,6 +78,7 @@ type Options struct {
 	FilesChanged               string `mapstructure:"files-changed"`
 	IgnoreInvalidWatchPattern  bool   `mapstructure:"ignore-invalid-watch-pattern"`
 	WatchIfNoWatchPatternFound bool   `mapstructure:"watch-if-no-watch-pattern-found"`
+	AutoDetectFilesChanged     bool   `mapstructure:"auto-detect-files-changed"`
 	KeepClusterAlive           bool   `mapstructure:"keep-cluster-alive"`
 	ArgocdNamespace            string `mapstructure:"argocd-namespace"`
 	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
@@ -266,6 +268,7 @@ func Parse() *Options {
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
+	rootCmd.Flags().Bool("auto-detect-files-changed", DefaultAutoDetectFilesChanged, "Auto detect files changed between branches")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().Bool("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound, "Render applications without watch pattern")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
@@ -421,7 +424,6 @@ func (o *Options) LogOptions() {
 	log.Info().Msgf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
 	log.Info().Msgf("✨ - repo: %s", o.Repo)
 	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
-
 	if o.LogFormat != DefaultLogFormat {
 		log.Info().Msgf("✨ - log-format: %s", o.LogFormat)
 	}
@@ -451,6 +453,8 @@ func (o *Options) LogOptions() {
 		if DefaultWatchIfNoWatchPatternFound != o.WatchIfNoWatchPatternFound {
 			log.Info().Msgf("✨ --- Rendering applications with no watch-pattern annotation")
 		}
+	} else if o.AutoDetectFilesChanged {
+		log.Info().Msgf("✨ - files-changed: auto-detected")
 	}
 	if len(o.parsedSelectors) > 0 {
 		// Convert each selector to string and join with commas
