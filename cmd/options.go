@@ -447,14 +447,16 @@ func (o *Options) LogOptions() {
 	}
 	if len(o.parsedFilesChanged) > 0 {
 		log.Info().Msgf("✨ - files-changed: %s", o.FilesChanged)
+	} else if o.AutoDetectFilesChanged {
+		log.Info().Msgf("✨ - files-changed: auto-detected")
+	}
+	if len(o.parsedFilesChanged) > 0 || o.AutoDetectFilesChanged {
 		if DefaultIgnoreInvalidWatchPattern != o.IgnoreInvalidWatchPattern {
 			log.Info().Msg("✨ --- Ignoring applications with invalid watch-pattern annotation")
 		}
 		if DefaultWatchIfNoWatchPatternFound != o.WatchIfNoWatchPatternFound {
 			log.Info().Msgf("✨ --- Rendering applications with no watch-pattern annotation")
 		}
-	} else if o.AutoDetectFilesChanged {
-		log.Info().Msgf("✨ - files-changed: auto-detected")
 	}
 	if len(o.parsedSelectors) > 0 {
 		// Convert each selector to string and join with commas

@@ -14,7 +14,7 @@ func TestListChangedFiles(t *testing.T) {
 	// Create temporary directories for testing
 	tempDir, err := os.MkdirTemp("", "changed_files_test_*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	dir1 := filepath.Join(tempDir, "dir1")
 	dir2 := filepath.Join(tempDir, "dir2")
@@ -180,36 +180,38 @@ func TestListChangedFilesWithNonExistentDirectories(t *testing.T) {
 	t.Run("non-existent first directory", func(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "changed_files_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		nonExistentDir := filepath.Join(tempDir, "non_existent")
 		existingDir := filepath.Join(tempDir, "existing")
 		require.NoError(t, os.MkdirAll(existingDir, 0755))
 
 		changedFiles, err := ListChangedFiles(nonExistentDir, existingDir)
-		require.NoError(t, err)
+		assert.Error(t, err, "Should return error when first directory doesn't exist")
 		assert.Empty(t, changedFiles, "Should return empty slice when first directory doesn't exist")
+		assert.Contains(t, err.Error(), "no such file or directory", "Error should indicate directory doesn't exist")
 	})
 
 	t.Run("non-existent second directory", func(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "changed_files_test_*")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		existingDir := filepath.Join(tempDir, "existing")
 		nonExistentDir := filepath.Join(tempDir, "non_existent")
 		require.NoError(t, os.MkdirAll(existingDir, 0755))
 
 		changedFiles, err := ListChangedFiles(existingDir, nonExistentDir)
-		require.NoError(t, err)
+		assert.Error(t, err, "Should return error when second directory doesn't exist")
 		assert.Empty(t, changedFiles, "Should return empty slice when second directory doesn't exist")
+		assert.Contains(t, err.Error(), "no such file or directory", "Error should indicate directory doesn't exist")
 	})
 }
 
 func TestCalculateFileHash(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "hash_test_*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	t.Run("identical content produces same hash", func(t *testing.T) {
 		file1 := filepath.Join(tempDir, "file1.txt")
@@ -264,7 +266,7 @@ func TestCalculateFileHash(t *testing.T) {
 func TestGetDirectoryHashes(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "dir_hash_test_*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	t.Run("directory with files", func(t *testing.T) {
 		testFiles := map[string]string{

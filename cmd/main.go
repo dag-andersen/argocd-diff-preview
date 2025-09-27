@@ -67,7 +67,7 @@ func run(opts *Options) error {
 	if opts.AutoDetectFilesChanged && len(filesChanged) == 0 {
 		cf, err := fileparsing.ListChangedFiles(baseBranch.FolderName(), targetBranch.FolderName())
 		if err != nil {
-			log.Error().Msgf("❌ Failed to list changed files: %s", err)
+			log.Error().Msgf("❌ Failed to auto-detect changed files: %s", err)
 			return err
 		}
 		filesChanged = cf
