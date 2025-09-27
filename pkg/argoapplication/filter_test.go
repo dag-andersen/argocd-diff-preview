@@ -63,7 +63,7 @@ func TestFilterByIgnoreAnnotation(t *testing.T) {
 				},
 			}
 
-			got := resource.filterByIgnoreAnnotation()
+			got, _ := resource.filterByIgnoreAnnotation()
 			if got != tt.want {
 				t.Errorf("filterByIgnoreAnnotation() = %v, want %v", got, tt.want)
 			}
@@ -205,7 +205,7 @@ metadata:
 			}
 
 			// Run filter
-			got := app.filterBySelectors(tt.selectors)
+			got, _ := app.filterBySelectors(tt.selectors)
 
 			// Check result
 			assert.Equal(t, tt.want, got)
@@ -581,7 +581,7 @@ metadata:
 			}
 
 			// Run filter
-			got := app.filterByFilesChanged(tt.filesChanged, tt.ignoreInvalidWatchPattern, tt.watchIfNoWatchPatternFound)
+			got, _ := app.filterByFilesChanged(tt.filesChanged, tt.ignoreInvalidWatchPattern, tt.watchIfNoWatchPatternFound)
 
 			// Check result
 			assert.Equal(t, tt.want, got)
@@ -1055,7 +1055,8 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 			annotations, _, err := unstructured.NestedStringMap(ttc.app.Object, "metadata", "annotations")
 			assert.NoError(t, err)
 			manifestGeneratePaths := annotations["argocd.argoproj.io/manifest-generate-paths"]
-			assert.Equal(t, ttc.changeExpected, app.filterByManifestGeneratePaths(manifestGeneratePaths, ttc.files))
+			got, _ := app.filterByManifestGeneratePaths(manifestGeneratePaths, ttc.files)
+			assert.Equal(t, ttc.changeExpected, got)
 		})
 	}
 }

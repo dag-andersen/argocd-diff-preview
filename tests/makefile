@@ -46,7 +46,8 @@ run-single-test-go: clean pull-base pull-target
 		--ignore-invalid-watch-pattern="$(ignore_invalid_watch_pattern)" \
 		--max-diff-length="$(max_diff_length)" \
 		--keep-cluster-alive \
-		--auto-detect-files-changed="$(auto_detect_files_changed)"
+		--auto-detect-files-changed="$(auto_detect_files_changed)" \
+		--debug
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
 	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
