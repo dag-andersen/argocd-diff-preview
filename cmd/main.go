@@ -56,7 +56,7 @@ func run(opts *Options) error {
 	// Create unique ID only consisting of lowercase letters of 5 characters
 	uniqueID := uuid.New().String()[:5]
 
-	if !opts.CreateCluster {
+	if !opts.CreateCluster && !opts.DryRun {
 		log.Info().Msgf("🔑 Unique ID for this run: %s", uniqueID)
 	}
 
@@ -102,11 +102,11 @@ func run(opts *Options) error {
 
 	// If dry-run is enabled, show which applications would be processed and exit
 	if opts.DryRun {
-		log.Info().Msg("💨 This is a dry run. The following applications would be processed:")
+		log.Info().Msg("💨 This is a dry run. The following application[sets] would be processed:")
 		if len(baseApps) > 0 {
 			log.Info().Msgf("👇 Base Branch ('%s'):", baseBranch.Name)
 			for _, app := range baseApps {
-				log.Info().Msgf("  - %s (%s)", app.Name, app.FileName)
+				log.Info().Msgf("  - %s: %s (%s)", app.Kind.ShortName(), app.Name, app.FileName)
 			}
 		} else {
 			log.Info().Msgf("🤷 No applications selected for the base branch ('%s').", baseBranch.Name)
@@ -115,7 +115,7 @@ func run(opts *Options) error {
 		if len(targetApps) > 0 {
 			log.Info().Msgf("👇 Target Branch ('%s'):", targetBranch.Name)
 			for _, app := range targetApps {
-				log.Info().Msgf("  - %s (%s)", app.Name, app.FileName)
+				log.Info().Msgf("  - %s: %s (%s)", app.Kind.ShortName(), app.Name, app.FileName)
 			}
 		} else {
 			log.Info().Msgf("🤷 No applications selected for the target branch ('%s').", targetBranch.Name)
@@ -209,7 +209,7 @@ func run(opts *Options) error {
 	}
 
 	// Generate applications from ApplicationSets
-	baseApps, targetApps, err = argoapplication.ConvertAppSetsToAppsInBothBranches(
+	baseApps, targetApps, convertAppSetsToAppsDuration, err := argoapplication.ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		baseApps,
 		targetApps,
@@ -331,7 +331,7 @@ func run(opts *Options) error {
 
 	// Create info box for storing run time information
 	infoBox := diff.InfoBox{
-		ExtractDuration:            extractDuration,
+		ExtractDuration:            extractDuration + convertAppSetsToAppsDuration,
 		ArgoCDInstallationDuration: argocdInstallationDuration,
 		ClusterCreationDuration:    clusterCreationDuration,
 		FullDuration:               time.Since(startTime),

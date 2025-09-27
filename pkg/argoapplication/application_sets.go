@@ -3,6 +3,7 @@ package argoapplication
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,7 +25,11 @@ func ConvertAppSetsToAppsInBothBranches(
 	redirectRevisions []string,
 	debug bool,
 	filterOptions FilterOptions,
-) ([]ArgoResource, []ArgoResource, error) {
+) ([]ArgoResource, []ArgoResource, time.Duration, error) {
+	startTime := time.Now()
+	defer func() {
+		log.Info().Msgf("🤖 Converting ApplicationSets to Applications in both branches took %s", time.Since(startTime))
+	}()
 
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
 
@@ -44,7 +49,7 @@ func ConvertAppSetsToAppsInBothBranches(
 
 	if err != nil {
 		log.Error().Str("branch", baseBranch.Name).Msg("❌ Failed to generate base apps")
-		return nil, nil, err
+		return nil, nil, time.Since(startTime), err
 	}
 
 	targetApps, err = processAppSets(
@@ -59,10 +64,10 @@ func ConvertAppSetsToAppsInBothBranches(
 	)
 	if err != nil {
 		log.Error().Str("branch", targetBranch.Name).Msg("❌ Failed to generate target apps")
-		return nil, nil, err
+		return nil, nil, time.Since(startTime), err
 	}
 
-	return baseApps, targetApps, nil
+	return baseApps, targetApps, time.Since(startTime), nil
 }
 
 func processAppSets(

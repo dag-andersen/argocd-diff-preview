@@ -183,8 +183,6 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 		return true, "application itself is in the list of files changed"
 	}
 
-	log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Checking if Application should be selected based on files changed: %v", filesChanged)
-
 	// Get annotations directly from unstructured
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
 	if err != nil || !found || len(annotations) == 0 {
