@@ -1,22 +1,24 @@
-# 🚧 BETA 🚧: Connecting to an existing cluster
+# Connecting to an already running cluster
 
-> This feature is new and not well tested. You're more than welcome to try it out and share feedback. Please open an issue on GitHub if you have any questions. 
+Instead of spinning up an ephemeral cluster for each diff preview, you can connect to an existing cluster. This saves approximately `60`–`90` seconds per run.
 
-Instead of spinning up an ephemeral cluster, you can connect to an existing one. This saves about `60`–`90` seconds per run.
+**Important:** We highly recommend **not** using your production Argo CD instance for rendering manifests. Instead, install a dedicated Argo CD instance for diff previews.
 
-We highly recommend **not** using your production Argo CD instance for rendering manifests. Instead, install a dedicated Argo CD instance.
+The Argo CD server does not need to be exposed to the internet, since `argocd-diff-preview` connects via a KubeConfig file (or service account).
 
-The Argo CD instance does **not** need to be exposed to the internet, since `argocd-diff-preview` connects through a KubeConfig file.
+To use this feature, mount a valid KubeConfig with access to the cluster and provide these options:
 
-To use this feature, simply mount a valid KubeConfig with access to the cluster, and provide these options: `--create-cluster false --argocd-namespace <namespace>`
+```bash
+--create-cluster false --argocd-namespace <namespace>
+```
 
-This will skip creating a new cluster and connect to Argo CD via port-forwarding in the specified namespace.
+This will skip cluster creation and connect to Argo CD via port-forwarding in the specified namespace.
 
 ## Requirements
 
 - The default `admin` user must not be disabled in Argo CD.
 - The `default` Argo CD project must exist.
-- The required secrets for authentication has already been added to the cluster.
+- The required secrets for authentication have already been added to the cluster.
 
 ## Example Demo
 
@@ -26,7 +28,6 @@ kind create cluster --name existing-cluster
 helm repo add argo https://argoproj.github.io/argo-helm
 helm install argo-cd argo/argo-cd --version 8.0.3
 ```
-
 
 ### _Step 2_: Clone the base and target branches
 ```bash
@@ -40,7 +41,7 @@ git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --de
 ### _Step 3_: Run the tool
 
 Make sure you:
-- Mount the KubeConfig to the container (`-v ~/.kube:/root/.kube`)
+- Mount the KubeConfig into the container (`-v ~/.kube:/root/.kube`)
 - Disable cluster creation (`--create-cluster=false`)
 - Specify the Argo CD namespace (`--argocd-namespace=<ns>`)
 
@@ -94,9 +95,9 @@ And then the output will look something like this:
 
 ## Authenticate with Cloud Providers
 
-If you're connecting to a cluster on a cloud provider, you often use a plugin or [ExecConfig](https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/#ExecConfig) to authenticate (e.g. `kubelogin` for Azure AKS or `aws eks get-token` for AWS EKS).
+If you're connecting to a cluster on a cloud provider, you often use a plugin or [ExecConfig](https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/#ExecConfig) to authenticate (for example, `kubelogin` for Azure AKS or `aws eks get-token` for AWS EKS).
 
-You can check this by running `kubectl config view --minify -o jsonpath='{.users[*].user}'` and look for the `command` field.
+You can check this by running `kubectl config view --minify -o jsonpath='{.users[*].user}'` and looking for the `command` field.
 
 These plugins/binaries are **not** available inside the Docker image, so you'll need to run `argocd-diff-preview` as a standalone binary.
 
