@@ -174,6 +174,57 @@ func TestListChangedFiles(t *testing.T) {
 		sort.Strings(expected)
 		assert.Equal(t, expected, changedFiles, "Should detect all files as new when comparing empty dir to non-empty")
 	})
+
+	t.Run("deep nested directories", func(t *testing.T) {
+		// Clean directories
+		cleanDir(t, dir1)
+		cleanDir(t, dir2)
+
+		// Create files with various levels of deep nesting
+		createTestFiles(t, dir1, map[string]string{
+			"root.txt":                                     "root content",
+			"level1/file.txt":                              "level 1 content",
+			"level1/level2/file.txt":                       "level 2 content",
+			"level1/level2/level3/file.txt":                "level 3 content",
+			"level1/level2/level3/level4/file.txt":         "level 4 content",
+			"path/to/something/deep.txt":                   "deep path content",
+			"very/deep/nested/structure/config.yaml":       "config content",
+			"a/b/c/d/e/f/g/deeply_nested.txt":              "very deep content",
+			"apps/frontend/src/components/Button.tsx":      "react component",
+			"infrastructure/kubernetes/manifests/app.yaml": "k8s manifest",
+		})
+
+		createTestFiles(t, dir2, map[string]string{
+			"root.txt":                                "root content",             // same
+			"level1/file.txt":                         "modified level 1 content", // modified
+			"level1/level2/file.txt":                  "level 2 content",          // same
+			"level1/level2/level3/file.txt":           "modified level 3 content", // modified
+			"level1/level2/level3/level4/file.txt":    "level 4 content",          // same
+			"path/to/something/deep.txt":              "deep path content",        // same
+			"very/deep/nested/structure/config.yaml":  "modified config content",  // modified
+			"a/b/c/d/e/f/g/deeply_nested.txt":         "very deep content",        // same
+			"apps/frontend/src/components/Button.tsx": "modified react component", // modified
+			// "infrastructure/kubernetes/manifests/app.yaml" - deleted
+			"new/deep/path/added.txt":                    "new deep file",      // new
+			"level1/level2/level3/level4/level5/new.txt": "very deep new file", // new
+		})
+
+		changedFiles, err := ListChangedFiles(dir1, dir2)
+		require.NoError(t, err)
+		sort.Strings(changedFiles)
+
+		expected := []string{
+			"apps/frontend/src/components/Button.tsx",
+			"infrastructure/kubernetes/manifests/app.yaml",
+			"level1/file.txt",
+			"level1/level2/level3/file.txt",
+			"level1/level2/level3/level4/level5/new.txt",
+			"new/deep/path/added.txt",
+			"very/deep/nested/structure/config.yaml",
+		}
+		sort.Strings(expected)
+		assert.Equal(t, expected, changedFiles, "Should detect changes in deeply nested directories")
+	})
 }
 
 func TestListChangedFilesWithNonExistentDirectories(t *testing.T) {
@@ -303,6 +354,36 @@ func TestGetDirectoryHashes(t *testing.T) {
 		nonExistentDir := filepath.Join(tempDir, "non_existent")
 		_, err := getDirectoryHashes(nonExistentDir)
 		assert.Error(t, err, "Should return error for non-existent directory")
+	})
+
+	t.Run("deeply nested directory structure", func(t *testing.T) {
+		deepDir := filepath.Join(tempDir, "deep_test")
+		require.NoError(t, os.MkdirAll(deepDir, 0755))
+		defer func() { _ = os.RemoveAll(deepDir) }()
+
+		testFiles := map[string]string{
+			"root.txt":                               "root content",
+			"level1/level2/level3/deep.txt":          "deep content",
+			"path/to/something/file.txt":             "path content",
+			"very/deep/nested/structure/config.yaml": "config content",
+			"a/b/c/d/e/f/deeply_nested.txt":          "very deep content",
+		}
+		createTestFiles(t, deepDir, testFiles)
+
+		hashes, err := getDirectoryHashes(deepDir)
+		require.NoError(t, err)
+
+		assert.Len(t, hashes, 5, "Should have hashes for all deeply nested files")
+		assert.Contains(t, hashes, "root.txt")
+		assert.Contains(t, hashes, "level1/level2/level3/deep.txt")
+		assert.Contains(t, hashes, "path/to/something/file.txt")
+		assert.Contains(t, hashes, "very/deep/nested/structure/config.yaml")
+		assert.Contains(t, hashes, "a/b/c/d/e/f/deeply_nested.txt")
+
+		// Verify all hashes are non-empty
+		for path, hash := range hashes {
+			assert.NotEmpty(t, hash, "Hash for %s should not be empty", path)
+		}
 	})
 }
 
