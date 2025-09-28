@@ -103,7 +103,7 @@ func (a *ArgoResource) Filter(
 	// First check selected annotation
 	selected, reason := a.filterByIgnoreAnnotation()
 	if !selected {
-		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Application is not selected because: %s", reason)
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
 		return false
 	}
 
@@ -111,7 +111,7 @@ func (a *ArgoResource) Filter(
 	if len(filterOptions.Selector) > 0 {
 		selected, reason := a.filterBySelectors(filterOptions.Selector)
 		if !selected {
-			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Application is not selected because: %s", reason)
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
 			return false
 		}
 	}
@@ -120,10 +120,10 @@ func (a *ArgoResource) Filter(
 	if len(filterOptions.FilesChanged) > 0 {
 		selected, reason := a.filterByFilesChanged(filterOptions.FilesChanged, filterOptions.IgnoreInvalidWatchPattern, filterOptions.WatchIfNoWatchPatternFound)
 		if !selected {
-			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Application is not selected because: %s", reason)
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
 			return false
 		}
-		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Application is selected because: %s", reason)
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is selected because: %s", a.Kind.ShortName(), reason)
 	}
 
 	return true

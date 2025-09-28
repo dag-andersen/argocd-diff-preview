@@ -65,11 +65,13 @@ func run(opts *Options) error {
 	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
 	if opts.AutoDetectFilesChanged && len(filesChanged) == 0 {
-		cf, err := fileparsing.ListChangedFiles(baseBranch.FolderName(), targetBranch.FolderName())
+		log.Info().Msg("🔍 Auto-detecting changed files")
+		cf, duration, err := fileparsing.ListChangedFiles(baseBranch.FolderName(), targetBranch.FolderName())
 		if err != nil {
 			log.Error().Msgf("❌ Failed to auto-detect changed files: %s", err)
 			return err
 		}
+		log.Info().Msgf("🔍 Found %d changed files in %s", len(cf), duration.Round(time.Second))
 		filesChanged = cf
 	}
 

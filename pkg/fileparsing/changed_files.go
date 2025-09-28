@@ -14,28 +14,20 @@ import (
 // ListChangedFiles compares two directories and returns a list of files that have changed.
 // It uses SHA-256 hashes to efficiently detect changes, additions, and modifications.
 // Returns relative file paths of changed files.
-func ListChangedFiles(folder1 string, folder2 string) ([]string, error) {
+func ListChangedFiles(folder1 string, folder2 string) ([]string, time.Duration, error) {
 	startTime := time.Now()
-	defer func() {
-		log.Debug().Msgf("🔍 Finding changed files in %s", time.Since(startTime).Round(time.Second))
-	}()
-
-	log.Debug().
-		Str("folder1", folder1).
-		Str("folder2", folder2).
-		Msg("🔍 Comparing directories for changed files")
 
 	// Get file hashes for both directories
 	hashes1, err := getDirectoryHashes(folder1)
 	if err != nil {
 		log.Error().Err(err).Str("folder", folder1).Msg("❌ Failed to get hashes for folder1")
-		return []string{}, err
+		return []string{}, time.Since(startTime), err
 	}
 
 	hashes2, err := getDirectoryHashes(folder2)
 	if err != nil {
 		log.Error().Err(err).Str("folder", folder2).Msg("❌ Failed to get hashes for folder2")
-		return []string{}, err
+		return []string{}, time.Since(startTime), err
 	}
 
 	var changedFiles []string
@@ -62,11 +54,7 @@ func ListChangedFiles(folder1 string, folder2 string) ([]string, error) {
 		}
 	}
 
-	log.Debug().
-		Int("changedFiles", len(changedFiles)).
-		Msg("🔍 Directory comparison completed")
-
-	return changedFiles, nil
+	return changedFiles, time.Since(startTime), nil
 }
 
 // getDirectoryHashes recursively walks a directory and returns a map of relative file paths to their SHA-256 hashes
