@@ -33,7 +33,7 @@ func TestListChangedFiles(t *testing.T) {
 		createTestFiles(t, dir1, testFiles)
 		createTestFiles(t, dir2, testFiles)
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		assert.Empty(t, changedFiles, "Identical directories should have no changed files")
 	})
@@ -53,7 +53,7 @@ func TestListChangedFiles(t *testing.T) {
 			"same.txt":     "identical content",
 		})
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		sort.Strings(changedFiles)
 
@@ -76,7 +76,7 @@ func TestListChangedFiles(t *testing.T) {
 			"subdir/new_nested.txt": "nested content",
 		})
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		sort.Strings(changedFiles)
 
@@ -100,7 +100,7 @@ func TestListChangedFiles(t *testing.T) {
 			"existing.txt": "existing content",
 		})
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		sort.Strings(changedFiles)
 
@@ -130,7 +130,7 @@ func TestListChangedFiles(t *testing.T) {
 			"subdir/new_nested.txt": "new nested content",
 		})
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		sort.Strings(changedFiles)
 
@@ -150,7 +150,7 @@ func TestListChangedFiles(t *testing.T) {
 		cleanDir(t, dir1)
 		cleanDir(t, dir2)
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		assert.Empty(t, changedFiles, "Empty directories should have no changed files")
 	})
@@ -166,7 +166,7 @@ func TestListChangedFiles(t *testing.T) {
 			"subdir/file2.txt": "content2",
 		})
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		sort.Strings(changedFiles)
 
@@ -209,7 +209,7 @@ func TestListChangedFiles(t *testing.T) {
 			"level1/level2/level3/level4/level5/new.txt": "very deep new file", // new
 		})
 
-		changedFiles, err := ListChangedFiles(dir1, dir2)
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
 		require.NoError(t, err)
 		sort.Strings(changedFiles)
 
@@ -237,7 +237,7 @@ func TestListChangedFilesWithNonExistentDirectories(t *testing.T) {
 		existingDir := filepath.Join(tempDir, "existing")
 		require.NoError(t, os.MkdirAll(existingDir, 0755))
 
-		changedFiles, err := ListChangedFiles(nonExistentDir, existingDir)
+		changedFiles, _, err := ListChangedFiles(nonExistentDir, existingDir)
 		assert.Error(t, err, "Should return error when first directory doesn't exist")
 		assert.Empty(t, changedFiles, "Should return empty slice when first directory doesn't exist")
 		assert.Contains(t, err.Error(), "no such file or directory", "Error should indicate directory doesn't exist")
@@ -252,7 +252,7 @@ func TestListChangedFilesWithNonExistentDirectories(t *testing.T) {
 		nonExistentDir := filepath.Join(tempDir, "non_existent")
 		require.NoError(t, os.MkdirAll(existingDir, 0755))
 
-		changedFiles, err := ListChangedFiles(existingDir, nonExistentDir)
+		changedFiles, _, err := ListChangedFiles(existingDir, nonExistentDir)
 		assert.Error(t, err, "Should return error when second directory doesn't exist")
 		assert.Empty(t, changedFiles, "Should return empty slice when second directory doesn't exist")
 		assert.Contains(t, err.Error(), "no such file or directory", "Error should indicate directory doesn't exist")
