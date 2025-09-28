@@ -75,7 +75,6 @@ func GenerateDiff(
 		infoBox:  timeInfo,
 	}
 	markdown := MarkdownOutput.printDiff(availableSpaceAfterOverhead, maxDiffMessageCharCount)
-
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
 		return fmt.Errorf("failed to write markdown: %w", err)
@@ -83,23 +82,19 @@ func GenerateDiff(
 	}
 
 	// HTML
-
 	HTMLOutput := HTMLOutput{
 		title:    title,
 		summary:  summary,
 		sections: htmlFileSections,
 		infoBox:  timeInfo,
 	}
-
-	// Generate HTML
 	htmlDiff := HTMLOutput.printDiff()
-
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
 	if err := utils.WriteFile(htmlPath, htmlDiff); err != nil {
 		return fmt.Errorf("failed to write html: %w", err)
 	}
 
-	log.Info().Msgf("🙏 Please check the %s file for differences", markdownPath)
+	log.Info().Msgf("🙏 Please check the %s and %s files for differences", markdownPath, htmlPath)
 	return nil
 }
 

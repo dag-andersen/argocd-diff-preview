@@ -63,7 +63,7 @@ func TestFilterByIgnoreAnnotation(t *testing.T) {
 				},
 			}
 
-			got := resource.filterByIgnoreAnnotation()
+			got, _ := resource.filterByIgnoreAnnotation()
 			if got != tt.want {
 				t.Errorf("filterByIgnoreAnnotation() = %v, want %v", got, tt.want)
 			}
@@ -205,7 +205,7 @@ metadata:
 			}
 
 			// Run filter
-			got := app.filterBySelectors(tt.selectors)
+			got, _ := app.filterBySelectors(tt.selectors)
 
 			// Check result
 			assert.Equal(t, tt.want, got)
@@ -218,11 +218,12 @@ func TestFilterByFilesChanged(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.FatalLevel)
 
 	tests := []struct {
-		name                      string
-		yaml                      string
-		filesChanged              []string
-		ignoreInvalidWatchPattern bool
-		want                      bool
+		name                       string
+		yaml                       string
+		filesChanged               []string
+		ignoreInvalidWatchPattern  bool
+		watchIfNoWatchPatternFound bool
+		want                       bool
 	}{
 		{
 			name: "no files changed",
@@ -233,9 +234,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "matching file watch pattern",
@@ -246,9 +248,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
-			filesChanged:              []string{"test.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"test.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "non-matching file watch pattern",
@@ -259,9 +262,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
-			filesChanged:              []string{"test.txt"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "multiple watch patterns",
@@ -272,9 +276,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$,.*\.txt$'`,
-			filesChanged:              []string{"test.txt"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "invalid watch pattern with ignore",
@@ -285,9 +290,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '[invalid, .*\.yaml$'`,
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: true,
-			want:                      true,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  true,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "invalid watch pattern without ignore",
@@ -298,9 +304,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '[invalid, .*\.yaml$'`,
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "empty watch pattern",
@@ -311,9 +318,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: ''`,
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "no watch pattern annotation",
@@ -322,9 +330,10 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: test-app`,
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "no metadata",
@@ -334,9 +343,10 @@ kind: Application
 spec:
   destination:
     namespace: default`,
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "nested path matching pattern",
@@ -347,9 +357,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: 'apps/backend/.*\.yaml$'`,
-			filesChanged:              []string{"apps/backend/deployment.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"apps/backend/deployment.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "nested path non-matching pattern",
@@ -360,9 +371,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: 'apps/backend/.*\.yaml$'`,
-			filesChanged:              []string{"apps/frontend/deployment.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"apps/frontend/deployment.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "multiple nested patterns",
@@ -373,9 +385,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: 'apps/backend/.*\.yaml$,apps/frontend/.*\.js$'`,
-			filesChanged:              []string{"apps/frontend/index.js"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"apps/frontend/index.js"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "glob pattern with nested paths",
@@ -386,9 +399,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: 'services/.*/k8s/.*\.yaml$'`,
-			filesChanged:              []string{"services/auth-service/k8s/deployment.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"services/auth-service/k8s/deployment.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "glob pattern nested paths non-matching",
@@ -399,9 +413,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: 'services/.*/k8s/.*\.yaml$'`,
-			filesChanged:              []string{"services/auth-service/src/main.go"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"services/auth-service/src/main.go"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "nested path with multiple files changed",
@@ -412,9 +427,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: 'microservices/user-service/.*\.yaml$'`,
-			filesChanged:              []string{"microservices/auth-service/deployment.yaml", "microservices/user-service/service.yaml", "README.md"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"microservices/auth-service/deployment.yaml", "microservices/user-service/service.yaml", "README.md"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "nested path exact match",
@@ -425,9 +441,10 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '^some/path/to/specific/file\.yaml$'`,
-			filesChanged:              []string{"some/path/to/specific/file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{"some/path/to/specific/file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "nested path exact match non-matching",
@@ -438,9 +455,113 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/watch-pattern: '^some/path/to/specific/file\.yaml$'`,
-			filesChanged:              []string{"some/path/to/different/file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{"some/path/to/different/file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		// Test cases for WatchIfNoWatchPatternFound behavior
+		{
+			name: "no watch pattern annotation with WatchIfNoWatchPatternFound=true",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: true,
+			want:                       true,
+		},
+		{
+			name: "no watch pattern annotation with WatchIfNoWatchPatternFound=false",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		{
+			name: "empty watch pattern with WatchIfNoWatchPatternFound=true",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/watch-pattern: ''`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: true,
+			want:                       true,
+		},
+		{
+			name: "empty watch pattern with WatchIfNoWatchPatternFound=false",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/watch-pattern: ''`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		{
+			name: "whitespace-only watch pattern with WatchIfNoWatchPatternFound=true",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/watch-pattern: '   '`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: true,
+			want:                       true,
+		},
+		{
+			name: "no annotations section with WatchIfNoWatchPatternFound=true",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: true,
+			want:                       true,
+		},
+		{
+			name: "no annotations section with WatchIfNoWatchPatternFound=false",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app`,
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		{
+			name: "application file itself changed with WatchIfNoWatchPatternFound=false",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app`,
+			filesChanged:               []string{"test.yaml"}, // matches FileName
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true, // Should return true because app file itself changed
 		},
 	}
 
@@ -460,7 +581,7 @@ metadata:
 			}
 
 			// Run filter
-			got := app.filterByFilesChanged(tt.filesChanged, tt.ignoreInvalidWatchPattern)
+			got, _ := app.filterByFilesChanged(tt.filesChanged, tt.ignoreInvalidWatchPattern, tt.watchIfNoWatchPatternFound)
 
 			// Check result
 			assert.Equal(t, tt.want, got)
@@ -473,12 +594,13 @@ func TestFilter(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.FatalLevel)
 
 	tests := []struct {
-		name                      string
-		yaml                      string
-		selectors                 []selector.Selector
-		filesChanged              []string
-		ignoreInvalidWatchPattern bool
-		want                      bool
+		name                       string
+		yaml                       string
+		selectors                  []selector.Selector
+		filesChanged               []string
+		ignoreInvalidWatchPattern  bool
+		watchIfNoWatchPatternFound bool
+		want                       bool
 	}{
 		{
 			name: "no selectors or files changed",
@@ -491,10 +613,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "matching label selector",
@@ -510,9 +633,10 @@ metadata:
 			selectors: []selector.Selector{
 				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "non-matching label selector",
@@ -528,9 +652,10 @@ metadata:
 			selectors: []selector.Selector{
 				{Key: "app", Value: "other", Operator: selector.Eq},
 			},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "matching file watch pattern",
@@ -543,10 +668,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"test.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"test.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "non-matching file watch pattern",
@@ -559,10 +685,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"test.txt"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "multiple watch patterns",
@@ -575,10 +702,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: '.*\.yaml$,.*\.txt$'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"test.txt"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "invalid watch pattern with ignore",
@@ -591,10 +719,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: '[invalid'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"test.yaml"},
-			ignoreInvalidWatchPattern: true,
-			want:                      true,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"test.yaml"},
+			ignoreInvalidWatchPattern:  true,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "invalid watch pattern without ignore",
@@ -607,10 +736,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: '[invalid'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "empty watch pattern",
@@ -623,10 +753,11 @@ metadata:
     app: test
   annotations:
     argocd-diff-preview/watch-pattern: ''`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "no watch pattern annotation",
@@ -637,10 +768,11 @@ metadata:
   name: test-app
   labels:
     app: test`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "no metadata",
@@ -650,10 +782,11 @@ kind: Application
 spec:
   destination:
     namespace: default`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"some-file.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "not equals operator",
@@ -669,9 +802,10 @@ metadata:
 			selectors: []selector.Selector{
 				{Key: "app", Value: "other", Operator: selector.Ne},
 			},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "not equals operator with matching value",
@@ -687,9 +821,10 @@ metadata:
 			selectors: []selector.Selector{
 				{Key: "app", Value: "test", Operator: selector.Ne},
 			},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "ignore annotation",
@@ -700,10 +835,11 @@ metadata:
   name: test-app
   annotations:
     argocd-diff-preview/ignore: 'true'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "ignore annotation with watch pattern",
@@ -715,10 +851,11 @@ metadata:
   annotations:
     argocd-diff-preview/ignore: "true"
     argocd-diff-preview/watch-pattern: '.*\\.yaml$'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      false,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 		{
 			name: "ignore annotation = false with matching selectors",
@@ -734,9 +871,10 @@ metadata:
 			selectors: []selector.Selector{
 				{Key: "app", Value: "test", Operator: selector.Eq},
 			},
-			filesChanged:              []string{},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
 		},
 		{
 			name: "ignore annotation = false with watch pattern",
@@ -750,10 +888,76 @@ metadata:
   annotations:
     argocd-diff-preview/ignore: "false"
     argocd-diff-preview/watch-pattern: '.*\\.yaml$'`,
-			selectors:                 []selector.Selector{},
-			filesChanged:              []string{"test.yaml"},
-			ignoreInvalidWatchPattern: false,
-			want:                      true,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"test.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		// Integration tests for WatchIfNoWatchPatternFound behavior
+		{
+			name: "no watch pattern with WatchIfNoWatchPatternFound=true should include app",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    app: test`,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: true,
+			want:                       true,
+		},
+		{
+			name: "no watch pattern with WatchIfNoWatchPatternFound=false should exclude app",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    app: test`,
+			selectors:                  []selector.Selector{},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		{
+			name: "matching selector but no watch pattern with WatchIfNoWatchPatternFound=true",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    env: prod`,
+			selectors: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: true,
+			want:                       true,
+		},
+		{
+			name: "matching selector but no watch pattern with WatchIfNoWatchPatternFound=false",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    env: prod`,
+			selectors: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+			filesChanged:               []string{"some-file.yaml"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
 		},
 	}
 
@@ -774,9 +978,10 @@ metadata:
 
 			// Run filter
 			got := app.Filter(FilterOptions{
-				Selector:                  tt.selectors,
-				FilesChanged:              tt.filesChanged,
-				IgnoreInvalidWatchPattern: tt.ignoreInvalidWatchPattern,
+				Selector:                   tt.selectors,
+				FilesChanged:               tt.filesChanged,
+				IgnoreInvalidWatchPattern:  tt.ignoreInvalidWatchPattern,
+				WatchIfNoWatchPatternFound: tt.watchIfNoWatchPatternFound,
 			})
 
 			// Check result
@@ -849,7 +1054,9 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 
 			annotations, _, err := unstructured.NestedStringMap(ttc.app.Object, "metadata", "annotations")
 			assert.NoError(t, err)
-			assert.Equal(t, ttc.changeExpected, app.filterByManifestGeneratePaths(annotations, ttc.files))
+			manifestGeneratePaths := annotations["argocd.argoproj.io/manifest-generate-paths"]
+			got, _ := app.filterByManifestGeneratePaths(manifestGeneratePaths, ttc.files)
+			assert.Equal(t, ttc.changeExpected, got)
 		})
 	}
 }

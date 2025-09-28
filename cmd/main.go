@@ -11,6 +11,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/diff"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/duplicates"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
@@ -55,21 +56,34 @@ func run(opts *Options) error {
 	// Create unique ID only consisting of lowercase letters of 5 characters
 	uniqueID := uuid.New().String()[:5]
 
-	if !opts.CreateCluster {
+	if !opts.CreateCluster && !opts.DryRun {
 		log.Info().Msgf("🔑 Unique ID for this run: %s", uniqueID)
 	}
-
-	// Check if users limited the Application Selection
-	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
 
 	// Create branches
 	baseBranch := git.NewBranch(opts.BaseBranch, git.Base)
 	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
 
+	if opts.AutoDetectFilesChanged && len(filesChanged) == 0 {
+		log.Info().Msg("🔍 Auto-detecting changed files")
+		cf, duration, err := fileparsing.ListChangedFiles(baseBranch.FolderName(), targetBranch.FolderName())
+		if err != nil {
+			log.Error().Msgf("❌ Failed to auto-detect changed files: %s", err)
+			return err
+		}
+		log.Info().Msgf("🔍 Found %d changed files in %s", len(cf), duration.Round(time.Second))
+		filesChanged = cf
+	}
+
+	// Check if users limited the Application Selection
+	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
+
 	filterOptions := argoapplication.FilterOptions{
-		Selector:                  selectors,
-		FilesChanged:              filesChanged,
-		IgnoreInvalidWatchPattern: opts.IgnoreInvalidWatchPattern,
+		Selector:                   selectors,
+		FileRegex:                  fileRegex,
+		FilesChanged:               filesChanged,
+		IgnoreInvalidWatchPattern:  opts.IgnoreInvalidWatchPattern,
+		WatchIfNoWatchPatternFound: opts.WatchIfNoWatchPatternFound,
 	}
 
 	// Get applications for both branches
@@ -77,7 +91,6 @@ func run(opts *Options) error {
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
-		fileRegex,
 		filterOptions,
 		opts.Repo,
 		redirectRevisions,
@@ -91,11 +104,11 @@ func run(opts *Options) error {
 
 	// If dry-run is enabled, show which applications would be processed and exit
 	if opts.DryRun {
-		log.Info().Msg("💨 This is a dry run. The following applications would be processed:")
+		log.Info().Msg("💨 This is a dry run. The following application[sets] would be processed:")
 		if len(baseApps) > 0 {
 			log.Info().Msgf("👇 Base Branch ('%s'):", baseBranch.Name)
 			for _, app := range baseApps {
-				log.Info().Msgf("  - %s (%s)", app.Name, app.FileName)
+				log.Info().Msgf("  - %s: %s (%s)", app.Kind.ShortName(), app.Name, app.FileName)
 			}
 		} else {
 			log.Info().Msgf("🤷 No applications selected for the base branch ('%s').", baseBranch.Name)
@@ -104,7 +117,7 @@ func run(opts *Options) error {
 		if len(targetApps) > 0 {
 			log.Info().Msgf("👇 Target Branch ('%s'):", targetBranch.Name)
 			for _, app := range targetApps {
-				log.Info().Msgf("  - %s (%s)", app.Name, app.FileName)
+				log.Info().Msgf("  - %s: %s (%s)", app.Kind.ShortName(), app.Name, app.FileName)
 			}
 		} else {
 			log.Info().Msgf("🤷 No applications selected for the target branch ('%s').", targetBranch.Name)
@@ -198,7 +211,7 @@ func run(opts *Options) error {
 	}
 
 	// Generate applications from ApplicationSets
-	baseApps, targetApps, err = argoapplication.ConvertAppSetsToAppsInBothBranches(
+	baseApps, targetApps, convertAppSetsToAppsDuration, err := argoapplication.ConvertAppSetsToAppsInBothBranches(
 		argocd,
 		baseApps,
 		targetApps,
@@ -320,7 +333,7 @@ func run(opts *Options) error {
 
 	// Create info box for storing run time information
 	infoBox := diff.InfoBox{
-		ExtractDuration:            extractDuration,
+		ExtractDuration:            extractDuration + convertAppSetsToAppsDuration,
 		ArgoCDInstallationDuration: argocdInstallationDuration,
 		ClusterCreationDuration:    clusterCreationDuration,
 		FullDuration:               time.Since(startTime),

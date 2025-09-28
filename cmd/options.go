@@ -30,58 +30,63 @@ var (
 
 // defaults
 var (
-	DefaultTimeout            = uint64(180)
-	DefaultLineCount          = uint(7)
-	DefaultBaseBranch         = "main"
-	DefaultOutputFolder       = "./output"
-	DefaultSecretsFolder      = "./secrets"
-	DefaultCluster            = "auto"
-	DefaultClusterName        = "argocd-diff-preview"
-	DefaultKindOptions        = ""
-	DefaultKindInternal       = false
-	DefaultK3dOptions         = ""
-	DefaultMaxDiffLength      = uint(65536)
-	DefaultArgocdNamespace    = "argocd"
-	DefaultArgocdChartVersion = "latest"
-	DefaultArgocdChartName    = "argo"
-	DefaultArgocdChartURL     = "https://argoproj.github.io/argo-helm"
-	DefaultLogFormat          = "human"
-	DefaultTitle              = "Argo CD Diff Preview"
-	DefaultCreateCluster      = true
-	DefaultKeepClusterAlive   = false
-	DefaultDryRun             = false
+	DefaultTimeout                    = uint64(180)
+	DefaultLineCount                  = uint(7)
+	DefaultBaseBranch                 = "main"
+	DefaultOutputFolder               = "./output"
+	DefaultSecretsFolder              = "./secrets"
+	DefaultCluster                    = "auto"
+	DefaultClusterName                = "argocd-diff-preview"
+	DefaultKindOptions                = ""
+	DefaultKindInternal               = false
+	DefaultK3dOptions                 = ""
+	DefaultMaxDiffLength              = uint(65536)
+	DefaultArgocdNamespace            = "argocd"
+	DefaultArgocdChartVersion         = "latest"
+	DefaultArgocdChartName            = "argo"
+	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
+	DefaultLogFormat                  = "human"
+	DefaultTitle                      = "Argo CD Diff Preview"
+	DefaultCreateCluster              = true
+	DefaultKeepClusterAlive           = false
+	DefaultDryRun                     = false
+	DefaultAutoDetectFilesChanged     = false
+	DefaultWatchIfNoWatchPatternFound = false
+	DefaultIgnoreInvalidWatchPattern  = false
 )
 
 type Options struct {
-	Debug                     bool   `mapstructure:"debug"`
-	DryRun                    bool   `mapstructure:"dry-run"`
-	Timeout                   uint64 `mapstructure:"timeout"`
-	FileRegex                 string `mapstructure:"file-regex"`
-	DiffIgnore                string `mapstructure:"diff-ignore"`
-	LineCount                 uint   `mapstructure:"line-count"`
-	BaseBranch                string `mapstructure:"base-branch"`
-	TargetBranch              string `mapstructure:"target-branch"`
-	Repo                      string `mapstructure:"repo"`
-	OutputFolder              string `mapstructure:"output-folder"`
-	SecretsFolder             string `mapstructure:"secrets-folder"`
-	CreateCluster             bool   `mapstructure:"create-cluster"`
-	ClusterType               string `mapstructure:"cluster"`
-	ClusterName               string `mapstructure:"cluster-name"`
-	KindOptions               string `mapstructure:"kind-options"`
-	KindInternal              bool   `mapstructure:"kind-internal"`
-	K3dOptions                string `mapstructure:"k3d-options"`
-	MaxDiffLength             uint   `mapstructure:"max-diff-length"`
-	Selector                  string `mapstructure:"selector"`
-	FilesChanged              string `mapstructure:"files-changed"`
-	IgnoreInvalidWatchPattern bool   `mapstructure:"ignore-invalid-watch-pattern"`
-	KeepClusterAlive          bool   `mapstructure:"keep-cluster-alive"`
-	ArgocdNamespace           string `mapstructure:"argocd-namespace"`
-	ArgocdChartVersion        string `mapstructure:"argocd-chart-version"`
-	ArgocdChartName           string `mapstructure:"argocd-chart-name"`
-	ArgocdChartURL            string `mapstructure:"argocd-chart-url"`
-	RedirectTargetRevisions   string `mapstructure:"redirect-target-revisions"`
-	LogFormat                 string `mapstructure:"log-format"`
-	Title                     string `mapstructure:"title"`
+	Debug                      bool   `mapstructure:"debug"`
+	DryRun                     bool   `mapstructure:"dry-run"`
+	Timeout                    uint64 `mapstructure:"timeout"`
+	FileRegex                  string `mapstructure:"file-regex"`
+	DiffIgnore                 string `mapstructure:"diff-ignore"`
+	LineCount                  uint   `mapstructure:"line-count"`
+	BaseBranch                 string `mapstructure:"base-branch"`
+	TargetBranch               string `mapstructure:"target-branch"`
+	Repo                       string `mapstructure:"repo"`
+	OutputFolder               string `mapstructure:"output-folder"`
+	SecretsFolder              string `mapstructure:"secrets-folder"`
+	CreateCluster              bool   `mapstructure:"create-cluster"`
+	ClusterType                string `mapstructure:"cluster"`
+	ClusterName                string `mapstructure:"cluster-name"`
+	KindOptions                string `mapstructure:"kind-options"`
+	KindInternal               bool   `mapstructure:"kind-internal"`
+	K3dOptions                 string `mapstructure:"k3d-options"`
+	MaxDiffLength              uint   `mapstructure:"max-diff-length"`
+	Selector                   string `mapstructure:"selector"`
+	FilesChanged               string `mapstructure:"files-changed"`
+	IgnoreInvalidWatchPattern  bool   `mapstructure:"ignore-invalid-watch-pattern"`
+	WatchIfNoWatchPatternFound bool   `mapstructure:"watch-if-no-watch-pattern-found"`
+	AutoDetectFilesChanged     bool   `mapstructure:"auto-detect-files-changed"`
+	KeepClusterAlive           bool   `mapstructure:"keep-cluster-alive"`
+	ArgocdNamespace            string `mapstructure:"argocd-namespace"`
+	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
+	ArgocdChartName            string `mapstructure:"argocd-chart-name"`
+	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
+	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
+	LogFormat                  string `mapstructure:"log-format"`
+	Title                      string `mapstructure:"title"`
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
@@ -210,6 +215,8 @@ func Parse() *Options {
 	viper.SetDefault("output-folder", DefaultOutputFolder)
 	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
 	viper.SetDefault("create-cluster", DefaultCreateCluster)
+	viper.SetDefault("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound)
+	viper.SetDefault("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern)
 	viper.SetDefault("keep-cluster-alive", DefaultKeepClusterAlive)
 	viper.SetDefault("cluster", DefaultCluster)
 	viper.SetDefault("cluster-name", DefaultClusterName)
@@ -261,7 +268,9 @@ func Parse() *Options {
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
-	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", false, "Ignore invalid watch pattern Regex on Applications")
+	rootCmd.Flags().Bool("auto-detect-files-changed", DefaultAutoDetectFilesChanged, "Auto detect files changed between branches")
+	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern, "Ignore invalid watch pattern Regex on Applications")
+	rootCmd.Flags().Bool("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound, "Render applications without watch pattern")
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 
@@ -415,7 +424,6 @@ func (o *Options) LogOptions() {
 	log.Info().Msgf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
 	log.Info().Msgf("✨ - repo: %s", o.Repo)
 	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
-
 	if o.LogFormat != DefaultLogFormat {
 		log.Info().Msgf("✨ - log-format: %s", o.LogFormat)
 	}
@@ -439,6 +447,16 @@ func (o *Options) LogOptions() {
 	}
 	if len(o.parsedFilesChanged) > 0 {
 		log.Info().Msgf("✨ - files-changed: %s", o.FilesChanged)
+	} else if o.AutoDetectFilesChanged {
+		log.Info().Msgf("✨ - files-changed: auto-detected")
+	}
+	if len(o.parsedFilesChanged) > 0 || o.AutoDetectFilesChanged {
+		if DefaultIgnoreInvalidWatchPattern != o.IgnoreInvalidWatchPattern {
+			log.Info().Msg("✨ --- Ignoring applications with invalid watch-pattern annotation")
+		}
+		if DefaultWatchIfNoWatchPatternFound != o.WatchIfNoWatchPatternFound {
+			log.Info().Msgf("✨ --- Rendering applications with no watch-pattern annotation")
+		}
 	}
 	if len(o.parsedSelectors) > 0 {
 		// Convert each selector to string and join with commas
@@ -450,9 +468,6 @@ func (o *Options) LogOptions() {
 	}
 	if len(o.parsedRedirectRevisions) > 0 {
 		log.Info().Msgf("✨ - redirect-target-revisions: %s", o.parsedRedirectRevisions)
-	}
-	if o.IgnoreInvalidWatchPattern {
-		log.Info().Msg("✨ Ignoring invalid watch patterns Regex on Applications")
 	}
 	if o.ArgocdChartVersion != DefaultArgocdChartVersion && o.ArgocdChartVersion != "" {
 		log.Info().Msgf("✨ - argocd-chart-version: %s", o.ArgocdChartVersion)

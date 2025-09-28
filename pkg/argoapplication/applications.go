@@ -73,7 +73,6 @@ func GetApplicationsForBranches(
 	argocdNamespace string,
 	baseBranch *git.Branch,
 	targetBranch *git.Branch,
-	fileRegex *string,
 	filterOptions FilterOptions,
 	repo string,
 	redirectRevisions []string,
@@ -81,7 +80,6 @@ func GetApplicationsForBranches(
 	baseApps, err := getApplications(
 		argocdNamespace,
 		baseBranch,
-		fileRegex,
 		filterOptions,
 		repo,
 		redirectRevisions,
@@ -93,7 +91,6 @@ func GetApplicationsForBranches(
 	targetApps, err := getApplications(
 		argocdNamespace,
 		targetBranch,
-		fileRegex,
 		filterOptions,
 		repo,
 		redirectRevisions,
@@ -109,14 +106,13 @@ func GetApplicationsForBranches(
 func getApplications(
 	argocdNamespace string,
 	branch *git.Branch,
-	fileRegex *string,
 	filterOptions FilterOptions,
 	repo string,
 	redirectRevisions []string,
 ) ([]ArgoResource, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
 
-	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), fileRegex)
+	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), filterOptions.FileRegex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
 	k8sResources := fileparsing.ParseYaml(branch.FolderName(), yamlFiles, branch.Type())
