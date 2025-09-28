@@ -225,6 +225,50 @@ func TestListChangedFiles(t *testing.T) {
 		sort.Strings(expected)
 		assert.Equal(t, expected, changedFiles, "Should detect changes in deeply nested directories")
 	})
+
+	t.Run("ignored folders", func(t *testing.T) {
+		// Clean directories
+		cleanDir(t, dir1)
+		cleanDir(t, dir2)
+
+		// Create files in both regular and ignored folders
+		createTestFiles(t, dir1, map[string]string{
+			"regular_file.txt":             "regular content",
+			".git/config":                  "git config content",
+			"temp/temp_file.txt":           "temp file",
+			"bin/executable":               "binary file",
+			"nested/regular.txt":           "nested regular",
+			"nested/.git/hooks/pre-commit": "nested git hook",
+		})
+
+		createTestFiles(t, dir2, map[string]string{
+			"regular_file.txt":             "modified regular content", // modified
+			".git/config":                  "modified git config",      // should be ignored
+			"nested/regular.txt":           "modified nested regular",  // modified
+			"nested/.git/hooks/pre-commit": "modified nested git hook", // should be ignored
+			"new_regular.txt":              "new regular content",      // new
+		})
+
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
+		require.NoError(t, err)
+		sort.Strings(changedFiles)
+
+		// Only regular files should be detected as changed, ignored folders should be skipped entirely
+		expected := []string{
+			"bin/executable", // bin is no longer ignored
+			"nested/regular.txt",
+			"new_regular.txt",
+			"regular_file.txt",
+			"temp/temp_file.txt", // temp is no longer ignored
+		}
+		sort.Strings(expected)
+		assert.Equal(t, expected, changedFiles, "Should only detect changes in non-ignored folders")
+
+		// Verify that no .git folder files are in the results
+		for _, file := range changedFiles {
+			assert.NotContains(t, file, ".git/", "Should not contain .git files")
+		}
+	})
 }
 
 func TestListChangedFilesWithNonExistentDirectories(t *testing.T) {

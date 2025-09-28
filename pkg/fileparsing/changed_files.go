@@ -57,6 +57,21 @@ func ListChangedFiles(folder1 string, folder2 string) ([]string, time.Duration, 
 	return changedFiles, time.Since(startTime), nil
 }
 
+// Ignore these folders when comparing files
+var ignoreFolders = []string{
+	".git",
+}
+
+// shouldIgnoreFolder checks if a folder should be ignored based on its name
+func shouldIgnoreFolder(folderName string) bool {
+	for _, ignoreFolder := range ignoreFolders {
+		if folderName == ignoreFolder {
+			return true
+		}
+	}
+	return false
+}
+
 // getDirectoryHashes recursively walks a directory and returns a map of relative file paths to their SHA-256 hashes
 func getDirectoryHashes(dirPath string) (map[string]string, error) {
 	hashes := make(map[string]string)
@@ -66,8 +81,12 @@ func getDirectoryHashes(dirPath string) (map[string]string, error) {
 			return err
 		}
 
-		// Skip directories
+		// Skip ignored directories
 		if info.IsDir() {
+			if shouldIgnoreFolder(info.Name()) {
+				log.Debug().Str("folder", info.Name()).Msg("🚫 Skipping ignored folder")
+				return filepath.SkipDir
+			}
 			return nil
 		}
 
