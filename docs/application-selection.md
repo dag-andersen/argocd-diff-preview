@@ -23,7 +23,7 @@ The `argocd-diff-preview/watch-pattern` annotation allows you to specify which f
 
 - Add the `argocd-diff-preview/watch-pattern` annotation to your Application or ApplicationSet manifests
 - The annotation accepts a comma-separated list of file paths or regex patterns
-- Applications are automatically rendered when their watch patterns match changed files
+- Applications are automatically rendered when their watch-patterns match changed files
 - Applications are always rendered if their own manifest file changes (no need to include it in the pattern)
 
 !!! important "Note"
@@ -64,7 +64,7 @@ For ApplicationSets, add the annotation in two places:
 - On the ApplicationSet itself (`metadata.annotations`)
 - On the template that generates applications (`spec.template.metadata.annotations`)
 
-The template annotation can use generator variables like `{{ .path.basename }}` to create application-specific watch patterns.
+The template annotation can use generator variables like `{{ .path.basename }}` to create application-specific watch-patterns.
 
 ```yaml title="ApplicationSet" hl_lines="7-9 21-23"
 apiVersion: argoproj.io/v1alpha1
@@ -129,11 +129,11 @@ For more details on this annotation, see the [Argo CD documentation](https://arg
 
 ### Implementing Changed File Detection in CI/CD
 
-Once you've added watch pattern annotations to your applications, configure your CI/CD pipeline to detect changed files and use them for filtering. Here are two approaches:
+Once you've added watch-pattern annotations to your applications, configure your CI/CD pipeline to detect changed files and use them for filtering. Here are two approaches:
 
 #### Approach 1: Automatic Detection (Recommended)
 
-The simplest approach is to use the `--auto-detect-files-changed` flag. The tool will automatically determine which files changed in the pull request and match them against the watch patterns.
+The simplest approach is to use the `--auto-detect-files-changed` flag. The tool will automatically determine which files changed in the pull request and match them against the watch-patterns.
 
 **Configuration options:**
 
