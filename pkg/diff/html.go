@@ -100,24 +100,35 @@ const htmlLine = `<tr class="%s"><td><pre>%s</pre></td></tr>`
 func (h *HTMLSection) printHTMLSection() string {
 	s := strings.ReplaceAll(htmlSection, "%header%", html.EscapeString(h.header))
 
-	rows := fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(h.commentHeader))
-	for _, line := range strings.Split(h.content, "\n") {
+	var rows strings.Builder
+	// Pre-allocate capacity based on content length to avoid reallocations
+	// Each line gets wrapped in ~40 chars of HTML + potential HTML escaping expansion
+	estimatedLines := strings.Count(h.content, "\n") + 1
+	htmlOverhead := estimatedLines * 50 // ~40 chars HTML + 10 for escaping expansion
+	rows.Grow(len(h.content) + len(h.commentHeader) + htmlOverhead)
+
+	// Add comment header
+	rows.WriteString(fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(h.commentHeader)))
+
+	// Process content lines
+	lines := strings.Split(h.content, "\n")
+	for _, line := range lines {
 		if len(line) == 0 {
-			rows += fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line))
+			rows.WriteString(fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line)))
 			continue
 		}
 		switch line[0] {
 		case '@':
-			rows += fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(line))
+			rows.WriteString(fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(line)))
 		case '-':
-			rows += fmt.Sprintf(htmlLine, "removed_line", html.EscapeString(line))
+			rows.WriteString(fmt.Sprintf(htmlLine, "removed_line", html.EscapeString(line)))
 		case '+':
-			rows += fmt.Sprintf(htmlLine, "added_line", html.EscapeString(line))
+			rows.WriteString(fmt.Sprintf(htmlLine, "added_line", html.EscapeString(line)))
 		default:
-			rows += fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line))
+			rows.WriteString(fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line)))
 		}
 	}
-	s = strings.ReplaceAll(s, "%rows%", rows)
+	s = strings.ReplaceAll(s, "%rows%", rows.String())
 
 	return s
 }
