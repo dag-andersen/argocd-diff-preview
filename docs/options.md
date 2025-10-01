@@ -1,10 +1,10 @@
 # Options
 
-This document describes all the available options for ArgoCD Diff Preview. Options can be provided via command-line flags or environment variables.
+This document describes all the available options for `argocd-diff-preview`. Options can be provided via command-line flags or environment variables.
 
 ## Usage
 
-```
+```bash
 argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-branch>
 ```
 
@@ -12,19 +12,22 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 
 | Flag | Environment Variable | Description |
 |------|---------------------|-------------|
-| `--repo <repo>` | `REPO` | Git Repository in format OWNER/REPO (e.g., `dag-andersen/argocd-diff-preview`) |
+| `--repo <repo>` | `REPO` | Git Repository in format `OWNER/REPO` (e.g., `dag-andersen/argocd-diff-preview`) |
 | `--target-branch <target-branch>`, `-t` | `TARGET_BRANCH` | Target branch name (the branch you want to compare with the base branch) |
 
 ## Flags
 
 | Flag | Environment Variable | Default | Description |
 |------|---------------------|---------|-------------|
+| `--create-cluster` | `CREATE_CLUSTER` | `true` | Create a new cluster if it doesn't exist |
+| `--auto-detect-files-changed` | `AUTO_DETECT_FILES_CHANGED` | `false` | Auto detect files changed between branches |
+| `--watch-if-no-watch-pattern-found` | `WATCH_IF_NO_WATCH_PATTERN_FOUND` | `false` | Render applications without watch-pattern annotation |
 | `--debug`, `-d` | `DEBUG` | `false` | Activate debug mode |
-| `--dry-run` | `DRY_RUN` | `false` | Perform a trial run listing the applications that would be processed |
-| `--ignore-invalid-watch-pattern` | `IGNORE_INVALID_WATCH_PATTERN` | `false` | Ignore invalid watch pattern Regex on Applications |
+| `--dry-run` | `DRY_RUN` | `false` | Show which applications would be processed without creating a cluster or generating a diff |
+| `--ignore-invalid-watch-pattern` | `IGNORE_INVALID_WATCH_PATTERN` | `false` | Ignore invalid watch-pattern Regex on Applications |
 | `--keep-cluster-alive` | `KEEP_CLUSTER_ALIVE` | `false` | Keep cluster alive after the tool finishes |
-| `--help`, `-h` | - | - | Prints help information |
-| `--version`, `-V` | - | - | Prints version information |
+| `--kind-internal` | `KIND_INTERNAL` | `false` | Use the kind cluster's internal address in the kubeconfig (allows connecting to the cluster when running the CLI in a container) |
+| `--version`, `-v` | - | - | Prints version information |
 
 ## Options
 
@@ -35,16 +38,16 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--argocd-chart-url <url>` | `ARGOCD_CHART_URL` | `https://argoproj.github.io/argo-helm` | Argo CD Helm Chart URL |
 | `--argocd-namespace <namespace>` | `ARGOCD_NAMESPACE` | `argocd` | Namespace to use for Argo CD |
 | `--base-branch <branch>`, `-b` | `BASE_BRANCH` | `main` | Base branch name |
-| `--cluster <tool>` | `CLUSTER` | `auto` | Local cluster tool. Options: kind, minikube, auto |
-| `--cluster-name <name>` | `CLUSTER_NAME` | `argocd-diff-preview` | Cluster name (only for kind) |
-| `--kind-options <options>` | `KIND_OPTIONS` | - | Additional options for kind cluster creation |
-| `--kind-internal` | `KIND_INTERNAL` | `false` | Use the kind cluster's internal address in the kubeconfig. Allows connecting to it when running the CLI in a container. |
+| `--cluster <tool>` | `CLUSTER` | `auto` | Local cluster tool. Options: `kind`, `minikube`, `k3d`, `auto` |
+| `--cluster-name <name>` | `CLUSTER_NAME` | `argocd-diff-preview` | Cluster name (only for kind & k3d) |
 | `--diff-ignore <pattern>`, `-i` | `DIFF_IGNORE` | - | Ignore lines in diff. Example: `v[1,9]+.[1,9]+.[1,9]+` for ignoring version changes |
 | `--file-regex <regex>`, `-r` | `FILE_REGEX` | - | Regex to filter files. Example: `/apps_.*\.yaml` |
 | `--files-changed <files>` | `FILES_CHANGED` | - | List of files changed between branches (comma, space or newline separated) |
+| `--k3d-options <options>` | `K3D_OPTIONS` | - | k3d options (only for k3d) |
+| `--kind-options <options>` | `KIND_OPTIONS` | - | kind options (only for kind) |
 | `--line-count <count>`, `-c` | `LINE_COUNT` | `7` | Generate diffs with \<n\> lines of context |
-| `--log-format <format>` | `LOG_FORMAT` | `human` | Log format. Options: human, json |
-| `--max-diff-length <length>` | `MAX_DIFF_LENGTH` | `65536` | Max diff message character count. It only limits the generated Markdown file |
+| `--log-format <format>` | `LOG_FORMAT` | `human` | Log format. Options: `human`, `json` |
+| `--max-diff-length <length>` | `MAX_DIFF_LENGTH` | `65536` | Max diff message character count (only limits the generated Markdown file) |
 | `--output-folder <folder>`, `-o` | `OUTPUT_FOLDER` | `./output` | Output folder where the diff will be saved |
 | `--redirect-target-revisions <revs>` | `REDIRECT_TARGET_REVISIONS` | - | List of target revisions to redirect |
 | `--secrets-folder <folder>`, `-s` | `SECRETS_FOLDER` | `./secrets` | Secrets folder where the secrets are read from |
