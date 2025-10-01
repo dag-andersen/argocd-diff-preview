@@ -34,7 +34,7 @@ diff:
         -v $(pwd)/target-branch:/target-branch \
         -e TARGET_BRANCH=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME} \
         -e REPO=${CI_MERGE_REQUEST_PROJECT_PATH} \
-        dagandersen/argocd-diff-preview:v0.1.17
+        dagandersen/argocd-diff-preview:v0.1.18
     - |
       DIFF_BODY=$(jq -Rs '.' < $(pwd)/output/diff.md)
       NOTE_ID=$(curl --silent --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
@@ -97,7 +97,7 @@ In the simple code example above, we do not provide the cluster with any credent
         -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
         -e TARGET_BRANCH=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME} \
         -e REPO=${CI_MERGE_REQUEST_PROJECT_PATH} \
-        dagandersen/argocd-diff-preview:v0.1.17
+        dagandersen/argocd-diff-preview:v0.1.18
 
 ```
 
