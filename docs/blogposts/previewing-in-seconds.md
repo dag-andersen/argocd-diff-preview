@@ -1,6 +1,6 @@
 # Previewing Argo CD Applications on Pull Requests in Seconds
 
-> **TL;DR**: You can now render previews of changes in a PR using an existing cluster instead of spinning up a new one each run. This results in very short preview times while maintaining accuracy.
+> **TL;DR**: You can now render previews of changes in a PR reusing an existing cluster instead of spinning up a new one each run. This results in very short preview times while maintaining accuracy.
 
 This is a continuation of my first blog post: [Rendering the TRUE Argo CD diff on your PRs](https://dev.to/dag-andersen/rendering-the-true-argo-cd-diff-on-your-prs-10bk). That article addresses a critical challenge in GitOps workflows: visualizing the actual impact of configuration changes when using templating tools like Helm and Kustomize.
 
@@ -10,22 +10,20 @@ The original solution spins up ephemeral Kubernetes clusters inside your CI/CD p
 
 ![](../assets/flow_dark.png)
 
-**Why this approach is superior to alternatives:**
+**Why this approach is superior to alternative tools:**
 - **True accuracy**: Uses Argo CD itself rather than tools that try to mimic its rendering logic
 - **No infrastructure access required**: Works without credentials to your production Argo CD instance
 - **Complete isolation**: Runs in complete isolation from your production systems
 
 However, this approach has one significant limitation: **Speed**. Creating a cluster and installing Argo CD takes 60-90 seconds every time, making even simple configuration changes take 80+ seconds to preview.
 
-## Speed: The Bottleneck and the Solution
-
-Instead of creating a new ephemeral cluster each time, `argocd-diff-preview` can now connect to a pre-existing cluster with Argo CD already installed. This reduces preview times from minutes to seconds while maintaining the same accuracy.
-
 This overhead adds 60-90 seconds to every run, regardless of how simple your configuration changes might be.
 
-### How It Works
+## Speed: The Bottleneck and the Solution
 
-The process remains identical to the original approach:
+Instead of creating a new ephemeral cluster each time, `argocd-diff-preview` can now connect to a pre-existing cluster with Argo CD already installed. This reduces preview times from minutes to seconds.
+
+### How It Works
 
 1. Scan both branches (base and target) for Argo CD Applications and ApplicationSets
 2. Temporarily create these applications with unique identifiers in your dedicated Argo CD instance
@@ -49,7 +47,7 @@ Each run uses a unique identifier, so multiple PRs can run without collisions.
 
 This is the approach described in the [first blog post](https://dev.to/dag-andersen/rendering-the-true-argo-cd-diff-on-your-prs-10bk). The tool creates a fresh Kubernetes cluster for each preview run.
 
-![](../assets/flow_dark.png)
+![](../assets/ephemeral-cluster.png)
 
 **How it works:**
 - Creates a fresh Kubernetes cluster (kind, k3d, or minikube)
@@ -58,20 +56,22 @@ This is the approach described in the [first blog post](https://dev.to/dag-ander
 - Destroys the cluster when done
 
 **Trade-offs:**
-- ✅ Zero setup, complete isolation, highest security, works with any CI/CD
-- ❌ Slow (60-90 second overhead per run), resource intensive
+- ✅ Zero setup
+- ✅ Complete isolation
+- ✅ Works with any CI/CD
+- ❌ Slow (60-90 second overhead per run)
+- ❌ Resource intensive (Creates a new cluster for each run)
 
-### Approach 2: Existing Cluster
+### Approach 2: Reusing Cluster
 
 Connect to a pre-existing cluster with Argo CD already installed, eliminating the cluster creation overhead.
 
 **Requirements:**
-- A dedicated Argo CD instance (never use your production instance) installed in a cluster
-- Access to the same repositories and Helm registries as production  
+- A dedicated Argo CD instance installed in a cluster with access to the same repositories and Helm registries as your _normal_ Argo CD instance
 - The default `admin` user is enabled and the `default` project exists
 - KubeConfig or service account credentials for your cluster available to your CI/CD pipeline
 
-![](../assets/existing-cluster.png)
+![](../assets/reusing-cluster.png)
 
 **Quick Demo:**
 ```bash
@@ -100,30 +100,25 @@ docker run \
 ```
 
 **Trade-offs:**
-- ✅ Fast execution (eliminates 60-90s overhead), same accuracy, concurrent runs
-- ❌ Infrastructure setup required, cluster credentials in CI/CD pipeline
+- ✅ Fast execution (eliminates 60-90s overhead)
+- ❌ Infrastructure setup required (Setup cluster with Argo CD)
+- ❌ Cluster credentials in CI/CD pipeline
 
-### Approach 3: Existing Cluster + Self-Hosted Runner
+### Approach 3: Reusing Cluster + Self-Hosted Runner
 
 For organizations concerned about credential sharing, run the pipeline from inside the same cluster as your dedicated Argo CD instance using GitHub Actions self-hosted runners.
 
-![](../assets/existing-cluster-self-hosted-runner.png)
+![](../assets/reusing-cluster-with-arc-runner.png)
 
 **The Process:**
 1. Install Action Runner Controller (ARC) in your cluster alongside the dedicated Argo CD instance
-2. The self-hosted runner can directly access Argo CD secrets using `kubectl get secrets -n argocd`
-3. These secrets are automatically passed to `argocd-diff-preview` for authentication with Git repositories and Helm registries
-4. The tool runs exactly as before, but without any credential management complexity
-
-**Key Benefits:**
-- **Enhanced security**: No credentials leave your infrastructure
-- **Same performance**: Eliminates cluster creation overhead
-- **Network isolation**: Runner operates within your cluster's security boundaries
-- **No credential management**: Runner accesses resources directly via service account
+2. The tool runs exactly as before, but without any credential management complexity
 
 **Trade-offs:**
-- ✅ Fast execution, enhanced security, network isolation, no credential management
-- ❌ Most complex setup (requires ARC + dedicated Argo CD), primarily limited to GitHub Actions
+- ✅ Fast execution (eliminates 60-90s overhead)
+- ✅ Network isolation (No need to expose your cluster to the internet)
+- ✅ No cluster credentials in CI/CD pipeline because you are using a service account from within the cluster
+- ❌ Most complex setup (requires ARC + dedicated Argo CD)
 
 > **Note**: For complete setup instructions, see the [self-hosted runner guide](../reusing-clusters/self-hosted-gh-runner.md).
 
@@ -183,7 +178,7 @@ For complete details, see the [application-selection documentation](./applicatio
 
 ## Real-World Results
 
-At Egmont, we use the self-hosted runner approach with a repository containing 600+ applications. Combined with smart application selection, we achieve preview times under 10 seconds - an 8x improvement over the original ephemeral cluster approach.
+At [Egmont](https://www.egmont.com), we use the self-hosted runner approach with a repository containing 600+ applications. Combined with smart application selection, we achieve preview times under 10 seconds - an 20x improvement over the original ephemeral cluster approach.
 
 The key is combining two optimizations:
 1. **Use an existing cluster** to eliminate cluster creation overhead
