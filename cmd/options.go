@@ -45,6 +45,8 @@ var (
 	DefaultArgocdChartVersion         = "latest"
 	DefaultArgocdChartName            = "argo"
 	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
+	DefaultArgocdChartRepoUserName     = ""
+	DefaultArgocdChartRepoPassword     = ""
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
@@ -84,6 +86,8 @@ type Options struct {
 	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
 	ArgocdChartName            string `mapstructure:"argocd-chart-name"`
 	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
+	ArgocdChartRepoUserName    string `mapstructure:"argocd-chart-repo-user-name"`
+	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -225,6 +229,8 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-version", DefaultArgocdChartVersion)
 	viper.SetDefault("argocd-chart-name", DefaultArgocdChartName)
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
+	viper.SetDefault("argocd-repo-user-name", DefaultArgocdChartRepoUserName)
+	viper.SetDefault("argocd-repo-password", DefaultArgocdChartRepoPassword)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -245,7 +251,8 @@ func Parse() *Options {
 	rootCmd.Flags().String("argocd-namespace", DefaultArgocdNamespace, "Namespace to use for Argo CD")
 	rootCmd.Flags().String("argocd-chart-name", DefaultArgocdChartName, "Argo CD Helm Chart name")
 	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
-
+	rootCmd.Flags().String("argocd-repo-user-name", DefaultArgocdChartRepoUserName, "Argo CD Helm Repo User Name")
+	rootCmd.Flags().String("argocd-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
@@ -477,6 +484,12 @@ func (o *Options) LogOptions() {
 	}
 	if o.ArgocdChartURL != DefaultArgocdChartURL {
 		log.Info().Msgf("✨ - argocd-chart-url: %s", o.ArgocdChartURL)
+	}
+	if o.ArgocdChartRepoUserName != DefaultArgocdChartRepoUserName {
+		log.Info().Msgf("✨ - argocd-chart-repo-user-name: %s", o.ArgocdChartRepoUserName)
+	}
+	if o.ArgocdChartRepoPassword != DefaultArgocdChartRepoPassword {
+		log.Info().Msgf("✨ - argocd-chart-repo-password: *********")
 	}
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)
