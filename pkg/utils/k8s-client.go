@@ -26,9 +26,10 @@ import (
 )
 
 type K8sClient struct {
-	clientSet       *dynamic.DynamicClient
-	discoveryClient discovery.DiscoveryInterface
-	mapper          *restmapper.DeferredDiscoveryRESTMapper
+	clientSet             *dynamic.DynamicClient
+	discoveryClient       discovery.DiscoveryInterface
+	cachedDiscoveryClient *disk.CachedDiscoveryClient
+	mapper                *restmapper.DeferredDiscoveryRESTMapper
 }
 
 func NewK8sClient() (*K8sClient, error) {
@@ -91,9 +92,10 @@ func NewK8sClient() (*K8sClient, error) {
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoveryClient)
 
 	return &K8sClient{
-		clientSet:       clientSet,
-		discoveryClient: discoveryClient,
-		mapper:          mapper,
+		clientSet:             clientSet,
+		discoveryClient:       discoveryClient,
+		cachedDiscoveryClient: cachedDiscoveryClient,
+		mapper:                mapper,
 	}, nil
 }
 
@@ -327,9 +329,24 @@ func (c *K8sClient) ApplyManifest(obj *unstructured.Unstructured, source string,
 	}
 
 	// Use REST mapper to get the correct GVR (handles proper pluralization)
+	// Retry once with cache invalidation if the first attempt fails
 	mapping, err := c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
-		return fmt.Errorf("failed to get REST mapping for %s: %w", gvk.String(), err)
+		// If we get a "no matches" error, the cache might be stale
+		// Invalidate the cache and retry
+		if strings.Contains(err.Error(), "no matches for kind") {
+			log.Debug().Msgf("REST mapping failed for %s, invalidating cache and retrying", gvk.String())
+			c.cachedDiscoveryClient.Invalidate()
+			c.mapper.Reset()
+
+			// Retry after cache invalidation
+			mapping, err = c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+			if err != nil {
+				return fmt.Errorf("failed to get REST mapping for %s (after cache invalidation): %w", gvk.String(), err)
+			}
+		} else {
+			return fmt.Errorf("failed to get REST mapping for %s: %w", gvk.String(), err)
+		}
 	}
 
 	gvr := mapping.Resource
