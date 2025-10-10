@@ -35,7 +35,7 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 		return nil
 	}
 
-	log.Info().Msg("🔌 Setting up port forward to ArgoCD server...")
+	log.Debug().Msg("🔌 Setting up port forward to ArgoCD server...")
 
 	// Create channels for coordination
 	readyChan := make(chan struct{}, 1)
@@ -44,13 +44,17 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 	// Set up port forward to argocd-server service
 	// Forward local port to pod port 8080 (the actual port the server listens on)
 	// Note: The service exposes 443, but the pod itself listens on 8080
-	serviceName := "argocd-server"
-	remotePort := 8080
+	// Discover the service by label "app.kubernetes.io/component=server"
+	labelSelector := "app.kubernetes.io/component=server"
+	serviceName, err := a.K8sClient.GetServiceNameByLabel(a.Namespace, labelSelector)
+	if err != nil {
+		a.portForwardMutex.Unlock()
+		return fmt.Errorf("failed to find ArgoCD server service with label %s: %w", labelSelector, err)
+	}
 
 	// Start the port forward
 	log.Debug().Msgf("Starting port forward from localhost:%d to %s:%d in namespace %s", a.portForwardLocalPort, serviceName, remotePort, a.Namespace)
-	err := a.K8sClient.PortForwardToService(a.Namespace, serviceName, a.portForwardLocalPort, remotePort, readyChan, stopChan)
-	if err != nil {
+	if err := a.K8sClient.PortForwardToService(a.Namespace, serviceName, a.portForwardLocalPort, remotePort, readyChan, stopChan); err != nil {
 		a.portForwardMutex.Unlock()
 		return fmt.Errorf("failed to set up port forward: %w", err)
 	}
@@ -67,7 +71,7 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 	// Add timeout to prevent hanging forever
 	select {
 	case <-readyChan:
-		log.Info().Msgf("🔌 Port forward ready: localhost:%d -> %s:%d", a.portForwardLocalPort, serviceName, remotePort)
+		log.Debug().Msgf("🔌 Port forward ready: localhost:%d -> %s:%d", a.portForwardLocalPort, serviceName, remotePort)
 		return nil
 	case <-time.After(30 * time.Second):
 		// Reset state on timeout
@@ -97,7 +101,7 @@ func (a *ArgoCDInstallation) StopPortForward() {
 }
 
 // getToken retrieves an authentication token from the ArgoCD API (cached)
-func (a *ArgoCDInstallation) getToken() (string, error) {
+func (a *ArgoCDInstallation) getToken(username, password string) (string, error) {
 
 	// Return cached token if available
 	if a.authToken != "" {
@@ -105,22 +109,16 @@ func (a *ArgoCDInstallation) getToken() (string, error) {
 		return a.authToken, nil
 	}
 
-	log.Info().Msg("🔑 Fetching new authentication token...")
+	log.Debug().Msg("🔑 Fetching new authentication token...")
 
 	// Set up port forward to ArgoCD server
 	if err := a.portForwardToArgoCD(); err != nil {
-		return "", fmt.Errorf("failed to set up port forward: %w", err)
-	}
-
-	// Get the admin password from the Kubernetes secret
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return "", fmt.Errorf("failed to get initial password: %w", err)
+		return "", err
 	}
 
 	// Prepare the login request payload
 	loginData := map[string]string{
-		"username": "admin",
+		"username": username,
 		"password": password,
 	}
 
@@ -133,7 +131,7 @@ func (a *ArgoCDInstallation) getToken() (string, error) {
 	// Use plain HTTP since we're connecting directly to the pod's port 8080
 	url := fmt.Sprintf("%s/api/v1/session", a.apiServerURL)
 
-	log.Info().Msgf("🌐 Making request to: %s", url)
+	log.Debug().Msgf("🌐 Making request to: %s", url)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -157,7 +155,7 @@ func (a *ArgoCDInstallation) getToken() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to make HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read the response body
 	body, err := io.ReadAll(resp.Body)
@@ -186,8 +184,17 @@ func (a *ArgoCDInstallation) getToken() (string, error) {
 	// Cache the token for future use
 	a.authToken = sessionResponse.Token
 
-	log.Info().Msg("🔑 Successfully obtained and cached ArgoCD token")
+	log.Debug().Msg("🔑 Successfully obtained and cached ArgoCD token")
 	return sessionResponse.Token, nil
+}
+
+func (a *ArgoCDInstallation) updateToken(username, password string) error {
+	token, err := a.getToken(username, password)
+	if err != nil {
+		return fmt.Errorf("failed to get initial token: %w", err)
+	}
+	a.authToken = token
+	return nil
 }
 
 // login performs login to ArgoCD using the CLI (legacy method)
@@ -200,17 +207,17 @@ func (a *ArgoCDInstallation) login() error {
 		return err
 	}
 
-	token, err := a.getToken()
-	if err != nil {
-		return fmt.Errorf("failed to get initial token: %w", err)
+	username := "admin"
+
+	// Update the token
+	if err := a.updateToken(username, password); err != nil {
+		return fmt.Errorf("failed to update token: %w", err)
 	}
-	log.Debug().Msgf("token: %s", token)
-	a.authToken = token
 
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+		out, err := a.runArgocdCommand("login", "--insecure", "--username", username, "--password", password)
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
@@ -243,13 +250,6 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 	if err := a.login(); err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
-
-	token, err := a.getToken()
-	if err != nil {
-		return time.Since(startTime), fmt.Errorf("failed to get initial token: %w", err)
-	}
-	a.authToken = token
-	log.Debug().Msgf("token: %s", a.authToken)
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 

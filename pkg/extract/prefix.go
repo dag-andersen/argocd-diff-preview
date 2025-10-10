@@ -44,13 +44,8 @@ func addApplicationPrefix(a *argoapplication.ArgoResource, prefix string) error 
 	return nil
 }
 
-// removeApplicationPrefix removes the prefix from the application name
 // returns the old id and an error
-func removeApplicationPrefix(a *argoapplication.ArgoResource, prefix string) (string, error) {
-	// remove the branch short name, and two dashes.
-	oldId := a.Id
-	newId := a.Id[len(prefix)+len("-x-"):]
-	a.Id = newId
-	a.Yaml.SetName(newId)
-	return oldId, nil
+func setName(a *argoapplication.ArgoResource, name string) {
+	a.Id = name
+	a.Yaml.SetName(name)
 }

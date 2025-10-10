@@ -737,6 +737,33 @@ func (c *K8sClient) PortForwardToPod(namespace, podName string, localPort, remot
 	return nil
 }
 
+// GetServiceNameByLabel finds a service in the namespace with the specified label selector
+// Returns the name of the first matching service, or an error if no service is found
+func (c *K8sClient) GetServiceNameByLabel(namespace, labelSelector string) (string, error) {
+	// Create a Kubernetes clientset
+	clientset, err := kubernetes.NewForConfig(c.config)
+	if err != nil {
+		return "", fmt.Errorf("failed to create kubernetes clientset: %w", err)
+	}
+
+	// List services matching the label selector
+	services, err := clientset.CoreV1().Services(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list services with label %s: %w", labelSelector, err)
+	}
+
+	if len(services.Items) == 0 {
+		return "", fmt.Errorf("no services found with label %s in namespace %s", labelSelector, namespace)
+	}
+
+	// Return the first matching service name
+	serviceName := services.Items[0].Name
+	log.Debug().Msgf("Found service %s with label %s in namespace %s", serviceName, labelSelector, namespace)
+	return serviceName, nil
+}
+
 // PortForwardToService sets up a port forward to a service by finding a pod for that service
 // Returns a channel that will be closed when the port forward is ready, a stop channel to terminate the forward,
 // and an error if the setup fails

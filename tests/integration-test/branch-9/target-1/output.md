@@ -168,6 +168,21 @@ Deleted (9):
 ```diff
 @@ Application deleted: my-app-set-dev (examples/basic-appset/my-app-set.yaml) @@
 -apiVersion: v1
+-automountServiceAccountToken: true
+-kind: ServiceAccount
+-metadata:
+-  annotations: {}
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-dev
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-
+----
+-apiVersion: v1
 -kind: Service
 -metadata:
 -  annotations: {}
@@ -189,21 +204,6 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
--
-----
--apiVersion: v1
--automountServiceAccountToken: true
--kind: ServiceAccount
--metadata:
--  annotations: {}
--  labels:
--    app.kubernetes.io/instance: my-app-set-dev
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
 -
 ----
 -apiVersion: apps/v1
@@ -264,6 +264,21 @@ Deleted (9):
 ```diff
 @@ Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml) @@
 -apiVersion: v1
+-automountServiceAccountToken: true
+-kind: ServiceAccount
+-metadata:
+-  annotations: {}
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-prod
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-
+----
+-apiVersion: v1
 -kind: Service
 -metadata:
 -  annotations: {}
@@ -285,21 +300,6 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
--
-----
--apiVersion: v1
--automountServiceAccountToken: true
--kind: ServiceAccount
--metadata:
--  annotations: {}
--  labels:
--    app.kubernetes.io/instance: my-app-set-prod
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
 -
 ----
 -apiVersion: apps/v1
@@ -360,6 +360,21 @@ Deleted (9):
 ```diff
 @@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@
 -apiVersion: v1
+-automountServiceAccountToken: true
+-kind: ServiceAccount
+-metadata:
+-  annotations: {}
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-
+----
+-apiVersion: v1
 -kind: Service
 -metadata:
 -  annotations: {}
@@ -381,21 +396,6 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-staging
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
--
-----
--apiVersion: v1
--automountServiceAccountToken: true
--kind: ServiceAccount
--metadata:
--  annotations: {}
--  labels:
--    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
 -
 ----
 -apiVersion: apps/v1

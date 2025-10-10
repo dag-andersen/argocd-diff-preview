@@ -36,15 +36,20 @@ var (
 	}
 )
 
+const (
+	// remotePort is the port that the ArgoCD server pod listens on
+	remotePort = 8080
+)
+
 type ArgoCDInstallation struct {
-	K8sClient  *utils.K8sClient
-	Namespace  string
-	Version    string
-	ConfigPath string
-	ChartName  string
-	ChartURL   string
-	ChartRepoUsername string
-	ChartRepoPassword string
+	K8sClient            *utils.K8sClient
+	Namespace            string
+	Version              string
+	ConfigPath           string
+	ChartName            string
+	ChartURL             string
+	ChartRepoUsername    string
+	ChartRepoPassword    string
 	portForwardActive    bool
 	portForwardMutex     sync.Mutex
 	portForwardStopChan  chan struct{}
@@ -56,14 +61,14 @@ type ArgoCDInstallation struct {
 func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string) *ArgoCDInstallation {
 	localPort := 8081
 	return &ArgoCDInstallation{
-		K8sClient:  client,
-		Namespace:  namespace,
-		Version:    version,
-		ConfigPath: "argocd-config",
-		ChartName:  repoName,
-		ChartURL:   repoURL,
-		ChartRepoUsername: repoUsername,
-		ChartRepoPassword: repoPassword,
+		K8sClient:            client,
+		Namespace:            namespace,
+		Version:              version,
+		ConfigPath:           "argocd-config",
+		ChartName:            repoName,
+		ChartURL:             repoURL,
+		ChartRepoUsername:    repoUsername,
+		ChartRepoPassword:    repoPassword,
 		portForwardLocalPort: localPort,
 		apiServerURL:         fmt.Sprintf("http://localhost:%d", localPort),
 	}
@@ -157,8 +162,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		// Create a new repository file
 		r := repo.NewFile()
 		r.Add(&repo.Entry{
-			Name: a.ChartName,
-			URL:  a.ChartURL,
+			Name:     a.ChartName,
+			URL:      a.ChartURL,
 			Username: a.ChartRepoUsername,
 			Password: a.ChartRepoPassword,
 		})
@@ -175,8 +180,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 		if !r.Has(a.ChartName) {
 			r.Add(&repo.Entry{
-				Name: a.ChartName,
-				URL:  a.ChartURL,
+				Name:     a.ChartName,
+				URL:      a.ChartURL,
 				Username: a.ChartRepoUsername,
 				Password: a.ChartRepoPassword,
 			})
@@ -189,8 +194,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Update repository
 	repoEntry := &repo.Entry{
-		Name: a.ChartName,
-		URL:  a.ChartURL,
+		Name:     a.ChartName,
+		URL:      a.ChartURL,
 		Username: a.ChartRepoUsername,
 		Password: a.ChartRepoPassword,
 	}
@@ -318,8 +323,6 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	return string(output), nil
 }
 
-// Authentication-related functions have been moved to auth.go
-
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
 	out, err := a.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
@@ -356,7 +359,7 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
 	// Ensure port forward is active
 	if err := a.portForwardToArgoCD(); err != nil {
-		return "", fmt.Errorf("failed to set up port forward: %w", err)
+		return "", err
 	}
 
 	// Make API request to get manifests
@@ -391,7 +394,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
 		}
 		return "", fmt.Errorf("failed to make HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)

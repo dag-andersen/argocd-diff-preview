@@ -15,9 +15,8 @@ Deleted (1):
 ```diff
 @@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@
 -apiVersion: v1
--data:
--  allow-snippet-annotations: "false"
--kind: ConfigMap
+-automountServiceAccountToken: true
+-kind: ServiceAccount
 -metadata:
 -  annotations: {}
 -  labels:
@@ -26,7 +25,7 @@ Deleted (1):
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: ingress-nginx
 -    app.kubernetes.io/part-of: ingress-nginx
--    app.kubernetes
+-    app.kubernetes.io/
 🚨 Diff is too long
 ```
 
