@@ -9,7 +9,7 @@ spec:
     name: in-cluster
     namespace: default
   sources:
-    - chart: ingress-nginx
+    - chart: ingress-nginxxx
       repoURL: "https://kubernetes.github.io/ingress-nginx"
       targetRevision: 4.10.0
       helm:
