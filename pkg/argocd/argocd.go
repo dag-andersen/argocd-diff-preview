@@ -449,7 +449,11 @@ func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts i
 	var exists bool
 	var out string
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		log.Debug().Msgf("GetManifestsWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
+		if attempt > 1 {
+			log.Debug().Msgf("GetManifestsWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
+		} else {
+			log.Debug().Msgf("GetManifestsWithRetry to Argo CD...")
+		}
 		out, exists, err = a.GetManifests(appName)
 		if err == nil {
 			return out, exists, nil
