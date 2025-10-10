@@ -17,19 +17,19 @@ import (
 )
 
 // Error and timeout messages that we look for in application status
-// var errorMessages = []string{
-// 	"helm template .",
-// 	"authentication required",
-// 	"authentication failed",
-// 	"path does not exist",
-// 	"error converting YAML to JSON",
-// 	"Unknown desc = `helm template .",
-// 	"Unknown desc = `kustomize build",
-// 	"Unknown desc = Unable to resolve",
-// 	"is not a valid chart repository or cannot be reached",
-// 	"Unknown desc = repository not found",
-// 	"to a commit SHA",
-// }
+var errorMessages = []string{
+	"helm template .",
+	"authentication required",
+	"authentication failed",
+	"path does not exist",
+	"error converting YAML to JSON",
+	"Unknown desc = `helm template .",
+	"Unknown desc = `kustomize build",
+	"Unknown desc = Unable to resolve",
+	"is not a valid chart repository or cannot be reached",
+	"Unknown desc = repository not found",
+	"to a commit SHA",
+}
 
 var timeoutMessages = []string{
 	"Client.Timeout",
@@ -245,18 +245,17 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	log.Debug().Str("App", app.GetLongName()).Msg("Applied manifest for application")
 
 	startTime := time.Now()
-	var result ExtractedApp
 
 	for {
 		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			return result, "", fmt.Errorf("timed out waiting for application %s", app.GetLongName())
+			return ExtractedApp{}, "", fmt.Errorf("timed out waiting for application %s", app.GetLongName())
 		}
 
 		// Get application status
 		output, err := argocd.K8sClient.GetArgoCDApplication(argocd.Namespace, app.Id)
 		if err != nil {
-			return result, "", fmt.Errorf("failed to get application %s: %w", app.GetLongName(), err)
+			return ExtractedApp{}, "", fmt.Errorf("failed to get application %s: %w", app.GetLongName(), err)
 		}
 
 		var appStatus struct {
@@ -272,52 +271,15 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		}
 
 		if err := yaml.Unmarshal([]byte(output), &appStatus); err != nil {
-			return result, "", fmt.Errorf("failed to parse application yaml for %s: %w", app.GetLongName(), err)
+			return ExtractedApp{}, "", fmt.Errorf("failed to parse application yaml for %s: %w", app.GetLongName(), err)
 		}
 
 		switch appStatus.Status.Sync.Status {
 		case "OutOfSync", "Synced":
-			log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
-
-			retryCount := 5
-			manifests, exists, err := argocd.GetManifestsWithRetry(app.Id, retryCount)
-			if !exists {
-				return result, "", fmt.Errorf("application %s does not exist", app.GetLongName())
-			}
-
+			extractedApp, oldName, err := getManifestsFromApp(argocd, app, prefix)
 			if err != nil {
-				return result, "", fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
+				return ExtractedApp{}, "", fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
 			}
-
-			log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")
-
-			manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
-			manifestsContent, err := processYamlOutput(manifests)
-			if err != nil {
-				log.Error().Err(err).Str("App", app.GetLongName()).Msg("Failed to process YAML")
-				return result, "", fmt.Errorf("failed to process YAML: %w", err)
-			}
-
-			// Apply Application-level ignoreDifferences (jsonPointers) before comparing diffs
-			rules := parseIgnoreDifferencesFromApp(app)
-			if len(rules) > 0 {
-				applyIgnoreDifferencesToManifests(manifestsContent, rules)
-			}
-			
-			err = removeArgoCDTrackingID(manifestsContent)
-			if err != nil {
-				return result, "", fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
-			}
-
-			// remove the prefix from the application name
-			oldName, err := removeApplicationPrefix(&app, prefix)
-			if err != nil {
-				return result, "", fmt.Errorf("failed to remove application prefix: %w", err)
-			}
-
-			// Parse the first non-empty manifest from the string
-			extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
-
 			return extractedApp, oldName, nil
 
 		case "Unknown":
@@ -331,17 +293,72 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 						} else {
 							log.Info().Str("App", app.GetLongName()).Msg("🔄 Refreshed application")
 						}
-					} else {
+					} else if containsAny(msg, errorMessages) {
 						log.Error().Str("App", app.GetLongName()).Msgf("❌ Application failed with error: %s", msg)
-						return result, "", fmt.Errorf("application %s failed: %s", app.Name, msg)
+						return ExtractedApp{}, "", fmt.Errorf("application %s failed: %s", app.Name, msg)
+					} else {
+						extractedApp, oldName, err := getManifestsFromApp(argocd, app, prefix)
+						if err == nil {
+							return extractedApp, oldName, nil
+						}
 					}
 				}
 			}
 		}
 
+		// Check if we've exceeded timeout
+		if time.Since(startTime).Seconds() > float64(timeout) {
+			return ExtractedApp{}, "", fmt.Errorf("timed out waiting for application %s", app.GetLongName())
+		}
+
 		// Sleep before next iteration
 		time.Sleep(5 * time.Second)
 	}
+}
+
+func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, prefix string) (ExtractedApp, string, error) {
+	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
+
+	retryCount := 5
+	manifests, exists, err := argocd.GetManifestsWithRetry(app.Id, retryCount)
+	if !exists {
+		return ExtractedApp{}, "", fmt.Errorf("application %s does not exist", app.GetLongName())
+	}
+
+	if err != nil {
+		return ExtractedApp{}, "", fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
+	}
+
+	log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")
+
+	manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
+	manifestsContent, err := processYamlOutput(manifests)
+	if err != nil {
+		log.Error().Err(err).Str("App", app.GetLongName()).Msg("Failed to process YAML")
+		return ExtractedApp{}, "", fmt.Errorf("failed to process YAML: %w", err)
+	}
+
+	// Apply Application-level ignoreDifferences (jsonPointers) before comparing diffs
+	rules := parseIgnoreDifferencesFromApp(app)
+	if len(rules) > 0 {
+		applyIgnoreDifferencesToManifests(manifestsContent, rules)
+	}
+
+	err = removeArgoCDTrackingID(manifestsContent)
+	if err != nil {
+		return ExtractedApp{}, "", fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
+	}
+
+	// remove the prefix from the application name
+	oldName, err := removeApplicationPrefix(&app, prefix)
+	if err != nil {
+		return ExtractedApp{}, "", fmt.Errorf("failed to remove application prefix: %w", err)
+	}
+
+	// Parse the first non-empty manifest from the string
+	extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
+
+	return extractedApp, oldName, nil
 }
 
 func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) error {

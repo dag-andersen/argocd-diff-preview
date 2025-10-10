@@ -1,5 +1,6 @@
 # Overrides done by argocd-diff-preview
 # These will happen after the values.yaml file is loaded
+createClusterRoles: false
 notifications:
   enabled: false
 dex:
@@ -17,6 +18,19 @@ controller:
     successThreshold: 1
     timeoutSeconds: 1
     failureThreshold: 40
+  roleRules:
+    - apiGroups:
+        - "*"
+      resources:
+        - "*"
+      verbs:
+        - "*"
+    - apiGroups:
+        - ""
+      resources:
+        - "*"
+      verbs:
+        - "*"
 server:
   readinessProbe:
     initialDelaySeconds: 0
