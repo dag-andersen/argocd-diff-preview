@@ -20,6 +20,7 @@ var errorMessages = []string{
 	"helm template .",
 	"authentication required",
 	"authentication failed",
+	"error logging into OCI registry",
 	"path does not exist",
 	"error converting YAML to JSON",
 	"Unknown desc = `helm template .",

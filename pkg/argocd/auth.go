@@ -44,13 +44,17 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 	// Set up port forward to argocd-server service
 	// Forward local port to pod port 8080 (the actual port the server listens on)
 	// Note: The service exposes 443, but the pod itself listens on 8080
-	serviceName := "argocd-server"
-	remotePort := 8080
+	// Discover the service by label "app.kubernetes.io/component=server"
+	labelSelector := "app.kubernetes.io/component=server"
+	serviceName, err := a.K8sClient.GetServiceNameByLabel(a.Namespace, labelSelector)
+	if err != nil {
+		a.portForwardMutex.Unlock()
+		return fmt.Errorf("failed to find ArgoCD server service with label %s: %w", labelSelector, err)
+	}
 
 	// Start the port forward
 	log.Debug().Msgf("Starting port forward from localhost:%d to %s:%d in namespace %s", a.portForwardLocalPort, serviceName, remotePort, a.Namespace)
-	err := a.K8sClient.PortForwardToService(a.Namespace, serviceName, a.portForwardLocalPort, remotePort, readyChan, stopChan)
-	if err != nil {
+	if err := a.K8sClient.PortForwardToService(a.Namespace, serviceName, a.portForwardLocalPort, remotePort, readyChan, stopChan); err != nil {
 		a.portForwardMutex.Unlock()
 		return fmt.Errorf("failed to set up port forward: %w", err)
 	}
@@ -109,7 +113,7 @@ func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 
 	// Set up port forward to ArgoCD server
 	if err := a.portForwardToArgoCD(); err != nil {
-		return "", fmt.Errorf("failed to set up port forward: %w", err)
+		return "", err
 	}
 
 	// Prepare the login request payload

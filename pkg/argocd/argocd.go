@@ -36,6 +36,11 @@ var (
 	}
 )
 
+const (
+	// remotePort is the port that the ArgoCD server pod listens on
+	remotePort = 8080
+)
+
 type ArgoCDInstallation struct {
 	K8sClient            *utils.K8sClient
 	Namespace            string
@@ -348,7 +353,7 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
 	// Ensure port forward is active
 	if err := a.portForwardToArgoCD(); err != nil {
-		return "", fmt.Errorf("failed to set up port forward: %w", err)
+		return "", err
 	}
 
 	// Make API request to get manifests
