@@ -1,16 +1,22 @@
 package argocd
 
 import (
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/yaml"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -39,9 +45,15 @@ type ArgoCDInstallation struct {
 	ChartURL   string
 	ChartRepoUsername string
 	ChartRepoPassword string
+	portForwardActive    bool
+	portForwardMutex     sync.Mutex
+	portForwardStopChan  chan struct{}
+	portForwardLocalPort int    // Local port for port forwarding (e.g., 8081)
+	apiServerURL         string // Constructed API server URL (e.g., "http://localhost:8081")
 }
 
 func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string) *ArgoCDInstallation {
+	localPort := 8081
 	return &ArgoCDInstallation{
 		K8sClient:  client,
 		Namespace:  namespace,
@@ -51,6 +63,8 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 		ChartURL:   repoURL,
 		ChartRepoUsername: repoUsername,
 		ChartRepoPassword: repoPassword,
+		portForwardLocalPort: localPort,
+		apiServerURL:         fmt.Sprintf("http://localhost:%d", localPort),
 	}
 }
 
@@ -108,19 +122,6 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
 	return duration, nil
-}
-
-func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
-	startTime := time.Now()
-
-	// Login to ArgoCD
-	if err := a.login(); err != nil {
-		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
-	}
-
-	log.Info().Msg("🦑 Logged in to Argo CD successfully")
-
-	return time.Since(startTime), nil
 }
 
 // installWithHelm installs ArgoCD using Helm
@@ -316,53 +317,7 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	return string(output), nil
 }
 
-func (a *ArgoCDInstallation) login() error {
-	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
-
-	// Get initial admin password
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return err
-	}
-
-	maxAttempts := 10
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
-		if err == nil {
-			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
-			break
-		}
-
-		if attempt >= maxAttempts {
-			log.Error().Err(err).Msgf("❌ Failed to login to Argo CD after %d attempts", maxAttempts)
-			return fmt.Errorf("failed to login after %d attempts", maxAttempts)
-		}
-
-		log.Debug().Msgf("Waiting 1s before next login attempt (%d/%d)...", attempt+1, maxAttempts)
-		log.Warn().Err(err).Msgf("Argo CD login attempt %d/%d failed.", attempt, maxAttempts)
-		time.Sleep(1 * time.Second)
-	}
-
-	log.Debug().Msg("Verifying login by listing applications...")
-	if _, errList := a.runArgocdCommand("app", "list"); errList != nil {
-		log.Error().Err(errList).Msg("❌ Failed to list applications after login (verification step).")
-		return fmt.Errorf("login verification failed (unable to list applications): %w", errList)
-	}
-
-	return nil
-}
-
-func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
-
-	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
-	if err != nil {
-		log.Error().Msgf("❌ Failed to get secret: %s", err)
-		return "", fmt.Errorf("failed to get secret: %w", err)
-	}
-
-	return secret, nil
-}
+// Authentication-related functions have been moved to auth.go
 
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
@@ -396,19 +351,100 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 	return "", err
 }
 
-// GetManifests returns the manifests for an application
+// GetManifests returns the manifests for an application using the ArgoCD API
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
-	out, err := a.runArgocdCommand("app", "manifests", appName)
+	// Ensure port forward is active
+	if err := a.portForwardToArgoCD(); err != nil {
+		return "", false, fmt.Errorf("failed to set up port forward: %w", err)
+	}
+
+	// Get authentication token
+	token, err := a.getInitialToken()
 	if err != nil {
+		return "", false, fmt.Errorf("failed to get authentication token: %w", err)
+	}
+
+	// Make API request to get manifests
+	url := fmt.Sprintf("%s/api/v1/applications/%s/manifests", a.apiServerURL, appName)
+
+	log.Debug().Msgf("Getting manifests for app %s from API: %s", appName, url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set authorization header with bearer token
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+
+	// Create HTTP client with TLS config to handle redirects
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		// Check if app exists
 		exists, _ := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
 		if !exists {
 			log.Warn().Msgf("App %s does not exist", appName)
 		}
+		return "", exists, fmt.Errorf("failed to make HTTP request: %w", err)
+	}
+	defer resp.Body.Close()
 
-		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return out, true, nil
+	// Check status code
+	if resp.StatusCode == 404 {
+		log.Warn().Msgf("App %s does not exist (404)", appName)
+		return "", false, fmt.Errorf("application not found: %s", appName)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("ArgoCD API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse JSON response to extract manifests
+	// The API returns manifests as an array of JSON strings, not objects
+	var manifestResponse struct {
+		Manifests []string `json:"manifests"`
+	}
+
+	if err := json.Unmarshal(body, &manifestResponse); err != nil {
+		return "", true, fmt.Errorf("failed to unmarshal manifests response: %w", err)
+	}
+
+	// Convert manifests to YAML format with --- separators
+	// Each manifest is already a JSON string, we need to convert each to YAML
+	var manifestsYAML strings.Builder
+	for i, manifestStr := range manifestResponse.Manifests {
+		// The manifest is a JSON string, convert it to YAML
+		manifestYAML, err := yaml.JSONToYAML([]byte(manifestStr))
+		if err != nil {
+			return "", true, fmt.Errorf("failed to convert manifest %d to YAML: %w", i, err)
+		}
+
+		// Write separator between manifests (except for the first one)
+		if i > 0 {
+			manifestsYAML.WriteString("---\n")
+		}
+
+		// Write the YAML manifest
+		manifestsYAML.Write(manifestYAML)
+	}
+
+	log.Debug().Msgf("Successfully retrieved %d manifests for app %s", len(manifestResponse.Manifests), appName)
+	return manifestsYAML.String(), true, nil
 }
 
 // GetManifestsWithRetry returns the manifests for an application with retry
