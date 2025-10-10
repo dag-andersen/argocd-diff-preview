@@ -353,10 +353,10 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 }
 
 // GetManifests returns the manifests for an application using the ArgoCD API
-func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
+func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
 	// Ensure port forward is active
 	if err := a.portForwardToArgoCD(); err != nil {
-		return "", false, fmt.Errorf("failed to set up port forward: %w", err)
+		return "", fmt.Errorf("failed to set up port forward: %w", err)
 	}
 
 	// Make API request to get manifests
@@ -366,7 +366,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to create HTTP request: %w", err)
+		return "", fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
 	// Set authorization header with bearer token
@@ -389,24 +389,33 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 		if !exists {
 			log.Warn().Msgf("App %s does not exist", appName)
 		}
-		return "", exists, fmt.Errorf("failed to make HTTP request: %w", err)
+		return "", fmt.Errorf("failed to make HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", false, fmt.Errorf("failed to read response body: %w", err)
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	// Check status code
 	if resp.StatusCode == 404 {
 		log.Warn().Msgf("App %s does not exist (404)", appName)
-		return "", false, fmt.Errorf("application not found: %s", appName)
+		return "", fmt.Errorf("application not found: %s", appName)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", false, fmt.Errorf("ArgoCD API returned status %d: %s", resp.StatusCode, string(body))
+
+		var response struct {
+			Error string `json:"error"`
+		}
+
+		if err := json.Unmarshal(body, &response); err == nil {
+			return "", fmt.Errorf("ArgoCD API returned error: %s", response.Error)
+		}
+
+		return "", fmt.Errorf("ArgoCD API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse JSON response to extract manifests
@@ -416,7 +425,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 	}
 
 	if err := json.Unmarshal(body, &manifestResponse); err != nil {
-		return "", true, fmt.Errorf("failed to unmarshal manifests response: %w", err)
+		return "", fmt.Errorf("failed to unmarshal manifests response: %w", err)
 	}
 
 	// Convert manifests to YAML format with --- separators
@@ -426,7 +435,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 		// The manifest is a JSON string, convert it to YAML
 		manifestYAML, err := yaml.JSONToYAML([]byte(manifestStr))
 		if err != nil {
-			return "", true, fmt.Errorf("failed to convert manifest %d to YAML: %w", i, err)
+			return "", fmt.Errorf("failed to convert manifest %d to YAML: %w", i, err)
 		}
 
 		// Write separator between manifests (except for the first one)
@@ -439,14 +448,13 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 	}
 
 	log.Debug().Msgf("Successfully retrieved %d manifests for app %s", len(manifestResponse.Manifests), appName)
-	return manifestsYAML.String(), true, nil
+	return manifestsYAML.String(), nil
 }
 
 // GetManifestsWithRetry returns the manifests for an application with retry
-func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts int) (string, bool, error) {
+func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts int) (string, error) {
 
 	var err error
-	var exists bool
 	var out string
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if attempt > 1 {
@@ -454,9 +462,9 @@ func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts i
 		} else {
 			log.Debug().Msgf("GetManifestsWithRetry to Argo CD...")
 		}
-		out, exists, err = a.GetManifests(appName)
+		out, err = a.GetManifests(appName)
 		if err == nil {
-			return out, exists, nil
+			return out, nil
 		}
 
 		if attempt < maxAttempts {
@@ -466,7 +474,7 @@ func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts i
 		}
 	}
 
-	return out, exists, err
+	return out, err
 }
 
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {
