@@ -14,6 +14,21 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml) @@
+ automountServiceAccountToken: true
+ kind: ServiceAccount
+ metadata:
+   annotations: {}
+   labels:
+     app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: experiment
+   namespace: default
+ 
+ ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -37,22 +52,6 @@ Modified (1):
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/name: myApp
    type: ClusterIP
- 
- ---
- apiVersion: v1
- automountServiceAccountToken: true
- kind: ServiceAccount
- metadata:
-   annotations: {}
-   labels:
-     app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: experiment
-   namespace: default
  
  ---
  apiVersion: apps/v1

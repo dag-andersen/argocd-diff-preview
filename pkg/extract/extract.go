@@ -312,6 +312,29 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		return ExtractedApp{}, "", fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
 	}
 
+	// set the namespace if not set
+	for _, manifest := range manifestsContent {
+		if manifest.GetNamespace() == "" {
+
+			// namespace specified in ArgoCD applicaiton - spec.destination.namespace
+			namespace, found, err := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
+			if err != nil {
+				return ExtractedApp{}, "", fmt.Errorf("failed to get namespace from application: %w", err)
+			}
+			if found {
+				manifest.SetNamespace(namespace)
+			}
+		}
+	}
+
+	newManifestsContent := make([]unstructured.Unstructured, 0, len(manifestsContent))
+	for _, manifest := range manifestsContent {
+		if HelmHookFilter(manifest) {
+			newManifestsContent = append(newManifestsContent, manifest)
+		}
+	}
+	manifestsContent = newManifestsContent
+
 	// remove the prefix from the application name
 	oldName, err := removeApplicationPrefix(&app, prefix)
 	if err != nil {
@@ -352,6 +375,16 @@ func removeArgoCDTrackingID(a []unstructured.Unstructured) error {
 	}
 
 	return nil
+}
+
+// returns true if the object is NOT a Helm hook
+func HelmHookFilter(obj unstructured.Unstructured) bool {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return true
+	}
+	_, exists := annotations["helm.sh/hook"]
+	return !exists
 }
 
 func isErrorCondition(condType string) bool {

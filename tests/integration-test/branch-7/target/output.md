@@ -15,6 +15,21 @@ Modified (2):
 
 ```diff
 @@ Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml) @@
+ automountServiceAccountToken: true
+ kind: ServiceAccount
+ metadata:
+   annotations: {}
+   labels:
+     app.kubernetes.io/instance: valid-manifest-generate-paths-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: super-duper-app-name
+   namespace: default
+ 
+ ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -38,22 +53,6 @@ Modified (2):
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/name: myApp
    type: ClusterIP
- 
- ---
- apiVersion: v1
- automountServiceAccountToken: true
- kind: ServiceAccount
- metadata:
-   annotations: {}
-   labels:
-     app.kubernetes.io/instance: valid-manifest-generate-paths-example
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: super-duper-app-name
-   namespace: default
  
  ---
  apiVersion: apps/v1
@@ -101,6 +100,21 @@ Modified (2):
 
 ```diff
 @@ Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml) @@
+ automountServiceAccountToken: true
+ kind: ServiceAccount
+ metadata:
+   annotations: {}
+   labels:
+     app.kubernetes.io/instance: watch-pattern-valid-regex-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: super-duper-app-name
+   namespace: default
+ 
+ ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -124,22 +138,6 @@ Modified (2):
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/name: myApp
    type: ClusterIP
- 
- ---
- apiVersion: v1
- automountServiceAccountToken: true
- kind: ServiceAccount
- metadata:
-   annotations: {}
-   labels:
-     app.kubernetes.io/instance: watch-pattern-valid-regex-example
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: super-duper-app-name
-   namespace: default
  
  ---
  apiVersion: apps/v1

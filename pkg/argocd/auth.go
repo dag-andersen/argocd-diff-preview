@@ -35,7 +35,7 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 		return nil
 	}
 
-	log.Info().Msg("🔌 Setting up port forward to ArgoCD server...")
+	log.Debug().Msg("🔌 Setting up port forward to ArgoCD server...")
 
 	// Create channels for coordination
 	readyChan := make(chan struct{}, 1)
@@ -67,7 +67,7 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 	// Add timeout to prevent hanging forever
 	select {
 	case <-readyChan:
-		log.Info().Msgf("🔌 Port forward ready: localhost:%d -> %s:%d", a.portForwardLocalPort, serviceName, remotePort)
+		log.Debug().Msgf("🔌 Port forward ready: localhost:%d -> %s:%d", a.portForwardLocalPort, serviceName, remotePort)
 		return nil
 	case <-time.After(30 * time.Second):
 		// Reset state on timeout
@@ -105,7 +105,7 @@ func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 		return a.authToken, nil
 	}
 
-	log.Info().Msg("🔑 Fetching new authentication token...")
+	log.Debug().Msg("🔑 Fetching new authentication token...")
 
 	// Set up port forward to ArgoCD server
 	if err := a.portForwardToArgoCD(); err != nil {
@@ -127,7 +127,7 @@ func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 	// Use plain HTTP since we're connecting directly to the pod's port 8080
 	url := fmt.Sprintf("%s/api/v1/session", a.apiServerURL)
 
-	log.Info().Msgf("🌐 Making request to: %s", url)
+	log.Debug().Msgf("🌐 Making request to: %s", url)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -180,7 +180,7 @@ func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 	// Cache the token for future use
 	a.authToken = sessionResponse.Token
 
-	log.Info().Msg("🔑 Successfully obtained and cached ArgoCD token")
+	log.Debug().Msg("🔑 Successfully obtained and cached ArgoCD token")
 	return sessionResponse.Token, nil
 }
 
