@@ -8,7 +8,6 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
@@ -29,6 +28,7 @@ var errorMessages = []string{
 	"is not a valid chart repository or cannot be reached",
 	"Unknown desc = repository not found",
 	"to a commit SHA",
+	"error fetching chart: failed to fetch chart: failed to get command args to log",
 }
 
 var timeoutMessages = []string{
@@ -252,57 +252,23 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			return ExtractedApp{}, "", fmt.Errorf("timed out waiting for application %s", app.GetLongName())
 		}
 
-		// Get application status
-		output, err := argocd.K8sClient.GetArgoCDApplication(argocd.Namespace, app.Id)
-		if err != nil {
-			return ExtractedApp{}, "", fmt.Errorf("failed to get application %s: %w", app.GetLongName(), err)
-		}
-
-		var appStatus struct {
-			Status struct {
-				Sync struct {
-					Status string `yaml:"status"`
-				} `yaml:"sync"`
-				Conditions []struct {
-					Type    string `yaml:"type"`
-					Message string `yaml:"message"`
-				} `yaml:"conditions"`
-			} `yaml:"status"`
-		}
-
-		if err := yaml.Unmarshal([]byte(output), &appStatus); err != nil {
-			return ExtractedApp{}, "", fmt.Errorf("failed to parse application yaml for %s: %w", app.GetLongName(), err)
-		}
-
-		switch appStatus.Status.Sync.Status {
-		case "OutOfSync", "Synced":
-			extractedApp, oldName, err := getManifestsFromApp(argocd, app, prefix)
-			if err != nil {
-				return ExtractedApp{}, "", fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
-			}
+		extractedApp, oldName, err := getManifestsFromApp(argocd, app, prefix)
+		if err == nil {
 			return extractedApp, oldName, nil
+		}
 
-		case "Unknown":
-			for _, condition := range appStatus.Status.Conditions {
-				if isErrorCondition(condition.Type) {
-					msg := condition.Message
-					if containsAny(msg, timeoutMessages) {
-						log.Warn().Str("App", app.GetLongName()).Msgf("⚠️ Application timed out with error: %s", msg)
-						if err := argocd.RefreshApp(app.Id); err != nil {
-							log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to refresh application")
-						} else {
-							log.Info().Str("App", app.GetLongName()).Msg("🔄 Refreshed application")
-						}
-					} else if containsAny(msg, errorMessages) {
-						log.Error().Str("App", app.GetLongName()).Msgf("❌ Application failed with error: %s", msg)
-						return ExtractedApp{}, "", fmt.Errorf("application %s failed: %s", app.Name, msg)
-					} else {
-						extractedApp, oldName, err := getManifestsFromApp(argocd, app, prefix)
-						if err == nil {
-							return extractedApp, oldName, nil
-						}
-					}
-				}
+		log.Debug().Err(err).Str("App", app.GetLongName()).Msg("Failed to get manifests from application")
+
+		errMsg := err.Error()
+		if containsAny(errMsg, errorMessages) {
+			log.Error().Str("App", app.GetLongName()).Msgf("❌ Application failed with error: %s", errMsg)
+			return ExtractedApp{}, "", err
+		} else if containsAny(errMsg, timeoutMessages) {
+			log.Warn().Str("App", app.GetLongName()).Msgf("⚠️ Application timed out with error: %s", errMsg)
+			if err := argocd.RefreshApp(app.Id); err != nil {
+				log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to refresh application")
+			} else {
+				log.Info().Str("App", app.GetLongName()).Msg("🔄 Refreshed application")
 			}
 		}
 
@@ -320,10 +286,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
 	retryCount := 5
-	manifests, exists, err := argocd.GetManifestsWithRetry(app.Id, retryCount)
-	if !exists {
-		return ExtractedApp{}, "", fmt.Errorf("application %s does not exist", app.GetLongName())
-	}
+	manifests, err := argocd.GetManifestsWithRetry(app.Id, retryCount)
 
 	if err != nil {
 		return ExtractedApp{}, "", fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
