@@ -96,8 +96,17 @@ func (a *ArgoCDInstallation) StopPortForward() {
 	}
 }
 
-// getInitialToken retrieves an authentication token from the ArgoCD API
-func (a *ArgoCDInstallation) getInitialToken() (string, error) {
+// getToken retrieves an authentication token from the ArgoCD API (cached)
+func (a *ArgoCDInstallation) getToken() (string, error) {
+
+	// Return cached token if available
+	if a.authToken != "" {
+		log.Debug().Msg("Using cached authentication token")
+		return a.authToken, nil
+	}
+
+	log.Info().Msg("🔑 Fetching new authentication token...")
+
 	// Set up port forward to ArgoCD server
 	if err := a.portForwardToArgoCD(); err != nil {
 		return "", fmt.Errorf("failed to set up port forward: %w", err)
@@ -174,7 +183,10 @@ func (a *ArgoCDInstallation) getInitialToken() (string, error) {
 		return "", fmt.Errorf("token not found in response")
 	}
 
-	log.Debug().Msg("Successfully obtained ArgoCD token")
+	// Cache the token for future use
+	a.authToken = sessionResponse.Token
+
+	log.Info().Msg("🔑 Successfully obtained and cached ArgoCD token")
 	return sessionResponse.Token, nil
 }
 
@@ -188,11 +200,12 @@ func (a *ArgoCDInstallation) login() error {
 		return err
 	}
 
-	token, err := a.getInitialToken()
+	token, err := a.getToken()
 	if err != nil {
 		return fmt.Errorf("failed to get initial token: %w", err)
 	}
-	log.Debug().Msgf("Initial token: %s", token)
+	log.Debug().Msgf("token: %s", token)
+	a.authToken = token
 
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -230,6 +243,13 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 	if err := a.login(); err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
+
+	token, err := a.getToken()
+	if err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to get initial token: %w", err)
+	}
+	a.authToken = token
+	log.Debug().Msgf("token: %s", a.authToken)
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 

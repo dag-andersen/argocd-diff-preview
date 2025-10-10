@@ -48,6 +48,7 @@ type ArgoCDInstallation struct {
 	portForwardStopChan  chan struct{}
 	portForwardLocalPort int    // Local port for port forwarding (e.g., 8081)
 	apiServerURL         string // Constructed API server URL (e.g., "http://localhost:8081")
+	authToken            string // Cached authentication token
 }
 
 func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string) *ArgoCDInstallation {
@@ -348,12 +349,6 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 		return "", false, fmt.Errorf("failed to set up port forward: %w", err)
 	}
 
-	// Get authentication token
-	token, err := a.getInitialToken()
-	if err != nil {
-		return "", false, fmt.Errorf("failed to get authentication token: %w", err)
-	}
-
 	// Make API request to get manifests
 	url := fmt.Sprintf("%s/api/v1/applications/%s/manifests", a.apiServerURL, appName)
 
@@ -365,7 +360,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 	}
 
 	// Set authorization header with bearer token
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.authToken))
 
 	// Create HTTP client with TLS config to handle redirects
 	client := &http.Client{
