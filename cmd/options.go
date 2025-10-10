@@ -45,6 +45,8 @@ var (
 	DefaultArgocdChartVersion         = "latest"
 	DefaultArgocdChartName            = "argo"
 	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
+	DefaultArgocdUsername             = "admin"
+	DefaultArgocdPassword             = ""
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
@@ -84,6 +86,8 @@ type Options struct {
 	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
 	ArgocdChartName            string `mapstructure:"argocd-chart-name"`
 	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
+	ArgocdUsername             string `mapstructure:"argocd-username"`
+	ArgocdPassword             string `mapstructure:"argocd-password"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -225,6 +229,8 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-version", DefaultArgocdChartVersion)
 	viper.SetDefault("argocd-chart-name", DefaultArgocdChartName)
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
+	viper.SetDefault("argocd-username", DefaultArgocdUsername)
+	viper.SetDefault("argocd-password", DefaultArgocdPassword)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -245,6 +251,8 @@ func Parse() *Options {
 	rootCmd.Flags().String("argocd-namespace", DefaultArgocdNamespace, "Namespace to use for Argo CD")
 	rootCmd.Flags().String("argocd-chart-name", DefaultArgocdChartName, "Argo CD Helm Chart name")
 	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
+	rootCmd.Flags().String("argocd-username", DefaultArgocdUsername, "Argo CD username for authentication")
+	rootCmd.Flags().String("argocd-password", DefaultArgocdPassword, "Argo CD password for authentication (defaults to initial admin password)")
 
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")

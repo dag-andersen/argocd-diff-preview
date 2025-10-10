@@ -43,6 +43,8 @@ type ArgoCDInstallation struct {
 	ConfigPath           string
 	ChartName            string
 	ChartURL             string
+	Username             string
+	Password             string
 	portForwardActive    bool
 	portForwardMutex     sync.Mutex
 	portForwardStopChan  chan struct{}
@@ -51,7 +53,7 @@ type ArgoCDInstallation struct {
 	authToken            string // Cached authentication token
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, username string, password string) *ArgoCDInstallation {
 	localPort := 8081
 	return &ArgoCDInstallation{
 		K8sClient:            client,
@@ -60,6 +62,8 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 		ConfigPath:           "argocd-config",
 		ChartName:            repoName,
 		ChartURL:             repoURL,
+		Username:             username,
+		Password:             password,
 		portForwardLocalPort: localPort,
 		apiServerURL:         fmt.Sprintf("http://localhost:%d", localPort),
 	}
@@ -307,8 +311,6 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	}
 	return string(output), nil
 }
-
-// Authentication-related functions have been moved to auth.go
 
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {

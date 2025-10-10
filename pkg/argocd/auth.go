@@ -97,7 +97,7 @@ func (a *ArgoCDInstallation) StopPortForward() {
 }
 
 // getToken retrieves an authentication token from the ArgoCD API (cached)
-func (a *ArgoCDInstallation) getToken() (string, error) {
+func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 
 	// Return cached token if available
 	if a.authToken != "" {
@@ -110,12 +110,6 @@ func (a *ArgoCDInstallation) getToken() (string, error) {
 	// Set up port forward to ArgoCD server
 	if err := a.portForwardToArgoCD(); err != nil {
 		return "", fmt.Errorf("failed to set up port forward: %w", err)
-	}
-
-	// Get the admin password from the Kubernetes secret
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return "", fmt.Errorf("failed to get initial password: %w", err)
 	}
 
 	// Prepare the login request payload
@@ -190,27 +184,40 @@ func (a *ArgoCDInstallation) getToken() (string, error) {
 	return sessionResponse.Token, nil
 }
 
+func (a *ArgoCDInstallation) updateToken(password string) error {
+	token, err := a.getToken(password)
+	if err != nil {
+		return fmt.Errorf("failed to get initial token: %w", err)
+	}
+	a.authToken = token
+	return nil
+}
+
 // login performs login to ArgoCD using the CLI (legacy method)
 func (a *ArgoCDInstallation) login() error {
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
-	// Get initial admin password
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return err
+	passwd := a.Password
+	// If username is "admin" and password is empty, get the initial admin password
+	if a.Username == "admin" && a.Password == "" {
+		log.Debug().Msg("Using default admin credentials - retrieving initial password from secret")
+		initialPassword, err := a.getInitialPassword()
+		if err != nil {
+			return err
+		}
+		passwd = initialPassword
 	}
 
-	token, err := a.getToken()
+	// Update the token
+	err := a.updateToken(passwd)
 	if err != nil {
 		return fmt.Errorf("failed to get initial token: %w", err)
 	}
-	log.Debug().Msgf("token: %s", token)
-	a.authToken = token
 
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+		out, err := a.runArgocdCommand("login", "--insecure", "--username", a.Username, "--password", passwd)
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
@@ -243,13 +250,6 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 	if err := a.login(); err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
-
-	token, err := a.getToken()
-	if err != nil {
-		return time.Since(startTime), fmt.Errorf("failed to get initial token: %w", err)
-	}
-	a.authToken = token
-	log.Debug().Msgf("token: %s", a.authToken)
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 
