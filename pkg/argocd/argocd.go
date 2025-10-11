@@ -388,7 +388,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, error) {
 		}
 		return "", fmt.Errorf("failed to make HTTP request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
