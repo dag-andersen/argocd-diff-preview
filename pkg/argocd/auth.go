@@ -101,7 +101,7 @@ func (a *ArgoCDInstallation) StopPortForward() {
 }
 
 // getToken retrieves an authentication token from the ArgoCD API (cached)
-func (a *ArgoCDInstallation) getToken(password string) (string, error) {
+func (a *ArgoCDInstallation) getToken(username, password string) (string, error) {
 
 	// Return cached token if available
 	if a.authToken != "" {
@@ -118,7 +118,7 @@ func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 
 	// Prepare the login request payload
 	loginData := map[string]string{
-		"username": "admin",
+		"username": username,
 		"password": password,
 	}
 
@@ -188,8 +188,8 @@ func (a *ArgoCDInstallation) getToken(password string) (string, error) {
 	return sessionResponse.Token, nil
 }
 
-func (a *ArgoCDInstallation) updateToken(password string) error {
-	token, err := a.getToken(password)
+func (a *ArgoCDInstallation) updateToken(username, password string) error {
+	token, err := a.getToken(username, password)
 	if err != nil {
 		return fmt.Errorf("failed to get initial token: %w", err)
 	}
@@ -213,7 +213,7 @@ func (a *ArgoCDInstallation) login() error {
 	}
 
 	// Update the token
-	err := a.updateToken(passwd)
+	err := a.updateToken(a.Username, passwd)
 	if err != nil {
 		return fmt.Errorf("failed to get initial token: %w", err)
 	}

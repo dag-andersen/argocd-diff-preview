@@ -489,6 +489,12 @@ func (o *Options) LogOptions() {
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)
 	}
+	if o.ArgocdUsername != DefaultArgocdUsername {
+		log.Info().Msgf("✨ - argocd-username: %s", o.ArgocdUsername)
+	}
+	if o.ArgocdPassword != DefaultArgocdPassword {
+		log.Info().Msgf("✨ - argocd-password: <redacted>")
+	}
 }
 
 // GetFileRegex returns the parsed regex

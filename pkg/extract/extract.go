@@ -99,17 +99,6 @@ func GetResourcesFromBothBranches(
 	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
 }
 
-func verifyNoDuplicateAppIds(apps []argoapplication.ArgoResource) error {
-	appNames := make(map[string]bool)
-	for _, app := range apps {
-		if appNames[app.Id] {
-			return fmt.Errorf("duplicate app name: %s", app.Id)
-		}
-		appNames[app.Id] = true
-	}
-	return nil
-}
-
 // getResourcesFromApps extracts resources from Argo CD for a specific branch as ExtractedApp structs
 func getResourcesFromApps(
 	argocd *argocdPkg.ArgoCDInstallation,
@@ -328,6 +317,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		}
 	}
 
+	// remove Helm hooks resources
 	newManifestsContent := make([]unstructured.Unstructured, 0, len(manifestsContent))
 	for _, manifest := range manifestsContent {
 		if HelmHookFilter(manifest) {
@@ -342,10 +332,20 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		return ExtractedApp{}, "", fmt.Errorf("failed to remove application prefix: %w", err)
 	}
 
-	// Parse the first non-empty manifest from the string
 	extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
 
 	return extractedApp, oldName, nil
+}
+
+func verifyNoDuplicateAppIds(apps []argoapplication.ArgoResource) error {
+	appNames := make(map[string]bool)
+	for _, app := range apps {
+		if appNames[app.Id] {
+			return fmt.Errorf("duplicate app name: %s", app.Id)
+		}
+		appNames[app.Id] = true
+	}
+	return nil
 }
 
 func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) error {
@@ -388,10 +388,6 @@ func HelmHookFilter(obj unstructured.Unstructured) bool {
 	return !exists
 }
 
-func isErrorCondition(condType string) bool {
-	return condType != "" && containsIgnoreCase(condType, "error")
-}
-
 func containsAny(s string, substrs []string) bool {
 	for _, substr := range substrs {
 		if s != "" && strings.Contains(s, substr) {
@@ -399,8 +395,4 @@ func containsAny(s string, substrs []string) bool {
 		}
 	}
 	return false
-}
-
-func containsIgnoreCase(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
