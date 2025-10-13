@@ -45,7 +45,7 @@ var (
 	DefaultArgocdChartVersion         = "latest"
 	DefaultArgocdChartName            = "argo"
 	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
-	DefaultArgocdChartRepoUserName     = ""
+	DefaultArgocdChartRepoUsername     = ""
 	DefaultArgocdChartRepoPassword     = ""
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
@@ -229,7 +229,7 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-version", DefaultArgocdChartVersion)
 	viper.SetDefault("argocd-chart-name", DefaultArgocdChartName)
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
-	viper.SetDefault("argocd-repo-username", DefaultArgocdChartRepoUserName)
+	viper.SetDefault("argocd-repo-username", DefaultArgocdChartRepoUsername)
 	viper.SetDefault("argocd-repo-password", DefaultArgocdChartRepoPassword)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
@@ -251,7 +251,7 @@ func Parse() *Options {
 	rootCmd.Flags().String("argocd-namespace", DefaultArgocdNamespace, "Namespace to use for Argo CD")
 	rootCmd.Flags().String("argocd-chart-name", DefaultArgocdChartName, "Argo CD Helm Chart name")
 	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
-	rootCmd.Flags().String("argocd-repo-username", DefaultArgocdChartRepoUserName, "Argo CD Helm Repo User Name")
+	rootCmd.Flags().String("argocd-repo-username", DefaultArgocdChartRepoUsername, "Argo CD Helm Repo User Name")
 	rootCmd.Flags().String("argocd-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
@@ -485,7 +485,7 @@ func (o *Options) LogOptions() {
 	if o.ArgocdChartURL != DefaultArgocdChartURL {
 		log.Info().Msgf("✨ - argocd-chart-url: %s", o.ArgocdChartURL)
 	}
-	if o.ArgocdChartRepoUserName != DefaultArgocdChartRepoUserName {
+	if o.ArgocdChartRepoUserName != DefaultArgocdChartRepoUsername {
 		log.Info().Msgf("✨ - argocd-chart-repo-username: %s", o.ArgocdChartRepoUserName)
 	}
 	if o.ArgocdChartRepoPassword != DefaultArgocdChartRepoPassword {
