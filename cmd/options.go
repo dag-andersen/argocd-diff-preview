@@ -86,7 +86,7 @@ type Options struct {
 	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
 	ArgocdChartName            string `mapstructure:"argocd-chart-name"`
 	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
-	ArgocdChartRepoUserName    string `mapstructure:"argocd-chart-repo-username"`
+	ArgocdChartRepoUsername    string `mapstructure:"argocd-chart-repo-username"`
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
@@ -485,8 +485,8 @@ func (o *Options) LogOptions() {
 	if o.ArgocdChartURL != DefaultArgocdChartURL {
 		log.Info().Msgf("✨ - argocd-chart-url: %s", o.ArgocdChartURL)
 	}
-	if o.ArgocdChartRepoUserName != DefaultArgocdChartRepoUsername {
-		log.Info().Msgf("✨ - argocd-chart-repo-username: %s", o.ArgocdChartRepoUserName)
+	if o.ArgocdChartRepoUsername != DefaultArgocdChartRepoUsername {
+		log.Info().Msgf("✨ - argocd-chart-repo-username: %s", o.ArgocdChartRepoUsername)
 	}
 	if o.ArgocdChartRepoPassword != DefaultArgocdChartRepoPassword {
 		log.Info().Msgf("✨ - argocd-chart-repo-password: *********")
