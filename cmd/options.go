@@ -45,8 +45,13 @@ var (
 	DefaultArgocdChartVersion         = "latest"
 	DefaultArgocdChartName            = "argo"
 	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
-	DefaultArgocdChartRepoUsername     = ""
-	DefaultArgocdChartRepoPassword     = ""
+	DefaultArgocdChartRepoUsername    = ""
+	DefaultArgocdChartRepoPassword    = ""
+	DefaultArgocdLoginInsecure        = true
+	DefaultArgocdLoginPlaintext       = false
+	DefaultArgocdLoginGrpcWeb         = false
+	DefaultArgocdLoginUsername        = ""
+	DefaultArgocdLoginPassword        = ""
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
@@ -88,6 +93,11 @@ type Options struct {
 	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
 	ArgocdChartRepoUsername    string `mapstructure:"argocd-chart-repo-username"`
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
+	ArgocdLoginInsecure        bool   `mapstructure:"argocd-login-insecure"`
+	ArgocdLoginPlaintext       bool   `mapstructure:"argocd-login-plaintext"`
+	ArgocdLoginGrpcWeb         bool   `mapstructure:"argocd-login-grpc-web"`
+	ArgocdLoginUsername        string `mapstructure:"argocd-login-username"`
+	ArgocdLoginPassword        string `mapstructure:"argocd-login-password"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -231,6 +241,11 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
 	viper.SetDefault("argocd-repo-username", DefaultArgocdChartRepoUsername)
 	viper.SetDefault("argocd-repo-password", DefaultArgocdChartRepoPassword)
+	viper.SetDefault("argocd-login-insecure", DefaultArgocdLoginInsecure)
+	viper.SetDefault("argocd-login-plaintext", DefaultArgocdLoginPlaintext)
+	viper.SetDefault("argocd-login-grpc-web", DefaultArgocdLoginGrpcWeb)
+	viper.SetDefault("argocd-login-username", DefaultArgocdLoginUsername)
+	viper.SetDefault("argocd-login-password", DefaultArgocdLoginPassword)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -253,6 +268,11 @@ func Parse() *Options {
 	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
 	rootCmd.Flags().String("argocd-repo-username", DefaultArgocdChartRepoUsername, "Argo CD Helm Repo User Name")
 	rootCmd.Flags().String("argocd-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
+	rootCmd.Flags().Bool("argocd-login-insecure", DefaultArgocdLoginInsecure, "Skip server certificate verification for Argo CD login")
+	rootCmd.Flags().Bool("argocd-login-plaintext", DefaultArgocdLoginPlaintext, "Disable TLS for Argo CD login")
+	rootCmd.Flags().Bool("argocd-login-grpc-web", DefaultArgocdLoginGrpcWeb, "Use gRPC-web protocol for Argo CD login")
+	rootCmd.Flags().String("argocd-login-username", DefaultArgocdLoginUsername, "Custom username for Argo CD login (default: admin)")
+	rootCmd.Flags().String("argocd-login-password", DefaultArgocdLoginPassword, "Custom password for Argo CD login (default: from k8s secret)")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")

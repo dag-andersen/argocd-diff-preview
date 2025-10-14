@@ -31,26 +31,36 @@ var (
 )
 
 type ArgoCDInstallation struct {
-	K8sClient  *utils.K8sClient
-	Namespace  string
-	Version    string
-	ConfigPath string
-	ChartName  string
-	ChartURL   string
+	K8sClient         *utils.K8sClient
+	Namespace         string
+	Version           string
+	ConfigPath        string
+	ChartName         string
+	ChartURL          string
 	ChartRepoUsername string
 	ChartRepoPassword string
+	LoginInsecure     bool
+	LoginPlaintext    bool
+	LoginGrpcWeb      bool
+	LoginUsername     string
+	LoginPassword     string
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginInsecure bool, loginPlaintext bool, loginGrpcWeb bool, loginUsername string, loginPassword string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
-		K8sClient:  client,
-		Namespace:  namespace,
-		Version:    version,
-		ConfigPath: "argocd-config",
-		ChartName:  repoName,
-		ChartURL:   repoURL,
+		K8sClient:         client,
+		Namespace:         namespace,
+		Version:           version,
+		ConfigPath:        "argocd-config",
+		ChartName:         repoName,
+		ChartURL:          repoURL,
 		ChartRepoUsername: repoUsername,
 		ChartRepoPassword: repoPassword,
+		LoginInsecure:     loginInsecure,
+		LoginPlaintext:    loginPlaintext,
+		LoginGrpcWeb:      loginGrpcWeb,
+		LoginUsername:     loginUsername,
+		LoginPassword:     loginPassword,
 	}
 }
 
@@ -319,16 +329,49 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 func (a *ArgoCDInstallation) login() error {
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
-	// Get initial admin password
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return err
+	// Determine username and password
+	username := "admin"
+	var password string
+	var err error
+
+	if a.LoginUsername != "" {
+		// Use custom username if provided
+		username = a.LoginUsername
+		log.Debug().Msgf("Using custom username: %s", username)
 	}
+
+	if a.LoginPassword != "" {
+		// Use custom password if provided
+		password = a.LoginPassword
+		log.Debug().Msg("Using custom password")
+	} else {
+		// Fall back to getting password from Kubernetes secret
+		password, err = a.getInitialPassword()
+		if err != nil {
+			return err
+		}
+		log.Debug().Msg("Using password from Kubernetes secret")
+	}
+
+	// Build login command with configurable flags
+	loginArgs := []string{"login"}
+
+	if a.LoginInsecure {
+		loginArgs = append(loginArgs, "--insecure")
+	}
+	if a.LoginPlaintext {
+		loginArgs = append(loginArgs, "--plaintext")
+	}
+	if a.LoginGrpcWeb {
+		loginArgs = append(loginArgs, "--grpc-web")
+	}
+
+	loginArgs = append(loginArgs, "--username", username, "--password", password)
 
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--plaintext", "--username", "admin", "--password", password)
+		out, err := a.runArgocdCommand(loginArgs...)
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
