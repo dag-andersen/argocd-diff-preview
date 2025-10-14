@@ -202,7 +202,7 @@ metadata:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := splitYAMLDocuments(tt.input)
+			result := SplitYAMLDocuments(tt.input)
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d documents, got %d", len(tt.expected), len(result))
@@ -266,7 +266,7 @@ metadata:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := splitYAMLDocuments(tt.input)
+			result := SplitYAMLDocuments(tt.input)
 
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected %d documents, got %d", len(tt.expected), len(result))

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -416,27 +415,6 @@ func (c *K8sClient) ApplyManifestFromFile(path string, fallbackNamespace string)
 	return c.ApplyManifestFromString(string(manifestBytes), fallbackNamespace)
 }
 
-// splitYAMLDocuments splits a YAML manifest into individual documents
-// It only splits on "---" that appear at the beginning of lines (YAML document separators)
-// This prevents splitting on "---" that appear in the middle of YAML content
-// Handles "---" with optional whitespace (spaces, tabs) and comments
-func splitYAMLDocuments(manifest string) []string {
-	// Pattern matches "---" at start of line with optional whitespace and optional comment
-	// \s matches any whitespace character (spaces, tabs, etc.)
-	docSeparatorRegex := regexp.MustCompile(`(?m)^---\s*(?:#.*)?$`)
-	documents := docSeparatorRegex.Split(manifest, -1)
-
-	// Filter out empty documents
-	var result []string
-	for _, doc := range documents {
-		if trimmed := strings.TrimSpace(doc); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-
-	return result
-}
-
 func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace string) (int, error) {
 	// Check if manifest is empty
 	if strings.TrimSpace(manifest) == "" {
@@ -445,20 +423,15 @@ func (c *K8sClient) ApplyManifestFromString(manifest string, fallbackNamespace s
 	}
 
 	// Split manifest into multiple documents (if any)
-	documents := splitYAMLDocuments(manifest)
+	documents := SplitYAMLDocuments(manifest)
 
 	count := 0
 
 	for _, doc := range documents {
-		// Skip empty documents
-		trimmedDoc := strings.TrimSpace(doc)
-		if trimmedDoc == "" {
-			continue
-		}
 
 		// Parse YAML into unstructured object
 		obj := &unstructured.Unstructured{}
-		if err := yaml.Unmarshal([]byte(trimmedDoc), &obj.Object); err != nil {
+		if err := yaml.Unmarshal([]byte(doc), &obj.Object); err != nil {
 			return count, fmt.Errorf("failed to parse manifest YAML: %w", err)
 		}
 
