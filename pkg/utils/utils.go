@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 
@@ -57,4 +58,19 @@ func UniqueNumber() uint64 {
 
 func UniqueId() string {
 	return fmt.Sprintf("uid-%d", UniqueNumber())
+}
+
+func SplitYAMLDocuments(manifest string) []string {
+	docSeparatorRegex := regexp.MustCompile(`(?m)^---\s*(?:#.*)?$`)
+	documents := docSeparatorRegex.Split(manifest, -1)
+
+	// Filter out empty or whitespace-only documents
+	var result []string
+	for _, doc := range documents {
+		if trimmed := strings.TrimSpace(doc); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+
+	return result
 }

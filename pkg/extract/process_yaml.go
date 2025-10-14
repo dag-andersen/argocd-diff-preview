@@ -2,9 +2,8 @@ package extract
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -14,26 +13,17 @@ import (
 // A chunk is a single YAML object, e.g. a Deployment, Service, etc.
 func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
 
-	// Split on YAML document separator (--- at the beginning of a line)
-	// This regex matches --- at the start of a line, optionally followed by whitespace
-	documentSeparator := regexp.MustCompile(`(?m)^---\s*$`)
-	documents := documentSeparator.Split(chunk, -1)
+	documents := utils.SplitYAMLDocuments(chunk)
 
 	manifests := make([]unstructured.Unstructured, 0)
 
 	for _, doc := range documents {
-		// Skip empty documents
-		trimmedDoc := strings.TrimSpace(doc)
-
-		if trimmedDoc == "" {
-			continue
-		}
 
 		// Create a new map to hold the parsed YAML
 		var yamlObj map[string]interface{}
-		err := yaml.Unmarshal([]byte(trimmedDoc), &yamlObj)
+		err := yaml.Unmarshal([]byte(doc), &yamlObj)
 		if err != nil {
-			log.Debug().Msgf("Failed to parse YAML: \n%s", trimmedDoc)
+			log.Debug().Msgf("Failed to parse YAML: \n%s", doc)
 			return nil, fmt.Errorf("failed to parse YAML: %w", err)
 		}
 
@@ -47,7 +37,7 @@ func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
 		kind, kindFound, _ := unstructured.NestedString(yamlObj, "kind")
 
 		if !found || !kindFound || apiVersion == "" || kind == "" {
-			log.Debug().Msgf("Found manifest with no apiVersion or kind: %s", trimmedDoc)
+			log.Debug().Msgf("Found manifest with no apiVersion or kind: %s", doc)
 			continue
 		}
 
