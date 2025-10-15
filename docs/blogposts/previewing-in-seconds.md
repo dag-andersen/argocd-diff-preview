@@ -81,11 +81,14 @@ We do not recommend using your _normal_ Argo CD instance for this. Instead, crea
 **Quick Demo:**
 ```bash
 # Create cluster and install Argo CD (one-time setup)
-kind create cluster --name diff-preview-cluster
+kind create cluster
 helm repo add argo https://argoproj.github.io/argo-helm
-helm install argo-cd argo/argo-cd --version 8.0.3
+helm install argo-cd argo/argo-cd --version 8.0.3 --create-namespace --namespace argocd-diff-preview
 
-# Clone branches for each PR
+# Wait for Argo CD to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd-diff-preview
+
+# Clone each branch from the PR into subfolders
 git clone https://github.com/dag-andersen/argocd-diff-preview base-branch --depth 1 -q 
 git clone https://github.com/dag-andersen/argocd-diff-preview target-branch --depth 1 -q -b helm-example-3
 
@@ -100,7 +103,7 @@ docker run \
   -e TARGET_BRANCH=helm-example-3 \
   -e REPO=dag-andersen/argocd-diff-preview \
   dagandersen/argocd-diff-preview:v0.1.18 \
-  --argocd-namespace=default \
+  --argocd-namespace=argocd-diff-preview \
   --create-cluster=false
 ```
 
