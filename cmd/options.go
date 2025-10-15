@@ -406,7 +406,7 @@ func (o *Options) LogOptions() {
 		log.Info().Msgf("✨ - dry-run: %t", o.DryRun)
 	} else {
 		if !o.CreateCluster {
-			log.Info().Msgf("✨ - reusing existing cluster")
+			log.Info().Msgf("✨ - using cluster with Argo CD pre-installed")
 		} else {
 			log.Info().Msgf("✨ - local-cluster-tool: %s", o.clusterProvider.GetName())
 			log.Info().Msgf("✨ - cluster-name: %s", o.ClusterName)

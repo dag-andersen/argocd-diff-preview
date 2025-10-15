@@ -1,6 +1,6 @@
-# Connecting to the host cluster from a self-hosted runner
+# Connecting the self-hosted runner to Argo CD on the host cluster
 
-Running `argocd-diff-preview` on a self-hosted runner with an existing Argo CD cluster combines maximum performance with enhanced security. This approach eliminates both cluster creation overhead and the need to store cluster credentials in your CI/CD pipeline.
+Running `argocd-diff-preview` on a self-hosted runner on a cluster that has Argo CD pre-installed combines maximum performance with enhanced security. This approach eliminates both cluster creation overhead and the need to store cluster credentials in your CI/CD pipeline.
 
 Instead of creating a temporary cluster for each diff preview, your self-hosted GitHub Actions runner connects directly to a dedicated Argo CD instance running in the same cluster. This offers fast execution (no cluster creation overhead) and enhanced security (no credential sharing).
 
@@ -236,7 +236,7 @@ jobs:
 
 - `runs-on: argocd-diff-runner` - Must match your `runnerScaleSetName` from Step 2
 - `--argocd-namespace=argocd-diff-preview` - Change if your Argo CD uses a different namespace
-- `--create-cluster=false` - Critical flag that tells the tool to use the existing cluster
+- `--create-cluster=false` - Critical flag that tells the tool to use a pre-provisioned cluster
 
 #### Option B: Using Docker
 
@@ -274,7 +274,7 @@ When the workflow runs successfully, you'll see output similar to this in your G
 
 ```
 ✨ Running with:
-✨ - reusing existing cluster
+✨ - reusing cluster with Argo CD pre-installed
 ✨ - base-branch: main
 ✨ - target-branch: refs/pull/123/merge
 ✨ - output-folder: ./output
