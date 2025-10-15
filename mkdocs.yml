@@ -20,12 +20,14 @@ nav:
 - Overview: index.md
 - Demo: demo.md
 - Getting started:
-  - github-actions-workflow.md
-  - gitlab-cicd.md
-  - Local Installation: installation.md
-  - Self-hosted Github Runners: self-hosted-gh-runner.md
-  - custom-argo-cd-installation.md
-- Connecting to existing cluster: existing-cluster.md
+  - getting-started/github-actions-workflow.md
+  - getting-started/gitlab-cicd.md
+  - Local Installation: getting-started/installation.md
+  - getting-started/custom-argo-cd-installation.md
+  - Self-hosted Github Runners: getting-started/self-hosted-gh-runner.md
+- Reusing clusters:
+  - Connect to an already running cluster: reusing-clusters/connecting.md
+  - Self-hosted runner connects with host cluster: reusing-clusters/self-hosted-gh-runner.md
 - generated-applications.md
 - Ignore Lines: ignoring-lines.md
 - application-selection.md
