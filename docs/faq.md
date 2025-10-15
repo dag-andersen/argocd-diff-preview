@@ -12,7 +12,7 @@
   Yes, no issues reported
 
 - **Cluster generator**:
-  Yes, but you have to add the ClusterSecrets to the `secrets` folder. Similar to how the secrets are provided [here](https://dag-andersen.github.io/argocd-diff-preview/github-actions-workflow)
+  Yes, but you have to add the ClusterSecrets to the `secrets` folder. Similar to how the secrets are provided [here](./getting-started/github-actions-workflow.md)
 
 - **Git generator**:
   Yes, no issues reported
@@ -24,7 +24,7 @@
   Yes, no issues reported
 
 - **Plugin generator**: 
-  Should work, but not tested. Read more on how to install a plugin [here](https://dag-andersen.github.io/argocd-diff-preview/custom-argo-cd-installation). Related Issue: [#40](https://github.com/dag-andersen/argocd-diff-preview/issues/40)
+  Should work, but not tested. Read more on how to install a plugin [here](./getting-started/custom-argo-cd-installation.md). Related Issue: [#40](https://github.com/dag-andersen/argocd-diff-preview/issues/40)
 
 - **Pull Request generator**:
    Should work, but not tested.
@@ -40,7 +40,7 @@
 
 ### Does it work with Config Management Plugins (CMP)
 
-Yes. More info [docs](https://dag-andersen.github.io/argocd-diff-preview/custom-argo-cd-installation)
+Yes. More info [docs](./getting-started/custom-argo-cd-installation.md)
 
 ---
 
@@ -73,7 +73,7 @@ Because of this, users must render their Helm charts and Kustomize templates bef
 
 The tool is rather conservative in making assumptions about how Applications are rendered, with the goal of avoiding false positives.
 
-More info: [docs](https://dag-andersen.github.io/argocd-diff-preview/generated-applications/)
+More info: [docs](./generated-applications.md)
 
 ---
 
@@ -91,4 +91,4 @@ More info: [docs](https://dag-andersen.github.io/argocd-diff-preview/generated-a
 
 **Longer answer:** Rendering the manifests for all applications in the repository on each pull request can be time-consuming. Limiting the number of applications rendered can significantly speed up the process. By default, `argocd-diff-preview` renders all applications in the repository.
 
-Check out the [full documentation](https://dag-andersen.github.io/argocd-diff-preview/application-selection/) to learn how to limit the number of applications rendered.
+Check out the [full documentation](./application-selection.md) to learn how to limit the number of applications rendered.
