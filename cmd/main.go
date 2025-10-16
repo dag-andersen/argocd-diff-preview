@@ -357,6 +357,8 @@ func run(opts *Options) error {
 		return err
 	}
 
+	log.Info().Msgf("⏰ Run time stats: %s", infoBox.Stats())
+
 	return nil
 }
 
