@@ -25,7 +25,9 @@ Here are some examples:
 
 ## Three Approaches to Preview Generation
 
-Since its introduction in 2024, the tool now supports more ways of running it, so you can optimize it for your use case! All three approaches are perfectly valid and you can choose the one that best fits your needs.
+Since its introduction in 2024, the tool now supports more ways of running it, so you can optimize it for your use case!
+
+All three approaches are perfectly valid and you can choose the one that best fits your needs.
 
 ### Approach 1: Ephemeral Clusters (Original)
 
@@ -204,11 +206,11 @@ For complete details, see the [application-selection documentation](https://dag-
 
 ## Comparison: Which Approach to Choose?
 
-| Approach                                                    | Best For                              | Pros                                                                        | Cons                                                                                                               |
-| ----------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Ephemeral clusters**                                      | Getting started, Full isolation       | • Simple setup<br>• Complete isolation                                      | • Slow (~60s overhead)                                                                                             |
-| **Cluster with Argo CD pre-installed**                      | Teams prioritizing speed              | • Fast <br>• Leverages Argo CD caching                                      | • Requires dedicated Argo CD setup<br>• Need cluster credentials in CI/CD<br>• Infrastructure maintenance          |
-| **Cluster with Argo CD pre-installed + self-hosted runner** | Teams prioritizing speed AND security | • Fast + secure<br>• Leverages Argo CD caching<br>• No credentials in CI/CD | • Most complex setup<br> • Requires dedicated Argo CD and self-hosted runner setup<br>• Infrastructure maintenance |
+| Approach                                                          | Best For                                      | Pros                                                                        | Cons                                                                                                               |
+| ----------------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Ephemeral<br>clusters**                                         | Getting started, Full isolation               | • Simple setup<br>• Complete isolation                                      | • Slow (~60s overhead)                                                                                             |
+| **Cluster with<br>Argo CD<br>pre-installed**                      | Teams prioritizing speed                      | • Fast<br>• Leverages Argo CD caching                                       | • Requires dedicated Argo CD setup<br>• Need cluster credentials in CI/CD<br>• Infrastructure maintenance          |
+| **Cluster with<br>Argo CD<br>pre-installed + self-hosted runner** | Teams prioritizing speed AND network security | • Fast + secure<br>• Leverages Argo CD caching<br>• No credentials in CI/CD | • Most complex setup<br> • Requires dedicated Argo CD and self-hosted runner setup<br>• Infrastructure maintenance |
 
 ## Real-World Results
 
@@ -228,13 +230,15 @@ This approach maintains the accuracy that makes `argocd-diff-preview` superior t
 
 ## Conclusion
 
-The evolution of `argocd-diff-preview` proves you don't have to choose between accuracy and speed. What started as an accurate - but slow - solution has matured into a flexible tool that adapts to your team's needs - whether you prioritize simplicity, speed, or security.
+The evolution of `argocd-diff-preview` proves you don't have to choose between accuracy and speed. What started as an accurate - but slow - solution has matured into a flexible tool that adapts to your team's needs - whether you prioritize _simplicity_, _speed_, or _security_.
 
-Throughout this journey, one principle has remained constant: **use Argo CD itself to render manifests**. This ensures your previews perfectly match what will actually deploy. What's new is the speed at which this happens. By using a cluster with Argo CD pre-installed and intelligently selecting applications, we've compressed preview times from minutes to seconds - making the feedback loop fast enough for practical daily use.
+Throughout this journey, one principle has remained constant: **use Argo CD itself to render manifests**. This ensures your previews perfectly match what will actually deploy. What's new is the speed at which this happens. By using a cluster with Argo CD pre-installed and intelligently selecting applications, we've lower preview times from minutes to seconds! ⏰⚡️
+
+Each approach presented in this blog post has its own pros and cons. You should choose the one that best fits your needs.
 
 I suggest that you begin with the "_ephemeral cluster_" approach to get familiar with the tool. As your confidence grows and speed becomes a priority, you can consider if you should switch to a faster setup using a cluster with Argo CD pre-installed. Combine this with well-placed `argocd-diff-preview/watch-pattern` annotations and you can achieve preview times under 10 seconds while maintaining the same accuracy you started with, even at scale.
 
-The result? Preview times under 10 seconds with the same accuracy you started with 🎉
+The result? Preview rendering in under 10 seconds 🎉
 
 ---
 
