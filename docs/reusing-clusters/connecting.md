@@ -1,8 +1,8 @@
-# Connecting to an already running cluster
+# Connecting to a cluster with Argo CD pre-installed
 
 ![](../assets/reusing-cluster-from-outside.png)
 
-Instead of spinning up an ephemeral cluster for each diff preview, you can connect to an existing cluster. This saves approximately `60`–`90` seconds per run.
+Instead of spinning up an ephemeral cluster for each diff preview, you can connect to a cluster with Argo CD already installed. This saves approximately `60`–`90` seconds per run.
 
 **Important:** We highly recommend **not** using your production Argo CD instance for rendering manifests. Instead, install a dedicated Argo CD instance for diff previews.
 
@@ -26,9 +26,14 @@ This will skip cluster creation and connect to Argo CD via port-forwarding in th
 
 ### _Step 1_: Create cluster (skip if you already have a cluster with Argo CD installed)
 ```bash
-kind create cluster --name existing-cluster
+kind create cluster
 helm repo add argo https://argoproj.github.io/argo-helm
-helm install argo-cd argo/argo-cd --version 8.0.3
+helm install argo-cd argo/argo-cd --version 8.0.3 --create-namespace --namespace argocd-diff-preview
+```
+
+```bash
+# Wait for Argo CD to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd-diff-preview
 ```
 
 ### _Step 2_: Clone the base and target branches
@@ -58,7 +63,7 @@ docker run \
   -e TARGET_BRANCH=helm-example-3 \
   -e REPO=dag-andersen/argocd-diff-preview \
   dagandersen/argocd-diff-preview:v0.1.18 \
-  --argocd-namespace=default \
+  --argocd-namespace=argocd-diff-preview \
   --create-cluster=false
 ```
 
@@ -66,11 +71,11 @@ And then the output will look something like this:
 
 ```
 ✨ Running with:
-✨ - reusing existing cluster
+✨ - reusing cluster with Argo CD pre-installed
 ✨ - base-branch: main
 ✨ - target-branch: helm-example-3
 ✨ - output-folder: ./output
-✨ - argocd-namespace: default
+✨ - argocd-namespace: argocd-diff-preview
 ✨ - repo: dag-andersen/argocd-diff-preview
 ✨ - timeout: 180 seconds
 🔑 Unique ID for this run: 60993

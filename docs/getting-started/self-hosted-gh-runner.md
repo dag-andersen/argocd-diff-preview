@@ -19,7 +19,7 @@ When your self-hosted runner pod runs inside the same cluster as Argo CD:
 1. The runner can access Argo CD secrets using `kubectl get secrets -n argocd`
 2. These secrets are extracted and cleaned of cluster-specific metadata
 3. The secrets are mounted into the `argocd-diff-preview` container
-4. A ephemeral cluster is created with these credentials pre-configured
+4. An ephemeral cluster is created with these credentials pre-configured
 5. The diff preview runs with full access to your Git repositories and Helm registries
 
 ### Benefits
@@ -124,9 +124,9 @@ jobs:
 
 ---
 
-## Approach 2: Reusing an already running cluster
+## Approach 2: Connecting to a pre-configured Argo CD
 
-For enhanced security and performance, you can skip the ephemeral cluster creation entirely and use your existing Argo CD instance directly. This approach is covered in detail in the [Connecting to the host cluster from a self-hosted runner](../reusing-clusters/self-hosted-gh-runner.md) guide.
+For enhanced security and performance, you can skip the ephemeral cluster creation entirely and use a pre-configured Argo CD instance directly. This approach is covered in detail in the [Connecting the self-hosted runner to Argo CD on the host cluster](../reusing-clusters/self-hosted-gh-runner.md) guide.
 
 ---
 
@@ -159,7 +159,7 @@ networking:
   podSubnet: "10.128.0.0/16"
 ```
 
-**Step 2: Pass the configuration to argocd-diff-preview**
+**Step 2: Pass the configuration to `argocd-diff-preview`**
 
 Add the `--kind-options` flag to your workflow to use the custom configuration:
 
