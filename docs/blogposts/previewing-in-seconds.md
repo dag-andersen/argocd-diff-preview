@@ -1,3 +1,5 @@
+# Argo CD: Previewing Pull Requests changes in SECONDS! 🥵⚡️⏰
+
 > **TL;DR**: You can now render previews of your PRs by using a cluster with Argo CD pre-installed instead of spinning up a new one each run. This results in very short preview times while maintaining accuracy. 
 
 This is a continuation of my first blog post: [Rendering the TRUE Argo CD diff on your PRs](https://dev.to/dag-andersen/rendering-the-true-argo-cd-diff-on-your-prs-10bk). That article addresses a critical challenge in GitOps workflows: visualizing the actual impact of configuration changes when using templating tools like Helm and Kustomize.
@@ -49,7 +51,7 @@ This is the approach described in detail in the [first blog post](https://dev.to
 - **No infrastructure access required**: Can work without credentials for your production Argo CD instance
 - **Complete isolation**: Can run in complete isolation from your production systems
 
-However, this approach has one significant limitation: **Speed**. Creating a cluster and installing Argo CD takes 60-90 seconds every time, making even simple configuration changes take 80+ seconds to preview.
+However, this approach has one significant limitation: **Speed**. Creating a cluster and installing Argo CD takes ~60 seconds every time, making even simple configuration changes take 80+ seconds to preview.
 
 This leads us to the next approach to running `argocd-diff-preview`.
 
@@ -57,7 +59,7 @@ This leads us to the next approach to running `argocd-diff-preview`.
 - ✅ Zero setup
 - ✅ Complete isolation
 - ✅ Works with any CI/CD (even works on your local machine)
-- ❌ Slow (60-90 second overhead per run)
+- ❌ Slow (~60 second overhead per run)
 - ❌ Resource-intensive (creates a new cluster for each run)
 
 ---
@@ -118,7 +120,7 @@ Each run uses a unique identifier, so multiple PRs can run without collisions.
 The main downside here is that you need access to the Kubernetes API from your GitHub/GitLab hosted pipeline. Some organizations will see this as a no-go... which leads us to the next way of running `argocd-diff-preview`... 
 
 **Trade-offs:**
-- ✅ Fast execution (eliminates 60-90s overhead)
+- ✅ Fast execution (eliminates ~60s overhead)
 - ✅ Utilizes Argo CD caching from previous runs
 - ❌ Infrastructure setup required (set up a cluster with Argo CD beforehand) 
 - ❌ Cluster credentials in CI/CD pipeline
@@ -142,7 +144,7 @@ Instead of creating a temporary cluster for each diff preview, your self-hosted 
 > **Note**: This setup is more complex than the previous two approaches. For complete setup instructions, see the [self-hosted runner guide](https://dag-andersen.github.io/argocd-diff-preview/reusing-clusters/self-hosted-gh-runner/).
 
 **Trade-offs:**
-- ✅ Fast execution (eliminates 60-90s overhead)
+- ✅ Fast execution (eliminates ~60s overhead)
 - ✅ Network isolation (No need to expose your cluster to the internet)
 - ✅ No cluster credentials in CI/CD pipeline because you are using a service account from within the cluster and Argo CD already has all the credentials it needs
 - ❌ Most complex setup (requires self-hosted runners + dedicated Argo CD)
@@ -204,7 +206,7 @@ For complete details, see the [application-selection documentation](https://dag-
 
 | Approach                                                    | Best For                              | Pros                                                                        | Cons                                                                                                               |
 | ----------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **Ephemeral clusters**                                      | Getting started, Full isolation       | • Simple setup<br>• Complete isolation                                      | • Slow (60-90s overhead)                                                                                           |
+| **Ephemeral clusters**                                      | Getting started, Full isolation       | • Simple setup<br>• Complete isolation                                      | • Slow (~60s overhead)                                                                                             |
 | **Cluster with Argo CD pre-installed**                      | Teams prioritizing speed              | • Fast <br>• Leverages Argo CD caching                                      | • Requires dedicated Argo CD setup<br>• Need cluster credentials in CI/CD<br>• Infrastructure maintenance          |
 | **Cluster with Argo CD pre-installed + self-hosted runner** | Teams prioritizing speed AND security | • Fast + secure<br>• Leverages Argo CD caching<br>• No credentials in CI/CD | • Most complex setup<br> • Requires dedicated Argo CD and self-hosted runner setup<br>• Infrastructure maintenance |
 
@@ -212,15 +214,15 @@ For complete details, see the [application-selection documentation](https://dag-
 
 At [Egmont](https://www.egmont.com), we use the "_Cluster with Argo CD pre-installed + self-hosted runner_" approach with a repository containing 600+ applications. Combined with smart application selection, we achieve preview times under 10 seconds - a 20x improvement over the original "_ephemeral cluster_" approach.
 
+Each pull request preview includes a `stats` section at the bottom.
+
+![stats section in preview](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/m4hn4g2pmykx4bmu5vda.png)
+
 The key is combining two optimizations:
 1. **Use a cluster with Argo CD pre-installed** to eliminate cluster creation overhead
 2. **Select only affected applications** using watch patterns to minimize rendering scope
 
-This approach maintains the accuracy that makes `argocd-diff-preview` superior to alternatives while delivering the speed needed for practical daily use.
-
-Each pull request preview includes a `stats` section at the bottom. The key to achieving fast performance is minimizing the number of applications rendered, so only the relevant applications are processed.
-
-![stats section in preview](../assets/time-modified.png)
+This approach maintains the accuracy that makes `argocd-diff-preview` superior to alternatives while delivering the preview in seconds.
 
 ---
 
