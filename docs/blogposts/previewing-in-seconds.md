@@ -6,11 +6,11 @@ The article shows how you can render changes to your manifests/Argo CD configura
 
 In short, it shows how you can transform a pull request like this:
 
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/a8i7hbfa7dqsq8ag4n2h.png)
+!["PR code changes"](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/5uj1woylw7979u1s50t9.png)
 
 and turn it into a preview like this: 
-
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/c5ffscsp6l5drkv05bwn.jpeg)
+ 
+!["Preview of the diff"](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/x2ia44gwlsogt1s5vgjn.png) 
 
 Here are some examples:
 
@@ -19,9 +19,11 @@ Here are some examples:
 - [Helm example | External Chart: Nginx](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
 - [Kustomize Example](https://github.com/dag-andersen/argocd-diff-preview/pull/12)
 
+---
+
 ## Three Approaches to Preview Generation
 
-Since its introduction in 2024, the tool now supports more ways of running it, so you can optimize it for your use case!
+Since its introduction in 2024, the tool now supports more ways of running it, so you can optimize it for your use case! All three approaches are perfectly valid and you can choose the one that best fits your needs.
 
 ### Approach 1: Ephemeral Clusters (Original)
 
@@ -29,7 +31,7 @@ This is the simplest solution, but also the slowest...
 
 The original solution spins up ephemeral Kubernetes clusters inside your CI/CD pipeline, letting Argo CD itself render the manifests. This ensures maximum accuracy since the same engine that will deploy your changes generates the preview.
 
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/fg16gqjm0488hxl4x8ov.png)
+!["Ephemeral cluster approach"](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/fg16gqjm0488hxl4x8ov.png)
 
 **How it works:**
 1. Create an ephemeral Kubernetes cluster (kind, k3d, or minikube)
@@ -68,7 +70,7 @@ See it as a cluster with Argo CD pre-installed that is on standby and ready to r
 
 We do not recommend using your _normal_ Argo CD instance for this. Instead, create a dedicated cluster or Argo CD instance for diff previews.
 
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/zhyupnhw2ese3iz8mmcb.png)
+!["Cluster with Argo CD pre-installed approach"](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/zhyupnhw2ese3iz8mmcb.png)
 
 **How it works:**
 1. Connect to the cluster
@@ -129,7 +131,7 @@ Running `argocd-diff-preview` on a self-hosted runner inside a cluster that has 
 
 Instead of creating a temporary cluster for each diff preview, your self-hosted GitHub Actions runner connects directly to a dedicated Argo CD instance running in the same cluster as the hosted runners. This offers fast execution (no cluster creation overhead) and enhanced network and credential security.
 
-![Image description](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/6nomrkuvrogliedld30d.png)
+!["Cluster with Argo CD pre-installed + self-hosted runner approach"](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/6nomrkuvrogliedld30d.png)
 
 **Setup Guide:**
 
@@ -144,6 +146,8 @@ Instead of creating a temporary cluster for each diff preview, your self-hosted 
 - ✅ Network isolation (No need to expose your cluster to the internet)
 - ✅ No cluster credentials in CI/CD pipeline because you are using a service account from within the cluster and Argo CD already has all the credentials it needs
 - ❌ Most complex setup (requires self-hosted runners + dedicated Argo CD)
+
+---
 
 ## Optimizing for Large Repositories
 
@@ -194,6 +198,8 @@ More information about the `watch-pattern` annotation can be found in the [appli
 
 For complete details, see the [application-selection documentation](https://dag-andersen.github.io/argocd-diff-preview/application-selection/).
 
+---
+
 ## Comparison: Which Approach to Choose?
 
 | Approach                                                    | Best For                              | Pros                                                                        | Cons                                                                                                               |
@@ -204,7 +210,7 @@ For complete details, see the [application-selection documentation](https://dag-
 
 ## Real-World Results
 
-At [Egmont](https://www.egmont.com), we use the self-hosted runner approach with a repository containing 600+ applications. Combined with smart application selection, we achieve preview times under 10 seconds - a 20x improvement over the original "ephemeral cluster" approach.
+At [Egmont](https://www.egmont.com), we use the "_Cluster with Argo CD pre-installed + self-hosted runner_" approach with a repository containing 600+ applications. Combined with smart application selection, we achieve preview times under 10 seconds - a 20x improvement over the original "_ephemeral cluster_" approach.
 
 The key is combining two optimizations:
 1. **Use a cluster with Argo CD pre-installed** to eliminate cluster creation overhead
@@ -212,13 +218,19 @@ The key is combining two optimizations:
 
 This approach maintains the accuracy that makes `argocd-diff-preview` superior to alternatives while delivering the speed needed for practical daily use.
 
+Each pull request preview includes a `stats` section at the bottom. The key to achieving fast performance is minimizing the number of applications rendered, so only the relevant applications are processed.
+
+![stats section in preview](../assets/time-modified.png)
+
+---
+
 ## Conclusion
 
-The evolution of `argocd-diff-preview` proves you don't have to choose between accuracy and speed. What started as an accurate-but-slow solution has matured into a flexible tool that adapts to your team's needs—whether you prioritize simplicity, speed, or security.
+The evolution of `argocd-diff-preview` proves you don't have to choose between accuracy and speed. What started as an accurate - but slow - solution has matured into a flexible tool that adapts to your team's needs - whether you prioritize simplicity, speed, or security.
 
-Throughout this journey, one principle has remained constant: **use Argo CD itself to render manifests**. This ensures your previews perfectly match what will actually deploy. What's transformed is the speed at which this happens. By using a cluster with Argo CD pre-installed and intelligently selecting applications, we've compressed preview times from minutes to seconds—making the feedback loop fast enough for practical daily use.
+Throughout this journey, one principle has remained constant: **use Argo CD itself to render manifests**. This ensures your previews perfectly match what will actually deploy. What's new is the speed at which this happens. By using a cluster with Argo CD pre-installed and intelligently selecting applications, we've compressed preview times from minutes to seconds - making the feedback loop fast enough for practical daily use.
 
-The path forward is straightforward: begin with the ephemeral cluster approach to get familiar with the tool. As your confidence grows and speed becomes a priority, transition to a dedicated cluster setup. For teams managing hundreds of applications, layer on smart application selection to achieve sub-10-second previews, even at scale.
+I suggest that you begin with the "_ephemeral cluster_" approach to get familiar with the tool. As your confidence grows and speed becomes a priority, you can consider if you should switch to a faster setup using a cluster with Argo CD pre-installed. Combine this with well-placed `argocd-diff-preview/watch-pattern` annotations and you can achieve preview times under 10 seconds while maintaining the same accuracy you started with, even at scale.
 
 The result? Preview times under 10 seconds with the same accuracy you started with 🎉
 
