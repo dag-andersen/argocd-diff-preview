@@ -45,8 +45,8 @@ var (
 	DefaultArgocdChartVersion         = "latest"
 	DefaultArgocdChartName            = "argo"
 	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
-	DefaultArgocdChartRepoUsername     = ""
-	DefaultArgocdChartRepoPassword     = ""
+	DefaultArgocdChartRepoUsername    = ""
+	DefaultArgocdChartRepoPassword    = ""
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
@@ -229,8 +229,8 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-version", DefaultArgocdChartVersion)
 	viper.SetDefault("argocd-chart-name", DefaultArgocdChartName)
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
-	viper.SetDefault("argocd-repo-username", DefaultArgocdChartRepoUsername)
-	viper.SetDefault("argocd-repo-password", DefaultArgocdChartRepoPassword)
+	viper.SetDefault("argocd-chart-repo-username", DefaultArgocdChartRepoUsername)
+	viper.SetDefault("argocd-chart-repo-password", DefaultArgocdChartRepoPassword)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -251,8 +251,8 @@ func Parse() *Options {
 	rootCmd.Flags().String("argocd-namespace", DefaultArgocdNamespace, "Namespace to use for Argo CD")
 	rootCmd.Flags().String("argocd-chart-name", DefaultArgocdChartName, "Argo CD Helm Chart name")
 	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
-	rootCmd.Flags().String("argocd-repo-username", DefaultArgocdChartRepoUsername, "Argo CD Helm Repo User Name")
-	rootCmd.Flags().String("argocd-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
+	rootCmd.Flags().String("argocd-chart-repo-username", DefaultArgocdChartRepoUsername, "Argo CD Helm Repo User Name")
+	rootCmd.Flags().String("argocd-chart-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
