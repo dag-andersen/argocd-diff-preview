@@ -39,7 +39,8 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.18
+            dagandersen/argocd-diff-preview:v0.1.18 \
+            --line-count 3
 
       - name: Post diff as comment
         run: |
