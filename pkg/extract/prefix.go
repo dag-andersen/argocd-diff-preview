@@ -31,7 +31,9 @@ func addApplicationPrefix(a *argoapplication.ArgoResource, prefix string) error 
 	if prefixSize+len(a.Id) > maxKubernetesNameLength {
 		// hash id so it becomes shorter
 		hashedId := fmt.Sprintf("%x", sha256.Sum256([]byte(a.Id)))
-		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, hashedId[:53-prefixSize])
+		hashPart := hashedId[:53-prefixSize]
+		log.Debug().Msgf("Application name too long. Renamed '%s' to '%s'", a.Id, hashPart)
+		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, hashPart)
 	} else {
 		newId = fmt.Sprintf("%s-%s-%s", prefix, branchShortName, a.Id)
 	}
