@@ -226,7 +226,9 @@ func getResourcesFromApps(
 // getResourcesFromApp extracts a single application from the cluster
 // returns the extracted app, the k8s resource name, and an error
 func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string) (ExtractedApp, string, error) {
-	// Apply the application manifest first
+
+	// Store ID (kubernetes resource name) before we add a prefix and hash
+	uniqueIdBeforeModifications := app.Id
 
 	err := addApplicationPrefix(&app, prefix)
 	if err != nil {
@@ -303,22 +305,22 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			if len(rules) > 0 {
 				applyIgnoreDifferencesToManifests(manifestsContent, rules)
 			}
-			
+
 			err = removeArgoCDTrackingID(manifestsContent)
 			if err != nil {
 				return result, "", fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
 			}
 
 			// remove the prefix from the application name
-			oldName, err := removeApplicationPrefix(&app, prefix)
+			k8sResourceName, err := removeApplicationPrefix(&app, prefix)
 			if err != nil {
 				return result, "", fmt.Errorf("failed to remove application prefix: %w", err)
 			}
 
 			// Parse the first non-empty manifest from the string
-			extractedApp := CreateExtractedApp(app.Id, app.Name, app.FileName, manifestsContent, app.Branch)
+			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
 
-			return extractedApp, oldName, nil
+			return extractedApp, k8sResourceName, nil
 
 		case "Unknown":
 			for _, condition := range appStatus.Status.Conditions {
