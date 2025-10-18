@@ -40,11 +40,13 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 
 	diffTooLongWarning := "\n🚨 Diff is too long"
 
-	spaceForDiffTooLongWarning := spaceForContent - len(diffTooLongWarning)
-	minNumberOfCharacters := 100
+	spaceBeforeDiffTooLongWarning := spaceForContent - len(diffTooLongWarning)
 
-	if minNumberOfCharacters < spaceForDiffTooLongWarning {
-		return header + m.comment + content[:spaceForDiffTooLongWarning] + diffTooLongWarning + footer, true
+	minNumberOfCharacters := 100
+	if minNumberOfCharacters < spaceBeforeDiffTooLongWarning {
+		truncatedContent := content[:spaceBeforeDiffTooLongWarning]
+		truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
+		return header + m.comment + truncatedContent + diffTooLongWarning + footer, true
 	}
 
 	// if there is not enough space for the content, return an empty string

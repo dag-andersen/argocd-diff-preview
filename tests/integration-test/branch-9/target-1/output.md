@@ -436,7 +436,7 @@ Deleted (9):
 -        ports:
 -        - containerPort: 80
 -          name: http
--          
+-
 🚨 Diff is too long
 ```
 
