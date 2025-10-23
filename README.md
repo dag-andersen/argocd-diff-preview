@@ -135,6 +135,12 @@ jobs:
 
 If you’re using GitLab, Bitbucket, Jenkins, CircleCI, or any other tool – it should still work. However, there might not be documentation available for it, since everything beyond the GitHub docs is community-contributed. If you get it working with a tool that isn’t mentioned in the documentation, we’d really appreciate it if you shared your setup with the community ❤️
 
+### Speed up the rendering process
+
+Instead of spinning up an ephemeral cluster for each diff preview, you can connect to a cluster with Argo CD pre-installed. This saves approximately `60` seconds per run. Refer to the [documentation](https://dag-andersen.github.io/argocd-diff-preview/reusing-clusters/connecting/) to learn how to do this.
+
+Rendering manifests for all applications in your repository on every pull request can be time-consuming, especially in large monorepos. By default, `argocd-diff-preview` renders all applications it finds, but you can significantly speed up the process by limiting which applications are rendered. Refer to the [Application Selection](https://dag-andersen.github.io/argocd-diff-preview/application-selection/) section in the docs to learn how to do this.
+
 ## Full Documentation
 
 [Link to docs](https://dag-andersen.github.io/argocd-diff-preview/)
