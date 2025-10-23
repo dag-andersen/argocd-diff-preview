@@ -139,6 +139,11 @@ If you’re using GitLab, Bitbucket, Jenkins, CircleCI, or any other tool – it
 
 [Link to docs](https://dag-andersen.github.io/argocd-diff-preview/)
 
+## Blog Posts
+
+- [Rendering the TRUE Argo CD diff on your PRs](https://dev.to/dag-andersen/rendering-the-true-argo-cd-diff-on-your-prs-10bk)
+- [Argo CD: Previewing Pull Request changes in SECONDS! 🥵⚡️⏰](https://dev.to/dag-andersen/argo-cd-previewing-pull-requests-changes-in-seconds-241g)
+
 ## ArgoCon 2024 Talk
 
 <img align="right" src="./docs/assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` was presented at ArgoCon 2024 in Utah, US. The talk covered current tools and methods for visualizing code changes in GitOps workflows and introduced this new approach, which uses ephemeral clusters to render accurate diffs directly on your pull requests.
