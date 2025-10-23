@@ -236,7 +236,7 @@ jobs:
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
             -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}" \
-            dagandersen/argocd-diff-preview:v0.1.18
+            dagandersen/argocd-diff-preview:v0.1.19
 ```
 
 ---
