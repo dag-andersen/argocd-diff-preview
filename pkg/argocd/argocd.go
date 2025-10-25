@@ -354,11 +354,16 @@ func (a *ArgoCDInstallation) login() error {
 }
 
 func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
-
+	var err error
+	var err_fallback error
 	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
 	if err != nil {
-		log.Error().Msgf("❌ Failed to get secret: %s", err)
-		return "", fmt.Errorf("failed to get secret: %w", err)
+		secret, err_fallback = a.K8sClient.GetSecretValue(a.Namespace, "argocd-cluster", "admin.password")
+		if err_fallback != nil {
+			log.Error().Msgf("❌ Failed to get secret 'argocd-initial-admin-secret': %s", err)
+			log.Error().Msgf("❌ Trying ArgoCD Operator location... Failed to get secret 'argocd-cluster': %s", err_fallback)
+			return "", fmt.Errorf("failed to get secret: %w", err)
+		}
 	}
 
 	return secret, nil
