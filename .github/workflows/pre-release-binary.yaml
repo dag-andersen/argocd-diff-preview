@@ -1,13 +1,12 @@
-name: Release Binary
+name: Pre-release Binary
 
 on:
   push:
     tags:
-      - "v*.*.*"
-      - "!v*.*.*-pre-release"
-      - "!v*.*.*-pre-release-*"
-      - "!v*.*.*-experimental"
-      - "!v*.*.*-experimental-*"
+      - "v*.*.*-pre-release"
+      - "v*.*.*-pre-release-*"
+      - "v*.*.*-experimental"
+      - "v*.*.*-experimental-*"
 
 env:
   BINARY_NAME: argocd-diff-preview
