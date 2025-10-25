@@ -6,6 +6,7 @@ on:
       - "v*.*.*"
       - "!v*.*.*-pre-release"
       - "!v*.*.*-pre-release-*"
+      - "!v*.*.*-experimental"
 
 env:
   BINARY_NAME: argocd-diff-preview

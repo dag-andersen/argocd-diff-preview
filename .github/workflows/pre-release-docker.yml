@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*.*.*-pre-release"
+      - "v*.*.*-experimental"
 
 jobs:
   build:
