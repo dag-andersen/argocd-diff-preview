@@ -105,38 +105,26 @@ ArgoCD Diff Preview uses integration tests to verify functionality. These tests 
 
 Using Go:
 ```bash
-make run-test-all-go
+make run-integration-tests-go
 ```
 
 Using Docker:
 ```bash
-make run-test-all-docker
+make run-integration-tests-docker
+```
+
+If you have made changes to the output of the tool, you can update the expected output of the tests by setting the `update_expected` variable to `true`. Example:
+
+```bash
+make run-integration-tests-docker update_expected=true
 ```
 
 ### Running Unit Tests
 
-The project includes Go unit tests that can be run using standard Go commands.
-
-#### Running All Unit Tests
-
 To run all unit tests in the project:
 
 ```bash
-go test ./...
-```
-
-Add the `-v` flag to see detailed output:
-
-```bash
-go test -v ./...
-```
-
-Running Tests in a Specific Package
-
-To run tests in a specific package, for example the `pkg/types` package:
-
-```bash
-go test ./pkg/types
+make run-unit-tests
 ```
 
 ## Documentation
