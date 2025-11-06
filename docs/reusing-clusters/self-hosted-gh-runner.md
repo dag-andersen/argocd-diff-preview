@@ -210,7 +210,7 @@ jobs:
 
       - name: Install argocd-diff-preview
         run: |
-          curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.17/argocd-diff-preview-Linux-x86_64.tar.gz
+          curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.19/argocd-diff-preview-Linux-x86_64.tar.gz
           tar -xvf argocd-diff-preview-Linux-x86_64.tar.gz
           sudo mv argocd-diff-preview /usr/local/bin
           argocd-diff-preview --version
