@@ -169,7 +169,7 @@ The following example utilizes a Gitlab runner in the same cluster where the ded
 * running `argocd-diff-preview` as binary with the options `--argocd-namespace=argocd-diff-preview` and `--create-cluster=false` to use the pre-installed ArgoCD
 * Update the Gitlab Merge Request with the diff using a Gitlab token that has appropriate permissions
 
-```
+```yaml
 default:
   tags:
     - openshift-gitlab-runner
