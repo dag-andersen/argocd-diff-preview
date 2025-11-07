@@ -4,6 +4,10 @@ Running `argocd-diff-preview` against a cluster that has Argo CD pre-installed c
 
 Utilizing the Openshift GitOps operator for managing the pre-installed ArgoCD instance comes with low overhead of managing another ArgoCD instance. It is included in the Operator upgrade process and is in line with the ArgoCD instances in the cluster used to deploy applications. In this setup, there is also no need to run `argocd-diff-preview` as DinD (Docker in Docker) which further increases security. In addition, if there are network settings in place in order to access private repositories outside of the Openshift cluster, this will work right away with this setup. If the main ArgoCD instance is also used to deploy its own configuration (e.g. ssh-known-hosts, tls certs, etc.) in a GitOps way, the instance for `argocd-diff-preview` can be configured in the same way for faster integration.
 
+Imagine something like this:
+
+![](../assets/openshift-reusing-cluster-with-gitlab-runner.png)
+
 ## How it works
 
 1. **Configure dedicated ArgoCD instance managed by Openshift GitOps Operator** in your cluster in the namespace `argocd-diff-preview`
