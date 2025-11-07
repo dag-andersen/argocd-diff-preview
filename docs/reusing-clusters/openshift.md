@@ -59,7 +59,7 @@ After this change, the Openshift GitOps controller will create a clusterrole and
 
 To check the permissions you can investigate the newly created clusterrole and clusterrolebinding:
 
-```
+```bash
 oc get clusterrolebindings argocd-argocd-diff-preview-argocd-application-controller -o yaml
 oc get clusterroles argocd-argocd-diff-preview-argocd-application-controller -o yaml
 ```
