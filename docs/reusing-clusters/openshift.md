@@ -41,7 +41,7 @@ To provide ArgoCD with enough permissions to read the live state of all namespac
 
 4. Add the following entry in `spec.config.env` (this entry may not exist yet and needs to be added). The value should contain a list of your current GitOps cluster scoped instance namespaces including the new one:
 
-    ```
+    ```yaml
     ...
     kind: Subscription
     ...
