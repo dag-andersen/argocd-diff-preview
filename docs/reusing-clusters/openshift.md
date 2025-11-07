@@ -126,7 +126,7 @@ To use `argocd-diff-preview` as a binary and have all tools available to update 
 
 Example Dockerfile `argocd-diff-preview-runner` based on a Red Hat UBI image:
 
-```
+```dockerfile title="Dockerfile"
 FROM registry.access.redhat.com/ubi10-minimal:latest
 
 RUN microdnf install -y curl git tar unzip && \
