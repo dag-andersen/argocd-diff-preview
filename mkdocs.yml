@@ -28,7 +28,7 @@ nav:
 - Reusing clusters:
   - Connect to an already running cluster: reusing-clusters/connecting.md
   - Self-hosted runner connects with host cluster: reusing-clusters/self-hosted-gh-runner.md
-  - Openshift - Self-hosted runner connects with pre-installed ArgoCD on the host cluster: reusing-clusters/openshift.md
+  - Openshift: reusing-clusters/openshift.md
 - generated-applications.md
 - Ignore Lines: ignoring-lines.md
 - application-selection.md
