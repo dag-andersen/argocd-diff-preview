@@ -80,7 +80,7 @@ To reduce credential handling and private repository configuration in the CI pip
 
 ### 4. Configure RBAC
 
-```
+```yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
