@@ -179,7 +179,7 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            dagandersen/argocd-diff-preview:v0.1.17 \
+            dagandersen/argocd-diff-preview:v0.1.19 \
             --target-branch=refs/pull/${{ github.event.number }}/merge \
             --repo=${{ github.repository }} \
             --auto-detect-files-changed=true \
