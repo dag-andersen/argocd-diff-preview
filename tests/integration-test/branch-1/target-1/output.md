@@ -8,7 +8,7 @@ Deleted (1):
 - folder2
 
 Modified (1):
-± nginx-ingress
+± nginx-ingress (1 l+, 1 l-)
 ```
 
 <details>

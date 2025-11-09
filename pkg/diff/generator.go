@@ -253,7 +253,7 @@ func generateGitDiff(
 			return "", nil, nil, fmt.Errorf("failed to get files: %w", err)
 		}
 
-		diffContent := ""
+		changeInfo := changeInfo{}
 
 		switch action {
 		case merkletrie.Insert:
@@ -269,7 +269,7 @@ func generateGitDiff(
 					return "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
 				}
 
-				diffContent = formatNewFileDiff(content, diffContextLines, diffIgnore)
+				changeInfo = formatNewFileDiff(content, diffContextLines, diffIgnore)
 			}
 
 		case merkletrie.Delete:
@@ -285,7 +285,7 @@ func generateGitDiff(
 					return "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
 				}
 
-				diffContent = formatDeletedFileDiff(content, diffContextLines, diffIgnore)
+				changeInfo = formatDeletedFileDiff(content, diffContextLines, diffIgnore)
 			}
 
 		case merkletrie.Modify:
@@ -318,7 +318,7 @@ func generateGitDiff(
 			}
 
 			// Use diff.Do to generate the diff
-			diffContent = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
+			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
 		}
 
 		toName := ""
@@ -336,11 +336,11 @@ func generateGitDiff(
 			newSourcePath: targetAppsMap[toName].SourcePath,
 			oldSourcePath: baseAppsMap[fromName].SourcePath,
 			action:        action,
-			content:       diffContent,
+			changeInfo:    changeInfo,
 		}
 
 		// If the diff didn't change and the names are the same, skip it
-		if diff.content == "" && diff.oldName == diff.newName && diff.oldSourcePath == diff.newSourcePath {
+		if diff.changeInfo.content == "" && diff.oldName == diff.newName && diff.oldSourcePath == diff.newSourcePath {
 			continue
 		}
 
@@ -369,7 +369,7 @@ func generateGitDiff(
 	for _, diff := range changedFiles {
 
 		// skips empty diffs
-		if diff.content == "" {
+		if diff.changeInfo.content == "" {
 			continue
 		}
 

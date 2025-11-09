@@ -46,7 +46,7 @@ func TestFormatNewFileDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := formatNewFileDiff(tt.content, tt.contextLines, tt.ignorePattern)
+			output := formatNewFileDiff(tt.content, tt.contextLines, tt.ignorePattern).content
 			if output != tt.expectedOutput {
 				t.Errorf("Expected:\n%s\nGot:\n%s", tt.expectedOutput, output)
 			}
@@ -94,7 +94,7 @@ func TestFormatDeletedFileDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := formatDeletedFileDiff(tt.content, tt.contextLines, tt.ignorePattern)
+			output := formatDeletedFileDiff(tt.content, tt.contextLines, tt.ignorePattern).content
 			if output != tt.expectedOutput {
 				t.Errorf("Expected:\n%s\nGot:\n%s", tt.expectedOutput, output)
 			}
@@ -163,7 +163,7 @@ func TestFormatModifiedFileDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := formatModifiedFileDiff(tt.oldContent, tt.newContent, tt.contextLines, tt.ignorePattern)
+			output := formatModifiedFileDiff(tt.oldContent, tt.newContent, tt.contextLines, tt.ignorePattern).content
 			if output != tt.expectedOutput {
 				t.Errorf("Expected:\n%s\nGot:\n%s", tt.expectedOutput, output)
 			}
@@ -180,7 +180,7 @@ func stringPtr(s string) *string {
 func TestFormatDiffEdgeCases(t *testing.T) {
 	// Test new file with special characters
 	specialChars := "line with spaces\nline with\ttab\nline with 特殊字符\n"
-	if output := formatNewFileDiff(specialChars, 3, nil); !strings.Contains(output, "+line with spaces") ||
+	if output := formatNewFileDiff(specialChars, 3, nil).content; !strings.Contains(output, "+line with spaces") ||
 		!strings.Contains(output, "+line with\ttab") ||
 		!strings.Contains(output, "+line with 特殊字符") {
 		t.Errorf("Special characters not handled correctly in new file diff: %s", output)
@@ -190,7 +190,7 @@ func TestFormatDiffEdgeCases(t *testing.T) {
 	trailingNewlines := "line1\nline2\nline3\n\n"
 	// Note: The actual implementation preserves empty trailing lines
 	expectedTrailingOutput := "+line1\n+line2\n+line3\n+\n"
-	if output := formatNewFileDiff(trailingNewlines, 3, nil); output != expectedTrailingOutput {
+	if output := formatNewFileDiff(trailingNewlines, 3, nil).content; output != expectedTrailingOutput {
 		t.Errorf("Trailing newlines not handled correctly. Expected:\n%s\nGot:\n%s", expectedTrailingOutput, output)
 	}
 
@@ -200,7 +200,7 @@ func TestFormatDiffEdgeCases(t *testing.T) {
 	ignorePattern := "IGNORE_"
 
 	// When the only changes are in ignored lines, no diff should be shown
-	output := formatModifiedFileDiff(oldContent, newContent, 3, &ignorePattern)
+	output := formatModifiedFileDiff(oldContent, newContent, 3, &ignorePattern).content
 	if output != "" {
 		t.Errorf("Ignored pattern not working correctly. Expected empty output, got:\n%s", output)
 	}
@@ -212,7 +212,7 @@ func TestFormatDiffEdgeCases(t *testing.T) {
 	// Note: The actual implementation includes ignored lines in the output
 	// if they are part of the context of visible changes
 	expectedOutput := " keep1\n-IGNORE_oldvalue\n-keep3\n+IGNORE_newvalue\n+modified3\n line4\n"
-	output = formatModifiedFileDiff(oldContent, newContent, 3, &ignorePattern)
+	output = formatModifiedFileDiff(oldContent, newContent, 3, &ignorePattern).content
 	if output != expectedOutput {
 		t.Errorf("Mixed ignored and visible changes not handled correctly. Expected:\n%s\nGot:\n%s", expectedOutput, output)
 	}
@@ -224,14 +224,14 @@ func TestContextLinesVariations(t *testing.T) {
 	newContent := "line1\nline2\nline3\nmodified4\nline5\nline6\nline7\nmodified8\nline9\nline10"
 
 	// Test with zero context lines
-	zeroContextOutput := formatModifiedFileDiff(oldContent, newContent, 0, nil)
+	zeroContextOutput := formatModifiedFileDiff(oldContent, newContent, 0, nil).content
 	if !strings.Contains(zeroContextOutput, "-line4\n+modified4") ||
 		!strings.Contains(zeroContextOutput, "-line8\n+modified8") {
 		t.Errorf("Zero context lines didn't show changes properly:\n%s", zeroContextOutput)
 	}
 
 	// Test with very large context (larger than file size)
-	largeContextOutput := formatModifiedFileDiff(oldContent, newContent, 100, nil)
+	largeContextOutput := formatModifiedFileDiff(oldContent, newContent, 100, nil).content
 	expectedLargeContext := " line1\n line2\n line3\n-line4\n+modified4\n line5\n line6\n line7\n-line8\n+modified8\n line9\n line10\n"
 	if largeContextOutput != expectedLargeContext {
 		t.Errorf("Large context not handled correctly. Expected:\n%s\nGot:\n%s", expectedLargeContext, largeContextOutput)
@@ -240,7 +240,7 @@ func TestContextLinesVariations(t *testing.T) {
 	// Test with small context
 	// The changes in this example are close enough that they extend into each other's context
 	// so no lines are skipped even with small context
-	smallContextOutput := formatModifiedFileDiff(oldContent, newContent, 2, nil)
+	smallContextOutput := formatModifiedFileDiff(oldContent, newContent, 2, nil).content
 	if len(strings.Split(smallContextOutput, "\n")) != (10 + 2) {
 		t.Errorf("Small context output should include most lines:\n%s", smallContextOutput)
 	}
@@ -255,7 +255,7 @@ func TestContextLinesVariations(t *testing.T) {
 	newLines[2] = "modified3"
 	newLines[17] = "modified18"
 
-	farApartOutput := formatModifiedFileDiff(strings.Join(oldLines, "\n"), strings.Join(newLines, "\n"), 1, nil)
+	farApartOutput := formatModifiedFileDiff(strings.Join(oldLines, "\n"), strings.Join(newLines, "\n"), 1, nil).content
 	if !strings.Contains(farApartOutput, "@@ skipped") {
 		t.Errorf("Context with far apart changes should have skipped lines: %s", farApartOutput)
 	}
@@ -267,20 +267,20 @@ func TestIgnorePatternEdgeCases(t *testing.T) {
 
 	// Test with empty string ignore pattern
 	emptyPattern := ""
-	output := formatNewFileDiff(content, 3, &emptyPattern)
+	output := formatNewFileDiff(content, 3, &emptyPattern).content
 	if output != "+line1\n+IGNORE_line2\n+line3\n" {
 		t.Errorf("Empty ignore pattern not handled correctly: %s", output)
 	}
 
 	// Test with nil ignore pattern
-	nilOutput := formatNewFileDiff(content, 3, nil)
+	nilOutput := formatNewFileDiff(content, 3, nil).content
 	if nilOutput != "+line1\n+IGNORE_line2\n+line3\n" {
 		t.Errorf("Nil ignore pattern not handled correctly: %s", nilOutput)
 	}
 
 	// Test with invalid regex pattern
 	invalidRegex := "[" // Invalid regex
-	invalidOutput := formatNewFileDiff(content, 3, &invalidRegex)
+	invalidOutput := formatNewFileDiff(content, 3, &invalidRegex).content
 	// Should fall back to string matching, which won't match anything
 	if invalidOutput != "+line1\n+IGNORE_line2\n+line3\n" {
 		t.Errorf("Invalid regex pattern not handled correctly: %s", invalidOutput)
@@ -305,7 +305,7 @@ func TestLargeDiff(t *testing.T) {
 	newContent := strings.Join(newLines, "\n")
 
 	// With small context, check that the output isn't excessively long
-	output := formatModifiedFileDiff(oldContent, newContent, 2, nil)
+	output := formatModifiedFileDiff(oldContent, newContent, 2, nil).content
 
 	// Just verify some basics about the output
 	if !strings.Contains(output, "-old line") && !strings.Contains(output, "+new line") {
@@ -319,7 +319,7 @@ func TestLargeDiff(t *testing.T) {
 	oldContent = strings.Join(oldLines, "\n")
 	newContent = strings.Join(newLines, "\n")
 
-	controlledOutput := formatModifiedFileDiff(oldContent, newContent, 1, nil)
+	controlledOutput := formatModifiedFileDiff(oldContent, newContent, 1, nil).content
 	expected := " common2\n-this will change\n+this was changed\n common4\n"
 
 	if controlledOutput != expected {
@@ -404,7 +404,7 @@ func TestRegexIgnorePatterns(t *testing.T) {
 			newContent := "unchanged\n" + tt.input + "_MODIFIED\nunchanged2"
 
 			pattern := tt.pattern
-			output := formatModifiedFileDiff(oldContent, newContent, 3, &pattern)
+			output := formatModifiedFileDiff(oldContent, newContent, 3, &pattern).content
 
 			// If pattern should ignore the line, no diff should be shown
 			if tt.shouldIgnore && output != "" {
@@ -427,12 +427,12 @@ func TestRegexIgnorePatterns(t *testing.T) {
 	testerContent := "line1\nTEST_LINE\nline3"
 	testerPattern := "TEST_"
 
-	newOutput := formatNewFileDiff(testerContent, 3, &testerPattern)
+	newOutput := formatNewFileDiff(testerContent, 3, &testerPattern).content
 	if !strings.Contains(newOutput, "+TEST_LINE") {
 		t.Errorf("New file output should contain TEST_LINE: %s", newOutput)
 	}
 
-	delOutput := formatDeletedFileDiff(testerContent, 3, &testerPattern)
+	delOutput := formatDeletedFileDiff(testerContent, 3, &testerPattern).content
 	if !strings.Contains(delOutput, "-TEST_LINE") {
 		t.Errorf("Deleted file output should contain TEST_LINE: %s", delOutput)
 	}
@@ -452,14 +452,14 @@ func TestRegexIgnorePatterns(t *testing.T) {
 		pattern := tt.pattern
 
 		t.Run(tt.name+"_new", func(t *testing.T) {
-			output := formatNewFileDiff(content, 3, &pattern)
+			output := formatNewFileDiff(content, 3, &pattern).content
 			if !strings.Contains(output, "+"+tt.input) {
 				t.Errorf("New file should contain line %s: %s", tt.input, output)
 			}
 		})
 
 		t.Run(tt.name+"_deleted", func(t *testing.T) {
-			output := formatDeletedFileDiff(content, 3, &pattern)
+			output := formatDeletedFileDiff(content, 3, &pattern).content
 			if !strings.Contains(output, "-"+tt.input) {
 				t.Errorf("Deleted file should contain line %s: %s", tt.input, output)
 			}
@@ -477,7 +477,7 @@ func TestMixedChangesWithRegex(t *testing.T) {
 	pattern := "^timestamp: [0-9]{4}-[0-9]{2}-[0-9]{2}$"
 
 	// We expect to see version change and content change, but not timestamp change
-	output := formatModifiedFileDiff(oldContent, newContent, 1, &pattern)
+	output := formatModifiedFileDiff(oldContent, newContent, 1, &pattern).content
 
 	// Should contain version change
 	if !strings.Contains(output, "-version: 1.0") || !strings.Contains(output, "+version: 2.0") {
@@ -605,11 +605,11 @@ data:
 		t.Run(tt.name, func(t *testing.T) {
 			var output string
 			if tt.oldContent == "" {
-				output = formatNewFileDiff(tt.newContent, tt.contextLines, tt.ignorePattern)
+				output = formatNewFileDiff(tt.newContent, tt.contextLines, tt.ignorePattern).content
 			} else if tt.newContent == "" {
-				output = formatDeletedFileDiff(tt.oldContent, tt.contextLines, tt.ignorePattern)
+				output = formatDeletedFileDiff(tt.oldContent, tt.contextLines, tt.ignorePattern).content
 			} else {
-				output = formatModifiedFileDiff(tt.oldContent, tt.newContent, tt.contextLines, tt.ignorePattern)
+				output = formatModifiedFileDiff(tt.oldContent, tt.newContent, tt.contextLines, tt.ignorePattern).content
 			}
 
 			if strings.TrimRight(output, "\n") != strings.TrimRight(tt.expectedOutput, "\n") {
@@ -635,7 +635,7 @@ func TestInvalidRegexPatterns(t *testing.T) {
 			patternPtr := &pattern
 
 			// Should not panic, should fall back to string matching
-			output := formatNewFileDiff(content, 3, patternPtr)
+			output := formatNewFileDiff(content, 3, patternPtr).content
 
 			// The output should still contain all lines
 			if !strings.Contains(output, "+TIMESTAMP: 123456") {
@@ -644,7 +644,7 @@ func TestInvalidRegexPatterns(t *testing.T) {
 
 			// Try with modified diff too
 			newContent := "line1\nTIMESTAMP: 654321\nline3"
-			modOutput := formatModifiedFileDiff(content, newContent, 3, patternPtr)
+			modOutput := formatModifiedFileDiff(content, newContent, 3, patternPtr).content
 
 			// Should still produce some output
 			if len(modOutput) == 0 && !strings.Contains(pattern, content) {
