@@ -10,6 +10,300 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func TestDisableAutoSync(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	tests := []struct {
+		name      string
+		yaml      string
+		want      string
+		kind      ApplicationKind
+		expectErr bool
+	}{
+		{
+			name: "Application with existing syncPolicy",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  syncPolicy:
+    automated:
+      enabled: false
+      prune: true
+      selfHeal: false
+    syncOptions:
+      - ServerSideApply=true
+`,
+			kind:      Application,
+			expectErr: false,
+		},
+		{
+			name: "Application without syncPolicy",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo
+  syncPolicy:
+    automated:
+      enabled: false
+      selfHeal: false
+    syncOptions:
+      - ServerSideApply=true
+`,
+			kind:      Application,
+			expectErr: false,
+		},
+		{
+			name: "Application with syncPolicy but no automated section",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  syncPolicy:
+    automated:
+      enabled: false
+      selfHeal: false
+    syncOptions:
+      - ServerSideApply=true
+`,
+			kind:      Application,
+			expectErr: false,
+		},
+		{
+			name: "ApplicationSet with existing syncPolicy",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-appset
+  namespace: default
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: dev
+  template:
+    spec:
+      project: default
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-appset
+  namespace: default
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: dev
+  template:
+    spec:
+      project: default
+      syncPolicy:
+        automated:
+          enabled: false
+          prune: true
+          selfHeal: false
+        syncOptions:
+          - ServerSideApply=true
+`,
+			kind:      ApplicationSet,
+			expectErr: false,
+		},
+		{
+			name: "ApplicationSet without syncPolicy",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-appset
+  namespace: default
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: dev
+  template:
+    spec:
+      project: default
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-appset
+  namespace: default
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: dev
+  template:
+    spec:
+      project: default
+      syncPolicy:
+        automated:
+          enabled: false
+          selfHeal: false
+        syncOptions:
+          - ServerSideApply=true
+`,
+			kind:      ApplicationSet,
+			expectErr: false,
+		},
+		{
+			name: "Application with automated.enabled already set to true",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  project: default
+  syncPolicy:
+    automated:
+      enabled: false
+      prune: true
+      selfHeal: false
+    syncOptions:
+      - ServerSideApply=true
+`,
+			kind:      Application,
+			expectErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse YAML
+			var node map[string]interface{}
+			err := yaml.Unmarshal([]byte(tt.yaml), &node)
+			assert.NoError(t, err)
+
+			// Create ArgoResource
+			app := &ArgoResource{
+				Yaml:     &unstructured.Unstructured{Object: node},
+				Kind:     tt.kind,
+				Id:       "test-resource",
+				Name:     "test-resource",
+				FileName: "test-resource.yaml",
+			}
+
+			// Run DisableAutoSync
+			err = app.DisableAutoSync()
+
+			// Check error
+			if tt.expectErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+
+			// Get result
+			got, err := app.AsString()
+			assert.NoError(t, err)
+
+			// Parse expected YAML to normalize formatting
+			var wantNode map[string]interface{}
+			err = yaml.Unmarshal([]byte(tt.want), &wantNode)
+			assert.NoError(t, err)
+			wantUnstructured := &unstructured.Unstructured{Object: wantNode}
+			wantBytes, err := yaml.Marshal(wantUnstructured)
+			assert.NoError(t, err)
+			want := string(wantBytes)
+
+			// Compare
+			assert.Equal(t, want, got)
+		})
+	}
+}
+
+func TestDisableAutoSyncWithNilYaml(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	app := &ArgoResource{
+		Yaml:     nil,
+		Kind:     Application,
+		Id:       "test-app",
+		Name:     "test-app",
+		FileName: "test-app.yaml",
+	}
+
+	err := app.DisableAutoSync()
+	assert.NoError(t, err) // Should not error, just return nil
+}
+
 func TestRedirectGenerators(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.FatalLevel)
 

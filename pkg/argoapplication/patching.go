@@ -47,10 +47,10 @@ func patchApplication(
 	// Chain the modifications
 	app.SetNamespace(argocdNamespace)
 
-	err := app.RemoveSyncPolicy()
+	err := app.DisableAutoSync()
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
-		return nil, fmt.Errorf("failed to remove sync policy: %w", err)
+		return nil, fmt.Errorf("failed to disable autosync: %w", err)
 	}
 
 	err = app.SetProjectToDefault()
@@ -175,36 +175,50 @@ func (a *ArgoResource) RemoveArgoCDFinalizers() error {
 	return nil
 }
 
-// RemoveSyncPolicy removes the syncPolicy from the resource
-func (a *ArgoResource) RemoveSyncPolicy() error {
+// DisableAutoSync disables automated sync by setting syncPolicy.automated.enabled to false
+func (a *ArgoResource) DisableAutoSync() error {
 	if a.Yaml == nil {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't remove 'syncPolicy' because YAML is nil")
+		log.Warn().Str("patchType", "disableSyncPolicy").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't disable 'syncPolicy' because YAML is nil")
 		return nil
 	}
 
-	var specPath []string
+	var syncPolicyPath []string
 	switch a.Kind {
 	case Application:
-		specPath = []string{"spec"}
+		syncPolicyPath = []string{"spec", "syncPolicy"}
 	case ApplicationSet:
-		specPath = []string{"spec", "template", "spec"}
+		syncPolicyPath = []string{"spec", "template", "spec", "syncPolicy"}
 	default:
 		return nil
 	}
 
-	// Check if spec exists
-	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
+	// Get or create syncPolicy map
+	syncPolicyMap, found, _ := unstructured.NestedMap(a.Yaml.Object, syncPolicyPath...)
 	if !found {
-		log.Warn().Str("patchType", "removeSyncPolicy").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't remove 'syncPolicy' because spec not found")
+		// skip if no syncPolicy
 		return nil
 	}
 
-	// Remove syncPolicy
-	delete(specMap, "syncPolicy")
+	// Get or create automated map
+	automatedMap, ok := syncPolicyMap["automated"].(map[string]interface{})
+	if !ok {
+		automatedMap = make(map[string]interface{})
+	}
 
-	// Set it back
-	if err := unstructured.SetNestedMap(a.Yaml.Object, specMap, specPath...); err != nil {
-		return fmt.Errorf("failed to set %s map: %w", strings.Join(specPath, "."), err)
+	// Set enabled to false
+	automatedMap["enabled"] = false
+	automatedMap["selfHeal"] = false
+	syncPolicyMap["automated"] = automatedMap
+
+	// Set it back (without syncOptions, which needs special handling)
+	if err := unstructured.SetNestedMap(a.Yaml.Object, syncPolicyMap, syncPolicyPath...); err != nil {
+		return fmt.Errorf("failed to set %s map: %w", strings.Join(syncPolicyPath, "."), err)
+	}
+
+	// Set syncOptions using the proper helper function for string slices
+	syncOptionsPath := append(syncPolicyPath, "syncOptions")
+	if err := unstructured.SetNestedStringSlice(a.Yaml.Object, []string{"ServerSideApply=true"}, syncOptionsPath...); err != nil {
+		return fmt.Errorf("failed to set syncOptions: %w", err)
 	}
 
 	return nil
