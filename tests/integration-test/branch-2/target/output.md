@@ -17,7 +17,6 @@ Modified (1):
  apiVersion: v1
  kind: Service
  metadata:
-   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/managed-by: Helm
@@ -43,7 +42,6 @@ Modified (1):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
-   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/managed-by: Helm
@@ -58,7 +56,6 @@ Modified (1):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
-   annotations: {}
    labels:
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/managed-by: Helm
@@ -81,7 +78,7 @@ Modified (1):
          app.kubernetes.io/instance: my-app
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: myApp
-@@ skipped 12 lines (67 -> 78) @@
+@@ skipped 12 lines (64 -> 75) @@
          - containerPort: 80
            name: http
            protocol: TCP

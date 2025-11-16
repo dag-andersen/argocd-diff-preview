@@ -5,7 +5,7 @@ Summary:
 Total: 2 files changed
 
 Deleted (1):
-- folder2 (-20)
+- folder2 (-19)
 
 Modified (1):
 ± nginx-ingress (+1|-1)
@@ -20,7 +20,6 @@ Modified (1):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: deploy-from-folder-two
 -spec:
 -  replicas: 2

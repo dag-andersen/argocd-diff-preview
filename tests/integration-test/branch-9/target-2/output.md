@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Deleted (1):
-- nginx-ingress (-501)
+- nginx-ingress (-490)
 ```
 
 <details>
@@ -19,14 +19,13 @@ Deleted (1):
 -  allow-snippet-annotations: "false"
 -kind: ConfigMap
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/component: controller
 -    app.kubernetes.io/instance: nginx-ingress
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: ingress-nginx
 -    app.kubernetes.io/part-of: ingress-nginx
--    app.kub
+-    app.kubernetes.io/version:
 🚨 Diff is too long
 ```
 

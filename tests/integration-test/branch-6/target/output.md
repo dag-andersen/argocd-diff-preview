@@ -111,7 +111,6 @@ Modified (7):
  apiVersion: v1
  kind: Service
  metadata:
-   annotations: {}
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
@@ -138,7 +137,6 @@ Modified (7):
  automountServiceAccountToken: true
  kind: ServiceAccount
  metadata:
-   annotations: {}
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app
@@ -153,7 +151,6 @@ Modified (7):
  apiVersion: apps/v1
  kind: Deployment
  metadata:
-   annotations: {}
    labels:
 -    app.kubernetes.io/instance: my-app
 +    app.kubernetes.io/instance: my-super-app

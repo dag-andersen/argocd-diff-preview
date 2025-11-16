@@ -51,7 +51,7 @@ pre {
 <pre>Total: 1 files changed
 
 Added (1):
-+ folder3 (+20)</pre>
++ folder3 (+19)</pre>
 
 <div class="diffs">
 <details>
@@ -61,7 +61,7 @@ folder3 (examples/git-generator/app/app-set.yaml)
 <div class="diff_container">
 <table>
 	<tr class="comment_line"><td><pre>@@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
-</pre></td></tr><tr class="added_line"><td><pre>+apiVersion: apps/v1</pre></td></tr><tr class="added_line"><td><pre>+kind: Deployment</pre></td></tr><tr class="added_line"><td><pre>+metadata:</pre></td></tr><tr class="added_line"><td><pre>+  annotations: {}</pre></td></tr><tr class="added_line"><td><pre>+  name: deploy-from-folder-three</pre></td></tr><tr class="added_line"><td><pre>+spec:</pre></td></tr><tr class="added_line"><td><pre>+  replicas: 2</pre></td></tr><tr class="added_line"><td><pre>+  selector:</pre></td></tr><tr class="added_line"><td><pre>+    matchLabels:</pre></td></tr><tr class="added_line"><td><pre>+      app: myapp</pre></td></tr><tr class="added_line"><td><pre>+  template:</pre></td></tr><tr class="added_line"><td><pre>+    metadata:</pre></td></tr><tr class="added_line"><td><pre>+      labels:</pre></td></tr><tr class="added_line"><td><pre>+        app: myapp</pre></td></tr><tr class="added_line"><td><pre>+    spec:</pre></td></tr><tr class="added_line"><td><pre>+      containers:</pre></td></tr><tr class="added_line"><td><pre>+      - image: dag-andersen/myapp:latest</pre></td></tr><tr class="added_line"><td><pre>+        name: myapp</pre></td></tr><tr class="added_line"><td><pre>+        ports:</pre></td></tr><tr class="added_line"><td><pre>+        - containerPort: 80</pre></td></tr><tr class="normal_line"><td><pre></pre></td></tr>
+</pre></td></tr><tr class="added_line"><td><pre>+apiVersion: apps/v1</pre></td></tr><tr class="added_line"><td><pre>+kind: Deployment</pre></td></tr><tr class="added_line"><td><pre>+metadata:</pre></td></tr><tr class="added_line"><td><pre>+  name: deploy-from-folder-three</pre></td></tr><tr class="added_line"><td><pre>+spec:</pre></td></tr><tr class="added_line"><td><pre>+  replicas: 2</pre></td></tr><tr class="added_line"><td><pre>+  selector:</pre></td></tr><tr class="added_line"><td><pre>+    matchLabels:</pre></td></tr><tr class="added_line"><td><pre>+      app: myapp</pre></td></tr><tr class="added_line"><td><pre>+  template:</pre></td></tr><tr class="added_line"><td><pre>+    metadata:</pre></td></tr><tr class="added_line"><td><pre>+      labels:</pre></td></tr><tr class="added_line"><td><pre>+        app: myapp</pre></td></tr><tr class="added_line"><td><pre>+    spec:</pre></td></tr><tr class="added_line"><td><pre>+      containers:</pre></td></tr><tr class="added_line"><td><pre>+      - image: dag-andersen/myapp:latest</pre></td></tr><tr class="added_line"><td><pre>+        name: myapp</pre></td></tr><tr class="added_line"><td><pre>+        ports:</pre></td></tr><tr class="added_line"><td><pre>+        - containerPort: 80</pre></td></tr><tr class="normal_line"><td><pre></pre></td></tr>
 </table>
 </div>
 </details>
