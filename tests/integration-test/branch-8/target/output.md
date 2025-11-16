@@ -5,7 +5,7 @@ Summary:
 Total: 2 files changed
 
 Added (1):
-+ folder3 (+20)
++ folder3 (+19)
 
 Modified (1):
 ± folder2 (+1|-1)
@@ -42,7 +42,6 @@ Modified (1):
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
-+  annotations: {}
 +  name: deploy-from-folder-three
 +spec:
 +  replicas: 2

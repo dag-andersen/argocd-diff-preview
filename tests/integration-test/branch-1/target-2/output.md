@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Deleted (1):
-- folder2 (-20)
+- folder2 (-19)
 ```
 
 <details>
@@ -17,7 +17,6 @@ Deleted (1):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: deploy-from-folder-two
 -spec:
 -  replicas: 2

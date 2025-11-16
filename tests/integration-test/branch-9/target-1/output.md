@@ -5,15 +5,15 @@ Summary:
 Total: 9 files changed
 
 Deleted (9):
-- app1 (-20)
-- app1 (-20)
-- app2 (-20)
-- app2 (-20)
-- custom-target-revision-example (-15)
-- my-app-set-dev (-86)
-- my-app-set-prod (-86)
-- my-app-set-staging (-86)
-- nginx-ingress (-501)
+- app1 (-19)
+- app1 (-19)
+- app2 (-19)
+- app2 (-19)
+- custom-target-revision-example (-14)
+- my-app-set-dev (-83)
+- my-app-set-prod (-83)
+- my-app-set-staging (-83)
+- nginx-ingress (-490)
 ```
 
 <details>
@@ -25,7 +25,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: deploy-from-folder-one
 -spec:
 -  replicas: 2
@@ -55,7 +54,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: deploy-from-folder-one
 -spec:
 -  replicas: 2
@@ -85,7 +83,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: deploy-from-folder-one
 -spec:
 -  replicas: 2
@@ -115,7 +112,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: deploy-from-folder-one
 -spec:
 -  replicas: 2
@@ -145,7 +141,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  name: my-deployment
 -  namespace: default
 -spec:
@@ -170,7 +165,6 @@ Deleted (9):
 -apiVersion: v1
 -kind: Service
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/managed-by: Helm
@@ -195,7 +189,6 @@ Deleted (9):
 -automountServiceAccountToken: true
 -kind: ServiceAccount
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/managed-by: Helm
@@ -209,7 +202,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/managed-by: Helm
@@ -266,7 +258,6 @@ Deleted (9):
 -apiVersion: v1
 -kind: Service
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/managed-by: Helm
@@ -291,7 +282,6 @@ Deleted (9):
 -automountServiceAccountToken: true
 -kind: ServiceAccount
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/managed-by: Helm
@@ -305,7 +295,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/managed-by: Helm
@@ -362,7 +351,6 @@ Deleted (9):
 -apiVersion: v1
 -kind: Service
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-staging
 -    app.kubernetes.io/managed-by: Helm
@@ -387,7 +375,6 @@ Deleted (9):
 -automountServiceAccountToken: true
 -kind: ServiceAccount
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-staging
 -    app.kubernetes.io/managed-by: Helm
@@ -401,7 +388,6 @@ Deleted (9):
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
--  annotations: {}
 -  labels:
 -    app.kubernetes.io/instance: my-app-set-staging
 -    app.kubernetes.io/managed-by: Helm
@@ -434,8 +420,17 @@ Deleted (9):
 -            port: http
 -        name: myApp
 -        ports:
--
-🚨 Diff is too long
+-        - containerPort: 80
+-          name: http
+-          protocol: TCP
+-        readinessProbe:
+-          httpGet:
+-            path: /
+-            port: http
+-        resources: {}
+-        securityContext: {}
+-      securityContext: {}
+-      serviceAccountName: super-app-name
 ```
 
 </details>

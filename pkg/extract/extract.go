@@ -370,7 +370,12 @@ func removeArgoCDTrackingID(a []unstructured.Unstructured) error {
 			}
 		}
 
-		obj.SetAnnotations(annotations)
+		// Remove the entire annotations field if it's now empty
+		if len(annotations) == 0 {
+			obj.SetAnnotations(nil)
+		} else {
+			obj.SetAnnotations(annotations)
+		}
 	}
 
 	return nil
