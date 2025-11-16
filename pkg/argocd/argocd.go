@@ -110,19 +110,6 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	return duration, nil
 }
 
-func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
-	startTime := time.Now()
-
-	// Login to ArgoCD
-	if err := a.login(); err != nil {
-		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
-	}
-
-	log.Info().Msg("🦑 Logged in to Argo CD successfully")
-
-	return time.Since(startTime), nil
-}
-
 // installWithHelm installs ArgoCD using Helm
 func (a *ArgoCDInstallation) installWithHelm() error {
 	installLatest := strings.TrimSpace(a.Version) == "" || strings.TrimSpace(a.Version) == "latest"
@@ -155,8 +142,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		// Create a new repository file
 		r := repo.NewFile()
 		r.Add(&repo.Entry{
-			Name: a.ChartName,
-			URL:  a.ChartURL,
+			Name:     a.ChartName,
+			URL:      a.ChartURL,
 			Username: a.ChartRepoUsername,
 			Password: a.ChartRepoPassword,
 		})
@@ -173,8 +160,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 		if !r.Has(a.ChartName) {
 			r.Add(&repo.Entry{
-				Name: a.ChartName,
-				URL:  a.ChartURL,
+				Name:     a.ChartName,
+				URL:      a.ChartURL,
 				Username: a.ChartRepoUsername,
 				Password: a.ChartRepoPassword,
 			})
@@ -187,8 +174,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Update repository
 	repoEntry := &repo.Entry{
-		Name: a.ChartName,
-		URL:  a.ChartURL,
+		Name:     a.ChartName,
+		URL:      a.ChartURL,
 		Username: a.ChartRepoUsername,
 		Password: a.ChartRepoPassword,
 	}
@@ -314,60 +301,6 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 		return "", fmt.Errorf("argocd command failed: %s: %w", string(output), err)
 	}
 	return string(output), nil
-}
-
-func (a *ArgoCDInstallation) login() error {
-	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
-
-	// Get initial admin password
-	password, err := a.getInitialPassword()
-	if err != nil {
-		return err
-	}
-
-	maxAttempts := 10
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
-		if err == nil {
-			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
-			break
-		}
-
-		if attempt >= maxAttempts {
-			log.Error().Err(err).Msgf("❌ Failed to login to Argo CD after %d attempts", maxAttempts)
-			return fmt.Errorf("failed to login after %d attempts", maxAttempts)
-		}
-
-		log.Debug().Msgf("Waiting 1s before next login attempt (%d/%d)...", attempt+1, maxAttempts)
-		log.Warn().Err(err).Msgf("Argo CD login attempt %d/%d failed.", attempt, maxAttempts)
-		time.Sleep(1 * time.Second)
-	}
-
-	log.Debug().Msg("Verifying login by listing applications...")
-	if _, errList := a.runArgocdCommand("app", "list"); errList != nil {
-		log.Error().Err(errList).Msg("❌ Failed to list applications after login (verification step).")
-		return fmt.Errorf("login verification failed (unable to list applications): %w", errList)
-	}
-
-	return nil
-}
-
-func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
-	var err error
-	var err_fallback error
-	secret, err := a.K8sClient.GetSecretValue(a.Namespace, "argocd-initial-admin-secret", "password")
-	if err != nil {
-		log.Debug().Msgf("Failed to get password in 'argocd-initial-admin-secret'. Trying to get fallback password in 'argocd-cluster' secret.") 
-		secret, err_fallback = a.K8sClient.GetSecretValue(a.Namespace, "argocd-cluster", "admin.password")
-		if err_fallback != nil {
-			log.Error().Err(err).Msgf("❌ Failed to get secret 'argocd-initial-admin-secret'")
-			log.Error().Err(err_fallback).Msgf("❌ Failed to get fallback secret 'argocd-cluster'")
-			return "", fmt.Errorf("failed to get secret: %w", err)
-		}
-	}
-
-	return secret, nil
 }
 
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
