@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Modified (1):
-± my-service-staging ((1 lines added, 1 lines deleted))
+± my-service-staging (+1|-1)
 ```
 
 <details>

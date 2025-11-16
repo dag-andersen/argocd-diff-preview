@@ -5,8 +5,8 @@ Summary:
 Total: 2 files changed
 
 Modified (2):
-± my-app-labels
-± my-app-watch-pattern-valid-regex
+± my-app-labels (+4|-4)
+± my-app-watch-pattern-valid-regex (+4|-4)
 ```
 
 <details>

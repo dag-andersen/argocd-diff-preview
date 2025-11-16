@@ -5,13 +5,13 @@ Summary:
 Total: 7 files changed
 
 Modified (7):
-± app1
-± app1
-± app2
-± app2
-± my-app -> my-super-app
-± my-service-staging
-± nginx-ingress
+± app1 (+1|-1)
+± app1 (+1|-1)
+± app2 (+1|-1)
+± app2 (+1|-1)
+± my-app -> my-super-app (+6|-6)
+± my-service-staging (+1|-1)
+± nginx-ingress (+1|-1)
 ```
 
 <details>

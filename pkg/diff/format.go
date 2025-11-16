@@ -43,10 +43,10 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	// Process the diffs and format them in unified diff format
 	// We'll keep track of context lines to include only the specified number
 	var processedLines []struct {
-		prefix   string
-		text     string
-		isChange bool
-		show     bool
+		operation diffmatchpatch.Operation
+		text      string
+		isChange  bool
+		show      bool
 	}
 
 	for _, d := range diffs {
@@ -76,20 +76,12 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				}
 			}
 
-			prefix := " "
-			switch d.Type {
-			case diffmatchpatch.DiffDelete:
-				prefix = "-"
-			case diffmatchpatch.DiffInsert:
-				prefix = "+"
-			}
-
 			processedLines = append(processedLines, struct {
-				prefix   string
-				text     string
-				isChange bool
-				show     bool
-			}{prefix, line, isChange, show})
+				operation diffmatchpatch.Operation
+				text      string
+				isChange  bool
+				show      bool
+			}{d.Type, line, isChange, show})
 		}
 	}
 
@@ -142,17 +134,17 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 
 	// Now build the output with separators between chunks
 	var filteredLines []struct {
-		prefix string
-		text   string
+		operation diffmatchpatch.Operation
+		text      string
 	}
 
 	for i, chunk := range chunks {
 		// Add all lines in this chunk
 		for j := chunk.start; j <= chunk.end; j++ {
 			filteredLines = append(filteredLines, struct {
-				prefix string
-				text   string
-			}{processedLines[j].prefix, processedLines[j].text})
+				operation diffmatchpatch.Operation
+				text      string
+			}{processedLines[j].operation, processedLines[j].text})
 		}
 
 		// Add separator if there's a next chunk and it's far enough away
@@ -163,9 +155,9 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			if skippedLines > 0 {
 				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, chunk.end+1, nextChunk.start-1)
 				filteredLines = append(filteredLines, struct {
-					prefix string
-					text   string
-				}{"", separator})
+					operation diffmatchpatch.Operation
+					text      string
+				}{diffmatchpatch.DiffEqual, separator})
 			}
 		}
 	}
@@ -178,12 +170,16 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		if strings.HasPrefix(line.text, "@@ skipped") {
 			buffer.WriteString(line.text + "\n")
 		} else {
-			if line.prefix == "+" {
+			switch line.operation {
+			case diffmatchpatch.DiffInsert:
 				addedLines++
-			} else if line.prefix == "-" {
+				buffer.WriteString("+" + line.text + "\n")
+			case diffmatchpatch.DiffDelete:
 				deletedLines++
+				buffer.WriteString("-" + line.text + "\n")
+			default:
+				buffer.WriteString(" " + line.text + "\n")
 			}
-			buffer.WriteString(line.prefix + line.text + "\n")
 		}
 	}
 

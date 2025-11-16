@@ -5,15 +5,15 @@ Summary:
 Total: 9 files changed
 
 Deleted (9):
-- app1
-- app1
-- app2
-- app2
-- custom-target-revision-example
-- my-app-set-dev
-- my-app-set-prod
-- my-app-set-staging
-- nginx-ingress
+- app1 (-20)
+- app1 (-20)
+- app2 (-20)
+- app2 (-20)
+- custom-target-revision-example (-15)
+- my-app-set-dev (-86)
+- my-app-set-prod (-86)
+- my-app-set-staging (-86)
+- nginx-ingress (-501)
 ```
 
 <details>
@@ -434,8 +434,6 @@ Deleted (9):
 -            port: http
 -        name: myApp
 -        ports:
--        - containerPort: 80
--          name: http
 -
 🚨 Diff is too long
 ```

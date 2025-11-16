@@ -31,11 +31,11 @@ func (d *Diff) prettyName() string {
 func (d *Diff) changeStats() string {
 	switch {
 	case d.changeInfo.addedLines > 0 && d.changeInfo.deletedLines > 0:
-		return fmt.Sprintf(" (%d l+, %d l-)", d.changeInfo.addedLines, d.changeInfo.deletedLines)
+		return fmt.Sprintf(" (+%d|-%d)", d.changeInfo.addedLines, d.changeInfo.deletedLines)
 	case d.changeInfo.addedLines > 0:
-		return fmt.Sprintf(" (%d l+)", d.changeInfo.addedLines)
+		return fmt.Sprintf(" (+%d)", d.changeInfo.addedLines)
 	case d.changeInfo.deletedLines > 0:
-		return fmt.Sprintf(" (%d l-)", d.changeInfo.deletedLines)
+		return fmt.Sprintf(" (-%d)", d.changeInfo.deletedLines)
 	default:
 		return ""
 	}

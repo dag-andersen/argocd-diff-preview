@@ -5,10 +5,10 @@ Summary:
 Total: 2 files changed
 
 Added (1):
-+ folder3
++ folder3 (+20)
 
 Modified (1):
-± folder2
+± folder2 (+1|-1)
 ```
 
 <details>
