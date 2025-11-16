@@ -10,46 +10,46 @@ import (
 func buildSummary(changedFiles []Diff) string {
 	var summaryBuilder strings.Builder
 
-	addedCount := 0
-	deletedCount := 0
-	modifiedCount := 0
+	addedFilesCount := 0
+	deletedFilesCount := 0
+	modifiedFilesCount := 0
 
 	for _, diff := range changedFiles {
 		switch diff.action {
 		case merkletrie.Insert:
-			addedCount++
+			addedFilesCount++
 		case merkletrie.Delete:
-			deletedCount++
+			deletedFilesCount++
 		case merkletrie.Modify:
-			modifiedCount++
+			modifiedFilesCount++
 		}
 	}
 
-	summaryBuilder.WriteString(fmt.Sprintf("Total: %d files changed\n", addedCount+deletedCount+modifiedCount))
+	summaryBuilder.WriteString(fmt.Sprintf("Total: %d files changed\n", addedFilesCount+deletedFilesCount+modifiedFilesCount))
 
-	if 0 < addedCount {
-		summaryBuilder.WriteString(fmt.Sprintf("\nAdded (%d):\n", addedCount))
+	if 0 < addedFilesCount {
+		summaryBuilder.WriteString(fmt.Sprintf("\nAdded (%d):\n", addedFilesCount))
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Insert {
-				summaryBuilder.WriteString(fmt.Sprintf("+ %s\n", diff.prettyName()))
+				summaryBuilder.WriteString(fmt.Sprintf("+ %s%s\n", diff.prettyName(), diff.changeStats()))
 			}
 		}
 	}
 
-	if 0 < deletedCount {
-		summaryBuilder.WriteString(fmt.Sprintf("\nDeleted (%d):\n", deletedCount))
+	if 0 < deletedFilesCount {
+		summaryBuilder.WriteString(fmt.Sprintf("\nDeleted (%d):\n", deletedFilesCount))
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Delete {
-				summaryBuilder.WriteString(fmt.Sprintf("- %s\n", diff.prettyName()))
+				summaryBuilder.WriteString(fmt.Sprintf("- %s%s\n", diff.prettyName(), diff.changeStats()))
 			}
 		}
 	}
 
-	if 0 < modifiedCount {
-		summaryBuilder.WriteString(fmt.Sprintf("\nModified (%d):\n", modifiedCount))
+	if 0 < modifiedFilesCount {
+		summaryBuilder.WriteString(fmt.Sprintf("\nModified (%d):\n", modifiedFilesCount))
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Modify {
-				summaryBuilder.WriteString(fmt.Sprintf("± %s\n", diff.prettyName()))
+				summaryBuilder.WriteString(fmt.Sprintf("± %s%s\n", diff.prettyName(), diff.changeStats()))
 			}
 		}
 	}

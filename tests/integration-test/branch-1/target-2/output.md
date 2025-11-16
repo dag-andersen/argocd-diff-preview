@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Deleted (1):
-- folder2
+- folder2 (-20)
 ```
 
 <details>

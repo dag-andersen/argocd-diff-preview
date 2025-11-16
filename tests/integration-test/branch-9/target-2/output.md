@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Deleted (1):
-- nginx-ingress
+- nginx-ingress (-501)
 ```
 
 <details>
@@ -26,7 +26,7 @@ Deleted (1):
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: ingress-nginx
 -    app.kubernetes.io/part-of: ingress-nginx
--    app.kubernetes
+-    app.kub
 🚨 Diff is too long
 ```
 

@@ -12,7 +12,7 @@ type Diff struct {
 	newSourcePath string
 	oldSourcePath string
 	action        merkletrie.Action
-	content       string
+	changeInfo    changeInfo
 }
 
 func (d *Diff) prettyName() string {
@@ -25,6 +25,19 @@ func (d *Diff) prettyName() string {
 		return d.oldName
 	default:
 		return "Unknown"
+	}
+}
+
+func (d *Diff) changeStats() string {
+	switch {
+	case d.changeInfo.addedLines > 0 && d.changeInfo.deletedLines > 0:
+		return fmt.Sprintf(" (+%d|-%d)", d.changeInfo.addedLines, d.changeInfo.deletedLines)
+	case d.changeInfo.addedLines > 0:
+		return fmt.Sprintf(" (+%d)", d.changeInfo.addedLines)
+	case d.changeInfo.deletedLines > 0:
+		return fmt.Sprintf(" (-%d)", d.changeInfo.deletedLines)
+	default:
+		return ""
 	}
 }
 
@@ -58,7 +71,7 @@ func (d *Diff) buildMarkdownSection() MarkdownSection {
 	return MarkdownSection{
 		title:   fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()),
 		comment: d.commentHeader(),
-		content: d.content,
+		content: d.changeInfo.content,
 	}
 }
 
@@ -66,6 +79,6 @@ func (d *Diff) buildHTMLSection() HTMLSection {
 	return HTMLSection{
 		header:        fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()),
 		commentHeader: d.commentHeader(),
-		content:       d.content,
+		content:       d.changeInfo.content,
 	}
 }

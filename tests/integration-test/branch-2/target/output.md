@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Modified (1):
-± my-app
+± my-app (+5|-5)
 ```
 
 <details>

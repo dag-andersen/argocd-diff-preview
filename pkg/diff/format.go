@@ -30,17 +30,23 @@ func shouldIgnoreLine(line, pattern string) bool {
 	return matched
 }
 
+type changeInfo struct {
+	content      string
+	addedLines   int
+	deletedLines int
+}
+
 // formatDiff formats diffmatchpatch.Diff into unified diff format
-func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string) string {
+func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string) changeInfo {
 	var buffer bytes.Buffer
 
 	// Process the diffs and format them in unified diff format
 	// We'll keep track of context lines to include only the specified number
 	var processedLines []struct {
-		prefix   string
-		text     string
-		isChange bool
-		show     bool
+		operation diffmatchpatch.Operation
+		text      string
+		isChange  bool
+		show      bool
 	}
 
 	for _, d := range diffs {
@@ -70,20 +76,12 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				}
 			}
 
-			prefix := " "
-			switch d.Type {
-			case diffmatchpatch.DiffDelete:
-				prefix = "-"
-			case diffmatchpatch.DiffInsert:
-				prefix = "+"
-			}
-
 			processedLines = append(processedLines, struct {
-				prefix   string
-				text     string
-				isChange bool
-				show     bool
-			}{prefix, line, isChange, show})
+				operation diffmatchpatch.Operation
+				text      string
+				isChange  bool
+				show      bool
+			}{d.Type, line, isChange, show})
 		}
 	}
 
@@ -97,7 +95,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 
 	// No changes to show, so return empty string
 	if len(changedLines) == 0 {
-		return ""
+		return changeInfo{content: "", addedLines: 0, deletedLines: 0}
 	}
 
 	// Now create chunks of lines to include based on context
@@ -136,17 +134,17 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 
 	// Now build the output with separators between chunks
 	var filteredLines []struct {
-		prefix string
-		text   string
+		operation diffmatchpatch.Operation
+		text      string
 	}
 
 	for i, chunk := range chunks {
 		// Add all lines in this chunk
 		for j := chunk.start; j <= chunk.end; j++ {
 			filteredLines = append(filteredLines, struct {
-				prefix string
-				text   string
-			}{processedLines[j].prefix, processedLines[j].text})
+				operation diffmatchpatch.Operation
+				text      string
+			}{processedLines[j].operation, processedLines[j].text})
 		}
 
 		// Add separator if there's a next chunk and it's far enough away
@@ -157,23 +155,35 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			if skippedLines > 0 {
 				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, chunk.end+1, nextChunk.start-1)
 				filteredLines = append(filteredLines, struct {
-					prefix string
-					text   string
-				}{"", separator})
+					operation diffmatchpatch.Operation
+					text      string
+				}{diffmatchpatch.DiffEqual, separator})
 			}
 		}
 	}
+
+	addedLines := 0
+	deletedLines := 0
 
 	// Write the filtered lines
 	for _, line := range filteredLines {
 		if strings.HasPrefix(line.text, "@@ skipped") {
 			buffer.WriteString(line.text + "\n")
 		} else {
-			buffer.WriteString(line.prefix + line.text + "\n")
+			switch line.operation {
+			case diffmatchpatch.DiffInsert:
+				addedLines++
+				buffer.WriteString("+" + line.text + "\n")
+			case diffmatchpatch.DiffDelete:
+				deletedLines++
+				buffer.WriteString("-" + line.text + "\n")
+			default:
+				buffer.WriteString(" " + line.text + "\n")
+			}
 		}
 	}
 
-	return buffer.String()
+	return changeInfo{content: buffer.String(), addedLines: addedLines, deletedLines: deletedLines}
 }
 
 // Helper functions for min/max
@@ -192,21 +202,21 @@ func max(a, b int) int {
 }
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
-func formatNewFileDiff(content string, contextLines uint, ignorePattern *string) string {
+func formatNewFileDiff(content string, contextLines uint, ignorePattern *string) changeInfo {
 	// For new files, we diff from empty string to the content
 	diffs := diff.Do("", content)
 	return formatDiff(diffs, contextLines, ignorePattern)
 }
 
 // formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
-func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string) string {
+func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string) changeInfo {
 	// For deleted files, we diff from the content to empty string
 	diffs := diff.Do(content, "")
 	return formatDiff(diffs, contextLines, ignorePattern)
 }
 
 // formatModifiedFileDiff formats a diff for a modified file using the go-git/utils/diff package
-func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string) string {
+func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string) changeInfo {
 	diffs := diff.Do(oldContent, newContent)
 	return formatDiff(diffs, contextLines, ignorePattern)
 }
