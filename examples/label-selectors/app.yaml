@@ -9,7 +9,7 @@ spec:
   project: default
   destination:
     name: in-cluster
-    namespace: default
+    namespace: some-namespace
   sources:
     - repoURL: https://github.com/dag-andersen/argocd-diff-preview
       ref: local-files

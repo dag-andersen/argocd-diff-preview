@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   destination:
-    name: in-cluster
+    name: some-cluster
     namespace: default
   source:
     path: examples/kustomize/my-service/overlay/staging

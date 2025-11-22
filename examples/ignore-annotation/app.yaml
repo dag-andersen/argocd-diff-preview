@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   destination:
-    name: in-cluster
+    name: some-cluster
     namespace: default
   sources:
     - repoURL: https://github.com/dag-andersen/argocd-diff-preview
