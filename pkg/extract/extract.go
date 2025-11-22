@@ -15,49 +15,6 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
-// Error and timeout messages that we look for in application status
-var timeoutMessages = []string{
-	"Client.Timeout",
-	"failed to get git client for repo",
-	"rpc error: code = Unknown desc = Get \"https",
-	"i/o timeout",
-	"Could not resolve host: github.com",
-	":8081: connect: connection refused",
-	"Temporary failure in name resolution",
-	"=git-upload-pack",
-	"DeadlineExceeded",
-}
-
-var errorMessages = []string{
-	"helm template .",
-	"authentication required",
-	"authentication failed",
-	"error logging into OCI registry",
-	"path does not exist",
-	"error converting YAML to JSON",
-	"Unknown desc = `helm template .",
-	"Unknown desc = `kustomize build",
-	"Unknown desc = Unable to resolve",
-	"is not a valid chart repository or cannot be reached",
-	"Unknown desc = repository not found",
-	"to a commit SHA",
-	"error fetching chart: failed to fetch chart: failed to get command args to log",
-	"ComparisonError: Failed to load target state: failed to get cluster version for cluster",
-}
-
-var helpMessages = map[string]string{
-	"ComparisonError: Failed to load target state: failed to get cluster version for cluster": "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--use-argocd-api=true' is not set",
-}
-
-func GetHelpMessage(err error) string {
-	for errorMessage, helpMessage := range helpMessages {
-		if strings.Contains(err.Error(), errorMessage) {
-			return helpMessage
-		}
-	}
-	return ""
-}
-
 // const worker count
 const maxWorkers = 40
 
