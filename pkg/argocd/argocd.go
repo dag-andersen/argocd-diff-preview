@@ -389,42 +389,11 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
-	return out, true, nil
-}
-
-// GetManifestsWithRetry returns the manifests for an application with retry
-func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts int) (string, error) {
-
-	var err error
-	var out string
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		if 1 < attempt {
-			log.Debug().Msgf("GetManifestsWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		} else {
-			log.Debug().Msgf("GetManifestsWithRetry to Argo CD...")
-		}
-		if a.UseAPI() {
-			out, err = a.GetManifestsFromAPI(appName)
-		} else {
-			output, exists, errGetManifests := a.GetManifests(appName)
-			out = output
-			err = errGetManifests
-			if !exists {
-				err = fmt.Errorf("application %s does not exist", appName)
-			}
-		}
-		if err == nil {
-			return out, nil
-		}
-
-		if attempt < maxAttempts {
-			log.Debug().Msgf("Waiting 1s before next get manifests attempt (%d/%d)...", attempt+1, maxAttempts)
-			log.Warn().Err(err).Msgf("⚠️ Get manifests attempt %d/%d failed.", attempt, maxAttempts)
-			time.Sleep(1 * time.Second)
-		}
+	if strings.TrimSpace(out) == "" {
+		return "", false, fmt.Errorf("no manifests found for app: %s", appName)
 	}
 
-	return out, err
+	return out, true, nil
 }
 
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {

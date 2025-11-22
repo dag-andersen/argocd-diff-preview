@@ -169,6 +169,10 @@ func (a *ArgoCDInstallation) GetManifestsFromAPI(appName string) (string, error)
 		return "", fmt.Errorf("failed to unmarshal manifests response: %w", err)
 	}
 
+	if len(manifestResponse.Manifests) == 0 {
+		return "", fmt.Errorf("no manifests found for app %s", appName)
+	}
+
 	// Convert manifests to YAML format with --- separators
 	// Each manifest is already a JSON string, we need to convert each to YAML
 	var manifestsYAML strings.Builder

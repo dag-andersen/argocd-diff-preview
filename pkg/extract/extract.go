@@ -219,6 +219,8 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		}
 
 		manifestsContent, err := getManifestsFromApp(argocd, app)
+
+		// If no error, return the extracted app
 		if err == nil {
 			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
@@ -245,17 +247,29 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		}
 
 		// Sleep before next iteration
-		time.Sleep(5 * time.Second)
+		time.Sleep(3 * time.Second)
 	}
 }
 
 func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource) ([]unstructured.Unstructured, error) {
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
-	attempts := 3
-	manifests, err := argocd.GetManifestsWithRetry(app.Id, attempts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
+	var manifests string
+	if argocd.UseAPI() {
+		output, err := argocd.GetManifestsFromAPI(app.Id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get manifests for application %s with Argo API: %w", app.GetLongName(), err)
+		}
+		manifests = output
+	} else {
+		output, exists, err := argocd.GetManifests(app.Id)
+		if !exists {
+			return nil, fmt.Errorf("%s", string(errorApplicationNotFound))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to get manifests for application %s with Argo CLI: %w", app.GetLongName(), err)
+		}
+		manifests = output
 	}
 
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")

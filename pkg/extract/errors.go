@@ -5,6 +5,7 @@ import "strings"
 // ErrorKind represents different types of errors we look for
 type ErrorKind string
 
+// for errors from Argo CD
 const (
 	ErrorHelmTemplate         ErrorKind = "helm template ."
 	ErrorAuthRequired         ErrorKind = "authentication required"
@@ -21,19 +22,6 @@ const (
 	ErrorFetchChart           ErrorKind = "error fetching chart: failed to fetch chart: failed to get command args to log"
 	ErrorClusterVersionFailed ErrorKind = "ComparisonError: Failed to load target state: failed to get cluster version for cluster"
 )
-
-// Error and timeout messages that we look for in application status
-var timeoutMessages = []string{
-	"Client.Timeout",
-	"failed to get git client for repo",
-	"rpc error: code = Unknown desc = Get \"https",
-	"i/o timeout",
-	"Could not resolve host: github.com",
-	":8081: connect: connection refused",
-	"Temporary failure in name resolution",
-	"=git-upload-pack",
-	"DeadlineExceeded",
-}
 
 var errorMessages = []string{
 	string(ErrorHelmTemplate),
@@ -66,3 +54,21 @@ func GetHelpMessage(err error) string {
 	return ""
 }
 
+// custom Error error messages
+const (
+	errorApplicationNotFound ErrorKind = "application does not exist"
+)
+
+// Timeout errors
+var timeoutMessages = []string{
+	"Client.Timeout",
+	"failed to get git client for repo",
+	"rpc error: code = Unknown desc = Get \"https",
+	"i/o timeout",
+	"Could not resolve host: github.com",
+	":8081: connect: connection refused",
+	"Temporary failure in name resolution",
+	"=git-upload-pack",
+	"DeadlineExceeded",
+	string(errorApplicationNotFound),
+}
