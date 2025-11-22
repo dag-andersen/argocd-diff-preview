@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	argocdsecurity "github.com/argoproj/argo-cd/v2/util/security"
+	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog/log"
