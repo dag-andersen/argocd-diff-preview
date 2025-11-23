@@ -390,7 +390,7 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 	}
 
 	if strings.TrimSpace(out) == "" {
-		return "", false, fmt.Errorf("no manifests found for app: %s", appName)
+		log.Warn().Msgf("⚠️ No manifests found for app: %s", appName)
 	}
 
 	return out, true, nil
