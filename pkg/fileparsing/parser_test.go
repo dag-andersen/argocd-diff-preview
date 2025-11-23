@@ -117,14 +117,16 @@ spec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var resources []Resource
-			processYamlChunk(tt.filename, tt.chunk, &resources, git.BranchType(""))
+			resource, ok := processYamlChunk(tt.filename, tt.chunk, git.BranchType(""))
 
 			if tt.want == nil {
-				assert.Empty(t, resources)
+				assert.False(t, ok)
+				assert.Nil(t, resource)
 			} else {
-				assert.Equal(t, tt.want[0].FileName, resources[0].FileName)
-				assert.Equal(t, tt.want[0].Yaml, resources[0].Yaml)
+				assert.True(t, ok)
+				assert.NotNil(t, resource)
+				assert.Equal(t, tt.want[0].FileName, resource.FileName)
+				assert.Equal(t, tt.want[0].Yaml, resource.Yaml)
 			}
 		})
 	}
