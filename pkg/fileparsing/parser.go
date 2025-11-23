@@ -95,7 +95,9 @@ func ParseYaml(dir string, files []string, branch git.BranchType) []Resource {
 			if line == "---" {
 				// Process the current chunk if it's not empty
 				if currentChunk.Len() > 0 {
-					processYamlChunk(file, currentChunk.String(), &resources, branch)
+					if resource, ok := processYamlChunk(file, currentChunk.String(), branch); ok {
+						resources = append(resources, *resource)
+					}
 				}
 				currentChunk.Reset()
 			} else {
@@ -106,19 +108,22 @@ func ParseYaml(dir string, files []string, branch git.BranchType) []Resource {
 
 		// Process the last chunk
 		if currentChunk.Len() > 0 {
-			processYamlChunk(file, currentChunk.String(), &resources, branch)
+			if resource, ok := processYamlChunk(file, currentChunk.String(), branch); ok {
+				resources = append(resources, *resource)
+			}
 		}
 	}
 
 	return resources
 }
 
-// processYamlChunk parses a YAML chunk into an unstructured.Unstructured
+// processYamlChunk parses a YAML chunk into a Resource
 // A chunk is a single YAML object, e.g. a Deployment, Service, etc.
-func processYamlChunk(filename, chunk string, resources *[]Resource, branch git.BranchType) {
+// Returns (resource, shouldInclude) where shouldInclude is true if the chunk is a valid resource
+func processYamlChunk(filename, chunk string, branch git.BranchType) (*Resource, bool) {
 	// Skip empty chunks or chunks with only whitespace
 	if strings.TrimSpace(chunk) == "" {
-		return
+		return nil, false
 	}
 
 	// Create a new map to hold the parsed YAML
@@ -126,12 +131,12 @@ func processYamlChunk(filename, chunk string, resources *[]Resource, branch git.
 	err := yaml.Unmarshal([]byte(chunk), &yamlObj)
 	if err != nil {
 		log.Debug().Err(err).Msgf("⚠️ Failed to parse YAML in file '%s'", filename)
-		return
+		return nil, false
 	}
 
 	// Skip empty objects
 	if len(yamlObj) == 0 {
-		return
+		return nil, false
 	}
 
 	// Convert the map to an unstructured.Unstructured
@@ -143,12 +148,12 @@ func processYamlChunk(filename, chunk string, resources *[]Resource, branch git.
 
 	if !found || !kindFound || apiVersion == "" || kind == "" {
 		log.Debug().Msgf("⚠️ Skipping invalid Kubernetes resource in file '%s' (missing apiVersion or kind)", filename)
-		return
+		return nil, false
 	}
 
-	*resources = append(*resources, Resource{
+	return &Resource{
 		FileName: filename,
 		Yaml:     yamlData,
 		Branch:   branch,
-	})
+	}, true
 }
