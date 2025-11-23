@@ -72,43 +72,38 @@ func (a *ArgoCDInstallation) getTokenFromConfig() (string, error) {
 		Users          []User    `yaml:"users"`
 	}
 
-	log.Debug().Msgf("ArgoCD config: %+v", string(configData))
-
 	// Parse the YAML config
 	var config Config
 	if err := yaml.Unmarshal(configData, &config); err != nil {
 		return "", fmt.Errorf("failed to parse ArgoCD config: %w", err)
 	}
 
-	log.Debug().Msgf("Parsed config - CurrentContext: '%s', Contexts count: %d, Users count: %d",
-		config.CurrentContext, len(config.Contexts), len(config.Users))
-
 	// Find the current context
 	var currentContextUser string
 	for _, ctx := range config.Contexts {
 		if ctx.Name == config.CurrentContext {
 			currentContextUser = ctx.User
-			log.Debug().Msgf("Found current context '%s' with user '%s'", config.CurrentContext, currentContextUser)
+			log.Debug().Msgf("Found current context '%s' with user '%s' in ArgoCD config at path: '%s'", config.CurrentContext, currentContextUser, configPath)
 			break
 		}
 	}
 
 	if currentContextUser == "" {
-		return "", fmt.Errorf("current context '%s' not found in contexts", config.CurrentContext)
+		return "", fmt.Errorf("current context '%s' not found in contexts in ArgoCD config at path: '%s'", config.CurrentContext, configPath)
 	}
 
 	// Find the user with matching name and get the auth token
 	for _, user := range config.Users {
 		if user.Name == currentContextUser {
 			if user.AuthToken != "" {
-				log.Info().Msgf("🔑 Found auth token for user '%s' (context: '%s') in ArgoCD config", user.Name, config.CurrentContext)
+				log.Info().Msgf("🔑 Found auth token at path: '%s'", configPath)
 				return user.AuthToken, nil
 			}
-			return "", fmt.Errorf("user '%s' found but has no auth token", user.Name)
+			return "", fmt.Errorf("user '%s' found but has no auth token in ArgoCD config at path: '%s'", user.Name, configPath)
 		}
 	}
 
-	return "", fmt.Errorf("no auth token found in ArgoCD config for user '%s'", currentContextUser)
+	return "", fmt.Errorf("no auth token found in ArgoCD config at path: '%s' for user '%s'", configPath, currentContextUser)
 }
 
 // // getTokenFromApi retrieves an authentication token from the ArgoCD API (cached)
