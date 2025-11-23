@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: empty-application
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  sources:
+    - path: docs
+      repoURL: https://github.com/dag-andersen/argocd-diff-preview
