@@ -165,6 +165,12 @@ func (a *ArgoCDInstallation) GetManifestsFromAPI(appName string) (string, error)
 		Manifests []string `json:"manifests"`
 	}
 
+	// if body is empty, it means the application is empty
+	if strings.TrimSpace(string(body)) == "{}" {
+		log.Warn().Msgf("⚠️ Application is empty: %s", appName)
+		return "", fmt.Errorf("application is empty: %s", appName)
+	}
+
 	if err := json.Unmarshal(body, &manifestResponse); err != nil {
 		return "", fmt.Errorf("failed to unmarshal manifests response: %w", err)
 	}
