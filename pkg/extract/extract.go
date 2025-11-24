@@ -220,8 +220,26 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 
 		manifestsContent, err := getManifestsFromApp(argocd, app)
 
+		// If the application is empty, check the application status
+		if err == nil && len(manifestsContent) == 0 {
+			argoErrMessage, internalError := argoapplication.GetErrorStatusFromApplication(argocd, app)
+			log.Debug().Str("App", app.GetLongName()).Msgf("Application is empty. Argo CD Error: %v, Internal Error: %v", argoErrMessage, internalError)
+			if argoErrMessage != nil {
+				if argocd.UseAPI() && isExpectedError(argoErrMessage.Error()) {
+					log.Debug().Str("App", app.GetLongName()).Msgf("Expected error because Argo CD is running with '--use-argocd-api=true' and Argo CD may be running with '%s'", argocdPkg.CreateClusterRoles)
+				} else {
+					err = argoErrMessage
+				}
+			} else if internalError != nil {
+				err = internalError
+			}
+		}
+
 		// If no error, return the extracted app
 		if err == nil {
+			if len(manifestsContent) == 0 {
+				log.Warn().Str("App", app.GetLongName()).Msg("⚠️ No manifests found for application")
+			}
 			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
 		}
@@ -270,6 +288,11 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			return nil, fmt.Errorf("failed to get manifests for application %s with Argo CLI: %w", app.GetLongName(), err)
 		}
 		manifests = output
+	}
+
+	if strings.TrimSpace(manifests) == "" {
+		log.Debug().Str("App", app.GetLongName()).Msg("No manifests found for application")
+		return []unstructured.Unstructured{}, nil
 	}
 
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")

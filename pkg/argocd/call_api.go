@@ -167,7 +167,7 @@ func (a *ArgoCDInstallation) GetManifestsFromAPI(appName string) (string, error)
 
 	// if body is empty, it means the application is empty
 	if strings.TrimSpace(string(body)) == "{}" {
-		log.Warn().Msgf("⚠️ Application is empty: %s", appName)
+		log.Debug().Msgf("Application is empty: %s", appName)
 		return "", nil
 	}
 

@@ -34,8 +34,9 @@ var (
 
 const (
 	// remotePort is the port that the ArgoCD server pod listens on
-	remotePort = 8080
-	localPort  = 8081
+	remotePort         = 8080
+	localPort          = 8081
+	CreateClusterRoles = "createClusterRoles: false"
 )
 
 type ArgoCDApiConnection struct {
@@ -268,6 +269,13 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}
 	chartValuesString := string(chartValuesBytes)
 
+	if strings.Contains(chartValuesString, CreateClusterRoles) {
+		log.Info().Msgf("Installing with '%s'", CreateClusterRoles)
+		if !a.UseAPI() {
+			log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work unless you use '--use-argocd-api=true'")
+		}
+	}
+
 	log.Debug().Msgf("Chart values: \n%s", chartValuesString)
 
 	log.Debug().Msgf("Installing Argo CD Helm Chart with timeout: %s", timeout)
@@ -390,7 +398,8 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 	}
 
 	if strings.TrimSpace(out) == "" {
-		log.Warn().Msgf("⚠️ No manifests found for app: %s", appName)
+		log.Debug().Msgf("No manifests found with `argocd app manifests %s`", appName)
+		return "", true, nil
 	}
 
 	return out, true, nil

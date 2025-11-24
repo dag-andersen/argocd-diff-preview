@@ -96,7 +96,8 @@ func (a *ArgoCDInstallation) getTokenFromConfig() (string, error) {
 	for _, user := range config.Users {
 		if user.Name == currentContextUser {
 			if user.AuthToken != "" {
-				log.Info().Msgf("🔑 Found auth token at path: '%s'", configPath)
+				log.Debug().Msgf("Found auth token at path: '%s'", configPath)
+				log.Info().Msg("🔑 Found auth token")
 				return user.AuthToken, nil
 			}
 			return "", fmt.Errorf("user '%s' found but has no auth token in ArgoCD config at path: '%s'", user.Name, configPath)
@@ -240,6 +241,11 @@ func (a *ArgoCDInstallation) login() error {
 	if a.UseAPI() {
 		if err := a.updateToken(); err != nil {
 			return fmt.Errorf("failed to update token: %w", err)
+		}
+
+		// Not needed to login, but we ensure we have a port forward to ArgoCD
+		if err := a.portForwardToArgoCD(); err != nil {
+			return fmt.Errorf("failed to port forward to ArgoCD: %w", err)
 		}
 	}
 

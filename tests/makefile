@@ -67,6 +67,11 @@ docker-build:
 	docker build -f ../$(docker_file) -t argocd-diff-preview ..
 
 run-single-test-docker: clean pull-base pull-target
+ifeq ($(use_argocd_api),true)
+	$(eval ARGOCD_CONFIG_VOLUME := -v $(PWD)/api-call/argocd-config/values.yaml:/argocd-config/values.yaml)
+else
+	$(eval ARGOCD_CONFIG_VOLUME :=)
+endif
 	docker run --network=host \
 		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
@@ -76,6 +81,7 @@ run-single-test-docker: clean pull-base pull-target
 		-v $(PWD)/secrets:/secrets \
 		-v $(PWD)/temp:/temp \
 		-v $(PWD)/kind-config:/kind-config \
+		$(ARGOCD_CONFIG_VOLUME) \
 		-e BASE_BRANCH="$(base_branch)" \
 		-e TARGET_BRANCH="$(target_branch)" \
 		-e FILE_REGEX="$(file_regex)" \

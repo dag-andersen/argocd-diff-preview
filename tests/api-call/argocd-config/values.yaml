@@ -1,0 +1,22 @@
+# Override this file with values
+createClusterRoles: false
+controller:
+  readinessProbe:
+    initialDelaySeconds: 0
+    periodSeconds: 1
+    successThreshold: 1
+    timeoutSeconds: 1
+    failureThreshold: 40
+  roleRules:
+    - apiGroups:
+        - "*"
+      resources:
+        - "*"
+      verbs:
+        - "*"
+    - apiGroups:
+        - ""
+      resources:
+        - "*"
+      verbs:
+        - "*"
