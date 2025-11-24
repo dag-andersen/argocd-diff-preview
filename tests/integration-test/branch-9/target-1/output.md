@@ -10,10 +10,10 @@ Deleted (9):
 - app2 (-19)
 - app2 (-19)
 - custom-target-revision-example (-14)
-- my-app-set-dev (-83)
-- my-app-set-prod (-83)
-- my-app-set-staging (-83)
-- nginx-ingress (-490)
+- my-app-set-dev (-81)
+- my-app-set-prod (-81)
+- my-app-set-staging (-81)
+- nginx-ingress (-480)
 ```
 
 <details>
@@ -162,43 +162,6 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: my-app-set-dev (examples/basic-appset/my-app-set.yaml) @@
--apiVersion: v1
--kind: Service
--metadata:
--  labels:
--    app.kubernetes.io/instance: my-app-set-dev
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
--spec:
--  ports:
--  - name: http
--    port: 80
--    protocol: TCP
--    targetPort: http
--  selector:
--    app.kubernetes.io/instance: my-app-set-dev
--    app.kubernetes.io/name: myApp
--  type: ClusterIP
--
-----
--apiVersion: v1
--automountServiceAccountToken: true
--kind: ServiceAccount
--metadata:
--  labels:
--    app.kubernetes.io/instance: my-app-set-dev
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
--
-----
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -245,21 +208,12 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-```
-
-</details>
-
-<details>
-<summary>my-app-set-prod (examples/basic-appset/my-app-set.yaml)</summary>
-<br>
-
-```diff
-@@ Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml) @@
+----
 -apiVersion: v1
 -kind: Service
 -metadata:
 -  labels:
--    app.kubernetes.io/instance: my-app-set-prod
+-    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: myApp
 -    app.kubernetes.io/version: 1.16.0
@@ -273,25 +227,32 @@ Deleted (9):
 -    protocol: TCP
 -    targetPort: http
 -  selector:
--    app.kubernetes.io/instance: my-app-set-prod
+-    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
--
 ----
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount
 -metadata:
 -  labels:
--    app.kubernetes.io/instance: my-app-set-prod
+-    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: myApp
 -    app.kubernetes.io/version: 1.16.0
 -    helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 -  namespace: default
--
-----
+```
+
+</details>
+
+<details>
+<summary>my-app-set-prod (examples/basic-appset/my-app-set.yaml)</summary>
+<br>
+
+```diff
+@@ Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -338,21 +299,12 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-```
-
-</details>
-
-<details>
-<summary>my-app-set-staging (examples/basic-appset/my-app-set.yaml)</summary>
-<br>
-
-```diff
-@@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@
+----
 -apiVersion: v1
 -kind: Service
 -metadata:
 -  labels:
--    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: myApp
 -    app.kubernetes.io/version: 1.16.0
@@ -366,25 +318,32 @@ Deleted (9):
 -    protocol: TCP
 -    targetPort: http
 -  selector:
--    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
--
 ----
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount
 -metadata:
 -  labels:
--    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: myApp
 -    app.kubernetes.io/version: 1.16.0
 -    helm.sh/chart: myApp-0.1.0
 -  name: super-app-name
 -  namespace: default
--
-----
+```
+
+</details>
+
+<details>
+<summary>my-app-set-staging (examples/basic-appset/my-app-set.yaml)</summary>
+<br>
+
+```diff
+@@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -431,6 +390,41 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
+----
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+-spec:
+-  ports:
+-  - name: http
+-    port: 80
+-    protocol: TCP
+-    targetPort: http
+-  selector:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/name: myApp
+-  type: ClusterIP
+----
+-apiVersion: v1
+-automountServiceAccountToken: true
+-kind: ServiceAccount
+-metadata:
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
 ```
 
 </details>
