@@ -34,9 +34,8 @@ var (
 
 const (
 	// remotePort is the port that the ArgoCD server pod listens on
-	remotePort         = 8080
-	localPort          = 8081
-	CreateClusterRoles = "createClusterRoles: false"
+	remotePort = 8080
+	localPort  = 8081
 )
 
 type ArgoCDApiConnection struct {
@@ -262,19 +261,22 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 
+	// look for 'createClusterRoles' in chartValues
+	if result, ok := chartValues["createClusterRoles"]; ok {
+		if result == "false" {
+			log.Info().Msgf("Installing with 'createClusterRoles: %s'", result)
+			if !a.UseAPI() {
+				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work unless you use '--use-argocd-api=true'")
+			}
+		}
+	}
+
 	// convert chartValues to a string
 	chartValuesBytes, err := yaml.Marshal(chartValues)
 	if err != nil {
 		return fmt.Errorf("failed to marshal chart values: %w", err)
 	}
 	chartValuesString := string(chartValuesBytes)
-
-	if strings.Contains(chartValuesString, CreateClusterRoles) {
-		log.Info().Msgf("Installing with '%s'", CreateClusterRoles)
-		if !a.UseAPI() {
-			log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work unless you use '--use-argocd-api=true'")
-		}
-	}
 
 	log.Debug().Msgf("Chart values: \n%s", chartValuesString)
 

@@ -226,7 +226,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			log.Debug().Str("App", app.GetLongName()).Msgf("Application is empty. Argo CD Error: %v, Internal Error: %v", argoErrMessage, internalError)
 			if argoErrMessage != nil {
 				if argocd.UseAPI() && isExpectedError(argoErrMessage.Error()) {
-					log.Debug().Str("App", app.GetLongName()).Msgf("Expected error because Argo CD is running with '--use-argocd-api=true' and Argo CD may be running with '%s'", argocdPkg.CreateClusterRoles)
+					log.Debug().Str("App", app.GetLongName()).Msgf("Expected error because Argo CD is running with '--use-argocd-api=true' and Argo CD may be running with 'createClusterRoles: false'")
 				} else {
 					err = argoErrMessage
 				}
