@@ -47,5 +47,5 @@ func GetErrorStatusFromApplication(argocd *argocd.ArgoCDInstallation, app ArgoRe
 		}
 	}
 
-	return nil, fmt.Errorf("Application sync status is not set")
+	return nil, fmt.Errorf("application '%s' sync status is not set", app.GetLongName())
 }
