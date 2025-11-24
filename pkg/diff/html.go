@@ -95,7 +95,8 @@ const htmlSection = `
 </details>
 `
 
-const htmlLine = `<tr class="%s"><td><pre>%s</pre></td></tr>`
+const htmlLine = `
+	<tr class="%s"><td><pre>%s</pre></td></tr>`
 
 func (h *HTMLSection) printHTMLSection() string {
 	s := strings.ReplaceAll(htmlSection, "%header%", html.EscapeString(h.header))
