@@ -1,7 +1,12 @@
 package argocd
 
 import (
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -25,6 +30,99 @@ func (a *ArgoCDInstallation) getInitialPassword() (string, error) {
 	return secret, nil
 }
 
+// getToken retrieves an authentication token from the ArgoCD API (cached)
+func (a *ArgoCDInstallation) getToken(username, password string) (string, error) {
+
+	log.Info().Msg("🔑 Fetching new authentication token...")
+
+	// Set up port forward to ArgoCD server
+	if err := a.portForwardToArgoCD(); err != nil {
+		return "", err
+	}
+
+	// Prepare the login request payload
+	loginData := map[string]string{
+		"username": username,
+		"password": password,
+	}
+
+	jsonData, err := json.Marshal(loginData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal login data: %w", err)
+	}
+
+	// Make the HTTP request to ArgoCD API
+	// Use plain HTTP since we're connecting directly to the pod's port 8080
+	url := fmt.Sprintf("%s/api/v1/session", a.ArgoCDApiConnection.apiServerURL)
+
+	log.Debug().Msgf("🌐 Making request to: %s", url)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create HTTP client with timeout and TLS config
+	// ArgoCD redirects HTTP to HTTPS, so we need to handle both
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // Skip certificate verification for self-signed certs
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to make HTTP request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Check if the request was successful
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ArgoCD API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse the JSON response to extract the token
+	var sessionResponse struct {
+		Token string `json:"token"`
+	}
+
+	if err := json.Unmarshal(body, &sessionResponse); err != nil {
+		return "", fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	if sessionResponse.Token == "" {
+		return "", fmt.Errorf("token not found in response")
+	}
+
+	// Cache the token for future use
+	a.ArgoCDApiConnection.authToken = sessionResponse.Token
+
+	log.Info().Msg("🔑 Successfully obtained and cached ArgoCD token")
+	return sessionResponse.Token, nil
+}
+
+func (a *ArgoCDInstallation) updateToken(username, password string) error {
+	// Return cached token if available
+	token, err := a.getToken(username, password)
+	if err != nil {
+		return fmt.Errorf("failed to get initial token: %w", err)
+	}
+	a.ArgoCDApiConnection.authToken = token
+	return nil
+}
+
+// login performs login to ArgoCD using the CLI (legacy method)
 func (a *ArgoCDInstallation) login() error {
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
@@ -34,10 +132,19 @@ func (a *ArgoCDInstallation) login() error {
 		return err
 	}
 
+	username := "admin"
+
+	// Update the token
+	if a.UseAPI() {
+		if err := a.updateToken(username, password); err != nil {
+			return fmt.Errorf("failed to update token: %w", err)
+		}
+	}
+
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+		out, err := a.runArgocdCommand("login", "--insecure", "--username", username, "--password", password)
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break

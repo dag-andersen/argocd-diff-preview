@@ -59,7 +59,7 @@ Deleted (9):
 - my-app-set-dev (-81)
 - my-app-set-prod (-81)
 - my-app-set-staging (-81)
-- nginx-ingress (-480)</pre>
+- nginx-ingress (-484)</pre>
 
 <div class="diffs">
 <details>
@@ -528,6 +528,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-admission</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 	<tr class="removed_line"><td><pre>-webhooks:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-- admissionReviewVersions:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - v1</pre></td></tr>
@@ -687,6 +688,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  controller: k8s.io/ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>----</pre></td></tr>
@@ -701,6 +703,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 	<tr class="removed_line"><td><pre>-rules:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
@@ -784,6 +787,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 	<tr class="removed_line"><td><pre>-roleRef:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  apiGroup: rbac.authorization.k8s.io</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  kind: ClusterRole</pre></td></tr>

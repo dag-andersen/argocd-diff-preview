@@ -13,7 +13,7 @@ Deleted (9):
 - my-app-set-dev (-81)
 - my-app-set-prod (-81)
 - my-app-set-staging (-81)
-- nginx-ingress (-480)
+- nginx-ingress (-484)
 ```
 
 <details>

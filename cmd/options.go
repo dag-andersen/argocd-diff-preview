@@ -50,6 +50,7 @@ var (
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
+	DefaultUseArgoCDApi               = false
 	DefaultKeepClusterAlive           = false
 	DefaultDryRun                     = false
 	DefaultAutoDetectFilesChanged     = false
@@ -88,6 +89,7 @@ type Options struct {
 	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
 	ArgocdChartRepoUsername    string `mapstructure:"argocd-chart-repo-username"`
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
+	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -231,6 +233,7 @@ func Parse() *Options {
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
 	viper.SetDefault("argocd-chart-repo-username", DefaultArgocdChartRepoUsername)
 	viper.SetDefault("argocd-chart-repo-password", DefaultArgocdChartRepoPassword)
+	viper.SetDefault("use-argocd-api", DefaultUseArgoCDApi)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -264,6 +267,7 @@ func Parse() *Options {
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
+	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
@@ -421,6 +425,9 @@ func (o *Options) LogOptions() {
 			if o.clusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
 				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
+		}
+		if o.UseArgoCDApi {
+			log.Info().Msgf("✨ - use-argocd-api: %t", o.UseArgoCDApi)
 		}
 	}
 
