@@ -318,17 +318,18 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		return nil, fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
 	}
 
-	// set the namespace if not set
-	for _, manifest := range manifestsContent {
-		if manifest.GetNamespace() == "" {
-
-			// namespace specified in ArgoCD application - spec.destination.namespace
-			namespace, found, err := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
-			if err != nil {
-				return nil, fmt.Errorf("failed to get namespace from application: %w", err)
-			}
-			if found {
-				manifest.SetNamespace(namespace)
+	if argocd.UseAPI() {
+		// set the namespace if not set
+		for _, manifest := range manifestsContent {
+			if manifest.GetNamespace() == "" {
+				// namespace specified in ArgoCD application - spec.destination.namespace
+				namespace, found, err := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
+				if err != nil {
+					return nil, fmt.Errorf("failed to get namespace from application: %w", err)
+				}
+				if found {
+					manifest.SetNamespace(namespace)
+				}
 			}
 		}
 	}

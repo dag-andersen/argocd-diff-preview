@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Deleted (1):
-- nginx-ingress (-484)
+- nginx-ingress (-480)
 ```
 
 <details>
