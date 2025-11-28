@@ -11,7 +11,7 @@ max_diff_length := 65536
 ignore_invalid_watch_pattern := false
 watch_if_no_watch_pattern_found := false
 auto_detect_files_changed := false
-use_argocd_api := false
+use_argocd_api ?= false
 update_expected ?= false
 
 pull-base:
@@ -116,30 +116,27 @@ else
 endif
 
 run-test-all-with-%:
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-1" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-2" diff_ignore="image"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base use_argocd_api="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base title="integration-test/branch-4"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-1" files_changed="examples/helm/values/filtered.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-2" files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-3" files_changed="something/else.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-4" selector="team=my-team"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-5" selector="team=other-team" title="integration-test/branch-5"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-6" file_regex=".*labels\.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-7" file_regex="this-does-not-exist\.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-8" watch_if_no_watch_pattern_found="true" files_changed="something/else.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target base_branch=integration-test/branch-5/base suffix="-9" watch_if_no_watch_pattern_found="true" auto_detect_files_changed="true" use_argocd_api="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target base_branch=integration-test/branch-6/base
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-7/target base_branch=integration-test/branch-7/base files_changed="examples/helm/values/filtered.yaml" create_cluster=true
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target base_branch=integration-test/branch-8/base files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base suffix="-1" max_diff_length=10000 use_argocd_api="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base suffix="-2" files_changed="examples/external-chart/nginx.yaml" max_diff_length=900
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-1" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-2" diff_ignore="image"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target  base_branch=integration-test/branch-2/base 
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target  base_branch=integration-test/branch-3/base 
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target  base_branch=integration-test/branch-4/base  title="integration-test/branch-4"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-1" files_changed="examples/helm/values/filtered.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-2" files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-3" files_changed="something/else.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-4" selector="team=my-team"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-5" selector="team=other-team" title="integration-test/branch-5"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-6" file_regex=".*labels\.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-7" file_regex="this-does-not-exist\.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-8" watch_if_no_watch_pattern_found="true" files_changed="something/else.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-9" watch_if_no_watch_pattern_found="true" auto_detect_files_changed="true" use_argocd_api="true"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target  base_branch=integration-test/branch-6/base  
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-7/target  base_branch=integration-test/branch-7/base  files_changed="examples/helm/values/filtered.yaml" create_cluster=true
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target  base_branch=integration-test/branch-8/base  files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target  base_branch=integration-test/branch-9/base  suffix="-1" max_diff_length=10000
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target  base_branch=integration-test/branch-9/base  suffix="-2" files_changed="examples/external-chart/nginx.yaml" max_diff_length=900
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-10/target base_branch=integration-test/branch-10/base suffix="-1" files_changed="examples/ignore-differences/app.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-11/target base_branch=integration-test/branch-11/base suffix="-1" auto_detect_files_changed="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-11/target base_branch=integration-test/branch-11/base suffix="-1" use_argocd_api="true" auto_detect_files_changed="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-11/target base_branch=integration-test/branch-11/base suffix="-2" auto_detect_files_changed="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-12/target base_branch=integration-test/branch-12/base suffix="-1" files_changed="examples/with-crds/applicaiton.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-12/target base_branch=integration-test/branch-12/base suffix="-1" auto_detect_files_changed="true" diff_ignore="annotations"
 
 run-test-all-docker: docker-build
