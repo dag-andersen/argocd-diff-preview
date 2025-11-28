@@ -80,6 +80,15 @@ func getResourcesFromApps(
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	startTime := time.Now()
 
+	var namespacedScopedResources map[string]bool
+	if argocd.UseAPI() {
+		nsr, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
+		}
+		namespacedScopedResources = nsr
+	}
+
 	log.Info().Msgf("🤖 Getting Applications (timeout in %d seconds)", timeout)
 
 	// Process apps in parallel with a worker pool
@@ -99,7 +108,7 @@ func getResourcesFromApps(
 		wg.Add(1)         // Add to wait group
 		go func(app argoapplication.ArgoResource) {
 			defer wg.Done() // Signal completion when goroutine ends
-			result, k8sName, err := getResourcesFromApp(argocd, app, timeout, prefix)
+			result, k8sName, err := getResourcesFromApp(argocd, app, timeout, prefix, namespacedScopedResources)
 			results <- struct {
 				app ExtractedApp
 				err error
@@ -186,7 +195,7 @@ func getResourcesFromApps(
 
 // getResourcesFromApp extracts a single application from the cluster
 // returns the extracted app, the k8s resource name, and an error
-func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string) (ExtractedApp, string, error) {
+func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string, namespacedScopedResources map[string]bool) (ExtractedApp, string, error) {
 
 	// Store ID (kubernetes resource name) before we add a prefix and hash
 	uniqueIdBeforeModifications := app.Id
@@ -218,7 +227,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application %s", app.GetLongName())
 		}
 
-		manifestsContent, err := getManifestsFromApp(argocd, app)
+		manifestsContent, err := getManifestsFromApp(argocd, app, namespacedScopedResources)
 
 		// If the application is empty, check the application status
 		if err == nil && len(manifestsContent) == 0 {
@@ -269,7 +278,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	}
 }
 
-func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource) ([]unstructured.Unstructured, error) {
+func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, namespacedScopedResources map[string]bool) ([]unstructured.Unstructured, error) {
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
 	var manifests string
@@ -328,7 +337,10 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 					return nil, fmt.Errorf("failed to get namespace from application: %w", err)
 				}
 				if found {
-					manifest.SetNamespace(namespace)
+					key := fmt.Sprintf("%s/%s", manifest.GetKind(), manifest.GetAPIVersion())
+					if namespaced, found := namespacedScopedResources[key]; found && namespaced {
+						manifest.SetNamespace(namespace)
+					}
 				}
 			}
 		}

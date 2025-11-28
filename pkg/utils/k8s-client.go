@@ -36,7 +36,7 @@ type K8sClient struct {
 	discoveryClient       discovery.DiscoveryInterface
 	cachedDiscoveryClient *disk.CachedDiscoveryClient
 	mapper                *restmapper.DeferredDiscoveryRESTMapper
-	config          *rest.Config
+	config                *rest.Config
 }
 
 func NewK8sClient() (*K8sClient, error) {
@@ -103,7 +103,7 @@ func NewK8sClient() (*K8sClient, error) {
 		discoveryClient:       discoveryClient,
 		cachedDiscoveryClient: cachedDiscoveryClient,
 		mapper:                mapper,
-		config:          config,
+		config:                config,
 	}, nil
 }
 
@@ -547,6 +547,42 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 	}
 
 	return string(decoded), nil
+}
+
+// GetListOfNamespacedScopedResources returns metadata about all namespaced resource types
+// Returns a map where the key is "kind/apiVersion" and the value is always true (indicating the resource is namespaced)
+func (c *K8sClient) GetListOfNamespacedScopedResources() (map[string]bool, error) {
+	namespacedScopedResources := make(map[string]bool)
+
+	// Get all API resources from the cluster
+	_, apiResourceLists, err := c.discoveryClient.ServerGroupsAndResources()
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover API resources: %w", err)
+	}
+
+	// Iterate through all resource groups and versions
+	for _, apiResourceList := range apiResourceLists {
+		// Check each resource in the API group
+		for _, apiResource := range apiResourceList.APIResources {
+			// Skip if this is a cluster-scoped resource (not namespaced)
+			if !apiResource.Namespaced {
+				continue
+			}
+
+			// Skip subresources (e.g., "pods/log", "deployments/scale")
+			if strings.Contains(apiResource.Name, "/") {
+				continue
+			}
+
+			// Create key as "Kind/apiVersion"
+			key := fmt.Sprintf("%s/%s", apiResource.Kind, apiResourceList.GroupVersion)
+
+			// Store with value true (indicating this resource is namespaced)
+			namespacedScopedResources[key] = true
+		}
+	}
+
+	return namespacedScopedResources, nil
 }
 
 // WaitForDeploymentReady waits for a deployment to be available
