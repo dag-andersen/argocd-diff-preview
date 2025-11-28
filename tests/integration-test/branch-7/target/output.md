@@ -15,45 +15,6 @@ Modified (2):
 
 ```diff
 @@ Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml) @@
- apiVersion: v1
- kind: Service
- metadata:
-   labels:
-     app.kubernetes.io/instance: valid-manifest-generate-paths-example
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: super-duper-app-name
-   namespace: default
- spec:
-   ports:
-   - name: http
-     port: 80
-     protocol: TCP
-     targetPort: http
-   selector:
-     app.kubernetes.io/instance: valid-manifest-generate-paths-example
-     app.kubernetes.io/name: myApp
-   type: ClusterIP
- 
- ---
- apiVersion: v1
- automountServiceAccountToken: true
- kind: ServiceAccount
- metadata:
-   labels:
-     app.kubernetes.io/instance: valid-manifest-generate-paths-example
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: super-duper-app-name
-   namespace: default
- 
- ---
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -75,7 +36,7 @@ Modified (2):
    template:
      metadata:
        labels:
-@@ skipped 15 lines (60 -> 74) @@
+@@ skipped 15 lines (21 -> 35) @@
          - containerPort: 80
            name: http
            protocol: TCP
@@ -88,6 +49,43 @@ Modified (2):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
+ ---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   labels:
+     app.kubernetes.io/instance: valid-manifest-generate-paths-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: super-duper-app-name
+   namespace: default
+ spec:
+   ports:
+   - name: http
+     port: 80
+     protocol: TCP
+     targetPort: http
+   selector:
+     app.kubernetes.io/instance: valid-manifest-generate-paths-example
+     app.kubernetes.io/name: myApp
+   type: ClusterIP
+ ---
+ apiVersion: v1
+ automountServiceAccountToken: true
+ kind: ServiceAccount
+ metadata:
+   labels:
+     app.kubernetes.io/instance: valid-manifest-generate-paths-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: super-duper-app-name
+   namespace: default
 ```
 
 </details>
@@ -98,6 +96,41 @@ Modified (2):
 
 ```diff
 @@ Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml) @@
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   labels:
+     app.kubernetes.io/instance: watch-pattern-valid-regex-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: super-duper-app-name
+   namespace: default
+ spec:
+   replicas: 5
+   selector:
+     matchLabels:
+       app.kubernetes.io/instance: watch-pattern-valid-regex-example
+       app.kubernetes.io/name: myApp
+   template:
+     metadata:
+       labels:
+@@ skipped 15 lines (21 -> 35) @@
+         - containerPort: 80
+           name: http
+           protocol: TCP
+         readinessProbe:
+           httpGet:
+             path: /
+             port: http
+         resources: {}
+         securityContext: {}
+       securityContext: {}
+-      serviceAccountName: super-app-name
++      serviceAccountName: super-duper-app-name
+ ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -120,7 +153,6 @@ Modified (2):
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/name: myApp
    type: ClusterIP
- 
  ---
  apiVersion: v1
  automountServiceAccountToken: true
@@ -135,42 +167,6 @@ Modified (2):
 -  name: super-app-name
 +  name: super-duper-app-name
    namespace: default
- 
- ---
- apiVersion: apps/v1
- kind: Deployment
- metadata:
-   labels:
-     app.kubernetes.io/instance: watch-pattern-valid-regex-example
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: super-duper-app-name
-   namespace: default
- spec:
-   replicas: 5
-   selector:
-     matchLabels:
-       app.kubernetes.io/instance: watch-pattern-valid-regex-example
-       app.kubernetes.io/name: myApp
-   template:
-     metadata:
-       labels:
-@@ skipped 15 lines (60 -> 74) @@
-         - containerPort: 80
-           name: http
-           protocol: TCP
-         readinessProbe:
-           httpGet:
-             path: /
-             port: http
-         resources: {}
-         securityContext: {}
-       securityContext: {}
--      serviceAccountName: super-app-name
-+      serviceAccountName: super-duper-app-name
 ```
 
 </details>
