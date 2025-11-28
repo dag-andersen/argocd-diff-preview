@@ -17,6 +17,9 @@ var ignorePatterns = []string{
 	"  checksum/config: ",
 	"  checksum/rules: ",
 	"  checksum/certs: ",
+	"  checksum/cmd-params: ",
+	"  checksum/config-maps: ",
+	"  checksum/secrets: ",
 	"  caBundle: ",
 }
 

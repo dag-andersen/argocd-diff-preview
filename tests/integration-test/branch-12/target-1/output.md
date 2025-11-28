@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Modified (1):
-± argocd-helm-chart (+2460|-86)
+± argocd-helm-chart (+2449|-78)
 ```
 
 <details>
