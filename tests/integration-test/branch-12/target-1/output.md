@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Modified (1):
-± argocd-helm-chart (+2449|-78)
+± argocd-helm-chart (+2436|-64)
 ```
 
 <details>
@@ -263,34 +263,7 @@ Modified (1):
        - name: argocd-dex-server-tls
          secret:
            items:
-@@ skipped 25 lines (447 -> 471) @@
-   replicas: 1
-   revisionHistoryLimit: 3
-   selector:
-     matchLabels:
-       app.kubernetes.io/instance: argocd-helm-chart
-       app.kubernetes.io/name: argocd-notifications-controller
-   strategy:
-     type: Recreate
-   template:
-     metadata:
-+      annotations:
-+        checksum/cmd-params: 60aae70f043f6e9f6ddea79cae9d636a9ed9d475e941ecaadf36b1bfd38deca7
-       labels:
-         app.kubernetes.io/component: notifications-controller
-         app.kubernetes.io/instance: argocd-helm-chart
-         app.kubernetes.io/managed-by: Helm
-         app.kubernetes.io/name: argocd-notifications-controller
-         app.kubernetes.io/part-of: argocd
--        app.kubernetes.io/version: v2.13.1
--        helm.sh/chart: argo-cd-7.7.7
-+        app.kubernetes.io/version: v3.2.0
-+        helm.sh/chart: argo-cd-9.1.4
-     spec:
-       affinity:
-         podAntiAffinity:
-           preferredDuringSchedulingIgnoredDuringExecution:
-           - podAffinityTerm:
+@@ skipped 52 lines (447 -> 498) @@
                labelSelector:
                  matchLabels:
                    app.kubernetes.io/name: argocd-notifications-controller
@@ -422,31 +395,7 @@ Modified (1):
        volumes:
        - configMap:
            defaultMode: 493
-@@ skipped 18 lines (684 -> 701) @@
- spec:
-   replicas: 1
-   revisionHistoryLimit: 3
-   selector:
-     matchLabels:
-       app.kubernetes.io/instance: argocd-helm-chart
-       app.kubernetes.io/name: argocd-repo-server
-   template:
-     metadata:
-       annotations:
--        checksum/cm: 61aaccd5834b32083a3f22b8f73aa4d45b6c4177aac57ef3bd5b6bbd535e9e51
--        checksum/cmd-params: 0c15d48ee658c664bbffb422c547dbc75de58c47b66879bd0752393e7ba76774
-+        checksum/cm: 131b8710f8adae0bbc77f5b2c5e96a6a592ca7e38533c13d4dcff8a4adc1f10f
-+        checksum/cmd-params: 60aae70f043f6e9f6ddea79cae9d636a9ed9d475e941ecaadf36b1bfd38deca7
-       labels:
-         app.kubernetes.io/component: repo-server
-         app.kubernetes.io/instance: argocd-helm-chart
-         app.kubernetes.io/managed-by: Helm
-         app.kubernetes.io/name: argocd-repo-server
-         app.kubernetes.io/part-of: argocd
--        app.kubernetes.io/version: v2.13.1
--        helm.sh/chart: argo-cd-7.7.7
-+        app.kubernetes.io/version: v3.2.0
-@@ skipped 26 lines (725 -> 750) @@
+@@ skipped 67 lines (684 -> 750) @@
          - name: ARGOCD_REPO_SERVER_LOGFORMAT
            valueFrom:
              configMapKeyRef:
@@ -640,31 +589,7 @@ Modified (1):
        - emptyDir: {}
          name: var-files
        - emptyDir: {}
-@@ skipped 39 lines (1084 -> 1122) @@
- spec:
-   replicas: 1
-   revisionHistoryLimit: 3
-   selector:
-     matchLabels:
-       app.kubernetes.io/instance: argocd-helm-chart
-       app.kubernetes.io/name: argocd-server
-   template:
-     metadata:
-       annotations:
--        checksum/cm: 61aaccd5834b32083a3f22b8f73aa4d45b6c4177aac57ef3bd5b6bbd535e9e51
--        checksum/cmd-params: 0c15d48ee658c664bbffb422c547dbc75de58c47b66879bd0752393e7ba76774
-+        checksum/cm: 131b8710f8adae0bbc77f5b2c5e96a6a592ca7e38533c13d4dcff8a4adc1f10f
-+        checksum/cmd-params: 60aae70f043f6e9f6ddea79cae9d636a9ed9d475e941ecaadf36b1bfd38deca7
-       labels:
-         app.kubernetes.io/component: server
-         app.kubernetes.io/instance: argocd-helm-chart
-         app.kubernetes.io/managed-by: Helm
-         app.kubernetes.io/name: argocd-server
-         app.kubernetes.io/part-of: argocd
--        app.kubernetes.io/version: v2.13.1
--        helm.sh/chart: argo-cd-7.7.7
-+        app.kubernetes.io/version: v3.2.0
-@@ skipped 136 lines (1146 -> 1281) @@
+@@ skipped 198 lines (1084 -> 1281) @@
              configMapKeyRef:
                key: server.connection.status.cache.expiration
                name: argocd-cmd-params-cm
@@ -805,31 +730,7 @@ Modified (1):
        - configMap:
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
-@@ skipped 51 lines (1548 -> 1598) @@
-   replicas: 1
-   revisionHistoryLimit: 5
-   selector:
-     matchLabels:
-       app.kubernetes.io/instance: argocd-helm-chart
-       app.kubernetes.io/name: argocd-application-controller
-   serviceName: argocd-helm-chart-application-controller
-   template:
-     metadata:
-       annotations:
--        checksum/cm: 61aaccd5834b32083a3f22b8f73aa4d45b6c4177aac57ef3bd5b6bbd535e9e51
--        checksum/cmd-params: 0c15d48ee658c664bbffb422c547dbc75de58c47b66879bd0752393e7ba76774
-+        checksum/cm: 131b8710f8adae0bbc77f5b2c5e96a6a592ca7e38533c13d4dcff8a4adc1f10f
-+        checksum/cmd-params: 60aae70f043f6e9f6ddea79cae9d636a9ed9d475e941ecaadf36b1bfd38deca7
-       labels:
-         app.kubernetes.io/component: application-controller
-         app.kubernetes.io/instance: argocd-helm-chart
-         app.kubernetes.io/managed-by: Helm
-         app.kubernetes.io/name: argocd-application-controller
-         app.kubernetes.io/part-of: argocd
--        app.kubernetes.io/version: v2.13.1
--        helm.sh/chart: argo-cd-7.7.7
-+        app.kubernetes.io/version: v3.2.0
-@@ skipped 71 lines (1622 -> 1692) @@
+@@ skipped 145 lines (1548 -> 1692) @@
              configMapKeyRef:
                key: controller.log.format
                name: argocd-cmd-params-cm
@@ -1658,7 +1559,81 @@ Modified (1):
 +                          from. The Path should never point to the root of the repo. If hydrateTo is set, this is just the path from which
 +                          hydrated manifests will be synced.
 +                        minLength: 1
-+
++                        pattern: ^.{2,}|[]$
++                        type: string
++                      targetBranch:
++                        description: |-
++                          TargetBranch is the branch from which hydrated manifests will be synced.
++                          If HydrateTo is not set, this is also the branch to which hydrated manifests are committed.
++                        type: string
++                    required:
++                    - path
++                    - targetBranch
++                    type: object
++                required:
++                - drySource
++                - syncSource
++                type: object
+               sources:
+                 description: Sources is a reference to the location of the application's
+                   manifests or chart
+                 items:
+                   description: ApplicationSource contains all required information
+                     about the source of an application
+                   properties:
+                     chart:
+                       description: Chart is a Helm chart name, and must be specified
+                         for applications sourced from a Helm repo.
+@@ skipped 125 lines (4746 -> 4870) @@
+                             (Helm's --pass-credentials)
+                           type: boolean
+                         releaseName:
+                           description: ReleaseName is the Helm release name to use.
+                             If omitted it will use the application name
+                           type: string
+                         skipCrds:
+                           description: SkipCrds skips custom resource definition installation
+                             step (Helm's --skip-crds)
+                           type: boolean
++                        skipSchemaValidation:
++                          description: SkipSchemaValidation skips JSON schema validation
++                            (Helm's --skip-schema-validation)
++                          type: boolean
++                        skipTests:
++                          description: SkipTests skips test manifest installation
++                            step (Helm's --skip-tests).
++                          type: boolean
+                         valueFiles:
+                           description: ValuesFiles is a list of Helm value files to
+                             use when generating a template
+                           items:
+                             type: string
+                           type: array
+                         values:
+                           description: Values specifies Helm values to be passed to
+                             helm template, typically defined as a block. ValuesObject
+                             takes precedence over Values, so use one or the other.
+@@ skipped 43 lines (4899 -> 4941) @@
+                           type: array
+                         forceCommonAnnotations:
+                           description: ForceCommonAnnotations specifies whether to
+                             force applying common annotations to resources for Kustomize
+                             apps
+                           type: boolean
+                         forceCommonLabels:
+                           description: ForceCommonLabels specifies whether to force
+                             applying common labels to resources for Kustomize apps
+                           type: boolean
++                        ignoreMissingComponents:
++                          description: IgnoreMissingComponents prevents kustomize
++                            from failing when components do not exist locally by not
++                            appending them to kustomization file
++                          type: boolean
+                         images:
+                           description: Images is a list of Kustomize image override
+                             specifications
+                           items:
+                             description: KustomizeImage represents a Kustomize image
 🚨 Diff is too long
 ```
 
