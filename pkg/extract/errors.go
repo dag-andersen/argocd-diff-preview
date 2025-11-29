@@ -77,12 +77,24 @@ var timeoutMessages = []string{
 }
 
 // Expected errors when running with 'createClusterRoles: false'
-const (
-	expectedError = `.*Failed to load live state: failed to get cluster info for .*?: error synchronizing cache state : failed to sync cluster .*?: failed to load initial state of resource.*`
-)
+var expectedErrorPatterns = []string{
+	`.*Failed to load live state: failed to get cluster info for .*?: error synchronizing cache state : failed to sync cluster .*?: failed to load initial state of resource.*`,
+	// `.*Failed to load live state: namespace ".*" for .* ".*" is not managed`,
+}
+var compiledExpectedErrors []*regexp.Regexp
+
+func init() {
+	compiledExpectedErrors = make([]*regexp.Regexp, len(expectedErrorPatterns))
+	for i, pattern := range expectedErrorPatterns {
+		compiledExpectedErrors[i] = regexp.MustCompile(pattern)
+	}
+}
 
 func isExpectedError(errorMessage string) bool {
-	regex := regexp.MustCompile(expectedError)
-	matches := regex.MatchString(errorMessage)
-	return matches
+	for _, regex := range compiledExpectedErrors {
+		if regex.MatchString(errorMessage) {
+			return true
+		}
+	}
+	return false
 }
