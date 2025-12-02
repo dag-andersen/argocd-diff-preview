@@ -229,22 +229,38 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 
 		manifestsContent, err := getManifestsFromApp(argocd, app, namespacedScopedResources)
 
-		// If the application is empty, check the application status
-		if err == nil && len(manifestsContent) == 0 {
+		// If the application is seemingly empty, check the application status and refresh and try again
+		attempts := 0
+		for attempts < 2 && err == nil && len(manifestsContent) == 0 {
+			attempts++
+
 			argoErrMessage, internalError := argoapplication.GetErrorStatusFromApplication(argocd, app)
 			log.Debug().Str("App", app.GetLongName()).Msgf("Application is empty. Argo CD Error: %v, Internal Error: %v", argoErrMessage, internalError)
 			if argoErrMessage != nil {
 				if argocd.UseAPI() && isExpectedError(argoErrMessage.Error()) {
 					log.Debug().Str("App", app.GetLongName()).Msgf("Expected error because Argo CD is running with '--use-argocd-api=true' and Argo CD may be running with 'createClusterRoles: false'")
+					break
 				} else {
 					err = argoErrMessage
+					break
 				}
 			} else if internalError != nil {
 				err = internalError
+				break
 			}
+
+			// refresh application just to be sure
+			log.Debug().Str("App", app.GetLongName()).Msg("No manifests and no error found for application, refreshing and trying again just to be sure")
+			if err := argocd.RefreshApp(app.Id); err != nil {
+				log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to refresh application")
+			} else {
+				log.Debug().Str("App", app.GetLongName()).Msg("Refreshed application")
+			}
+			manifestsContent, err = getManifestsFromApp(argocd, app, namespacedScopedResources)
+			time.Sleep(time.Second)
 		}
 
-		// If no error, return the extracted app
+		// If still no error, return the extracted app
 		if err == nil {
 			if len(manifestsContent) == 0 {
 				log.Warn().Str("App", app.GetLongName()).Msg("⚠️ No manifests found for application")
