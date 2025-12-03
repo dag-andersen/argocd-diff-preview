@@ -10,6 +10,7 @@ type ErrorKind string
 
 // for errors from Argo CD
 const (
+	ErrorNoClusterWithName    ErrorKind = "there are no clusters with this name"
 	ErrorHelmTemplate         ErrorKind = "helm template ."
 	ErrorAuthRequired         ErrorKind = "authentication required"
 	ErrorAuthFailed           ErrorKind = "authentication failed"
@@ -27,6 +28,7 @@ const (
 )
 
 var errorMessages = []string{
+	string(ErrorNoClusterWithName),
 	string(ErrorHelmTemplate),
 	string(ErrorAuthRequired),
 	string(ErrorAuthFailed),
