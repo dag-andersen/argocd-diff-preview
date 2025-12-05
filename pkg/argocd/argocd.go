@@ -6,10 +6,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -30,27 +32,54 @@ var (
 	}
 )
 
-type ArgoCDInstallation struct {
-	K8sClient  *utils.K8sClient
-	Namespace  string
-	Version    string
-	ConfigPath string
-	ChartName  string
-	ChartURL   string
-	ChartRepoUsername string
-	ChartRepoPassword string
+const (
+	// remotePort is the port that the ArgoCD server pod listens on
+	remotePort = 8080
+	localPort  = 8081
+)
+
+type ArgoCDApiConnection struct {
+	apiServerURL         string // Constructed API server URL (e.g., "http://localhost:8081")
+	authToken            string // Cached authentication token
+	portForwardActive    bool
+	portForwardMutex     sync.Mutex
+	portForwardStopChan  chan struct{}
+	portForwardLocalPort int // Local port for port forwarding (e.g., 8081)
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string) *ArgoCDInstallation {
+type ArgoCDInstallation struct {
+	K8sClient           *utils.K8sClient
+	Namespace           string
+	Version             string
+	ConfigPath          string
+	ChartName           string
+	ChartURL            string
+	ChartRepoUsername   string
+	ChartRepoPassword   string
+	ArgoCDApiConnection *ArgoCDApiConnection // nil if API is not used
+}
+
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, useAPI bool) *ArgoCDInstallation {
+	var argocdApiConnection *ArgoCDApiConnection
+	if useAPI {
+		argocdApiConnection = &ArgoCDApiConnection{
+			portForwardLocalPort: localPort,
+			apiServerURL:         fmt.Sprintf("http://localhost:%d", localPort),
+		}
+	} else {
+		argocdApiConnection = nil
+	}
+
 	return &ArgoCDInstallation{
-		K8sClient:  client,
-		Namespace:  namespace,
-		Version:    version,
-		ConfigPath: "argocd-config",
-		ChartName:  repoName,
-		ChartURL:   repoURL,
-		ChartRepoUsername: repoUsername,
-		ChartRepoPassword: repoPassword,
+		K8sClient:           client,
+		Namespace:           namespace,
+		Version:             version,
+		ConfigPath:          "argocd-config",
+		ChartName:           repoName,
+		ChartURL:            repoURL,
+		ChartRepoUsername:   repoUsername,
+		ChartRepoPassword:   repoPassword,
+		ArgoCDApiConnection: argocdApiConnection,
 	}
 }
 
@@ -232,6 +261,25 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
 
+	// look for 'createClusterRoles' in chartValues
+	if result, ok := chartValues["createClusterRoles"]; ok {
+		if result == "false" {
+			log.Info().Msgf("Installing with 'createClusterRoles: %s'", result)
+			if !a.UseAPI() {
+				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work unless you use '--use-argocd-api=true'")
+			}
+		}
+	}
+
+	// convert chartValues to a string
+	chartValuesBytes, err := yaml.Marshal(chartValues)
+	if err != nil {
+		return fmt.Errorf("failed to marshal chart values: %w", err)
+	}
+	chartValuesString := string(chartValuesBytes)
+
+	log.Debug().Msgf("Chart values: \n%s", chartValuesString)
+
 	log.Debug().Msgf("Installing Argo CD Helm Chart with timeout: %s", timeout)
 
 	// Install chart in go routine
@@ -303,6 +351,10 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	return string(output), nil
 }
 
+func (a *ArgoCDInstallation) UseAPI() bool {
+	return a.ArgoCDApiConnection != nil
+}
+
 // AppsetGenerate runs 'argocd appset generate' on a file and returns the output
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
 	out, err := a.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
@@ -341,36 +393,18 @@ func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) 
 	if err != nil {
 		exists, _ := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
 		if !exists {
-			log.Warn().Msgf("App %s does not exist", appName)
+			log.Warn().Msgf("App '%s' does not exist", appName)
 		}
 
 		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
-	return out, true, nil
-}
-
-// GetManifestsWithRetry returns the manifests for an application with retry
-func (a *ArgoCDInstallation) GetManifestsWithRetry(appName string, maxAttempts int) (string, bool, error) {
-
-	var err error
-	var exists bool
-	var out string
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		log.Debug().Msgf("GetManifestsWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, exists, err = a.GetManifests(appName)
-		if err == nil {
-			return out, exists, nil
-		}
-
-		if attempt < maxAttempts {
-			log.Debug().Msgf("Waiting 1s before next get manifests attempt (%d/%d)...", attempt+1, maxAttempts)
-			log.Warn().Err(err).Msgf("⚠️ Get manifests attempt %d/%d failed.", attempt, maxAttempts)
-			time.Sleep(1 * time.Second)
-		}
+	if strings.TrimSpace(out) == "" {
+		log.Debug().Msgf("No manifests found with `argocd app manifests %s`", appName)
+		return "", true, nil
 	}
 
-	return out, exists, err
+	return out, true, nil
 }
 
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {
