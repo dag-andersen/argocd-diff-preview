@@ -269,7 +269,7 @@ spec:
 
 	// Run the diff generation
 	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, baseApps, targetApps,
+		basePath, targetPath, nil, 3, false, baseApps, targetApps,
 	)
 
 	if err != nil {
@@ -392,7 +392,7 @@ spec:
 
 	// Run the diff generation
 	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, baseApps, targetApps,
+		basePath, targetPath, nil, 3, false, baseApps, targetApps,
 	)
 
 	if err != nil {
