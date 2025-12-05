@@ -35,6 +35,7 @@ func GenerateDiff(
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
+	hideDeletedAppDiff bool,
 	timeInfo InfoBox,
 ) error {
 
@@ -54,7 +55,7 @@ func GenerateDiff(
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps)
+	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -120,6 +121,7 @@ func generateGitDiff(
 	basePath, targetPath string,
 	diffIgnore *string,
 	diffContextLines uint,
+	hideDeletedAppDiff bool,
 	baseApps []AppInfo,
 	targetApps []AppInfo,
 ) (string, []MarkdownSection, []HTMLSection, error) {
@@ -274,7 +276,9 @@ func generateGitDiff(
 
 		case merkletrie.Delete:
 
-			if from != nil {
+			// Skip generating diff content for deleted apps when hideDeletedAppDiff is enabled
+			// The header will still be shown, but not the full diff content
+			if !hideDeletedAppDiff && from != nil {
 				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
@@ -368,8 +372,9 @@ func generateGitDiff(
 	htmlFileSections := make([]HTMLSection, 0, len(changedFiles))
 	for _, diff := range changedFiles {
 
-		// skips empty diffs
-		if diff.changeInfo.content == "" {
+		// skips empty diffs, but allow deleted apps through when hideDeletedAppDiff is true
+		// (they'll show the deletion header only)
+		if diff.changeInfo.content == "" && !(hideDeletedAppDiff && diff.action == merkletrie.Delete) {
 			continue
 		}
 
