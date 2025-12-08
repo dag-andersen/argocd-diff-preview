@@ -68,7 +68,9 @@ func (a *ArgoResource) WriteToFolder(folder string) (string, error) {
 	return randomFileName, nil
 }
 
-// GetApplicationsForBranches gets applications for both base and target branches
+// GetApplicationsForBranches gets applications for both base and target branches.
+// Apps that are ignored via the argocd-diff-preview/ignore annotation on the target branch
+// will also be filtered out from the base branch to avoid showing them as "deleted".
 func GetApplicationsForBranches(
 	argocdNamespace string,
 	baseBranch *git.Branch,
@@ -77,7 +79,7 @@ func GetApplicationsForBranches(
 	repo string,
 	redirectRevisions []string,
 ) ([]ArgoResource, []ArgoResource, error) {
-	baseApps, err := getApplications(
+	baseApps, _, err := getApplications(
 		argocdNamespace,
 		baseBranch,
 		filterOptions,
@@ -88,7 +90,7 @@ func GetApplicationsForBranches(
 		return nil, nil, err
 	}
 
-	targetApps, err := getApplications(
+	targetApps, targetIgnoredApps, err := getApplications(
 		argocdNamespace,
 		targetBranch,
 		filterOptions,
@@ -99,17 +101,23 @@ func GetApplicationsForBranches(
 		return nil, nil, err
 	}
 
+	// Filter out apps from base branch that are ignored on target branch.
+	// This prevents apps with argocd-diff-preview/ignore annotation from showing as "deleted".
+	baseApps = RemoveIgnoredApps(baseApps, targetIgnoredApps, baseBranch.Name)
+
 	return baseApps, targetApps, nil
 }
 
-// getApplications gets applications for a single branch
+// getApplications gets applications for a single branch.
+// Returns (apps, ignoredApps, error) where ignoredApps contains the apps
+// that were filtered out due to the argocd-diff-preview/ignore annotation.
 func getApplications(
 	argocdNamespace string,
 	branch *git.Branch,
 	filterOptions FilterOptions,
 	repo string,
 	redirectRevisions []string,
-) ([]ArgoResource, error) {
+) ([]ArgoResource, []IgnoredApp, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
 
 	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), filterOptions.FileRegex)
@@ -121,33 +129,33 @@ func getApplications(
 	applications := FromResourceToApplication(k8sResources)
 
 	if len(applications) == 0 {
-		return []ArgoResource{}, nil
+		return []ArgoResource{}, nil, nil
 	}
 
 	// filter applications
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Application[Sets]", len(applications))
-	applications = FilterAllWithLogging(applications, filterOptions, branch)
+	filterResult := FilterAllWithLogging(applications, filterOptions, branch)
 
-	if len(applications) == 0 {
-		return []ArgoResource{}, nil
+	if len(filterResult.Apps) == 0 {
+		return []ArgoResource{}, filterResult.IgnoredApps, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(applications))
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(filterResult.Apps))
 
-	applications, err := patchApplications(
+	patchedApps, err := patchApplications(
 		argocdNamespace,
-		applications,
+		filterResult.Apps,
 		branch,
 		repo,
 		redirectRevisions,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	log.Debug().Str("branch", branch.Name).Msgf("Patched %d Application[Sets]", len(applications))
+	log.Debug().Str("branch", branch.Name).Msgf("Patched %d Application[Sets]", len(patchedApps))
 
-	return applications, nil
+	return patchedApps, filterResult.IgnoredApps, nil
 }
 
 // PatchApplication patches a single ArgoResource
