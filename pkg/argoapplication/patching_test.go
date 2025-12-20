@@ -599,7 +599,7 @@ metadata:
   namespace: default
 spec:
   destination:
-    server: https://kubernetes.default.svc
+    name: my-cluster
     namespace: default
 `,
 			want: `
@@ -610,7 +610,7 @@ metadata:
   namespace: default
 spec:
   destination:
-    name: error
+    server: https://kubernetes.default.svc
     namespace: default
 `,
 			expectErr: nil,
@@ -697,7 +697,7 @@ spec:
 			expectErr: nil,
 		},
 		{
-			name: "application with destination containing name should update name and remove server",
+			name: "application with destination containing name should delete name and set server",
 			kind: Application,
 			yaml: `
 apiVersion: argoproj.io/v1alpha1
@@ -708,7 +708,7 @@ metadata:
 spec:
   destination:
     name: my-cluster
-    server: https://kubernetes.default.svc
+    server: https://other-server.example.com
     namespace: default
 `,
 			want: `
@@ -719,7 +719,7 @@ metadata:
   namespace: default
 spec:
   destination:
-    name: error
+    server: https://kubernetes.default.svc
     namespace: default
 `,
 			expectErr: nil,
@@ -743,7 +743,7 @@ spec:
 			}
 
 			// Run PointDestinationToInCluster
-			err = app.PointDestinationToInCluster()
+			err = app.SetDestinationServerToLocal()
 
 			// Check result
 			if tt.expectErr == nil {
