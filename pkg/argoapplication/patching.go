@@ -129,8 +129,6 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	switch a.Kind {
 	case Application:
 		destPath = []string{"spec", "destination"}
-	case ApplicationSet:
-		destPath = []string{"spec", "template", "spec", "destination"}
 	default:
 		return nil
 	}
