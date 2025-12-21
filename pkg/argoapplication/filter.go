@@ -28,8 +28,19 @@ type FilterOptions struct {
 	WatchIfNoWatchPatternFound bool
 }
 
-func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) []ArgoResource {
-	// Log selector and files changed info
+// FilterApps filters apps from both branches and merges the results.
+// An app should be rendered if it's selected in at least one branch.
+// Key for comparison: "Kind|Name|filename"
+func FilterApps(
+	baseApps []ArgoResource,
+	targetApps []ArgoResource,
+	filterOptions FilterOptions,
+	baseBranch *git.Branch,
+	targetBranch *git.Branch,
+) ([]ArgoResource, []ArgoResource) {
+
+	log.Info().Msg("🤖 Filtering Application[Sets] for both branches")
+
 	switch {
 	case len(filterOptions.Selector) > 0 && len(filterOptions.FilesChanged) > 0:
 		var selectorStrs []string
@@ -47,52 +58,97 @@ func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, bran
 			selectorStrs = append(selectorStrs, s.String())
 		}
 		log.Info().Msgf(
-			"🤖 Will only run on Applications that match '%s'",
+			"🤖 Will only run on Applications that match selectors: '%s'",
 			strings.Join(selectorStrs, ","),
 		)
 	case len(filterOptions.FilesChanged) > 0:
 		log.Info().Msgf(
-			"🤖 Will only run on Applications that watch these files: '%s'",
+			"🤖 Will only run on Applications that watch these changed files: '%s'",
 			strings.Join(filterOptions.FilesChanged, "', '"),
 		)
 	}
 
-	numberOfAppsBeforeFiltering := len(apps)
+	// Filter both branches
+	baseAppsSelected, baseAppsNotSelected := filterAll(baseApps, filterOptions)
+	log.Debug().Str("branch", baseBranch.Name).Msgf("baseAppsSelected: %d, baseAppsNotSelected: %d", len(baseAppsSelected), len(baseAppsNotSelected))
+	targetAppsSelected, targetAppsNotSelected := filterAll(targetApps, filterOptions)
+	log.Debug().Str("branch", targetBranch.Name).Msgf("targetAppsSelected: %d, targetAppsNotSelected: %d", len(targetAppsSelected), len(targetAppsNotSelected))
 
-	// Filter applications
-	filteredApps := FilterAll(apps, filterOptions)
-
-	// Log filtering results
-	if numberOfAppsBeforeFiltering != len(filteredApps) {
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Found %d Application[Sets] before filtering",
-			numberOfAppsBeforeFiltering,
-		)
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Found %d Application[Sets] after filtering",
-			len(filteredApps),
-		)
-	} else {
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Found %d Application[Sets]",
-			numberOfAppsBeforeFiltering,
-		)
+	makeKey := func(app ArgoResource) string {
+		return fmt.Sprintf("%s|%s|%s", app.Kind.ShortName(), app.Name, app.FileName)
 	}
 
-	return filteredApps
-}
+	// Build a set of keys for selected apps in each branch
+	// If any app with a given key is selected, all apps with that key should be included
+	selectedKeys := make(map[string]bool)
+	for _, app := range baseAppsSelected {
+		selectedKeys[makeKey(app)] = true
+	}
+	for _, app := range targetAppsSelected {
+		selectedKeys[makeKey(app)] = true
+	}
 
-func FilterAll(
-	apps []ArgoResource,
-	filterOptions FilterOptions,
-) []ArgoResource {
-	var filteredApps []ArgoResource
-	for _, app := range apps {
-		if app.Filter(filterOptions) {
-			filteredApps = append(filteredApps, app)
+	// Build maps of all apps by key for easy lookup (selected + not selected)
+	// Use slices to handle multiple apps with the same key
+	baseAllApps := make(map[string][]ArgoResource)
+	for _, app := range baseAppsSelected {
+		key := makeKey(app)
+		baseAllApps[key] = append(baseAllApps[key], app)
+	}
+	for _, app := range baseAppsNotSelected {
+		key := makeKey(app)
+		baseAllApps[key] = append(baseAllApps[key], app)
+	}
+
+	targetAllApps := make(map[string][]ArgoResource)
+	for _, app := range targetAppsSelected {
+		key := makeKey(app)
+		targetAllApps[key] = append(targetAllApps[key], app)
+	}
+	for _, app := range targetAppsNotSelected {
+		key := makeKey(app)
+		targetAllApps[key] = append(targetAllApps[key], app)
+	}
+
+	// Final selected apps: all apps from each branch that have a key in selectedKeys
+	finalBaseApps := []ArgoResource{}
+	for key := range selectedKeys {
+		if apps, exists := baseAllApps[key]; exists {
+			finalBaseApps = append(finalBaseApps, apps...)
 		}
 	}
-	return filteredApps
+
+	finalTargetApps := []ArgoResource{}
+	for key := range selectedKeys {
+		if apps, exists := targetAllApps[key]; exists {
+			finalTargetApps = append(finalTargetApps, apps...)
+		}
+	}
+
+	if len(baseApps) != len(finalBaseApps) || len(targetApps) != len(finalTargetApps) {
+		log.Info().Str("branch", baseBranch.Name).Msgf("🤖 Found %d Application[Sets] after filtering", len(finalBaseApps))
+		log.Info().Str("branch", targetBranch.Name).Msgf("🤖 Found %d Application[Sets] after filtering", len(finalTargetApps))
+	} else {
+		log.Info().Msg("🤖 Filters did not result in any Application[Sets] being removed from the list")
+	}
+
+	return finalBaseApps, finalTargetApps
+}
+
+func filterAll(
+	apps []ArgoResource,
+	filterOptions FilterOptions,
+) ([]ArgoResource, []ArgoResource) {
+	var selectedApps []ArgoResource
+	var notSelectedApps []ArgoResource
+	for _, app := range apps {
+		if app.Filter(filterOptions) {
+			selectedApps = append(selectedApps, app)
+		} else {
+			notSelectedApps = append(notSelectedApps, app)
+		}
+	}
+	return selectedApps, notSelectedApps
 }
 
 // Filter checks if the application matches the given selectors and watches the given files

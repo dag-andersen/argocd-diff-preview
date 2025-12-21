@@ -26,103 +26,69 @@ func ConvertAppSetsToAppsInBothBranches(
 	debug bool,
 	filterOptions FilterOptions,
 ) ([]ArgoResource, []ArgoResource, time.Duration, error) {
-	startTime := time.Now()
-	defer func() {
-		log.Info().Msgf("🤖 Converting ApplicationSets to Applications in both branches took %s", time.Since(startTime))
-	}()
 
+	baseTempFolder := fmt.Sprintf("%s/%s/app-sets", tempFolder, git.Base)
+	targetTempFolder := fmt.Sprintf("%s/%s/app-sets", tempFolder, git.Target)
+
+	// CONVERT APPSETS TO APPS ------------------------------------------------------
 	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
 
-	baseTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Base)
-	targetTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Target)
-
-	baseApps, err := processAppSets(
+	baseAppsGenerated, baseDuration, err := convertAppSetsToApps(
 		argocd,
 		baseApps,
 		baseBranch,
 		baseTempFolder,
 		debug,
-		filterOptions,
-		repo,
-		redirectRevisions,
 	)
-
 	if err != nil {
-		log.Error().Str("branch", baseBranch.Name).Msg("❌ Failed to generate base apps")
-		return nil, nil, time.Since(startTime), err
+		log.Error().Str("branch", baseBranch.Name).Msg("❌ Failed to generate apps")
+		return nil, nil, 0, err
 	}
 
-	targetApps, err = processAppSets(
+	targetAppsGenerated, targetDuration, err := convertAppSetsToApps(
 		argocd,
 		targetApps,
 		targetBranch,
 		targetTempFolder,
 		debug,
-		filterOptions,
-		repo,
-		redirectRevisions,
 	)
 	if err != nil {
 		log.Error().Str("branch", targetBranch.Name).Msg("❌ Failed to generate target apps")
-		return nil, nil, time.Since(startTime), err
+		return nil, nil, 0, err
 	}
 
-	return baseApps, targetApps, time.Since(startTime), nil
-}
+	convertAppSetsToAppsDuration := baseDuration + targetDuration
+	log.Info().Msgf("🤖 Converting ApplicationSets to Applications in both branches took %s", convertAppSetsToAppsDuration.Round(time.Second))
 
-func processAppSets(
-	argocd *argocd.ArgoCDInstallation,
-	appSets []ArgoResource,
-	branch *git.Branch,
-	tempFolder string,
-	debug bool,
-	filterOptions FilterOptions,
-	repo string,
-	redirectRevisions []string,
-) ([]ArgoResource, error) {
+	// FILTER APPLICATIONS ------------------------------------------------------
+	baseAppsSelected, targetAppsSelected := FilterApps(baseAppsGenerated, targetAppsGenerated, filterOptions, baseBranch, targetBranch)
 
-	appSetTempFolder := fmt.Sprintf("%s/app-sets", tempFolder)
-	if err := utils.CreateFolder(appSetTempFolder, true); err != nil {
-		log.Error().Msgf("❌ Failed to create temp folder: %s", appSetTempFolder)
-		return nil, err
-	}
-
-	apps, err := convertAppSetsToApps(
-		argocd,
-		appSets,
-		branch,
-		appSetTempFolder,
-		debug,
-	)
-	if err != nil {
-		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
-		return nil, err
-	}
-
-	if len(apps) == 0 {
-		return apps, nil
-	}
-
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(apps))
-	apps = FilterAll(apps, filterOptions)
-
-	if len(apps) == 0 {
-		log.Info().Str("branch", branch.Name).Msg("🤖 No applications left after filtering")
-		return apps, nil
-	}
-
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(apps))
-	apps, err = patchApplications(
+	// PATCH APPLICATIONS ------------------------------------------------------
+	baseAppsPatched, err := patchApplications(
 		argocd.Namespace,
-		apps,
-		branch,
+		baseAppsSelected,
+		baseBranch,
 		repo,
 		redirectRevisions,
 	)
 	if err != nil {
-		log.Error().Str("branch", branch.Name).Msgf("❌ Failed to patch Applications on branch: %s", branch.Name)
-		return nil, err
+		log.Error().Str("branch", baseBranch.Name).Msg("❌ Failed to patch base applications")
+		return nil, nil, convertAppSetsToAppsDuration, err
 	}
+
+	targetAppsPatched, err := patchApplications(
+		argocd.Namespace,
+		targetAppsSelected,
+		targetBranch,
+		repo,
+		redirectRevisions,
+	)
+	if err != nil {
+		log.Error().Str("branch", targetBranch.Name).Msg("❌ Failed to patch target applications")
+		return nil, nil, convertAppSetsToAppsDuration, err
+	}
+
+	// DEBUG WRITE APPLICATIONS TO FILES ------------------------------------------------------
 
 	if debug {
 		appTempFolder := fmt.Sprintf("%s/apps", tempFolder)
@@ -130,15 +96,22 @@ func processAppSets(
 			log.Error().Msgf("❌ Failed to create temp folder: %s", appTempFolder)
 		}
 
-		for _, app := range apps {
+		for _, app := range baseAppsPatched {
 			if _, err := app.WriteToFolder(appTempFolder); err != nil {
-				log.Error().Err(err).Str("branch", branch.Name).Str(app.Kind.ShortName(), app.GetLongName()).Msgf("❌ Failed to write Application to file")
+				log.Error().Err(err).Str("branch", baseBranch.Name).Str(app.Kind.ShortName(), app.GetLongName()).Msgf("❌ Failed to write Application to file")
+				break
+			}
+		}
+
+		for _, app := range targetAppsPatched {
+			if _, err := app.WriteToFolder(appTempFolder); err != nil {
+				log.Error().Err(err).Str("branch", targetBranch.Name).Str(app.Kind.ShortName(), app.GetLongName()).Msgf("❌ Failed to write Application to file")
 				break
 			}
 		}
 	}
 
-	return apps, nil
+	return baseAppsPatched, targetAppsPatched, convertAppSetsToAppsDuration, nil
 }
 
 func convertAppSetsToApps(
@@ -147,7 +120,14 @@ func convertAppSetsToApps(
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
-) ([]ArgoResource, error) {
+) ([]ArgoResource, time.Duration, error) {
+	startTime := time.Now()
+
+	if err := utils.CreateFolder(tempFolder, true); err != nil {
+		log.Error().Msgf("❌ Failed to create temp folder: %s", tempFolder)
+		return nil, time.Since(startTime), err
+	}
+
 	var appsNew []ArgoResource
 	appSetCounter := 0
 	generatedAppsCounter := 0
@@ -156,7 +136,7 @@ func convertAppSetsToApps(
 
 	if debug {
 		if err := argocd.EnsureArgoCdIsReady(); err != nil {
-			return nil, fmt.Errorf("failed to wait for deployments to be ready: %w", err)
+			return nil, time.Since(startTime), fmt.Errorf("failed to wait for deployments to be ready: %w", err)
 		}
 	}
 
@@ -181,7 +161,7 @@ func convertAppSetsToApps(
 		output, err := argocd.AppsetGenerateWithRetry(randomFileName, retryCount)
 		if err != nil {
 			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
-			return nil, err
+			return nil, time.Since(startTime), err
 		}
 
 		// check if output is empty / null
@@ -257,12 +237,12 @@ func convertAppSetsToApps(
 
 	if appSetCounter > 0 {
 		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Generated %d applications from %d ApplicationSets for branch: %s",
-			generatedAppsCounter, appSetCounter, branch.Name,
+			"🤖 Generated %d applications from %d ApplicationSets",
+			generatedAppsCounter, appSetCounter,
 		)
 	} else {
-		log.Info().Msgf("🤖 No ApplicationSets found for branch: %s", branch.Name)
+		log.Info().Str("branch", branch.Name).Msg("🤖 No ApplicationSets found")
 	}
 
-	return appsNew, nil
+	return appsNew, time.Since(startTime), nil
 }

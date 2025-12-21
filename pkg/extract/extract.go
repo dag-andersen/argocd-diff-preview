@@ -212,6 +212,7 @@ func getResourcesFromApps(
 		return nil, nil, firstError
 	}
 
+	log.Info().Msgf("🎉 Rendered all %d applications", renderedApps)
 	// Wait for all goroutines to complete (including deletions)
 	log.Info().Msg("🧼 Waiting for all application deletions to complete...")
 	wg.Wait()

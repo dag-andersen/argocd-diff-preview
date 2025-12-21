@@ -16,8 +16,9 @@ func patchApplications(
 	repo string,
 	redirectRevisions []string,
 ) ([]ArgoResource, error) {
-	var patchedApps []ArgoResource
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(applications))
 
+	var patchedApps []ArgoResource
 	for _, app := range applications {
 		patchedApp, err := patchApplication(
 			argocdNamespace,
@@ -31,6 +32,8 @@ func patchApplications(
 		}
 		patchedApps = append(patchedApps, *patchedApp)
 	}
+
+	log.Debug().Str("branch", branch.Name).Msgf("Patched %d Application[Sets]", len(patchedApps))
 
 	return patchedApps, nil
 }

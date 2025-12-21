@@ -77,10 +77,26 @@ func GetApplicationsForBranches(
 	repo string,
 	redirectRevisions []string,
 ) ([]ArgoResource, []ArgoResource, error) {
-	baseApps, err := getApplications(
+
+	// GET APPLICATIONS FOR BOTH BRANCHES ------------------------------------------------------
+	baseApps, err := getApplications(baseBranch, filterOptions.FileRegex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	targetApps, err := getApplications(targetBranch, filterOptions.FileRegex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// FILTER APPLICATIONS ------------------------------------------------------
+	baseAppsSelected, targetAppsSelected := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+	// PATCH APPLICATIONS ------------------------------------------------------
+	baseAppsPatched, err := patchApplications(
 		argocdNamespace,
+		baseAppsSelected,
 		baseBranch,
-		filterOptions,
 		repo,
 		redirectRevisions,
 	)
@@ -88,10 +104,10 @@ func GetApplicationsForBranches(
 		return nil, nil, err
 	}
 
-	targetApps, err := getApplications(
+	targetAppsPatched, err := patchApplications(
 		argocdNamespace,
+		targetAppsSelected,
 		targetBranch,
-		filterOptions,
 		repo,
 		redirectRevisions,
 	)
@@ -99,53 +115,23 @@ func GetApplicationsForBranches(
 		return nil, nil, err
 	}
 
-	return baseApps, targetApps, nil
+	return baseAppsPatched, targetAppsPatched, nil
 }
 
 // getApplications gets applications for a single branch
 func getApplications(
-	argocdNamespace string,
 	branch *git.Branch,
-	filterOptions FilterOptions,
-	repo string,
-	redirectRevisions []string,
+	fileRegex *string,
 ) ([]ArgoResource, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
 
-	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), filterOptions.FileRegex)
+	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), fileRegex)
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
 
 	k8sResources := fileparsing.ParseYaml(branch.FolderName(), yamlFiles, branch.Type())
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d k8sResources", len(k8sResources))
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d Kubernetes Resources", len(k8sResources))
 
 	applications := FromResourceToApplication(k8sResources)
-
-	if len(applications) == 0 {
-		return []ArgoResource{}, nil
-	}
-
-	// filter applications
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Application[Sets]", len(applications))
-	applications = FilterAllWithLogging(applications, filterOptions, branch)
-
-	if len(applications) == 0 {
-		return []ArgoResource{}, nil
-	}
-
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(applications))
-
-	applications, err := patchApplications(
-		argocdNamespace,
-		applications,
-		branch,
-		repo,
-		redirectRevisions,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Debug().Str("branch", branch.Name).Msgf("Patched %d Application[Sets]", len(applications))
-
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d Argo CD Applications or ApplicationSets", len(applications))
 	return applications, nil
 }

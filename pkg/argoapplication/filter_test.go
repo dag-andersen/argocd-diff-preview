@@ -3,6 +3,7 @@ package argoapplication
 import (
 	"testing"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -1059,6 +1060,612 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 			assert.Equal(t, ttc.changeExpected, got)
 		})
 	}
+}
+
+func TestFilterApps(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	baseBranch := git.NewBranch("main", git.Base)
+	targetBranch := git.NewBranch("feature", git.Target)
+
+	// Helper to create an ArgoResource from YAML
+	createApp := func(name, fileName, yamlStr string, branch git.BranchType) ArgoResource {
+		var node unstructured.Unstructured
+		if err := yaml.Unmarshal([]byte(yamlStr), &node); err != nil {
+			t.Fatalf("Error unmarshalling YAML: %v", err)
+		}
+		return ArgoResource{
+			Yaml:     &node,
+			Kind:     Application,
+			Id:       name,
+			Name:     name,
+			FileName: fileName,
+			Branch:   branch,
+		}
+	}
+
+	t.Run("no filters - all apps selected", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Target),
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, FilterOptions{}, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("ignore annotation filters out app", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd-diff-preview/ignore: "true"`, git.Base),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd-diff-preview/ignore: "true"`, git.Target),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2`, git.Target),
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, FilterOptions{}, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+		assert.Equal(t, "app2", baseResult[0].Name)
+		assert.Equal(t, "app2", targetResult[0].Name)
+	})
+
+	t.Run("ignore annotation only in one branch - app still excluded", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd-diff-preview/ignore: "true"`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Target), // No ignore annotation in target
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, FilterOptions{}, baseBranch, targetBranch)
+
+		// app1 is selected in target (no ignore), so both branches should include it
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("label selector filters apps", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod`, git.Base),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  labels:
+    env: dev`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod`, git.Target),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  labels:
+    env: dev`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+		assert.Equal(t, "app1", baseResult[0].Name)
+		assert.Equal(t, "app1", targetResult[0].Name)
+	})
+
+	t.Run("watch pattern filters apps", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd-diff-preview/watch-pattern: 'backend/.*'`, git.Base),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  annotations:
+    argocd-diff-preview/watch-pattern: 'frontend/.*'`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd-diff-preview/watch-pattern: 'backend/.*'`, git.Target),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  annotations:
+    argocd-diff-preview/watch-pattern: 'frontend/.*'`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			FilesChanged: []string{"backend/deployment.yaml"},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+		assert.Equal(t, "app1", baseResult[0].Name)
+		assert.Equal(t, "app1", targetResult[0].Name)
+	})
+
+	t.Run("app selected in target but not base - both included", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: dev`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod`, git.Target), // Changed to prod in target
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// app1 is selected in target (has env=prod), so both should be included
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("app selected in base but not target - both included", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: dev`, git.Target), // Changed to dev in target
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// app1 is selected in base (has env=prod), so both should be included
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("app not selected in either branch - excluded", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: dev`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: staging`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// Neither has env=prod, so both should be empty
+		assert.Len(t, baseResult, 0)
+		assert.Len(t, targetResult, 0)
+	})
+
+	t.Run("new app only in target - included", func(t *testing.T) {
+		baseApps := []ArgoResource{}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Target),
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, FilterOptions{}, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 0)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("deleted app only in base - included", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Base),
+		}
+		targetApps := []ArgoResource{}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, FilterOptions{}, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 0)
+	})
+
+	t.Run("duplicate apps with same key - all included when one is selected", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod`, git.Base),
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: dev`, git.Base), // Same key but different labels
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod`, git.Target),
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: dev`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// Both apps share the same key, and one matches env=prod, so both should be included
+		assert.Len(t, baseResult, 2)
+		assert.Len(t, targetResult, 2)
+	})
+
+	t.Run("combined ignore annotation and selector", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod
+  annotations:
+    argocd-diff-preview/ignore: "true"`, git.Base),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  labels:
+    env: prod`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod
+  annotations:
+    argocd-diff-preview/ignore: "true"`, git.Target),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  labels:
+    env: prod`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// app1 is ignored despite matching selector, app2 should be included
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+		assert.Equal(t, "app2", baseResult[0].Name)
+	})
+
+	t.Run("combined selector and watch pattern", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod
+  annotations:
+    argocd-diff-preview/watch-pattern: 'backend/.*'`, git.Base),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  labels:
+    env: prod
+  annotations:
+    argocd-diff-preview/watch-pattern: 'frontend/.*'`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  labels:
+    env: prod
+  annotations:
+    argocd-diff-preview/watch-pattern: 'backend/.*'`, git.Target),
+			createApp("app2", "app2.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  labels:
+    env: prod
+  annotations:
+    argocd-diff-preview/watch-pattern: 'frontend/.*'`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			Selector: []selector.Selector{
+				{Key: "env", Value: "prod", Operator: selector.Eq},
+			},
+			FilesChanged: []string{"backend/deployment.yaml"},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// Both match selector, but only app1 matches watch pattern
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+		assert.Equal(t, "app1", baseResult[0].Name)
+	})
+
+	t.Run("manifest-generate-paths annotation", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+spec:
+  source:
+    path: apps/backend`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+spec:
+  source:
+    path: apps/backend`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			FilesChanged: []string{"apps/backend/deployment.yaml"},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("app file itself changed", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "apps/app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Base),
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "apps/app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			FilesChanged: []string{"apps/app1.yaml"},
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		// App file itself is in files changed, so it should be selected
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("watchIfNoWatchPatternFound true", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Base), // No watch pattern
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			FilesChanged:               []string{"some/file.yaml"},
+			WatchIfNoWatchPatternFound: true,
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 1)
+		assert.Len(t, targetResult, 1)
+	})
+
+	t.Run("watchIfNoWatchPatternFound false", func(t *testing.T) {
+		baseApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Base), // No watch pattern
+		}
+		targetApps := []ArgoResource{
+			createApp("app1", "app1.yaml", `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1`, git.Target),
+		}
+
+		filterOptions := FilterOptions{
+			FilesChanged:               []string{"some/file.yaml"},
+			WatchIfNoWatchPatternFound: false,
+		}
+
+		baseResult, targetResult := FilterApps(baseApps, targetApps, filterOptions, baseBranch, targetBranch)
+
+		assert.Len(t, baseResult, 0)
+		assert.Len(t, targetResult, 0)
+	})
 }
 
 func getYamlApp(t *testing.T, annotation string, sourcePath string) *unstructured.Unstructured {
