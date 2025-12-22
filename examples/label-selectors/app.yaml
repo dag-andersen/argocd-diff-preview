@@ -4,7 +4,7 @@ metadata:
   name: label-selectors-example
   namespace: argocd
   labels:
-    team: my-team
+    team: your-team
 spec:
   project: default
   destination:
