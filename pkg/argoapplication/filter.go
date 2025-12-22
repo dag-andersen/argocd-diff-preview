@@ -28,7 +28,12 @@ type FilterOptions struct {
 	WatchIfNoWatchPatternFound bool
 }
 
-func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) []ArgoResource {
+type ArgoSelection struct {
+	SelectedApps []ArgoResource
+	SkippedApps  []ArgoResource
+}
+
+func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) *ArgoSelection {
 	// Log selector and files changed info
 	switch {
 	case len(filterOptions.Selector) > 0 && len(filterOptions.FilesChanged) > 0:
@@ -60,17 +65,17 @@ func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, bran
 	numberOfAppsBeforeFiltering := len(apps)
 
 	// Filter applications
-	filteredApps := FilterAll(apps, filterOptions)
+	selection := FilterAll(apps, filterOptions)
 
 	// Log filtering results
-	if numberOfAppsBeforeFiltering != len(filteredApps) {
+	if numberOfAppsBeforeFiltering != len(selection.SelectedApps) {
 		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets] before filtering",
 			numberOfAppsBeforeFiltering,
 		)
 		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets] after filtering",
-			len(filteredApps),
+			len(selection.SelectedApps),
 		)
 	} else {
 		log.Info().Str("branch", branch.Name).Msgf(
@@ -79,20 +84,26 @@ func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, bran
 		)
 	}
 
-	return filteredApps
+	return selection
 }
 
 func FilterAll(
 	apps []ArgoResource,
 	filterOptions FilterOptions,
-) []ArgoResource {
-	var filteredApps []ArgoResource
+) *ArgoSelection {
+	var selectedApps []ArgoResource
+	var skippedApps []ArgoResource
 	for _, app := range apps {
 		if app.Filter(filterOptions) {
-			filteredApps = append(filteredApps, app)
+			selectedApps = append(selectedApps, app)
+		} else {
+			skippedApps = append(skippedApps, app)
 		}
 	}
-	return filteredApps
+	return &ArgoSelection{
+		SelectedApps: selectedApps,
+		SkippedApps:  skippedApps,
+	}
 }
 
 // Filter checks if the application matches the given selectors and watches the given files

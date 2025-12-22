@@ -16,8 +16,8 @@ import (
 
 func ConvertAppSetsToAppsInBothBranches(
 	argocd *argocd.ArgoCDInstallation,
-	baseApps []ArgoResource,
-	targetApps []ArgoResource,
+	baseApps *ArgoSelection,
+	targetApps *ArgoSelection,
 	baseBranch *git.Branch,
 	targetBranch *git.Branch,
 	repo string,
@@ -25,7 +25,7 @@ func ConvertAppSetsToAppsInBothBranches(
 	redirectRevisions []string,
 	debug bool,
 	filterOptions FilterOptions,
-) ([]ArgoResource, []ArgoResource, time.Duration, error) {
+) (*ArgoSelection, *ArgoSelection, time.Duration, error) {
 	startTime := time.Now()
 	defer func() {
 		log.Info().Msgf("🤖 Converting ApplicationSets to Applications in both branches took %s", time.Since(startTime))
@@ -72,14 +72,14 @@ func ConvertAppSetsToAppsInBothBranches(
 
 func processAppSets(
 	argocd *argocd.ArgoCDInstallation,
-	appSets []ArgoResource,
+	appSets *ArgoSelection,
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
 	filterOptions FilterOptions,
 	repo string,
 	redirectRevisions []string,
-) ([]ArgoResource, error) {
+) (*ArgoSelection, error) {
 
 	appSetTempFolder := fmt.Sprintf("%s/app-sets", tempFolder)
 	if err := utils.CreateFolder(appSetTempFolder, true); err != nil {
@@ -89,7 +89,7 @@ func processAppSets(
 
 	apps, err := convertAppSetsToApps(
 		argocd,
-		appSets,
+		appSets.SelectedApps,
 		branch,
 		appSetTempFolder,
 		debug,
@@ -100,21 +100,24 @@ func processAppSets(
 	}
 
 	if len(apps) == 0 {
-		return apps, nil
+		return &ArgoSelection{
+			SelectedApps: apps,
+			SkippedApps:  appSets.SkippedApps,
+		}, nil
 	}
 
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(apps))
-	apps = FilterAll(apps, filterOptions)
+	appSelection := FilterAll(apps, filterOptions)
 
-	if len(apps) == 0 {
+	if len(appSelection.SelectedApps) == 0 {
 		log.Info().Str("branch", branch.Name).Msg("🤖 No applications left after filtering")
-		return apps, nil
+		return appSelection, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(apps))
-	apps, err = patchApplications(
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(appSelection.SelectedApps))
+	patchedApps, err := patchApplications(
 		argocd.Namespace,
-		apps,
+		appSelection.SelectedApps,
 		branch,
 		repo,
 		redirectRevisions,
@@ -130,7 +133,7 @@ func processAppSets(
 			log.Error().Msgf("❌ Failed to create temp folder: %s", appTempFolder)
 		}
 
-		for _, app := range apps {
+		for _, app := range patchedApps {
 			if _, err := app.WriteToFolder(appTempFolder); err != nil {
 				log.Error().Err(err).Str("branch", branch.Name).Str(app.Kind.ShortName(), app.GetLongName()).Msgf("❌ Failed to write Application to file")
 				break
@@ -138,7 +141,10 @@ func processAppSets(
 		}
 	}
 
-	return apps, nil
+	return &ArgoSelection{
+		SelectedApps: patchedApps,
+		SkippedApps:  append(appSelection.SkippedApps, appSets.SkippedApps...),
+	}, nil
 }
 
 func convertAppSetsToApps(

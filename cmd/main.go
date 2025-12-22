@@ -106,18 +106,18 @@ func run(opts *Options) error {
 	// If dry-run is enabled, show which applications would be processed and exit
 	if opts.DryRun {
 		log.Info().Msg("💨 This is a dry run. The following application[sets] would be processed:")
-		if len(baseApps) > 0 {
+		if len(baseApps.SelectedApps) > 0 {
 			log.Info().Msgf("👇 Base Branch ('%s'):", baseBranch.Name)
-			for _, app := range baseApps {
+			for _, app := range baseApps.SelectedApps {
 				log.Info().Msgf("  - %s: %s (%s)", app.Kind.ShortName(), app.Name, app.FileName)
 			}
 		} else {
 			log.Info().Msgf("🤷 No applications selected for the base branch ('%s').", baseBranch.Name)
 		}
 
-		if len(targetApps) > 0 {
+		if len(targetApps.SelectedApps) > 0 {
 			log.Info().Msgf("👇 Target Branch ('%s'):", targetBranch.Name)
-			for _, app := range targetApps {
+			for _, app := range targetApps.SelectedApps {
 				log.Info().Msgf("  - %s: %s (%s)", app.Kind.ShortName(), app.Name, app.FileName)
 			}
 		} else {
@@ -129,8 +129,8 @@ func run(opts *Options) error {
 	}
 
 	// Return if no applications are found
-	foundBaseApps := len(baseApps) > 0
-	foundTargetApps := len(targetApps) > 0
+	foundBaseApps := len(baseApps.SelectedApps) > 0
+	foundTargetApps := len(targetApps.SelectedApps) > 0
 	if !foundBaseApps && !foundTargetApps {
 		log.Info().Msg("👀 Found no applications to process in either branch")
 
@@ -241,8 +241,8 @@ func run(opts *Options) error {
 	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
 
 	// Return if no applications are found
-	foundBaseApps = len(baseApps) > 0
-	foundTargetApps = len(targetApps) > 0
+	foundBaseApps = len(baseApps.SelectedApps) > 0
+	foundTargetApps = len(targetApps.SelectedApps) > 0
 	if !foundBaseApps && !foundTargetApps {
 		log.Info().Msg("👀 Found no applications to render")
 
@@ -261,8 +261,8 @@ func run(opts *Options) error {
 	}
 
 	// enure unique ids
-	baseApps = argoapplication.UniqueIds(baseApps, baseBranch)
-	targetApps = argoapplication.UniqueIds(targetApps, targetBranch)
+	baseApps.SelectedApps = argoapplication.UniqueIds(baseApps.SelectedApps, baseBranch)
+	targetApps.SelectedApps = argoapplication.UniqueIds(targetApps.SelectedApps, targetBranch)
 
 	if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
 		log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
@@ -270,16 +270,16 @@ func run(opts *Options) error {
 	}
 
 	// Advice the user to limit the Application Selection
-	if !searchIsLimited && (len(baseApps) > 50 || len(targetApps) > 50) {
-		log.Warn().Msgf("💡 You are rendering %d Applications. You might want to limit the Application rendered on each run.", len(baseApps)+len(targetApps))
+	if !searchIsLimited && (len(baseApps.SelectedApps) > 50 || len(targetApps.SelectedApps) > 50) {
+		log.Warn().Msgf("💡 You are rendering %d Applications. You might want to limit the Application rendered on each run.", len(baseApps.SelectedApps)+len(targetApps.SelectedApps))
 		log.Warn().Msg("💡 Check out the documentation under section `Application Selection` for more information.")
 	}
 
 	// For debugging purposes, we can still write the manifests to files
 	if opts.Debug {
 		// Generate application manifests as strings
-		baseManifest := argoapplication.ApplicationsToString(baseApps)
-		targetManifest := argoapplication.ApplicationsToString(targetApps)
+		baseManifest := argoapplication.ApplicationsToString(baseApps.SelectedApps)
+		targetManifest := argoapplication.ApplicationsToString(targetApps.SelectedApps)
 		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", tempFolder, baseBranch.FolderName()), baseManifest); err != nil {
 			log.Error().Msg("❌ Failed to write base apps")
 			return err
@@ -295,8 +295,8 @@ func run(opts *Options) error {
 	baseManifests, targetManifests, extractDuration, err := extract.GetResourcesFromBothBranches(
 		argocd,
 		opts.Timeout,
-		baseApps,
-		targetApps,
+		baseApps.SelectedApps,
+		targetApps.SelectedApps,
 		uniqueID,
 		deleteAfterProcessing,
 	)
@@ -346,7 +346,7 @@ func run(opts *Options) error {
 		ArgoCDInstallationDuration: argocdInstallationDuration,
 		ClusterCreationDuration:    clusterCreationDuration,
 		FullDuration:               time.Since(startTime),
-		ApplicationCount:           len(baseApps) + len(targetApps),
+		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
 	// Generate diff between base and target branches

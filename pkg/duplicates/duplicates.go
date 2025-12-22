@@ -9,11 +9,11 @@ import (
 )
 
 // RemoveDuplicates finds and filters out duplicate applications between base and target branches
-func RemoveDuplicates(baseApps, targetApps []argoapplication.ArgoResource) ([]argoapplication.ArgoResource, []argoapplication.ArgoResource) {
+func RemoveDuplicates(baseApps, targetApps *argoapplication.ArgoSelection) (*argoapplication.ArgoSelection, *argoapplication.ArgoSelection) {
 	// Find duplicates
 	var duplicateYaml []*unstructured.Unstructured
-	for _, baseApp := range baseApps {
-		for _, targetApp := range targetApps {
+	for _, baseApp := range baseApps.SelectedApps {
+		for _, targetApp := range targetApps.SelectedApps {
 			if baseApp.Id == targetApp.Id && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
 				log.Debug().Str(baseApp.Kind.ShortName(), baseApp.Name).Msg("Skipping application because it has not changed")
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
@@ -27,8 +27,8 @@ func RemoveDuplicates(baseApps, targetApps []argoapplication.ArgoResource) ([]ar
 	}
 
 	// Remove duplicates and log stats
-	baseAppsBefore := len(baseApps)
-	targetAppsBefore := len(targetApps)
+	baseAppsBefore := len(baseApps.SelectedApps)
+	targetAppsBefore := len(targetApps.SelectedApps)
 
 	// Actually filter out the duplicates using the helper function
 	baseApps = filterDuplicates(baseApps, duplicateYaml)
@@ -36,29 +36,29 @@ func RemoveDuplicates(baseApps, targetApps []argoapplication.ArgoResource) ([]ar
 
 	log.Info().Str("branch", string(git.Base)).Msgf(
 		"🤖 Skipped %d Application[Sets] because they have not changed after patching",
-		baseAppsBefore-len(baseApps),
+		baseAppsBefore-len(baseApps.SelectedApps),
 	)
 
 	log.Info().Str("branch", string(git.Target)).Msgf(
 		"🤖 Skipped %d Application[Sets] because they have not changed after patching",
-		targetAppsBefore-len(targetApps),
+		targetAppsBefore-len(targetApps.SelectedApps),
 	)
 
 	log.Info().Str("branch", string(git.Base)).Msgf(
 		"🤖 Using the remaining %d Application[Sets]",
-		len(baseApps),
+		len(baseApps.SelectedApps),
 	)
 
 	log.Info().Str("branch", string(git.Target)).Msgf(
 		"🤖 Using the remaining %d Application[Sets]",
-		len(targetApps),
+		len(targetApps.SelectedApps),
 	)
 
 	return baseApps, targetApps
 }
 
-func filterDuplicates(apps []argoapplication.ArgoResource, duplicates []*unstructured.Unstructured) []argoapplication.ArgoResource {
-	log.Debug().Msgf("filtering %d Applications for duplicates", len(apps))
+func filterDuplicates(apps *argoapplication.ArgoSelection, duplicates []*unstructured.Unstructured) *argoapplication.ArgoSelection {
+	log.Debug().Msgf("filtering %d Applications for duplicates", len(apps.SelectedApps))
 
 	// Create a set of duplicate YAML strings for O(1) lookup
 	duplicateSet := make(map[string]bool)
@@ -71,20 +71,26 @@ func filterDuplicates(apps []argoapplication.ArgoResource, duplicates []*unstruc
 		duplicateSet[string(dupStr)] = true
 	}
 
-	var filtered []argoapplication.ArgoResource
-	for _, app := range apps {
+	var selectedApps []argoapplication.ArgoResource
+	skippedApps := apps.SkippedApps
+	for _, app := range apps.SelectedApps {
 		appStr, err := yaml.Marshal(app.Yaml)
 		if err != nil {
 			log.Debug().Err(err).Str("app", app.Name).Msg("failed to marshal app YAML, including in results")
-			filtered = append(filtered, app)
+			selectedApps = append(selectedApps, app)
 			continue
 		}
 
 		if !duplicateSet[string(appStr)] {
-			filtered = append(filtered, app)
+			selectedApps = append(selectedApps, app)
+		} else {
+			skippedApps = append(skippedApps, app)
 		}
 	}
 
-	log.Debug().Msgf("removed %d duplicates", len(apps)-len(filtered))
-	return filtered
+	log.Debug().Msgf("removed %d duplicates", len(apps.SelectedApps)-len(selectedApps))
+	return &argoapplication.ArgoSelection{
+		SelectedApps: selectedApps,
+		SkippedApps:  skippedApps,
+	}
 }
