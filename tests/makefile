@@ -49,8 +49,8 @@ run-single-test-go: clean pull-base pull-target
 		--auto-detect-files-changed="$(auto_detect_files_changed)" \
 		--debug
 	mkdir -p ./$(target_branch)$(suffix)/
-	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
-	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
+	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
+	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html
 ifeq ($(update_expected),true)
 	mv ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	mv ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
@@ -96,8 +96,8 @@ run-single-test-docker: clean pull-base pull-target
 		-e KEEP_CLUSTER_ALIVE=true \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
-	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
-	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
+	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
+	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html
 ifeq ($(update_expected),true)
 	mv ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	mv ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
@@ -130,6 +130,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target base_branch=integration-test/branch-9/base suffix="-2" files_changed="examples/external-chart/nginx.yaml" max_diff_length=900
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-10/target base_branch=integration-test/branch-10/base suffix="-1" files_changed="examples/ignore-differences/app.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-11/target base_branch=integration-test/branch-11/base suffix="-1"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-13/target base_branch=integration-test/branch-13/base suffix="-1"
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker

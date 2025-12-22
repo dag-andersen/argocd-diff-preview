@@ -176,4 +176,4 @@ Modified (2):
 </details>
 
 _Stats_:
-[], [], [], [], []
+[Applications: 24], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

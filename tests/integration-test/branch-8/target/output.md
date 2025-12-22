@@ -63,4 +63,4 @@ Modified (1):
 </details>
 
 _Stats_:
-[], [], [], [], []
+[Applications: 3], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

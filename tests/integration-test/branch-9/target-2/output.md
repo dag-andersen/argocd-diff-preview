@@ -34,4 +34,4 @@ Deleted (1):
 ⚠️⚠️⚠️ Diff exceeds max length of 900 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
-[], [], [], [], []
+[Applications: 1], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
