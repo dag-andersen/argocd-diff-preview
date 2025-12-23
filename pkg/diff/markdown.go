@@ -83,12 +83,15 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 		selection_changes = fmt.Sprintf("\n%s\n", s)
 	}
 	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
-	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())
+
+	// the InfoBox has a dynamic size. This is a problem for the integration tests, because the output is not deterministic.
+	// By adding a buffer, we ensure availableSpaceForDetailedDiff has a fixed size
+	infoBoxBufferSize := 100
 
 	warningMessage := fmt.Sprintf("⚠️⚠️⚠️ Diff exceeds max length of %d characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
 
-	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage)
+	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize
 
 	var sectionsDiff strings.Builder
 
@@ -115,6 +118,7 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 		sectionsDiff.WriteString("No changes found")
 	}
 
+	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())
 	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
 
 	output = strings.TrimSpace(output) + "\n"
