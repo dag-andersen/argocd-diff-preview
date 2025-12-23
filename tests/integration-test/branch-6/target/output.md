@@ -108,46 +108,6 @@ Modified (7):
 
 ```diff
 @@ Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml) @@
- apiVersion: v1
- kind: Service
- metadata:
-   labels:
--    app.kubernetes.io/instance: my-app
-+    app.kubernetes.io/instance: my-super-app
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
-   name: super-app-name
-   namespace: default
- spec:
-   ports:
-   - name: http
-     port: 80
-     protocol: TCP
-     targetPort: http
-   selector:
--    app.kubernetes.io/instance: my-app
-+    app.kubernetes.io/instance: my-super-app
-     app.kubernetes.io/name: myApp
-   type: ClusterIP
- 
- ---
- apiVersion: v1
- automountServiceAccountToken: true
- kind: ServiceAccount
- metadata:
-   labels:
--    app.kubernetes.io/instance: my-app
-+    app.kubernetes.io/instance: my-super-app
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
-   name: super-app-name
-   namespace: default
- 
- ---
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -182,6 +142,50 @@ Modified (7):
          imagePullPolicy: IfNotPresent
          livenessProbe:
            httpGet:
+@@ skipped 10 lines (34 -> 43) @@
+             port: http
+         resources: {}
+         securityContext: {}
+       securityContext: {}
+       serviceAccountName: super-app-name
+ ---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   labels:
+-    app.kubernetes.io/instance: my-app
++    app.kubernetes.io/instance: my-super-app
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+   name: super-app-name
+   namespace: default
+ spec:
+   ports:
+   - name: http
+     port: 80
+     protocol: TCP
+     targetPort: http
+   selector:
+-    app.kubernetes.io/instance: my-app
++    app.kubernetes.io/instance: my-super-app
+     app.kubernetes.io/name: myApp
+   type: ClusterIP
+ ---
+ apiVersion: v1
+ automountServiceAccountToken: true
+ kind: ServiceAccount
+ metadata:
+   labels:
+-    app.kubernetes.io/instance: my-app
++    app.kubernetes.io/instance: my-super-app
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+   name: super-app-name
+   namespace: default
 ```
 
 </details>
@@ -204,6 +208,16 @@ Modified (7):
            requests:
 -            memory: 128Mi
 +            memory: 64Mi
+ ---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   labels:
+     app: myapp
+   name: staging-myapp
+   namespace: default
+ spec:
+   ports:
 ```
 
 </details>

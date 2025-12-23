@@ -12,12 +12,16 @@ import (
 
 // Patterns that should always be ignored
 var ignorePatterns = []string{
-	"  app.kubernetes.io/version: ",
-	"  helm.sh/chart: ",
-	"  checksum/config: ",
-	"  checksum/rules: ",
-	"  checksum/certs: ",
-	"  caBundle: ",
+	"app.kubernetes.io/version: ",
+	"helm.sh/chart: ",
+	"checksum/config: ",
+	"checksum/rules: ",
+	"checksum/certs: ",
+	"checksum/cmd-params: ",
+	"checksum/cm: ",
+	"checksum/config-maps: ",
+	"checksum/secrets: ",
+	"caBundle: ",
 }
 
 // shouldIgnoreLine checks if a line should be ignored based on regex pattern
@@ -69,7 +73,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			// Ignore specific hardcoded lines.
 			if show && isChange {
 				for _, pattern := range ignorePatterns {
-					if strings.Contains(line, pattern) {
+					if strings.HasPrefix(strings.TrimLeft(line, " \t"), pattern) {
 						show = false
 						break
 					}

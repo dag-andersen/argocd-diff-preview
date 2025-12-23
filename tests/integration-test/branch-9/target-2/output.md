@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Deleted (1):
-- nginx-ingress (-490)
+- nginx-ingress (-480)
 ```
 
 <details>
@@ -14,18 +14,16 @@ Deleted (1):
 
 ```diff
 @@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@
--apiVersion: v1
--data:
--  allow-snippet-annotations: "false"
--kind: ConfigMap
+-apiVersion: admissionregistration.k8s.io/v1
+-kind: ValidatingWebhookConfiguration
 -metadata:
 -  labels:
--    app.kubernetes.io/component: controller
+-    app.kubernetes.io/component: admission-webhook
 -    app.kubernetes.io/instance: nginx-ingress
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: ingress-nginx
 -    app.kubernetes.io/part-of: ingress-nginx
--    app.kubernetes.io/version:
+-    app.kubernetes
 🚨 Diff is too long
 ```
 

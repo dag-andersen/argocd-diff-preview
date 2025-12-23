@@ -14,6 +14,41 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml) @@
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   labels:
+     app.kubernetes.io/instance: my-app-labels
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: experiment
+   namespace: default
+ spec:
+   replicas: 5
+   selector:
+     matchLabels:
+       app.kubernetes.io/instance: my-app-labels
+       app.kubernetes.io/name: myApp
+   template:
+     metadata:
+       labels:
+@@ skipped 15 lines (21 -> 35) @@
+         - containerPort: 80
+           name: http
+           protocol: TCP
+         readinessProbe:
+           httpGet:
+             path: /
+             port: http
+         resources: {}
+         securityContext: {}
+       securityContext: {}
+-      serviceAccountName: super-app-name
++      serviceAccountName: experiment
+ ---
  apiVersion: v1
  kind: Service
  metadata:
@@ -36,7 +71,6 @@ Modified (1):
      app.kubernetes.io/instance: my-app-labels
      app.kubernetes.io/name: myApp
    type: ClusterIP
- 
  ---
  apiVersion: v1
  automountServiceAccountToken: true
@@ -51,42 +85,6 @@ Modified (1):
 -  name: super-app-name
 +  name: experiment
    namespace: default
- 
- ---
- apiVersion: apps/v1
- kind: Deployment
- metadata:
-   labels:
-     app.kubernetes.io/instance: my-app-labels
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name
-+  name: experiment
-   namespace: default
- spec:
-   replicas: 5
-   selector:
-     matchLabels:
-       app.kubernetes.io/instance: my-app-labels
-       app.kubernetes.io/name: myApp
-   template:
-     metadata:
-       labels:
-@@ skipped 15 lines (60 -> 74) @@
-         - containerPort: 80
-           name: http
-           protocol: TCP
-         readinessProbe:
-           httpGet:
-             path: /
-             port: http
-         resources: {}
-         securityContext: {}
-       securityContext: {}
--      serviceAccountName: super-app-name
-+      serviceAccountName: experiment
 ```
 
 </details>

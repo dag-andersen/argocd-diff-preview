@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -402,6 +403,34 @@ func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) (diff.AppIn
 
 // convertToYamlString converts a list of ExtractedApp to a single YAML string
 func convertToYamlString(apps *extract.ExtractedApp) (string, error) {
+	// Sort by API version, then by kind, then by name, with CRDs always at the end
+	sort.SliceStable(apps.Manifest, func(i, j int) bool {
+		apiI := apps.Manifest[i].GetAPIVersion()
+		apiJ := apps.Manifest[j].GetAPIVersion()
+		kindI := apps.Manifest[i].GetKind()
+		kindJ := apps.Manifest[j].GetKind()
+		nameI := apps.Manifest[i].GetName()
+		nameJ := apps.Manifest[j].GetName()
+
+		// CRDs should always be at the end
+		isCRD_I := kindI == "CustomResourceDefinition"
+		isCRD_J := kindJ == "CustomResourceDefinition"
+
+		if isCRD_I != isCRD_J {
+			// If only one is a CRD, the non-CRD comes first
+			return !isCRD_I
+		}
+
+		// Sort by apiVersion first, then by kind, then by name
+		if apiI != apiJ {
+			return apiI < apiJ
+		}
+		if kindI != kindJ {
+			return kindI < kindJ
+		}
+		return nameI < nameJ
+	})
+
 	var manifestStrings []string
 	for _, manifest := range apps.Manifest {
 		manifestString, err := yaml.Marshal(manifest.Object)
@@ -410,5 +439,5 @@ func convertToYamlString(apps *extract.ExtractedApp) (string, error) {
 		}
 		manifestStrings = append(manifestStrings, string(manifestString))
 	}
-	return strings.Join(manifestStrings, "\n---\n"), nil
+	return strings.Join(manifestStrings, "---\n"), nil
 }
