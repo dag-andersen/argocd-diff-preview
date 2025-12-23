@@ -1260,7 +1260,7 @@ Modified (1):
                                specifications
                              items:
                                description: KustomizeImage represents a Kustomize image
-                                 definition in the format []<image_name>:<image_tag>
+                                 definition in the format [old_image_name=]<image_name>:<image_tag>
                                type: string
                              type: array
                            kubeVersion:
@@ -1357,7 +1357,7 @@ Modified (1):
                                  specifications
                                items:
                                  description: KustomizeImage represents a Kustomize
-                                   image definition in the format []<image_name>:<image_tag>
+                                   image definition in the format [old_image_name=]<image_name>:<image_tag>
                                  type: string
                                type: array
                              kubeVersion:
@@ -1454,7 +1454,7 @@ Modified (1):
                            specifications
                          items:
                            description: KustomizeImage represents a Kustomize image
-                             definition in the format []<image_name>:<image_tag>
+                             definition in the format [old_image_name=]<image_name>:<image_tag>
                            type: string
                          type: array
                        kubeVersion:
@@ -1559,7 +1559,7 @@ Modified (1):
 +                          from. The Path should never point to the root of the repo. If hydrateTo is set, this is just the path from which
 +                          hydrated manifests will be synced.
 +                        minLength: 1
-+                        pattern: ^.{2,}|[]$
++                        pattern: ^.{2,}|[^./]$
 +                        type: string
 +                      targetBranch:
 +                        description: |-
@@ -1642,4 +1642,4 @@ Modified (1):
 ⚠️⚠️⚠️ Diff exceeds max length of 65536 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag
 
 _Stats_:
-[], [], [], [], []
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
