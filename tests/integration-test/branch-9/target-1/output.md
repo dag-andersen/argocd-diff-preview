@@ -389,7 +389,7 @@ Deleted (9):
 -        resources: {}
 -        securityContext: {}
 -      securityContext: {}
--      serviceAcco
+-      serviceAcc
 🚨 Diff is too long
 ```
 

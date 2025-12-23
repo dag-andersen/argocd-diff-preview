@@ -6,7 +6,7 @@ This page describes **4 strategies** for controlling which applications are rend
 
 1. **Rendering only changed applications** - Automatically detect and render only applications affected by file changes
 2. **Ignoring individual applications** - Explicitly exclude specific applications from rendering
-3. **Label selectors** - Filter applications based on Kubernetes labels
+3. **Label selectors** - Select/filter applications based on Kubernetes labels
 4. **File path regex** - Target applications based on their file path location
 
 ---

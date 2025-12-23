@@ -79,7 +79,7 @@ func run(opts *Options) error {
 	// Check if users limited the Application Selection
 	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
 
-	filterOptions := argoapplication.FilterOptions{
+	appSelectionOptions := argoapplication.ApplicationSelectionOptions{
 		Selector:                   selectors,
 		FileRegex:                  fileRegex,
 		FilesChanged:               filesChanged,
@@ -92,7 +92,7 @@ func run(opts *Options) error {
 		opts.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
-		filterOptions,
+		appSelectionOptions,
 		opts.Repo,
 		redirectRevisions,
 	)
@@ -101,7 +101,7 @@ func run(opts *Options) error {
 		return err
 	}
 
-	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
+	baseApps, targetApps = duplicates.RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps)
 
 	// If dry-run is enabled, show which applications would be processed and exit
 	if opts.DryRun {
@@ -230,7 +230,7 @@ func run(opts *Options) error {
 		tempFolder,
 		redirectRevisions,
 		opts.Debug,
-		filterOptions,
+		appSelectionOptions,
 	)
 	if err != nil {
 		log.Error().Msgf("❌ Failed to generate apps from ApplicationSets")
@@ -238,7 +238,7 @@ func run(opts *Options) error {
 	}
 
 	// Check for duplicates again
-	baseApps, targetApps = duplicates.RemoveDuplicates(baseApps, targetApps)
+	baseApps, targetApps = duplicates.RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps)
 
 	// Return if no applications are found
 	foundBaseApps = len(baseApps.SelectedApps) > 0

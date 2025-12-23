@@ -73,14 +73,14 @@ func GetApplicationsForBranches(
 	argocdNamespace string,
 	baseBranch *git.Branch,
 	targetBranch *git.Branch,
-	filterOptions FilterOptions,
+	appSelectionOptions ApplicationSelectionOptions,
 	repo string,
 	redirectRevisions []string,
 ) (*ArgoSelection, *ArgoSelection, error) {
 	baseApps, err := getApplications(
 		argocdNamespace,
 		baseBranch,
-		filterOptions,
+		appSelectionOptions,
 		repo,
 		redirectRevisions,
 	)
@@ -91,7 +91,7 @@ func GetApplicationsForBranches(
 	targetApps, err := getApplications(
 		argocdNamespace,
 		targetBranch,
-		filterOptions,
+		appSelectionOptions,
 		repo,
 		redirectRevisions,
 	)
@@ -106,17 +106,17 @@ func GetApplicationsForBranches(
 func getApplications(
 	argocdNamespace string,
 	branch *git.Branch,
-	filterOptions FilterOptions,
+	appSelectionOptions ApplicationSelectionOptions,
 	repo string,
 	redirectRevisions []string,
 ) (*ArgoSelection, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
 
-	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), filterOptions.FileRegex)
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir %s", len(yamlFiles), branch.FolderName())
+	yamlFiles := fileparsing.GetYamlFiles(branch.FolderName(), appSelectionOptions.FileRegex)
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Found %d files in dir '%s'", len(yamlFiles), branch.FolderName())
 
 	k8sResources := fileparsing.ParseYaml(branch.FolderName(), yamlFiles, branch.Type())
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d k8sResources", len(k8sResources))
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d Kubernetes resources", len(k8sResources))
 
 	allApps := FromResourceToApplication(k8sResources)
 
@@ -129,19 +129,18 @@ func getApplications(
 		}, nil
 	}
 
-	// filter applications
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Application[Sets]", len(allApps))
-	filteredApps := FilterAllWithLogging(allApps, filterOptions, branch)
+	// selecting applications
+	appSelection := ApplicationSelectionWithLogging(allApps, appSelectionOptions, branch)
 
-	if len(filteredApps.SelectedApps) == 0 {
-		return filteredApps, nil
+	if len(appSelection.SelectedApps) == 0 {
+		return appSelection, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(filteredApps.SelectedApps))
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(appSelection.SelectedApps))
 
 	patchedApps, err := patchApplications(
 		argocdNamespace,
-		filteredApps.SelectedApps,
+		appSelection.SelectedApps,
 		branch,
 		repo,
 		redirectRevisions,
@@ -154,6 +153,6 @@ func getApplications(
 
 	return &ArgoSelection{
 		SelectedApps: patchedApps,
-		SkippedApps:  filteredApps.SkippedApps,
+		SkippedApps:  appSelection.SkippedApps,
 	}, nil
 }

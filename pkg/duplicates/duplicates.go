@@ -7,8 +7,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// RemoveDuplicates finds and filters out duplicate applications between base and target branches
-func RemoveDuplicates(baseApps, targetApps *argoapplication.ArgoSelection) (*argoapplication.ArgoSelection, *argoapplication.ArgoSelection) {
+// RemoveIdenticalCopiesBetweenBranches finds and filters out duplicate applications between base and target branches
+func RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps *argoapplication.ArgoSelection) (*argoapplication.ArgoSelection, *argoapplication.ArgoSelection) {
 	// Find duplicates
 	var duplicateYaml []*unstructured.Unstructured
 	for _, baseApp := range baseApps.SelectedApps {

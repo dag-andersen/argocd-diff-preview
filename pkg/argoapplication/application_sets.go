@@ -24,25 +24,20 @@ func ConvertAppSetsToAppsInBothBranches(
 	tempFolder string,
 	redirectRevisions []string,
 	debug bool,
-	filterOptions FilterOptions,
+	appSelectionOptions ApplicationSelectionOptions,
 ) (*ArgoSelection, *ArgoSelection, time.Duration, error) {
 	startTime := time.Now()
-	defer func() {
-		log.Info().Msgf("🤖 Converting ApplicationSets to Applications in both branches took %s", time.Since(startTime))
-	}()
 
-	log.Info().Msg("🤖 Converting ApplicationSets to Applications in both branches")
+	log.Info().Msg("🤖 Converting ApplicationSets to Applications for both branches")
 
 	baseTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Base)
-	targetTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Target)
-
 	baseApps, err := processAppSets(
 		argocd,
 		baseApps,
 		baseBranch,
 		baseTempFolder,
 		debug,
-		filterOptions,
+		appSelectionOptions,
 		repo,
 		redirectRevisions,
 	)
@@ -52,13 +47,14 @@ func ConvertAppSetsToAppsInBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
+	targetTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Target)
 	targetApps, err = processAppSets(
 		argocd,
 		targetApps,
 		targetBranch,
 		targetTempFolder,
 		debug,
-		filterOptions,
+		appSelectionOptions,
 		repo,
 		redirectRevisions,
 	)
@@ -76,7 +72,7 @@ func processAppSets(
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
-	filterOptions FilterOptions,
+	appSelectionOptions ApplicationSelectionOptions,
 	repo string,
 	redirectRevisions []string,
 ) (*ArgoSelection, error) {
@@ -87,7 +83,7 @@ func processAppSets(
 		return nil, err
 	}
 
-	apps, err := convertAppSetsToApps(
+	appsAfterAppSetConvertion, err := convertAppSetsToApps(
 		argocd,
 		appSets.SelectedApps,
 		branch,
@@ -99,22 +95,21 @@ func processAppSets(
 		return nil, err
 	}
 
-	if len(apps) == 0 {
+	if len(appsAfterAppSetConvertion) == 0 {
 		return &ArgoSelection{
-			SelectedApps: apps,
+			SelectedApps: appsAfterAppSetConvertion,
 			SkippedApps:  appSets.SkippedApps,
 		}, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(apps))
-	appSelection := FilterAll(apps, filterOptions)
+	appSelection := ApplicationSelection(appsAfterAppSetConvertion, appSelectionOptions)
 
 	if len(appSelection.SelectedApps) == 0 {
-		log.Info().Str("branch", branch.Name).Msg("🤖 No applications left after filtering")
+		log.Info().Str("branch", branch.Name).Msg("🤖 No application generated from ApplicationSets")
 		return appSelection, nil
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(appSelection.SelectedApps))
+	log.Info().Str("branch", branch.Name).Msg("🤖 Patching new Applications from ApplicationSets")
 	patchedApps, err := patchApplications(
 		argocd.Namespace,
 		appSelection.SelectedApps,
@@ -123,9 +118,11 @@ func processAppSets(
 		redirectRevisions,
 	)
 	if err != nil {
-		log.Error().Str("branch", branch.Name).Msgf("❌ Failed to patch Applications on branch: %s", branch.Name)
+		log.Error().Str("branch", branch.Name).Msg("❌ Failed to patch new Applications from ApplicationSets")
 		return nil, err
 	}
+
+	log.Debug().Str("branch", branch.Name).Msgf("Patched %d new Applications from ApplicationSets", len(patchedApps))
 
 	if debug {
 		appTempFolder := fmt.Sprintf("%s/apps", tempFolder)
@@ -263,11 +260,12 @@ func convertAppSetsToApps(
 
 	if appSetCounter > 0 {
 		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Generated %d applications from %d ApplicationSets for branch: %s",
-			generatedAppsCounter, appSetCounter, branch.Name,
+			"🤖 Generated %d applications from %d ApplicationSets",
+			generatedAppsCounter,
+			appSetCounter,
 		)
 	} else {
-		log.Info().Msgf("🤖 No ApplicationSets found for branch: %s", branch.Name)
+		log.Info().Str("branch", branch.Name).Msg("🤖 No ApplicationSets found for branch")
 	}
 
 	return appsNew, nil

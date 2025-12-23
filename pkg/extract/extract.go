@@ -119,7 +119,7 @@ func getResourcesFromApps(
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	startTime := time.Now()
 
-	log.Info().Msgf("🤖 Getting Applications (timeout in %d seconds)", timeout)
+	log.Info().Msgf("🤖 Getting Applications from cluster (timeout in %d seconds)", timeout)
 
 	// Process apps in parallel with a worker pool
 	results := make(chan struct {
