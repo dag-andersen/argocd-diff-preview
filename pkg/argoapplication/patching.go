@@ -59,10 +59,10 @@ func patchApplication(
 		return nil, fmt.Errorf("failed to set project to default: %w", err)
 	}
 
-	err = app.PointDestinationToInCluster()
+	err = app.SetDestinationServerToLocal()
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
-		return nil, fmt.Errorf("failed to point destination to in-cluster: %w", err)
+		return nil, fmt.Errorf("failed to set destination server to local: %w", err)
 	}
 
 	err = app.RemoveArgoCDFinalizers()
@@ -118,8 +118,8 @@ func (a *ArgoResource) SetProjectToDefault() error {
 	return nil
 }
 
-// PointDestinationToInCluster updates the destination to point to the in-cluster service
-func (a *ArgoResource) PointDestinationToInCluster() error {
+// SetDestinationServerToLocal updates the destination to point to the in-cluster service
+func (a *ArgoResource) SetDestinationServerToLocal() error {
 	if a.Yaml == nil {
 		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msg("Resource contains no YAML")
 		return nil
@@ -129,8 +129,6 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	switch a.Kind {
 	case Application:
 		destPath = []string{"spec", "destination"}
-	case ApplicationSet:
-		destPath = []string{"spec", "template", "spec", "destination"}
 	default:
 		return nil
 	}
@@ -144,8 +142,8 @@ func (a *ArgoResource) PointDestinationToInCluster() error {
 	}
 
 	// Update destination
-	destMap["name"] = "in-cluster"
-	delete(destMap, "server")
+	delete(destMap, "name")
+	destMap["server"] = "https://kubernetes.default.svc"
 
 	// Set it back
 	if err := unstructured.SetNestedMap(a.Yaml.Object, destMap, destPath...); err != nil {

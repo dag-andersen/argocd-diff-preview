@@ -38,4 +38,4 @@ Deleted (1):
 </details>
 
 _Stats_:
-[], [], [], [], []
+[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

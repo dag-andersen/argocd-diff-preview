@@ -11,6 +11,7 @@ max_diff_length := 65536
 ignore_invalid_watch_pattern := false
 watch_if_no_watch_pattern_found := false
 auto_detect_files_changed := false
+hide_deleted_app_diff := false
 update_expected ?= false
 
 pull-base:
@@ -32,6 +33,7 @@ run-single-test-go: clean pull-base pull-target
 		--base-branch "$(base_branch)" \
 		--target-branch "$(target_branch)" \
 		--repo $(github_org)/$(gitops_repo) \
+		--hide-deleted-app-diff="$(hide_deleted_app_diff)" \
 		--argocd-namespace "$(argocd_namespace)" \
 		--files-changed="$(files_changed)" \
 		--selector="$(selector)" \
@@ -49,8 +51,8 @@ run-single-test-go: clean pull-base pull-target
 		--auto-detect-files-changed="$(auto_detect_files_changed)" \
 		--debug
 	mkdir -p ./$(target_branch)$(suffix)/
-	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
-	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
+	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
+	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html
 ifeq ($(update_expected),true)
 	mv ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	mv ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
@@ -83,6 +85,7 @@ run-single-test-docker: clean pull-base pull-target
 		-e WATCH_IF_NO_WATCH_PATTERN_FOUND="$(watch_if_no_watch_pattern_found)" \
 		-e AUTO_DETECT_FILES_CHANGED="$(auto_detect_files_changed)" \
 		-e IGNORE_INVALID_WATCH_PATTERN="$(ignore_invalid_watch_pattern)" \
+		-e HIDE_DELETED_APP_DIFF="$(hide_deleted_app_diff)" \
 		-e ARGOCD_NAMESPACE="$(argocd_namespace)" \
 		-e ARGOCD_CHART_NAME="$(argocd_chart_name)" \
 		-e ARGOCD_CHART_URL="$(argocd_chart_url)" \
@@ -96,8 +99,8 @@ run-single-test-docker: clean pull-base pull-target
 		-e KEEP_CLUSTER_ALIVE=true \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
-	cat ./output/diff.md | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.md
-	cat ./output/diff.html | sed 's/\[[^][]*\]/[]/g' > ./output/diff-2.html
+	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
+	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html
 ifeq ($(update_expected),true)
 	mv ./output/diff-2.md ./$(target_branch)$(suffix)/output.md
 	mv ./output/diff-2.html ./$(target_branch)$(suffix)/output.html
@@ -111,6 +114,7 @@ endif
 run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-1" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-2" diff_ignore="image"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-3" hide_deleted_app_diff="true"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base title="integration-test/branch-4"
@@ -131,6 +135,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-10/target base_branch=integration-test/branch-10/base suffix="-1" files_changed="examples/ignore-differences/app.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-11/target base_branch=integration-test/branch-11/base suffix="-1"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-12/target base_branch=integration-test/branch-12/base suffix="-1" auto_detect_files_changed="true" diff_ignore="annotations"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-13/target base_branch=integration-test/branch-13/base suffix="-1"
 
 run-test-all-docker: docker-build
 	$(MAKE) run-test-all-with-docker

@@ -11,4 +11,4 @@ Added (1):
 No changes found
 
 _Stats_:
-[], [], [], [], []
+[Applications: 41], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
