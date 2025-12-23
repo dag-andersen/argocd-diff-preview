@@ -36,7 +36,7 @@ func ConvertAppSetsToAppsInBothBranches(
 	baseTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Base)
 	targetTempFolder := fmt.Sprintf("%s/%s", tempFolder, git.Target)
 
-	baseApps, err := processAppSets(
+	baseApps, _, err := processAppSets(
 		argocd,
 		baseApps,
 		baseBranch,
@@ -46,13 +46,12 @@ func ConvertAppSetsToAppsInBothBranches(
 		repo,
 		redirectRevisions,
 	)
-
 	if err != nil {
 		log.Error().Str("branch", baseBranch.Name).Msg("❌ Failed to generate base apps")
 		return nil, nil, time.Since(startTime), err
 	}
 
-	targetApps, err = processAppSets(
+	targetApps, targetIgnoredApps, err := processAppSets(
 		argocd,
 		targetApps,
 		targetBranch,
@@ -67,6 +66,10 @@ func ConvertAppSetsToAppsInBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
+	// Filter out apps from base branch that are ignored on target branch.
+	// This prevents apps with argocd-diff-preview/ignore annotation from showing as "deleted".
+	baseApps = RemoveIgnoredApps(baseApps, targetIgnoredApps, baseBranch.Name)
+
 	return baseApps, targetApps, time.Since(startTime), nil
 }
 
@@ -79,12 +82,12 @@ func processAppSets(
 	filterOptions FilterOptions,
 	repo string,
 	redirectRevisions []string,
-) ([]ArgoResource, error) {
+) ([]ArgoResource, []IgnoredApp, error) {
 
 	appSetTempFolder := fmt.Sprintf("%s/app-sets", tempFolder)
 	if err := utils.CreateFolder(appSetTempFolder, true); err != nil {
 		log.Error().Msgf("❌ Failed to create temp folder: %s", appSetTempFolder)
-		return nil, err
+		return nil, nil, err
 	}
 
 	apps, err := convertAppSetsToApps(
@@ -96,19 +99,20 @@ func processAppSets(
 	)
 	if err != nil {
 		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(apps) == 0 {
-		return apps, nil
+		return apps, nil, nil
 	}
 
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Filtering %d Applications", len(apps))
-	apps = FilterAll(apps, filterOptions)
+	filterResult := FilterAll(apps, filterOptions)
+	apps = filterResult.Apps
 
 	if len(apps) == 0 {
 		log.Info().Str("branch", branch.Name).Msg("🤖 No applications left after filtering")
-		return apps, nil
+		return apps, filterResult.IgnoredApps, nil
 	}
 
 	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Applications", len(apps))
@@ -121,7 +125,7 @@ func processAppSets(
 	)
 	if err != nil {
 		log.Error().Str("branch", branch.Name).Msgf("❌ Failed to patch Applications on branch: %s", branch.Name)
-		return nil, err
+		return nil, nil, err
 	}
 
 	if debug {
@@ -138,7 +142,7 @@ func processAppSets(
 		}
 	}
 
-	return apps, nil
+	return apps, filterResult.IgnoredApps, nil
 }
 
 func convertAppSetsToApps(

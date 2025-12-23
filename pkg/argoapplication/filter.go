@@ -28,7 +28,47 @@ type FilterOptions struct {
 	WatchIfNoWatchPatternFound bool
 }
 
-func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) []ArgoResource {
+// IgnoredApp represents an app that was ignored via annotation, tracking both ID and source file
+type IgnoredApp struct {
+	Id       string
+	FileName string
+}
+
+// FilterResult contains the filtered apps and any apps that were ignored via annotation
+type FilterResult struct {
+	Apps        []ArgoResource
+	IgnoredApps []IgnoredApp // Apps filtered out due to argocd-diff-preview/ignore annotation
+}
+
+// RemoveIgnoredApps filters out apps from baseApps that match any app in ignoredApps.
+// Matching is done by both ID and FileName to avoid filtering apps with same name from different sources.
+func RemoveIgnoredApps(baseApps []ArgoResource, ignoredApps []IgnoredApp, branchName string) []ArgoResource {
+	if len(ignoredApps) == 0 {
+		return baseApps
+	}
+
+	ignoredSet := make(map[string]struct{}, len(ignoredApps))
+	for _, ignored := range ignoredApps {
+		key := fmt.Sprintf("%s|%s", ignored.Id, ignored.FileName)
+		ignoredSet[key] = struct{}{}
+	}
+
+	var filtered []ArgoResource
+	for _, app := range baseApps {
+		key := fmt.Sprintf("%s|%s", app.Id, app.FileName)
+		if _, exists := ignoredSet[key]; !exists {
+			filtered = append(filtered, app)
+		} else {
+			log.Debug().Str("branch", branchName).Msgf(
+				"Skipping %s '%s' because it is ignored on target branch",
+				app.Kind.ShortName(), app.GetLongName(),
+			)
+		}
+	}
+	return filtered
+}
+
+func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) FilterResult {
 	// Log selector and files changed info
 	switch {
 	case len(filterOptions.Selector) > 0 && len(filterOptions.FilesChanged) > 0:
@@ -60,17 +100,17 @@ func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, bran
 	numberOfAppsBeforeFiltering := len(apps)
 
 	// Filter applications
-	filteredApps := FilterAll(apps, filterOptions)
+	result := FilterAll(apps, filterOptions)
 
 	// Log filtering results
-	if numberOfAppsBeforeFiltering != len(filteredApps) {
+	if numberOfAppsBeforeFiltering != len(result.Apps) {
 		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets] before filtering",
 			numberOfAppsBeforeFiltering,
 		)
 		log.Info().Str("branch", branch.Name).Msgf(
 			"🤖 Found %d Application[Sets] after filtering",
-			len(filteredApps),
+			len(result.Apps),
 		)
 	} else {
 		log.Info().Str("branch", branch.Name).Msgf(
@@ -79,32 +119,41 @@ func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, bran
 		)
 	}
 
-	return filteredApps
+	return result
 }
 
 func FilterAll(
 	apps []ArgoResource,
 	filterOptions FilterOptions,
-) []ArgoResource {
+) FilterResult {
 	var filteredApps []ArgoResource
+	var ignoredApps []IgnoredApp
 	for _, app := range apps {
-		if app.Filter(filterOptions) {
+		selected, ignoredByAnnotation := app.Filter(filterOptions)
+		if selected {
 			filteredApps = append(filteredApps, app)
+		} else if ignoredByAnnotation {
+			ignoredApps = append(ignoredApps, IgnoredApp{Id: app.Id, FileName: app.FileName})
 		}
 	}
-	return filteredApps
+	return FilterResult{
+		Apps:        filteredApps,
+		IgnoredApps: ignoredApps,
+	}
 }
 
-// Filter checks if the application matches the given selectors and watches the given files
+// Filter checks if the application matches the given selectors and watches the given files.
+// Returns (selected bool, ignoredByAnnotation bool) where ignoredByAnnotation is true
+// if the app was filtered out specifically due to the argocd-diff-preview/ignore annotation.
 func (a *ArgoResource) Filter(
 	filterOptions FilterOptions,
-) bool {
+) (bool, bool) {
 
 	// First check selected annotation
 	selected, reason := a.filterByIgnoreAnnotation()
 	if !selected {
 		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
-		return false
+		return false, true // ignoredByAnnotation = true
 	}
 
 	// Then check selectors
@@ -112,7 +161,7 @@ func (a *ArgoResource) Filter(
 		selected, reason := a.filterBySelectors(filterOptions.Selector)
 		if !selected {
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
-			return false
+			return false, false
 		}
 	}
 
@@ -121,17 +170,15 @@ func (a *ArgoResource) Filter(
 		selected, reason := a.filterByFilesChanged(filterOptions.FilesChanged, filterOptions.IgnoreInvalidWatchPattern, filterOptions.WatchIfNoWatchPatternFound)
 		if !selected {
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
-			return false
+			return false, false
 		}
 		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is selected because: %s", a.Kind.ShortName(), reason)
 	}
 
-	return true
+	return true, false
 }
 
 func (a *ArgoResource) filterByIgnoreAnnotation() (bool, string) {
-
-	// get annotations
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
 	if err != nil || !found || len(annotations) == 0 {
 		return true, "no 'argocd-diff-preview/ignore' annotation found"

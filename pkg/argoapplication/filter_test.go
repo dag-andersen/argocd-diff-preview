@@ -977,7 +977,7 @@ metadata:
 			}
 
 			// Run filter
-			got := app.Filter(FilterOptions{
+			got, _ := app.Filter(FilterOptions{
 				Selector:                   tt.selectors,
 				FilesChanged:               tt.filesChanged,
 				IgnoreInvalidWatchPattern:  tt.ignoreInvalidWatchPattern,
@@ -1096,4 +1096,144 @@ spec:
 		t.Fatalf("Error unmarshalling YAML: %v", err)
 	}
 	return &node
+}
+
+// TestFilterReturnsIgnoredByAnnotation tests that Filter returns ignoredByAnnotation = true
+// when an app is filtered out due to the argocd-diff-preview/ignore annotation
+func TestFilterReturnsIgnoredByAnnotation(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	tests := []struct {
+		name                  string
+		annotations           map[string]any
+		labels                map[string]any
+		selectors             []selector.Selector
+		wantSelected          bool
+		wantIgnoredByAnnotation bool
+	}{
+		{
+			name: "app with ignore annotation returns ignoredByAnnotation=true",
+			annotations: map[string]any{
+				"argocd-diff-preview/ignore": "true",
+			},
+			labels:                map[string]any{},
+			selectors:             []selector.Selector{},
+			wantSelected:          false,
+			wantIgnoredByAnnotation: true,
+		},
+		{
+			name:        "app without ignore annotation returns ignoredByAnnotation=false",
+			annotations: map[string]any{},
+			labels:      map[string]any{"app": "test"},
+			selectors:   []selector.Selector{},
+			wantSelected:          true,
+			wantIgnoredByAnnotation: false,
+		},
+		{
+			name:        "app filtered by selector returns ignoredByAnnotation=false",
+			annotations: map[string]any{},
+			labels:      map[string]any{"app": "test"},
+			selectors:   []selector.Selector{{Key: "app", Operator: selector.Eq, Value: "other"}},
+			wantSelected:          false,
+			wantIgnoredByAnnotation: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resource := &ArgoResource{
+				Id:   "test-app",
+				Kind: Application,
+				Yaml: &unstructured.Unstructured{
+					Object: map[string]any{
+						"metadata": map[string]any{
+							"annotations": tt.annotations,
+							"labels":      tt.labels,
+						},
+					},
+				},
+			}
+
+			gotSelected, gotIgnoredByAnnotation := resource.Filter(FilterOptions{
+				Selector: tt.selectors,
+			})
+			assert.Equal(t, tt.wantSelected, gotSelected, "selected mismatch")
+			assert.Equal(t, tt.wantIgnoredByAnnotation, gotIgnoredByAnnotation, "ignoredByAnnotation mismatch")
+		})
+	}
+}
+
+// TestFilterAllReturnsIgnoredIDs tests that FilterAll returns the IDs of apps
+// that were filtered out due to the argocd-diff-preview/ignore annotation
+func TestFilterAllReturnsIgnoredIDs(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	apps := []ArgoResource{
+		{
+			Id:   "app-1",
+			Kind: Application,
+			Yaml: &unstructured.Unstructured{
+				Object: map[string]any{
+					"metadata": map[string]any{
+						"labels": map[string]any{"app": "test"},
+					},
+				},
+			},
+		},
+		{
+			Id:   "app-2-ignored",
+			Kind: Application,
+			Yaml: &unstructured.Unstructured{
+				Object: map[string]any{
+					"metadata": map[string]any{
+						"annotations": map[string]any{
+							"argocd-diff-preview/ignore": "true",
+						},
+						"labels": map[string]any{"app": "test"},
+					},
+				},
+			},
+		},
+		{
+			Id:   "app-3",
+			Kind: Application,
+			Yaml: &unstructured.Unstructured{
+				Object: map[string]any{
+					"metadata": map[string]any{
+						"labels": map[string]any{"app": "test"},
+					},
+				},
+			},
+		},
+		{
+			Id:   "app-4-ignored",
+			Kind: Application,
+			Yaml: &unstructured.Unstructured{
+				Object: map[string]any{
+					"metadata": map[string]any{
+						"annotations": map[string]any{
+							"argocd-diff-preview/ignore": "true",
+						},
+						"labels": map[string]any{"app": "test"},
+					},
+				},
+			},
+		},
+	}
+
+	result := FilterAll(apps, FilterOptions{})
+
+	// Should have 2 apps (app-1 and app-3)
+	assert.Len(t, result.Apps, 2)
+	assert.Equal(t, "app-1", result.Apps[0].Id)
+	assert.Equal(t, "app-3", result.Apps[1].Id)
+
+	// Should have 2 ignored apps (app-2-ignored and app-4-ignored)
+	assert.Len(t, result.IgnoredApps, 2)
+	ignoredIDs := make([]string, len(result.IgnoredApps))
+	for i, ignored := range result.IgnoredApps {
+		ignoredIDs[i] = ignored.Id
+	}
+	assert.Contains(t, ignoredIDs, "app-2-ignored")
+	assert.Contains(t, ignoredIDs, "app-4-ignored")
 }
