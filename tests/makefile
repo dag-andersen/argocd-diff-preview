@@ -11,6 +11,7 @@ max_diff_length := 65536
 ignore_invalid_watch_pattern := false
 watch_if_no_watch_pattern_found := false
 auto_detect_files_changed := false
+hide_deleted_app_diff := false
 update_expected ?= false
 
 pull-base:
@@ -32,6 +33,7 @@ run-single-test-go: clean pull-base pull-target
 		--base-branch "$(base_branch)" \
 		--target-branch "$(target_branch)" \
 		--repo $(github_org)/$(gitops_repo) \
+		--hide-deleted-app-diff="$(hide_deleted_app_diff)" \
 		--argocd-namespace "$(argocd_namespace)" \
 		--files-changed="$(files_changed)" \
 		--selector="$(selector)" \
@@ -83,6 +85,7 @@ run-single-test-docker: clean pull-base pull-target
 		-e WATCH_IF_NO_WATCH_PATTERN_FOUND="$(watch_if_no_watch_pattern_found)" \
 		-e AUTO_DETECT_FILES_CHANGED="$(auto_detect_files_changed)" \
 		-e IGNORE_INVALID_WATCH_PATTERN="$(ignore_invalid_watch_pattern)" \
+		-e HIDE_DELETED_APP_DIFF="$(hide_deleted_app_diff)" \
 		-e ARGOCD_NAMESPACE="$(argocd_namespace)" \
 		-e ARGOCD_CHART_NAME="$(argocd_chart_name)" \
 		-e ARGOCD_CHART_URL="$(argocd_chart_url)" \
@@ -111,6 +114,7 @@ endif
 run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-1" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-2" diff_ignore="image"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-3" hide_deleted_app_diff="true"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target base_branch=integration-test/branch-2/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target base_branch=integration-test/branch-3/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target base_branch=integration-test/branch-4/base title="integration-test/branch-4"
