@@ -7,10 +7,11 @@ import (
 )
 
 type HTMLOutput struct {
-	title    string
-	summary  string
-	sections []HTMLSection
-	infoBox  InfoBox
+	title         string
+	summary       string
+	sections      []HTMLSection
+	statsInfo     StatsInfo
+	selectionInfo SelectionInfo
 }
 
 const htmlTemplate = `
@@ -69,7 +70,7 @@ pre {
 <div class="diffs">
 %app_diffs%
 </div>
-
+%selection_changes%
 <pre>%info_box%</pre>
 </div>
 </body>
@@ -149,6 +150,11 @@ func (h *HTMLOutput) printDiff() string {
 	output := strings.ReplaceAll(htmlTemplate, "%title%", h.title)
 	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(h.summary))
 	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
-	output = strings.ReplaceAll(output, "%info_box%", h.infoBox.String())
+	selection_changes := ""
+	if s := h.selectionInfo.String(); s != "" {
+		selection_changes = fmt.Sprintf("\n<pre>%s</pre>\n<br>\n", s)
+	}
+	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
+	output = strings.ReplaceAll(output, "%info_box%", h.statsInfo.String())
 	return strings.TrimSpace(output) + "\n"
 }

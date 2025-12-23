@@ -290,6 +290,9 @@ func run(opts *Options) error {
 		}
 	}
 
+	// Store info about how many aps were skipped
+	selectionInfo := diff.ConvertArgoSelectionToSelectionInfo(baseApps, targetApps)
+
 	// Extract resources from the cluster based on each branch, passing the manifests directly
 	deleteAfterProcessing := !opts.CreateCluster
 	baseManifests, targetManifests, extractDuration, err := extract.GetResourcesFromBothBranches(
@@ -341,11 +344,11 @@ func run(opts *Options) error {
 	}
 
 	// Create info box for storing run time information
-	infoBox := diff.InfoBox{
+	statsInfo := diff.StatsInfo{
+		FullDuration:               time.Since(startTime),
 		ExtractDuration:            extractDuration + convertAppSetsToAppsDuration,
 		ArgoCDInstallationDuration: argocdInstallationDuration,
 		ClusterCreationDuration:    clusterCreationDuration,
-		FullDuration:               time.Since(startTime),
 		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
@@ -361,13 +364,14 @@ func run(opts *Options) error {
 		opts.LineCount,
 		opts.MaxDiffLength,
 		opts.HideDeletedAppDiff,
-		infoBox,
+		statsInfo,
+		selectionInfo,
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err
 	}
 
-	log.Info().Msgf("⏰ Run time stats: %s", infoBox.Stats())
+	log.Info().Msgf("⏰ Run time stats: %s", statsInfo.Stats())
 
 	return nil
 }

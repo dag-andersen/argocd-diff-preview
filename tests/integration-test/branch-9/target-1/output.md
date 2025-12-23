@@ -389,42 +389,8 @@ Deleted (9):
 -        resources: {}
 -        securityContext: {}
 -      securityContext: {}
--      serviceAccountName: super-app-name
-----
--apiVersion: v1
--kind: Service
--metadata:
--  labels:
--    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
--spec:
--  ports:
--  - name: http
--    port: 80
--    protocol: TCP
--    targetPort: http
--  selector:
--    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/name: myApp
--  type: ClusterIP
-----
--apiVersion: v1
--automountServiceAccountToken: true
--kind: ServiceAccount
--metadata:
--  labels:
--    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
+-      serviceAcco
+🚨 Diff is too long
 ```
 
 </details>

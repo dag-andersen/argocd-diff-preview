@@ -54,10 +54,11 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 }
 
 type MarkdownOutput struct {
-	title    string
-	summary  string
-	sections []MarkdownSection
-	infoBox  InfoBox
+	title         string
+	summary       string
+	sections      []MarkdownSection
+	statsInfo     StatsInfo
+	selectionInfo SelectionInfo
 }
 
 const markdownTemplate = `
@@ -69,35 +70,50 @@ Summary:
 ` + "```" + `
 
 %app_diffs%
-
+%selection_changes%
 %info_box%
 `
 
 func markdownTemplateLength() int {
-	template := strings.ReplaceAll(markdownTemplate, "%summary%", "")
+	template := strings.ReplaceAll(markdownTemplate, "%title%", "")
+	template = strings.ReplaceAll(template, "%summary%", "")
 	template = strings.ReplaceAll(template, "%app_diffs%", "")
-	template = strings.ReplaceAll(template, "%title%", "")
+	template = strings.ReplaceAll(template, "%selection_changes%", "")
 	template = strings.ReplaceAll(template, "%info_box%", "")
 	return len(template)
 }
 
-func (m *MarkdownOutput) printDiff(maxSize int, maxDiffMessageCharCount uint) string {
+func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
+
+	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
+	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(m.summary))
+	selection_changes := ""
+	if s := m.selectionInfo.String(); s != "" {
+		selection_changes = fmt.Sprintf("\n%s\n", s)
+	}
+	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
+	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())
 
 	warningMessage := fmt.Sprintf("⚠️⚠️⚠️ Diff exceeds max length of %d characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
 
+	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage)
+
 	var sectionsDiff strings.Builder
 
-	sizeLeft := maxSize - len(warningMessage)
+	spaceRemaining := availableSpaceForDetailedDiff
 	AddWarning := false
 
 	for _, section := range m.sections {
-		sectionContent, truncated := section.build(sizeLeft)
+		if spaceRemaining <= 0 {
+			break
+		}
+		sectionContent, truncated := section.build(spaceRemaining)
 		sectionsDiff.WriteString(sectionContent)
 		if truncated {
 			AddWarning = true
 		}
-		sizeLeft -= len(sectionContent)
+		spaceRemaining -= len(sectionContent)
 	}
 
 	if AddWarning {
@@ -108,10 +124,8 @@ func (m *MarkdownOutput) printDiff(maxSize int, maxDiffMessageCharCount uint) st
 		sectionsDiff.WriteString("No changes found")
 	}
 
-	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
-	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(m.summary))
 	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
-	output = strings.ReplaceAll(output, "%info_box%", m.infoBox.String())
+
 	output = strings.TrimSpace(output) + "\n"
 
 	if AddWarning {
