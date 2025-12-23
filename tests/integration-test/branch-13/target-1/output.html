@@ -51,7 +51,7 @@ pre {
 <pre>Total: 1 files changed
 
 Added (1):
-+ ignore-annotation-example (+83)</pre>
++ ignore-annotation-example (+81)</pre>
 
 <div class="diffs">
 <details>
@@ -63,43 +63,6 @@ ignore-annotation-example (examples/ignore-annotation/app.yaml)
 	
 	<tr class="comment_line"><td><pre>@@ Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml) @@
 </pre></td></tr>
-	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
-	<tr class="added_line"><td><pre>+kind: Service</pre></td></tr>
-	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
-	<tr class="added_line"><td><pre>+  labels:</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: ignore-annotation-example</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/managed-by: Helm</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.16.0</pre></td></tr>
-	<tr class="added_line"><td><pre>+    helm.sh/chart: myApp-0.1.0</pre></td></tr>
-	<tr class="added_line"><td><pre>+  name: super-app-name</pre></td></tr>
-	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
-	<tr class="added_line"><td><pre>+spec:</pre></td></tr>
-	<tr class="added_line"><td><pre>+  ports:</pre></td></tr>
-	<tr class="added_line"><td><pre>+  - name: http</pre></td></tr>
-	<tr class="added_line"><td><pre>+    port: 80</pre></td></tr>
-	<tr class="added_line"><td><pre>+    protocol: TCP</pre></td></tr>
-	<tr class="added_line"><td><pre>+    targetPort: http</pre></td></tr>
-	<tr class="added_line"><td><pre>+  selector:</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: ignore-annotation-example</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
-	<tr class="added_line"><td><pre>+  type: ClusterIP</pre></td></tr>
-	<tr class="added_line"><td><pre>+</pre></td></tr>
-	<tr class="added_line"><td><pre>+---</pre></td></tr>
-	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
-	<tr class="added_line"><td><pre>+automountServiceAccountToken: true</pre></td></tr>
-	<tr class="added_line"><td><pre>+kind: ServiceAccount</pre></td></tr>
-	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
-	<tr class="added_line"><td><pre>+  labels:</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: ignore-annotation-example</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/managed-by: Helm</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
-	<tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.16.0</pre></td></tr>
-	<tr class="added_line"><td><pre>+    helm.sh/chart: myApp-0.1.0</pre></td></tr>
-	<tr class="added_line"><td><pre>+  name: super-app-name</pre></td></tr>
-	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
-	<tr class="added_line"><td><pre>+</pre></td></tr>
-	<tr class="added_line"><td><pre>+---</pre></td></tr>
 	<tr class="added_line"><td><pre>+apiVersion: apps/v1</pre></td></tr>
 	<tr class="added_line"><td><pre>+kind: Deployment</pre></td></tr>
 	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
@@ -146,6 +109,41 @@ ignore-annotation-example (examples/ignore-annotation/app.yaml)
 	<tr class="added_line"><td><pre>+        securityContext: {}</pre></td></tr>
 	<tr class="added_line"><td><pre>+      securityContext: {}</pre></td></tr>
 	<tr class="added_line"><td><pre>+      serviceAccountName: super-app-name</pre></td></tr>
+	<tr class="added_line"><td><pre>+---</pre></td></tr>
+	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: Service</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  labels:</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: ignore-annotation-example</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.16.0</pre></td></tr>
+	<tr class="added_line"><td><pre>+    helm.sh/chart: myApp-0.1.0</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: super-app-name</pre></td></tr>
+	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
+	<tr class="added_line"><td><pre>+spec:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  ports:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - name: http</pre></td></tr>
+	<tr class="added_line"><td><pre>+    port: 80</pre></td></tr>
+	<tr class="added_line"><td><pre>+    protocol: TCP</pre></td></tr>
+	<tr class="added_line"><td><pre>+    targetPort: http</pre></td></tr>
+	<tr class="added_line"><td><pre>+  selector:</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: ignore-annotation-example</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
+	<tr class="added_line"><td><pre>+  type: ClusterIP</pre></td></tr>
+	<tr class="added_line"><td><pre>+---</pre></td></tr>
+	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+automountServiceAccountToken: true</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ServiceAccount</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  labels:</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: ignore-annotation-example</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
+	<tr class="added_line"><td><pre>+    app.kubernetes.io/version: 1.16.0</pre></td></tr>
+	<tr class="added_line"><td><pre>+    helm.sh/chart: myApp-0.1.0</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: super-app-name</pre></td></tr>
+	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
 	<tr class="normal_line"><td><pre></pre></td></tr>
 </table>
 </div>
