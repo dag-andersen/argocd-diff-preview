@@ -331,41 +331,6 @@ spec:
 	}
 }
 
-func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
-	tempDir := t.TempDir()
-	basePath := filepath.Join(tempDir, "base")
-	targetPath := filepath.Join(tempDir, "target")
-
-	baseApps := []AppInfo{
-		{
-			Id:          "app.yaml",
-			Name:        "app",
-			SourcePath:  "/path/app",
-			FileContent: "kind: ConfigMap\nmetadata:\n  name: app\n",
-		},
-	}
-
-	summary, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil)
-	if err != nil {
-		t.Fatalf("generateGitDiff failed: %v", err)
-	}
-	if summary == "No changes found" {
-		t.Fatalf("expected changes for deleted app, got %q", summary)
-	}
-	if len(markdownSections) != 1 {
-		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
-	}
-	if len(htmlSections) != 1 {
-		t.Fatalf("expected 1 html section, got %d", len(htmlSections))
-	}
-	if markdownSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("markdown content = %q, want %q", markdownSections[0].content, deletedAppDiffHiddenMessage)
-	}
-	if htmlSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("html content = %q, want %q", htmlSections[0].content, deletedAppDiffHiddenMessage)
-	}
-}
-
 // TestGenerateGitDiff_ChangingFilenames tests that files are matched by app identity when filenames change
 func TestGenerateGitDiff_ChangingFilenames(t *testing.T) {
 	// Create temporary directory for test

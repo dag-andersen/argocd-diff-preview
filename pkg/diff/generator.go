@@ -17,7 +17,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
-const deletedAppDiffHiddenMessage = "Diff content omitted because --hide-deleted-app-diff is enabled."
+const deletedAppDiffHiddenMessage = "Diff content omitted because '--hide-deleted-app-diff' is enabled."
 
 type AppInfo struct {
 	Id          string
@@ -298,7 +298,6 @@ func generateGitDiff(
 
 		case merkletrie.Modify:
 
-			// Get content of both files and use the diff package
 			var oldContent, newContent string
 
 			if from != nil {
@@ -325,7 +324,6 @@ func generateGitDiff(
 				}
 			}
 
-			// Use diff.Do to generate the diff
 			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
 		}
 
