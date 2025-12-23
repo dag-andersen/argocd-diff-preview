@@ -139,7 +139,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 						content: "- old content\n+ new content",
 					},
 				},
-				infoBox: InfoBox{
+				statsInfo: StatsInfo{
 					ApplicationCount: 2,
 					FullDuration:     time.Second * 5,
 				},
@@ -168,7 +168,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 				title:    "Empty Diff",
 				summary:  "No changes",
 				sections: []MarkdownSection{},
-				infoBox: InfoBox{
+				statsInfo: StatsInfo{
 					ApplicationCount: 0,
 				},
 			},
@@ -196,7 +196,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 						content: strings.Repeat("Very long diff content that will cause truncation\n", 100),
 					},
 				},
-				infoBox: InfoBox{
+				statsInfo: StatsInfo{
 					ApplicationCount: 1,
 				},
 			},
@@ -214,7 +214,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.output.printDiff(tt.maxSize, tt.maxDiffMessageCharCount)
+			got := tt.output.printDiff(tt.maxDiffMessageCharCount)
 
 			for _, expected := range tt.expectedContains {
 				if !strings.Contains(got, expected) {
@@ -252,11 +252,11 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 					content: "content",
 				},
 			},
-			infoBox: InfoBox{ApplicationCount: 1},
+			statsInfo: StatsInfo{ApplicationCount: 1},
 		}
 
 		// Max size smaller than template
-		got := output.printDiff(10, 100)
+		got := output.printDiff(30)
 
 		// Should still produce valid output
 		if !strings.Contains(got, "## Test") {
@@ -275,10 +275,10 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 					content: "content",
 				},
 			},
-			infoBox: InfoBox{ApplicationCount: 1},
+			statsInfo: StatsInfo{ApplicationCount: 1},
 		}
 
-		got := output.printDiff(0, 100)
+		got := output.printDiff(0)
 
 		// Should handle gracefully
 		if got == "" {
@@ -337,7 +337,7 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 				content: "Test content",
 			},
 		},
-		infoBox: InfoBox{
+		statsInfo: StatsInfo{
 			ApplicationCount:           3,
 			FullDuration:               time.Minute * 2,
 			ExtractDuration:            time.Second * 30,
@@ -346,10 +346,10 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 		},
 	}
 
-	got := output.printDiff(10000, 5000)
+	got := output.printDiff(5000)
 
 	// Verify all template placeholders are replaced
-	templatePlaceholders := []string{"%title%", "%summary%", "%app_diffs%", "%info_box%"}
+	templatePlaceholders := []string{"%title%", "%summary%", "%app_diffs%", "%selection_changes%", "%info_box%"}
 	for _, placeholder := range templatePlaceholders {
 		if strings.Contains(got, placeholder) {
 			t.Errorf("Template placeholder %s was not replaced in output:\n%s", placeholder, got)
@@ -373,4 +373,98 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 			t.Errorf("Expected content %q not found in output:\n%s", expected, got)
 		}
 	}
+}
+
+func TestMarkdownOutput_SelectionChanges(t *testing.T) {
+	t.Run("No selection changes when counts are equal", func(t *testing.T) {
+		output := MarkdownOutput{
+			title:   "Test Diff",
+			summary: "Summary",
+			sections: []MarkdownSection{
+				{
+					title:   "App",
+					comment: "@@ Test @@\n",
+					content: "content",
+				},
+			},
+			selectionInfo: SelectionInfo{
+				Base:   AppSelectionInfo{SkippedApplications: 2, SkippedApplicationSets: 1},
+				Target: AppSelectionInfo{SkippedApplications: 2, SkippedApplicationSets: 1},
+			},
+			statsInfo: StatsInfo{ApplicationCount: 1},
+		}
+
+		got := output.printDiff(5000)
+
+		// Should NOT contain skipped resources info when counts are equal
+		if strings.Contains(got, "_Skipped resources_") {
+			t.Errorf("Should not contain skipped resources info when counts are equal, got:\n%s", got)
+		}
+	})
+
+	t.Run("Shows selection changes when Application counts differ", func(t *testing.T) {
+		output := MarkdownOutput{
+			title:   "Test Diff",
+			summary: "Summary",
+			sections: []MarkdownSection{
+				{
+					title:   "App",
+					comment: "@@ Test @@\n",
+					content: "content",
+				},
+			},
+			selectionInfo: SelectionInfo{
+				Base:   AppSelectionInfo{SkippedApplications: 2, SkippedApplicationSets: 1},
+				Target: AppSelectionInfo{SkippedApplications: 5, SkippedApplicationSets: 1},
+			},
+			statsInfo: StatsInfo{ApplicationCount: 1},
+		}
+
+		got := output.printDiff(5000)
+
+		expectedContent := []string{
+			"_Skipped resources_",
+			"Applications: `2` (base) -> `5` (target)",
+			"ApplicationSets: `1` (base) -> `1` (target)",
+		}
+
+		for _, expected := range expectedContent {
+			if !strings.Contains(got, expected) {
+				t.Errorf("Expected content %q not found in output:\n%s", expected, got)
+			}
+		}
+	})
+
+	t.Run("Shows selection changes when ApplicationSet counts differ", func(t *testing.T) {
+		output := MarkdownOutput{
+			title:   "Test Diff",
+			summary: "Summary",
+			sections: []MarkdownSection{
+				{
+					title:   "App",
+					comment: "@@ Test @@\n",
+					content: "content",
+				},
+			},
+			selectionInfo: SelectionInfo{
+				Base:   AppSelectionInfo{SkippedApplications: 3, SkippedApplicationSets: 0},
+				Target: AppSelectionInfo{SkippedApplications: 3, SkippedApplicationSets: 2},
+			},
+			statsInfo: StatsInfo{ApplicationCount: 1},
+		}
+
+		got := output.printDiff(5000)
+
+		expectedContent := []string{
+			"_Skipped resources_",
+			"Applications: `3` (base) -> `3` (target)",
+			"ApplicationSets: `0` (base) -> `2` (target)",
+		}
+
+		for _, expected := range expectedContent {
+			if !strings.Contains(got, expected) {
+				t.Errorf("Expected content %q not found in output:\n%s", expected, got)
+			}
+		}
+	})
 }
