@@ -2,7 +2,6 @@ package duplicates
 
 import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -30,31 +29,35 @@ func RemoveDuplicates(baseApps, targetApps *argoapplication.ArgoSelection) (*arg
 	baseAppsBefore := len(baseApps.SelectedApps)
 	targetAppsBefore := len(targetApps.SelectedApps)
 
+	log.Info().Msgf("🤖 Skipping identical applications between base and target branches")
+
 	// Actually filter out the duplicates using the helper function
-	baseApps = filterDuplicates(baseApps, duplicateYaml)
-	targetApps = filterDuplicates(targetApps, duplicateYaml)
+	baseAppsDeDuplication := filterDuplicates(baseApps, duplicateYaml)
+	targetAppsDeDuplication := filterDuplicates(targetApps, duplicateYaml)
 
-	log.Info().Str("branch", string(git.Base)).Msgf(
-		"🤖 Skipped %d Application[Sets] because they have not changed after patching",
-		baseAppsBefore-len(baseApps.SelectedApps),
-	)
+	if baseAppsBefore != len(baseAppsDeDuplication.SelectedApps) || targetAppsBefore != len(targetAppsDeDuplication.SelectedApps) {
+		log.Info().Msgf(
+			"🤖 Skipped %d Application[Sets] in base branch because it has an identical copy in the target branch",
+			baseAppsBefore-len(baseAppsDeDuplication.SelectedApps),
+		)
+		log.Info().Msgf(
+			"🤖 Keeping the remaining %d Application[Sets] for the base branch",
+			len(baseAppsDeDuplication.SelectedApps),
+		)
 
-	log.Info().Str("branch", string(git.Target)).Msgf(
-		"🤖 Skipped %d Application[Sets] because they have not changed after patching",
-		targetAppsBefore-len(targetApps.SelectedApps),
-	)
+		log.Info().Msgf(
+			"🤖 Skipped %d Application[Sets] in target branch because it has an identical copy in the base branch",
+			targetAppsBefore-len(targetAppsDeDuplication.SelectedApps),
+		)
+		log.Info().Msgf(
+			"🤖 Keeping the remaining %d Application[Sets] for the target branch",
+			len(targetAppsDeDuplication.SelectedApps),
+		)
+	} else {
+		log.Info().Msg("🤖 No identical applications found between base and target branches")
+	}
 
-	log.Info().Str("branch", string(git.Base)).Msgf(
-		"🤖 Using the remaining %d Application[Sets]",
-		len(baseApps.SelectedApps),
-	)
-
-	log.Info().Str("branch", string(git.Target)).Msgf(
-		"🤖 Using the remaining %d Application[Sets]",
-		len(targetApps.SelectedApps),
-	)
-
-	return baseApps, targetApps
+	return baseAppsDeDuplication, targetAppsDeDuplication
 }
 
 func filterDuplicates(apps *argoapplication.ArgoSelection, duplicates []*unstructured.Unstructured) *argoapplication.ArgoSelection {

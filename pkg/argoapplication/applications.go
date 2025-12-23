@@ -120,6 +120,8 @@ func getApplications(
 
 	allApps := FromResourceToApplication(k8sResources)
 
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Which resulted in %d Argo CD Applications or ApplicationSets", len(allApps))
+
 	if len(allApps) == 0 {
 		return &ArgoSelection{
 			SelectedApps: allApps,

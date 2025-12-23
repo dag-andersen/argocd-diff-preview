@@ -30,16 +30,18 @@ func ConvertArgoSelectionToSelectionInfo(baseApps *argoapplication.ArgoSelection
 	var targetSkippedApplications int
 	var targetSkippedApplicationSets int
 	for _, app := range baseApps.SkippedApps {
-		if app.Kind == argoapplication.Application {
+		switch app.Kind {
+		case argoapplication.Application:
 			baseSkippedApplications++
-		} else if app.Kind == argoapplication.ApplicationSet {
+		case argoapplication.ApplicationSet:
 			baseSkippedApplicationSets++
 		}
 	}
 	for _, app := range targetApps.SkippedApps {
-		if app.Kind == argoapplication.Application {
+		switch app.Kind {
+		case argoapplication.Application:
 			targetSkippedApplications++
-		} else if app.Kind == argoapplication.ApplicationSet {
+		case argoapplication.ApplicationSet:
 			targetSkippedApplicationSets++
 		}
 	}

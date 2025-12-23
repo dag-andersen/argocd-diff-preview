@@ -74,15 +74,6 @@ Summary:
 %info_box%
 `
 
-func markdownTemplateLength() int {
-	template := strings.ReplaceAll(markdownTemplate, "%title%", "")
-	template = strings.ReplaceAll(template, "%summary%", "")
-	template = strings.ReplaceAll(template, "%app_diffs%", "")
-	template = strings.ReplaceAll(template, "%selection_changes%", "")
-	template = strings.ReplaceAll(template, "%info_box%", "")
-	return len(template)
-}
-
 func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 
 	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
