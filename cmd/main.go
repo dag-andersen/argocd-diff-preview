@@ -295,7 +295,7 @@ func run(opts *Options) error {
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
 	deleteAfterProcessing := !opts.CreateCluster
-	baseManifests, targetManifests, extractDuration, err := extract.GetResourcesFromBothBranches(
+	baseManifests, targetManifests, extractDuration, err := extract.RenderApplicaitonsFromBothBranches(
 		argocd,
 		opts.Timeout,
 		baseApps.SelectedApps,

@@ -61,7 +61,11 @@ func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 		log.Info().
 			Str("branch", branch.Name).
 			Msgf("🔍 Found %d duplicate application names. Suffixing with -1, -2, -3, etc.", duplicateCounter)
-		log.Info().Str("branch", branch.Name).Msgf("🤖 Applications after unique names: %v", len(newApps))
+	}
+
+	// validate that the number of applications that was parsed as input is the same as the number of applications that was parsed as output
+	if len(apps) != len(newApps) {
+		panic(fmt.Sprintf("failed to ensure unique IDs: expected %d apps, got %d. Please report this as a bug.", len(apps), len(newApps)))
 	}
 
 	return newApps
