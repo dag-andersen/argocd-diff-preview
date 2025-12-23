@@ -269,7 +269,7 @@ spec:
 
 	// Run the diff generation
 	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, baseApps, targetApps,
+		basePath, targetPath, nil, 3, false, baseApps, targetApps,
 	)
 
 	if err != nil {
@@ -328,6 +328,41 @@ spec:
 			!strings.Contains(sectionContent, "+  replicas: 2") {
 			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, sectionContent)
 		}
+	}
+}
+
+func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	baseApps := []AppInfo{
+		{
+			Id:          "app.yaml",
+			Name:        "app",
+			SourcePath:  "/path/app",
+			FileContent: "kind: ConfigMap\nmetadata:\n  name: app\n",
+		},
+	}
+
+	summary, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil)
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+	if summary == "No changes found" {
+		t.Fatalf("expected changes for deleted app, got %q", summary)
+	}
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+	if len(htmlSections) != 1 {
+		t.Fatalf("expected 1 html section, got %d", len(htmlSections))
+	}
+	if markdownSections[0].content != deletedAppDiffHiddenMessage {
+		t.Fatalf("markdown content = %q, want %q", markdownSections[0].content, deletedAppDiffHiddenMessage)
+	}
+	if htmlSections[0].content != deletedAppDiffHiddenMessage {
+		t.Fatalf("html content = %q, want %q", htmlSections[0].content, deletedAppDiffHiddenMessage)
 	}
 }
 
@@ -392,7 +427,7 @@ spec:
 
 	// Run the diff generation
 	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, baseApps, targetApps,
+		basePath, targetPath, nil, 3, false, baseApps, targetApps,
 	)
 
 	if err != nil {
