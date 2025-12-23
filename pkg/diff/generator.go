@@ -17,6 +17,8 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
+const deletedAppDiffHiddenMessage = "Diff content omitted because --hide-deleted-app-diff is enabled."
+
 type AppInfo struct {
 	Id          string
 	Name        string
@@ -278,7 +280,9 @@ func generateGitDiff(
 
 			// Skip generating diff content for deleted apps when hideDeletedAppDiff is enabled
 			// The header will still be shown, but not the full diff content
-			if !hideDeletedAppDiff && from != nil {
+			if hideDeletedAppDiff {
+				changeInfo.content = deletedAppDiffHiddenMessage
+			} else if from != nil {
 				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
@@ -372,9 +376,8 @@ func generateGitDiff(
 	htmlFileSections := make([]HTMLSection, 0, len(changedFiles))
 	for _, diff := range changedFiles {
 
-		// skips empty diffs, but allow deleted apps through when hideDeletedAppDiff is true
-		// (they'll show the deletion header only)
-		if diff.changeInfo.content == "" && !(hideDeletedAppDiff && diff.action == merkletrie.Delete) {
+		// skips empty diffs
+		if diff.changeInfo.content == "" {
 			continue
 		}
 
