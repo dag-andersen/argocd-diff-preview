@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -28,13 +27,7 @@ type ApplicationSelectionOptions struct {
 	WatchIfNoWatchPatternFound bool
 }
 
-type ArgoSelection struct {
-	SelectedApps []ArgoResource
-	SkippedApps  []ArgoResource
-}
-
-func ApplicationSelectionWithLogging(apps []ArgoResource, appSelectionOptions ApplicationSelectionOptions, branch *git.Branch) *ArgoSelection {
-	// Log selector and files changed info
+func (appSelectionOptions ApplicationSelectionOptions) LogRules() {
 	switch {
 	case len(appSelectionOptions.Selector) > 0 && len(appSelectionOptions.FilesChanged) > 0:
 		var selectorStrs []string
@@ -42,7 +35,7 @@ func ApplicationSelectionWithLogging(apps []ArgoResource, appSelectionOptions Ap
 			selectorStrs = append(selectorStrs, s.String())
 		}
 		log.Info().Msgf(
-			"🤖 Will only select Applications that match '%s' and watch these files: '%s'",
+			"🤖 Will only select Application[Sets] that match '%s' and watch these files: '%s'",
 			strings.Join(selectorStrs, ","),
 			strings.Join(appSelectionOptions.FilesChanged, "', '"),
 		)
@@ -52,32 +45,20 @@ func ApplicationSelectionWithLogging(apps []ArgoResource, appSelectionOptions Ap
 			selectorStrs = append(selectorStrs, s.String())
 		}
 		log.Info().Msgf(
-			"🤖 Will only select Applications that match '%s'",
+			"🤖 Will only select Application[Sets] that match '%s'",
 			strings.Join(selectorStrs, ","),
 		)
 	case len(appSelectionOptions.FilesChanged) > 0:
 		log.Info().Msgf(
-			"🤖 Will only select Applications that watch these files: '%s'",
+			"🤖 Will only select Application[Sets] that watch these files: '%s'",
 			strings.Join(appSelectionOptions.FilesChanged, "', '"),
 		)
 	}
+}
 
-	log.Debug().Str("branch", branch.Name).Msg("Selecting Application[Sets] for branch")
-
-	// Filter applications
-	selection := ApplicationSelection(apps, appSelectionOptions)
-
-	// Log filtering results
-	if len(apps) != len(selection.SelectedApps) {
-		log.Info().Str("branch", branch.Name).Msgf("🤖 Selected %d Application[Sets], Skipped %d Application[Sets]", len(selection.SelectedApps), len(selection.SkippedApps))
-	} else {
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Selected all %d Application[Sets]",
-			len(selection.SelectedApps),
-		)
-	}
-
-	return selection
+type ArgoSelection struct {
+	SelectedApps []ArgoResource
+	SkippedApps  []ArgoResource
 }
 
 func ApplicationSelection(

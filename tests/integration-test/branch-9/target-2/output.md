@@ -20,7 +20,7 @@ Deleted (1):
 -  labels:
 -    app.kubernetes.io/component: admission-webhook
 -    app.kubernetes.io/instance: nginx-ingress
--
+-    app.kubernetes.io/m
 🚨 Diff is too long
 ```
 
@@ -31,7 +31,6 @@ Deleted (1):
 _Skipped resources_: 
 - Applications: `10` (base) -> `9` (target)
 - ApplicationSets: `6` (base) -> `3` (target)
-
 
 _Stats_:
 [Applications: 1], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

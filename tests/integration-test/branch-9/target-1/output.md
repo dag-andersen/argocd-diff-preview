@@ -423,8 +423,8 @@ Deleted (9):
 -    app.kubernetes.io/name: myApp
 -    app.kubernetes.io/version: 1.16.0
 -    helm.sh/chart: myApp-0.1.0
--  name: super
-🚨 Diff is too long
+-  name: super-app-name
+-  namespace: default
 ```
 
 </details>

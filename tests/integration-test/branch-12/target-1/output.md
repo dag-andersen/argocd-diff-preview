@@ -1633,7 +1633,7 @@ Modified (1):
                            description: Images is a list of Kustomize image override
                              specifications
                            items:
-                             description: KustomizeImage
+                             description: KustomizeImage represents a Kustomi
 🚨 Diff is too long
 ```
 

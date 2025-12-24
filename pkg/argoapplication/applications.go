@@ -129,18 +129,32 @@ func getApplications(
 		}, nil
 	}
 
-	// selecting applications
-	appSelection := ApplicationSelectionWithLogging(allApps, appSelectionOptions, branch)
+	log.Debug().Str("branch", branch.Name).Msg("Selecting Application[Sets] for branch")
 
-	if len(appSelection.SelectedApps) == 0 {
-		return appSelection, nil
+	appSelectionOptions.LogRules()
+
+	// Filter applications
+	selection := ApplicationSelection(allApps, appSelectionOptions)
+
+	// Log filtering results
+	if len(allApps) != len(selection.SelectedApps) {
+		log.Info().Str("branch", branch.Name).Msgf("🤖 Selected %d Application[Sets], Skipped %d Application[Sets]", len(selection.SelectedApps), len(selection.SkippedApps))
+	} else {
+		log.Info().Str("branch", branch.Name).Msgf(
+			"🤖 Selected all %d Application[Sets]",
+			len(selection.SelectedApps),
+		)
 	}
 
-	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(appSelection.SelectedApps))
+	if len(selection.SelectedApps) == 0 {
+		return selection, nil
+	}
+
+	log.Info().Str("branch", branch.Name).Msgf("🤖 Patching %d Application[Sets]", len(selection.SelectedApps))
 
 	patchedApps, err := patchApplications(
 		argocdNamespace,
-		appSelection.SelectedApps,
+		selection.SelectedApps,
 		branch,
 		repo,
 		redirectRevisions,
@@ -153,6 +167,6 @@ func getApplications(
 
 	return &ArgoSelection{
 		SelectedApps: patchedApps,
-		SkippedApps:  appSelection.SkippedApps,
+		SkippedApps:  selection.SkippedApps,
 	}, nil
 }

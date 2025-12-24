@@ -18,7 +18,7 @@ type SelectionInfo struct {
 
 func (t SelectionInfo) String() string {
 	if t.Base.SkippedApplications != t.Target.SkippedApplications || t.Base.SkippedApplicationSets != t.Target.SkippedApplicationSets {
-		return fmt.Sprintf("_Skipped resources_: \n- Applications: `%d` (base) -> `%d` (target)\n- ApplicationSets: `%d` (base) -> `%d` (target)\n", t.Base.SkippedApplications, t.Target.SkippedApplications, t.Base.SkippedApplicationSets, t.Target.SkippedApplicationSets)
+		return fmt.Sprintf("_Skipped resources_: \n- Applications: `%d` (base) -> `%d` (target)\n- ApplicationSets: `%d` (base) -> `%d` (target)", t.Base.SkippedApplications, t.Target.SkippedApplications, t.Base.SkippedApplicationSets, t.Target.SkippedApplicationSets)
 	}
 	return ""
 }

@@ -33,10 +33,18 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 
 	spaceForContent := maxSize - len(header) - len(footer) - len(m.comment)
 
+	if spaceForContent < 0 {
+		log.Debug().Msgf("Markdown - Skipping section, because diff section does not fit in space: %d < 0", spaceForContent)
+		return "", true
+	}
+
 	// if there is enough space for the content, return the full section
 	if len(content) < spaceForContent {
+		log.Debug().Msgf("Markdown - Diff section fits in space: %d < %d", spaceForContent, len(content))
 		return header + m.comment + content + footer, false
 	}
+
+	log.Debug().Msgf("Markdown - diff section does not fit in space: %d < %d", spaceForContent, len(content))
 
 	diffTooLongWarning := "\n🚨 Diff is too long"
 
@@ -46,8 +54,11 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	if minNumberOfCharacters < spaceBeforeDiffTooLongWarning {
 		truncatedContent := content[:spaceBeforeDiffTooLongWarning]
 		truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
+		log.Debug().Msgf("Markdown - returning truncated content with warning")
 		return header + m.comment + truncatedContent + diffTooLongWarning + footer, true
 	}
+
+	log.Debug().Msgf("Markdown - available space is below threashhold %d, returning empty string", minNumberOfCharacters)
 
 	// if there is not enough space for the content, return an empty string
 	return "", true
@@ -86,12 +97,14 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 
 	// the InfoBox has a dynamic size. This is a problem for the integration tests, because the output is not deterministic.
 	// By adding a buffer, we ensure availableSpaceForDetailedDiff has a fixed size
-	infoBoxBufferSize := 100
+	infoBoxBufferSize := 80
 
 	warningMessage := fmt.Sprintf("⚠️⚠️⚠️ Diff exceeds max length of %d characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
 
 	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize
+
+	log.Debug().Msgf("availableSpaceForDetailedDiff: %d", availableSpaceForDetailedDiff)
 
 	var sectionsDiff strings.Builder
 
