@@ -25,6 +25,11 @@ func (m *MarkdownSection) Size() int {
 	return len(markdownSectionHeader(m.title)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
 }
 
+var (
+	minSizeForSectionContent = 100
+	diffTooLongWarning       = "\n🚨 Diff is too long"
+)
+
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	header := markdownSectionHeader(m.title)
@@ -46,19 +51,16 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 
 	log.Debug().Msgf("Markdown - diff section does not fit in space: %d < %d", spaceForContent, len(content))
 
-	diffTooLongWarning := "\n🚨 Diff is too long"
-
 	spaceBeforeDiffTooLongWarning := spaceForContent - len(diffTooLongWarning)
 
-	minNumberOfCharacters := 100
-	if minNumberOfCharacters < spaceBeforeDiffTooLongWarning {
+	if minSizeForSectionContent < spaceBeforeDiffTooLongWarning {
 		truncatedContent := content[:spaceBeforeDiffTooLongWarning]
 		truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
 		log.Debug().Msgf("Markdown - returning truncated content with warning")
 		return header + m.comment + truncatedContent + diffTooLongWarning + footer, true
 	}
 
-	log.Debug().Msgf("Markdown - available space is below threashhold %d, returning empty string", minNumberOfCharacters)
+	log.Debug().Msgf("Markdown - available space is below threashhold %d, returning empty string", minSizeForSectionContent)
 
 	// if there is not enough space for the content, return an empty string
 	return "", true
