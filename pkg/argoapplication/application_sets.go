@@ -157,7 +157,7 @@ func processAppSets(
 		return nil, err
 	}
 
-	log.Debug().Str("branch", branch.Name).Msgf("Patched %d new Applications from ApplicationSets", len(patchedApps))
+	log.Debug().Str("branch", branch.Name).Msgf("Patched all %d applications", len(patchedApps))
 
 	if debug {
 		appTempFolder := fmt.Sprintf("%s/apps", tempFolder)

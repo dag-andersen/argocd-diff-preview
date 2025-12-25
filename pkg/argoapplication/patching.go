@@ -289,10 +289,15 @@ func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, br
 		source["targetRevision"] = targetRev
 	}
 
+	if targetRev == branch {
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Target revision is already '%s'. Skipping redirect.", branch)
+		return nil
+	}
+
 	shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRev)
 
 	if shouldRedirect {
-		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Redirecting targetRevision from %s to %s", targetRev, branch)
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Redirecting targetRevision from '%s' to '%s'", targetRev, branch)
 		source["targetRevision"] = branch
 	}
 
@@ -432,7 +437,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 			if shouldRedirect {
 				gitMap["revision"] = branch
 				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Str("branch", branch).
-					Msgf("Redirecting revision from %s to %s in %s[%d].git", revision, branch, parent, i)
+					Msgf("Redirecting revision from '%s' to '%s' in %s[%d].git", revision, branch, parent, i)
 			}
 		}
 	}
