@@ -1309,7 +1309,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                               specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                             items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               description: KustomizeImage represents a Kustomize image</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                 definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                 definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                             type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                           kubeVersion:</pre></td></tr>
@@ -1406,7 +1406,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                 specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                   image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                   image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                             kubeVersion:</pre></td></tr>
@@ -1503,7 +1503,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                           specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                         items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                           description: KustomizeImage represents a Kustomize image</pre></td></tr>
-	<tr class="normal_line"><td><pre>                             definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                             definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                           type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                         type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                       kubeVersion:</pre></td></tr>
@@ -1608,7 +1608,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                          from. The Path should never point to the root of the repo. If hydrateTo is set, this is just the path from which</pre></td></tr>
 	<tr class="added_line"><td><pre>+                          hydrated manifests will be synced.</pre></td></tr>
 	<tr class="added_line"><td><pre>+                        minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                        pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                        pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                        type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                      targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                        description: |-</pre></td></tr>
@@ -1683,7 +1683,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                             specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                           items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                             description: KustomizeImage represents a Kustomize image</pre></td></tr>
-	<tr class="normal_line"><td><pre>                               definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                               definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                             type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                           type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                         kubeVersion:</pre></td></tr>
@@ -1868,7 +1868,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                 specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                   image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                   image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                             kubeVersion:</pre></td></tr>
@@ -1966,7 +1966,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                   specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                     image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                     image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               kubeVersion:</pre></td></tr>
@@ -2091,7 +2091,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                       override specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                       description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                         image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                         image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                       type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   kubeVersion:</pre></td></tr>
@@ -2191,7 +2191,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                         override specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                       items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                         description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                           image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                           image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                         type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                       type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     kubeVersion:</pre></td></tr>
@@ -2317,7 +2317,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                   specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                     image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                     image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               kubeVersion:</pre></td></tr>
@@ -2415,7 +2415,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                     override specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                       image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                       image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 kubeVersion:</pre></td></tr>
@@ -2628,7 +2628,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                  from. The Path should never point to the root of the repo. If hydrateTo is set, this is just the path from which</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                  hydrated manifests will be synced.</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                              targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                description: |-</pre></td></tr>
@@ -2711,7 +2711,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                  from. The Path should never point to the root of the repo. If hydrateTo is set, this is just the path from which</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                  hydrated manifests will be synced.</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                              targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                description: |-</pre></td></tr>
@@ -2788,7 +2788,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                   specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                     image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                     image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                               kubeVersion:</pre></td></tr>
@@ -2887,7 +2887,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>                                     override specifications</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     description: KustomizeImage represents a Kustomize</pre></td></tr>
-	<tr class="normal_line"><td><pre>                                       image definition in the format []&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
+	<tr class="normal_line"><td><pre>                                       image definition in the format [old_image_name=]&lt;image_name&gt;:&lt;image_tag&gt;</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                     type: string</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                   type: array</pre></td></tr>
 	<tr class="normal_line"><td><pre>                                 kubeVersion:</pre></td></tr>
@@ -3052,7 +3052,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -3340,7 +3340,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -3626,7 +3626,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -3889,7 +3889,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -4152,7 +4152,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -4440,7 +4440,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -4726,7 +4726,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -4990,7 +4990,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -5252,7 +5252,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -5559,7 +5559,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -5839,7 +5839,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -6102,7 +6102,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -6365,7 +6365,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -6654,7 +6654,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -6940,7 +6940,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -7204,7 +7204,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -7467,7 +7467,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -7774,7 +7774,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -8054,7 +8054,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                                properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                                    pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                  targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                                    type: string</pre></td></tr>
@@ -8318,7 +8318,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -8581,7 +8581,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -8888,7 +8888,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -9169,7 +9169,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                                      properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                          pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                        targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                          type: string</pre></td></tr>
@@ -9457,7 +9457,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+                            properties:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                              path:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                minLength: 1</pre></td></tr>
-	<tr class="added_line"><td><pre>+                                pattern: ^.{2,}|[]$</pre></td></tr>
+	<tr class="added_line"><td><pre>+                                pattern: ^.{2,}|[^./]$</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                type: string</pre></td></tr>
 	<tr class="added_line"><td><pre>+                              targetBranch:</pre></td></tr>
 	<tr class="added_line"><td><pre>+                                type: string</pre></td></tr>
@@ -9729,7 +9729,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 </div>
 
 <pre>_Stats_:
-[], [], [], [], []</pre>
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>

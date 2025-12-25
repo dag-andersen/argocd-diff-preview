@@ -44,13 +44,21 @@ func createTestArgoResource(kind, name, fileName string, branch git.BranchType) 
 	return *argoapplication.NewArgoResource(yamlObj, appKind, name, name, fileName, branch)
 }
 
+// Helper function to create ArgoSelection from apps
+func createArgoSelection(apps []argoapplication.ArgoResource) *argoapplication.ArgoSelection {
+	return &argoapplication.ArgoSelection{
+		SelectedApps: apps,
+		SkippedApps:  []argoapplication.ArgoResource{},
+	}
+}
+
 func TestFilterDuplicates_BasicFunctionality(t *testing.T) {
 	// Create test apps
 	app1 := createTestArgoResource("Application", "app1", "app1.yaml", git.Base)
 	app2 := createTestArgoResource("Application", "app2", "app2.yaml", git.Base)
 	app3 := createTestArgoResource("Application", "app3", "app3.yaml", git.Base)
 
-	apps := []argoapplication.ArgoResource{app1, app2, app3}
+	apps := createArgoSelection([]argoapplication.ArgoResource{app1, app2, app3})
 
 	// Create duplicates (app1 and app3 are duplicates)
 	duplicates := []*unstructured.Unstructured{
@@ -62,8 +70,10 @@ func TestFilterDuplicates_BasicFunctionality(t *testing.T) {
 	result := filterDuplicates(apps, duplicates)
 
 	// Should only return app2
-	assert.Len(t, result, 1)
-	assert.Equal(t, "app2", result[0].Name)
+	assert.Len(t, result.SelectedApps, 1)
+	assert.Equal(t, "app2", result.SelectedApps[0].Name)
+	// Duplicates should be moved to SkippedApps
+	assert.Len(t, result.SkippedApps, 2)
 }
 
 func TestFilterDuplicates_NoDuplicates(t *testing.T) {
@@ -71,7 +81,7 @@ func TestFilterDuplicates_NoDuplicates(t *testing.T) {
 	app1 := createTestArgoResource("Application", "app1", "app1.yaml", git.Base)
 	app2 := createTestArgoResource("Application", "app2", "app2.yaml", git.Base)
 
-	apps := []argoapplication.ArgoResource{app1, app2}
+	apps := createArgoSelection([]argoapplication.ArgoResource{app1, app2})
 
 	// Create duplicates that don't match any apps
 	app3 := createTestArgoResource("Application", "app3", "app3.yaml", git.Base)
@@ -81,9 +91,10 @@ func TestFilterDuplicates_NoDuplicates(t *testing.T) {
 	result := filterDuplicates(apps, duplicates)
 
 	// Should return all apps
-	assert.Len(t, result, 2)
-	assert.Equal(t, "app1", result[0].Name)
-	assert.Equal(t, "app2", result[1].Name)
+	assert.Len(t, result.SelectedApps, 2)
+	assert.Equal(t, "app1", result.SelectedApps[0].Name)
+	assert.Equal(t, "app2", result.SelectedApps[1].Name)
+	assert.Len(t, result.SkippedApps, 0)
 }
 
 func TestFilterDuplicates_AllDuplicates(t *testing.T) {
@@ -91,7 +102,7 @@ func TestFilterDuplicates_AllDuplicates(t *testing.T) {
 	app1 := createTestArgoResource("Application", "app1", "app1.yaml", git.Base)
 	app2 := createTestArgoResource("Application", "app2", "app2.yaml", git.Base)
 
-	apps := []argoapplication.ArgoResource{app1, app2}
+	apps := createArgoSelection([]argoapplication.ArgoResource{app1, app2})
 
 	// All apps are duplicates
 	duplicates := []*unstructured.Unstructured{
@@ -103,35 +114,39 @@ func TestFilterDuplicates_AllDuplicates(t *testing.T) {
 	result := filterDuplicates(apps, duplicates)
 
 	// Should return empty list
-	assert.Len(t, result, 0)
+	assert.Len(t, result.SelectedApps, 0)
+	assert.Len(t, result.SkippedApps, 2)
 }
 
 func TestFilterDuplicates_EmptyInputs(t *testing.T) {
 	t.Run("empty apps", func(t *testing.T) {
-		apps := []argoapplication.ArgoResource{}
+		apps := createArgoSelection([]argoapplication.ArgoResource{})
 		app1 := createTestArgoResource("Application", "app1", "app1.yaml", git.Base)
 		duplicates := []*unstructured.Unstructured{app1.Yaml}
 
 		result := filterDuplicates(apps, duplicates)
-		assert.Len(t, result, 0)
+		assert.Len(t, result.SelectedApps, 0)
+		assert.Len(t, result.SkippedApps, 0)
 	})
 
 	t.Run("empty duplicates", func(t *testing.T) {
 		app1 := createTestArgoResource("Application", "app1", "app1.yaml", git.Base)
-		apps := []argoapplication.ArgoResource{app1}
+		apps := createArgoSelection([]argoapplication.ArgoResource{app1})
 		duplicates := []*unstructured.Unstructured{}
 
 		result := filterDuplicates(apps, duplicates)
-		assert.Len(t, result, 1)
-		assert.Equal(t, "app1", result[0].Name)
+		assert.Len(t, result.SelectedApps, 1)
+		assert.Equal(t, "app1", result.SelectedApps[0].Name)
+		assert.Len(t, result.SkippedApps, 0)
 	})
 
 	t.Run("both empty", func(t *testing.T) {
-		apps := []argoapplication.ArgoResource{}
+		apps := createArgoSelection([]argoapplication.ArgoResource{})
 		duplicates := []*unstructured.Unstructured{}
 
 		result := filterDuplicates(apps, duplicates)
-		assert.Len(t, result, 0)
+		assert.Len(t, result.SelectedApps, 0)
+		assert.Len(t, result.SkippedApps, 0)
 	})
 }
 
@@ -141,7 +156,7 @@ func TestFilterDuplicates_MixedKinds(t *testing.T) {
 	appSet1 := createTestArgoResource("ApplicationSet", "appset1", "appset1.yaml", git.Base)
 	app2 := createTestArgoResource("Application", "app2", "app2.yaml", git.Base)
 
-	apps := []argoapplication.ArgoResource{app1, appSet1, app2}
+	apps := createArgoSelection([]argoapplication.ArgoResource{app1, appSet1, app2})
 
 	// Only app1 is a duplicate
 	duplicates := []*unstructured.Unstructured{app1.Yaml}
@@ -149,10 +164,11 @@ func TestFilterDuplicates_MixedKinds(t *testing.T) {
 	result := filterDuplicates(apps, duplicates)
 
 	// Should return appSet1 and app2
-	assert.Len(t, result, 2)
-	names := []string{result[0].Name, result[1].Name}
+	assert.Len(t, result.SelectedApps, 2)
+	names := []string{result.SelectedApps[0].Name, result.SelectedApps[1].Name}
 	assert.Contains(t, names, "appset1")
 	assert.Contains(t, names, "app2")
+	assert.Len(t, result.SkippedApps, 1)
 }
 
 func TestFilterDuplicates_Performance(t *testing.T) {
@@ -161,19 +177,21 @@ func TestFilterDuplicates_Performance(t *testing.T) {
 	const numDuplicates = 50
 
 	// Create many apps
-	var apps []argoapplication.ArgoResource
+	var appsList []argoapplication.ArgoResource
 	for i := 0; i < numApps; i++ {
 		app := createTestArgoResource("Application",
 			fmt.Sprintf("app%d", i),
 			fmt.Sprintf("app%d.yaml", i),
 			git.Base)
-		apps = append(apps, app)
+		appsList = append(appsList, app)
 	}
+
+	apps := createArgoSelection(appsList)
 
 	// Create duplicates (first half of apps)
 	var duplicates []*unstructured.Unstructured
 	for i := 0; i < numDuplicates; i++ {
-		duplicates = append(duplicates, apps[i].Yaml)
+		duplicates = append(duplicates, appsList[i].Yaml)
 	}
 
 	// Measure time
@@ -182,7 +200,8 @@ func TestFilterDuplicates_Performance(t *testing.T) {
 	duration := time.Since(start)
 
 	// Verify correctness
-	assert.Len(t, result, numApps-numDuplicates)
+	assert.Len(t, result.SelectedApps, numApps-numDuplicates)
+	assert.Len(t, result.SkippedApps, numDuplicates)
 
 	// Performance should be reasonable (less than 100ms for 100 apps)
 	assert.Less(t, duration, 100*time.Millisecond,
@@ -196,7 +215,7 @@ func TestFilterDuplicates_IdenticalContent(t *testing.T) {
 	app1 := createTestArgoResource("Application", "same-app", "app1.yaml", git.Base)
 	app2 := createTestArgoResource("Application", "same-app", "app2.yaml", git.Base)
 
-	apps := []argoapplication.ArgoResource{app1, app2}
+	apps := createArgoSelection([]argoapplication.ArgoResource{app1, app2})
 
 	// Use one as duplicate
 	duplicates := []*unstructured.Unstructured{app1.Yaml}
@@ -205,5 +224,28 @@ func TestFilterDuplicates_IdenticalContent(t *testing.T) {
 
 	// Both should be filtered since they have identical YAML content
 	// (app1 matches directly, app2 has same content so also matches)
-	assert.Len(t, result, 0)
+	assert.Len(t, result.SelectedApps, 0)
+	assert.Len(t, result.SkippedApps, 2)
+}
+
+func TestFilterDuplicates_PreservesExistingSkippedApps(t *testing.T) {
+	// Create test apps
+	app1 := createTestArgoResource("Application", "app1", "app1.yaml", git.Base)
+	app2 := createTestArgoResource("Application", "app2", "app2.yaml", git.Base)
+	skippedApp := createTestArgoResource("Application", "skipped", "skipped.yaml", git.Base)
+
+	apps := &argoapplication.ArgoSelection{
+		SelectedApps: []argoapplication.ArgoResource{app1, app2},
+		SkippedApps:  []argoapplication.ArgoResource{skippedApp},
+	}
+
+	// app1 is a duplicate
+	duplicates := []*unstructured.Unstructured{app1.Yaml}
+
+	result := filterDuplicates(apps, duplicates)
+
+	// Should preserve existing skipped apps and add new ones
+	assert.Len(t, result.SelectedApps, 1)
+	assert.Equal(t, "app2", result.SelectedApps[0].Name)
+	assert.Len(t, result.SkippedApps, 2) // skippedApp + app1
 }

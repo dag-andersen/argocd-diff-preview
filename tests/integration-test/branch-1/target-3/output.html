@@ -51,7 +51,7 @@ pre {
 <pre>Total: 2 files changed
 
 Deleted (1):
-- folder2 (-19)
+- folder2
 
 Modified (1):
 ± nginx-ingress (+1|-1)</pre>
@@ -66,26 +66,7 @@ folder2 (examples/git-generator/app/app-set.yaml)
 	
 	<tr class="comment_line"><td><pre>@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 </pre></td></tr>
-	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
-	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
-	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-  name: deploy-from-folder-two</pre></td></tr>
-	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-  replicas: 2</pre></td></tr>
-	<tr class="removed_line"><td><pre>-  selector:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-    matchLabels:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-      app: myapp</pre></td></tr>
-	<tr class="removed_line"><td><pre>-  template:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-    metadata:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-      labels:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-        app: myapp</pre></td></tr>
-	<tr class="removed_line"><td><pre>-    spec:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-      containers:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-      - image: dag-andersen/myapp:latest</pre></td></tr>
-	<tr class="removed_line"><td><pre>-        name: myapp</pre></td></tr>
-	<tr class="removed_line"><td><pre>-        ports:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
-	<tr class="normal_line"><td><pre></pre></td></tr>
+	<tr class="normal_line"><td><pre>Diff content omitted because &#39;--hide-deleted-app-diff&#39; is enabled.</pre></td></tr>
 </table>
 </div>
 </details>
@@ -99,6 +80,13 @@ nginx-ingress (examples/helm/applications/nginx.yaml)
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
 </pre></td></tr>
+	<tr class="normal_line"><td><pre>         - name: POD_NAME</pre></td></tr>
+	<tr class="normal_line"><td><pre>           valueFrom:</pre></td></tr>
+	<tr class="normal_line"><td><pre>             fieldRef:</pre></td></tr>
+	<tr class="normal_line"><td><pre>               fieldPath: metadata.name</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - name: POD_NAMESPACE</pre></td></tr>
+	<tr class="normal_line"><td><pre>           valueFrom:</pre></td></tr>
+	<tr class="normal_line"><td><pre>             fieldRef:</pre></td></tr>
 	<tr class="normal_line"><td><pre>               fieldPath: metadata.namespace</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - name: LD_PRELOAD</pre></td></tr>
 	<tr class="normal_line"><td><pre>           value: /usr/local/lib/libmimalloc.so</pre></td></tr>
@@ -107,6 +95,13 @@ nginx-ingress (examples/helm/applications/nginx.yaml)
 	<tr class="normal_line"><td><pre>         imagePullPolicy: IfNotPresent</pre></td></tr>
 	<tr class="normal_line"><td><pre>         lifecycle:</pre></td></tr>
 	<tr class="normal_line"><td><pre>           preStop:</pre></td></tr>
+	<tr class="normal_line"><td><pre>             exec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>               command:</pre></td></tr>
+	<tr class="normal_line"><td><pre>               - /wait-shutdown</pre></td></tr>
+	<tr class="normal_line"><td><pre>         livenessProbe:</pre></td></tr>
+	<tr class="normal_line"><td><pre>           failureThreshold: 5</pre></td></tr>
+	<tr class="normal_line"><td><pre>           httpGet:</pre></td></tr>
+	<tr class="normal_line"><td><pre>             path: /healthz</pre></td></tr>
 	<tr class="normal_line"><td><pre></pre></td></tr>
 </table>
 </div>

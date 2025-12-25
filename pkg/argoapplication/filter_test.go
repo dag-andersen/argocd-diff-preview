@@ -977,7 +977,7 @@ metadata:
 			}
 
 			// Run filter
-			got := app.Filter(FilterOptions{
+			got := app.Filter(ApplicationSelectionOptions{
 				Selector:                   tt.selectors,
 				FilesChanged:               tt.filesChanged,
 				IgnoreInvalidWatchPattern:  tt.ignoreInvalidWatchPattern,

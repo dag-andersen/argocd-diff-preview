@@ -38,9 +38,9 @@ func CreateExtractedApp(id string, name string, sourcePath string, manifest []un
 	}
 }
 
-// GetResourcesFromBothBranches extracts resources from both base and target branches
+// RenderApplicaitonsFromBothBranches extracts resources from both base and target branches
 // by applying their manifests to the cluster and capturing the resulting resources
-func GetResourcesFromBothBranches(
+func RenderApplicaitonsFromBothBranches(
 	argocd *argocdPkg.ArgoCDInstallation,
 	timeout uint64,
 	baseApps []argoapplication.ArgoResource,
@@ -57,6 +57,9 @@ func GetResourcesFromBothBranches(
 	if err := verifyNoDuplicateAppIds(targetApps); err != nil {
 		return nil, nil, time.Since(startTime), err
 	}
+
+	// print how many applications are being rendered for each branch
+	log.Info().Msgf("📌 Final number of Applications planned to be rendered: [Base: %d], [Target: %d]", len(baseApps), len(targetApps))
 
 	apps := append(baseApps, targetApps...)
 
@@ -89,7 +92,7 @@ func getResourcesFromApps(
 		namespacedScopedResources = nsr
 	}
 
-	log.Info().Msgf("🤖 Getting Applications (timeout in %d seconds)", timeout)
+	log.Info().Msgf("🤖 Rendering Applications (timeout in %d seconds)", timeout)
 
 	// Process apps in parallel with a worker pool
 	results := make(chan struct {
@@ -181,6 +184,8 @@ func getResourcesFromApps(
 	if firstError != nil {
 		return nil, nil, firstError
 	}
+
+	log.Info().Msgf("🎉 Rendered all %d applications", renderedApps)
 
 	// Wait for all goroutines to complete (including deletions)
 	log.Info().Msg("🧼 Waiting for all application deletions to complete...")

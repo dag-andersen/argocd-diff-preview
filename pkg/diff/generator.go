@@ -17,6 +17,8 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
+const deletedAppDiffHiddenMessage = "Diff content omitted because '--hide-deleted-app-diff' is enabled."
+
 type AppInfo struct {
 	Id          string
 	Name        string
@@ -35,7 +37,9 @@ func GenerateDiff(
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
-	timeInfo InfoBox,
+	hideDeletedAppDiff bool,
+	statsInfo StatsInfo,
+	selectionInfo SelectionInfo,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -54,28 +58,21 @@ func GenerateDiff(
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, baseApps, targetApps)
+	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
-	}
-
-	infoBoxString := timeInfo.String()
-
-	// Calculate the available space for the file sections
-	availableSpaceAfterOverhead := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
-	if availableSpaceAfterOverhead < 0 {
-		availableSpaceAfterOverhead = 0
 	}
 
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
 	MarkdownOutput := MarkdownOutput{
-		title:    title,
-		summary:  summary,
-		sections: markdownFileSections,
-		infoBox:  timeInfo,
+		title:         title,
+		summary:       summary,
+		sections:      markdownFileSections,
+		statsInfo:     statsInfo,
+		selectionInfo: selectionInfo,
 	}
-	markdown := MarkdownOutput.printDiff(availableSpaceAfterOverhead, maxDiffMessageCharCount)
+	markdown := MarkdownOutput.printDiff(maxDiffMessageCharCount)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	log.Debug().Msgf("Writing markdown output to %s", markdownPath)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
@@ -86,10 +83,11 @@ func GenerateDiff(
 	// HTML
 	log.Debug().Msg("Creating html output")
 	HTMLOutput := HTMLOutput{
-		title:    title,
-		summary:  summary,
-		sections: htmlFileSections,
-		infoBox:  timeInfo,
+		title:         title,
+		summary:       summary,
+		sections:      htmlFileSections,
+		statsInfo:     statsInfo,
+		selectionInfo: selectionInfo,
 	}
 	htmlDiff := HTMLOutput.printDiff()
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
@@ -120,6 +118,7 @@ func generateGitDiff(
 	basePath, targetPath string,
 	diffIgnore *string,
 	diffContextLines uint,
+	hideDeletedAppDiff bool,
 	baseApps []AppInfo,
 	targetApps []AppInfo,
 ) (string, []MarkdownSection, []HTMLSection, error) {
@@ -274,7 +273,11 @@ func generateGitDiff(
 
 		case merkletrie.Delete:
 
-			if from != nil {
+			// Skip generating diff content for deleted apps when hideDeletedAppDiff is enabled
+			// The header will still be shown, but not the full diff content
+			if hideDeletedAppDiff {
+				changeInfo.content = deletedAppDiffHiddenMessage
+			} else if from != nil {
 				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
 					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
@@ -290,7 +293,6 @@ func generateGitDiff(
 
 		case merkletrie.Modify:
 
-			// Get content of both files and use the diff package
 			var oldContent, newContent string
 
 			if from != nil {
@@ -317,7 +319,6 @@ func generateGitDiff(
 				}
 			}
 
-			// Use diff.Do to generate the diff
 			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
 		}
 

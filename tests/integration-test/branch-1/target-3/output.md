@@ -5,7 +5,7 @@ Summary:
 Total: 2 files changed
 
 Deleted (1):
-- folder2 (-19)
+- folder2
 
 Modified (1):
 ± nginx-ingress (+1|-1)
@@ -17,25 +17,7 @@ Modified (1):
 
 ```diff
 @@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
--apiVersion: apps/v1
--kind: Deployment
--metadata:
--  name: deploy-from-folder-two
--spec:
--  replicas: 2
--  selector:
--    matchLabels:
--      app: myapp
--  template:
--    metadata:
--      labels:
--        app: myapp
--    spec:
--      containers:
--      - image: dag-andersen/myapp:latest
--        name: myapp
--        ports:
--        - containerPort: 80
+Diff content omitted because '--hide-deleted-app-diff' is enabled.
 ```
 
 </details>
@@ -46,6 +28,13 @@ Modified (1):
 
 ```diff
 @@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+         - name: POD_NAME
+           valueFrom:
+             fieldRef:
+               fieldPath: metadata.name
+         - name: POD_NAMESPACE
+           valueFrom:
+             fieldRef:
                fieldPath: metadata.namespace
          - name: LD_PRELOAD
            value: /usr/local/lib/libmimalloc.so
@@ -54,6 +43,13 @@ Modified (1):
          imagePullPolicy: IfNotPresent
          lifecycle:
            preStop:
+             exec:
+               command:
+               - /wait-shutdown
+         livenessProbe:
+           failureThreshold: 5
+           httpGet:
+             path: /healthz
 ```
 
 </details>
