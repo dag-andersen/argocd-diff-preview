@@ -38,7 +38,8 @@ func GenerateDiff(
 	lineCount uint,
 	maxCharCount uint,
 	hideDeletedAppDiff bool,
-	timeInfo InfoBox,
+	statsInfo StatsInfo,
+	selectionInfo SelectionInfo,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -62,23 +63,16 @@ func GenerateDiff(
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
 
-	infoBoxString := timeInfo.String()
-
-	// Calculate the available space for the file sections
-	availableSpaceAfterOverhead := int(maxDiffMessageCharCount) - markdownTemplateLength() - len(summary) - len(infoBoxString) - len(title)
-	if availableSpaceAfterOverhead < 0 {
-		availableSpaceAfterOverhead = 0
-	}
-
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
 	MarkdownOutput := MarkdownOutput{
-		title:    title,
-		summary:  summary,
-		sections: markdownFileSections,
-		infoBox:  timeInfo,
+		title:         title,
+		summary:       summary,
+		sections:      markdownFileSections,
+		statsInfo:     statsInfo,
+		selectionInfo: selectionInfo,
 	}
-	markdown := MarkdownOutput.printDiff(availableSpaceAfterOverhead, maxDiffMessageCharCount)
+	markdown := MarkdownOutput.printDiff(maxDiffMessageCharCount)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	log.Debug().Msgf("Writing markdown output to %s", markdownPath)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
@@ -89,10 +83,11 @@ func GenerateDiff(
 	// HTML
 	log.Debug().Msg("Creating html output")
 	HTMLOutput := HTMLOutput{
-		title:    title,
-		summary:  summary,
-		sections: htmlFileSections,
-		infoBox:  timeInfo,
+		title:         title,
+		summary:       summary,
+		sections:      htmlFileSections,
+		statsInfo:     statsInfo,
+		selectionInfo: selectionInfo,
 	}
 	htmlDiff := HTMLOutput.printDiff()
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)

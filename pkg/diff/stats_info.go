@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-type InfoBox struct {
+type StatsInfo struct {
 	FullDuration               time.Duration
 	ExtractDuration            time.Duration
 	ArgoCDInstallationDuration time.Duration
@@ -13,11 +13,11 @@ type InfoBox struct {
 	ApplicationCount           int
 }
 
-func (t InfoBox) String() string {
+func (t StatsInfo) String() string {
 	return fmt.Sprintf("_Stats_:\n%s", t.Stats())
 }
 
-func (t InfoBox) Stats() string {
+func (t StatsInfo) Stats() string {
 	return fmt.Sprintf("[Applications: %d], [Full Run: %s], [Rendering: %s], [Cluster: %s], [Argo CD: %s]",
 		t.ApplicationCount, t.FullDuration.Round(time.Second), t.ExtractDuration.Round(time.Second), t.ClusterCreationDuration.Round(time.Second), t.ArgoCDInstallationDuration.Round(time.Second))
 }

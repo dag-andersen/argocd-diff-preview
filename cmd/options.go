@@ -245,7 +245,7 @@ func Parse() *Options {
 	rootCmd.Flags().String("timeout", fmt.Sprintf("%d", DefaultTimeout), "Set timeout in seconds")
 
 	// File and diff related
-	rootCmd.Flags().StringP("file-regex", "r", "", "Regex to filter files. Example: /apps_.*\\.yaml")
+	rootCmd.Flags().StringP("file-regex", "r", "", "Regex to select/filter files. Example: /apps_.*\\.yaml")
 	rootCmd.Flags().StringP("diff-ignore", "i", "", "Ignore lines in diff. Example: v[1,9]+.[1,9]+.[1,9]+ for ignoring version changes")
 	rootCmd.Flags().StringP("line-count", "c", fmt.Sprintf("%d", DefaultLineCount), "Generate diffs with <n> lines of context")
 

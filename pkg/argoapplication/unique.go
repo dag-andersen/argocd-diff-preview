@@ -18,6 +18,7 @@ func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 
 	var newApps []ArgoResource
 	duplicateCounter := 0
+	duplicateExample := ""
 
 	// Process each group of applications
 	for id, appsWithSameId := range duplicateIds {
@@ -31,6 +32,10 @@ func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 			sort.Slice(appsWithSameId, func(i, j int) bool {
 				return appsWithSameId[i].FileName < appsWithSameId[j].FileName
 			})
+
+			if duplicateExample == "" {
+				duplicateExample = appsWithSameId[0].Id
+			}
 
 			// Rename each app with a suffix
 			for i, app := range appsWithSameId {
@@ -60,8 +65,12 @@ func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 	if duplicateCounter > 0 {
 		log.Info().
 			Str("branch", branch.Name).
-			Msgf("🔍 Found %d duplicate application names. Suffixing with -1, -2, -3, etc.", duplicateCounter)
-		log.Info().Str("branch", branch.Name).Msgf("🤖 Applications after unique names: %v", len(newApps))
+			Msgf("🔍 Found %d duplicate application names. Example: '%s'. Suffixing with -1, -2, -3, etc.", duplicateCounter, duplicateExample)
+	}
+
+	// validate that the number of applications that was parsed as input is the same as the number of applications that was parsed as output
+	if len(apps) != len(newApps) {
+		panic(fmt.Sprintf("failed to ensure unique IDs: expected %d apps, got %d. Please report this as a bug.", len(apps), len(newApps)))
 	}
 
 	return newApps

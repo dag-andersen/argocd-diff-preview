@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,7 +19,7 @@ const (
 	annotationArgoCDManifestGeneratePaths = "argocd.argoproj.io/manifest-generate-paths"
 )
 
-type FilterOptions struct {
+type ApplicationSelectionOptions struct {
 	FileRegex                  *string
 	Selector                   []selector.Selector
 	FilesChanged               []string
@@ -28,76 +27,62 @@ type FilterOptions struct {
 	WatchIfNoWatchPatternFound bool
 }
 
-func FilterAllWithLogging(apps []ArgoResource, filterOptions FilterOptions, branch *git.Branch) []ArgoResource {
-	// Log selector and files changed info
+func (appSelectionOptions ApplicationSelectionOptions) LogRules() {
 	switch {
-	case len(filterOptions.Selector) > 0 && len(filterOptions.FilesChanged) > 0:
+	case len(appSelectionOptions.Selector) > 0 && len(appSelectionOptions.FilesChanged) > 0:
 		var selectorStrs []string
-		for _, s := range filterOptions.Selector {
+		for _, s := range appSelectionOptions.Selector {
 			selectorStrs = append(selectorStrs, s.String())
 		}
 		log.Info().Msgf(
-			"🤖 Will only run on Applications that match '%s' and watch these files: '%s'",
+			"🤖 Will only select Application[Sets] that match '%s' and watch these files: '%s'",
 			strings.Join(selectorStrs, ","),
-			strings.Join(filterOptions.FilesChanged, "', '"),
+			strings.Join(appSelectionOptions.FilesChanged, "', '"),
 		)
-	case len(filterOptions.Selector) > 0:
+	case len(appSelectionOptions.Selector) > 0:
 		var selectorStrs []string
-		for _, s := range filterOptions.Selector {
+		for _, s := range appSelectionOptions.Selector {
 			selectorStrs = append(selectorStrs, s.String())
 		}
 		log.Info().Msgf(
-			"🤖 Will only run on Applications that match '%s'",
+			"🤖 Will only select Application[Sets] that match '%s'",
 			strings.Join(selectorStrs, ","),
 		)
-	case len(filterOptions.FilesChanged) > 0:
+	case len(appSelectionOptions.FilesChanged) > 0:
 		log.Info().Msgf(
-			"🤖 Will only run on Applications that watch these files: '%s'",
-			strings.Join(filterOptions.FilesChanged, "', '"),
+			"🤖 Will only select Application[Sets] that watch these files: '%s'",
+			strings.Join(appSelectionOptions.FilesChanged, "', '"),
 		)
 	}
-
-	numberOfAppsBeforeFiltering := len(apps)
-
-	// Filter applications
-	filteredApps := FilterAll(apps, filterOptions)
-
-	// Log filtering results
-	if numberOfAppsBeforeFiltering != len(filteredApps) {
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Found %d Application[Sets] before filtering",
-			numberOfAppsBeforeFiltering,
-		)
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Found %d Application[Sets] after filtering",
-			len(filteredApps),
-		)
-	} else {
-		log.Info().Str("branch", branch.Name).Msgf(
-			"🤖 Found %d Application[Sets]",
-			numberOfAppsBeforeFiltering,
-		)
-	}
-
-	return filteredApps
 }
 
-func FilterAll(
+type ArgoSelection struct {
+	SelectedApps []ArgoResource
+	SkippedApps  []ArgoResource
+}
+
+func ApplicationSelection(
 	apps []ArgoResource,
-	filterOptions FilterOptions,
-) []ArgoResource {
-	var filteredApps []ArgoResource
+	appSelectionOptions ApplicationSelectionOptions,
+) *ArgoSelection {
+	var selectedApps []ArgoResource
+	var skippedApps []ArgoResource
 	for _, app := range apps {
-		if app.Filter(filterOptions) {
-			filteredApps = append(filteredApps, app)
+		if app.Filter(appSelectionOptions) {
+			selectedApps = append(selectedApps, app)
+		} else {
+			skippedApps = append(skippedApps, app)
 		}
 	}
-	return filteredApps
+	return &ArgoSelection{
+		SelectedApps: selectedApps,
+		SkippedApps:  skippedApps,
+	}
 }
 
 // Filter checks if the application matches the given selectors and watches the given files
 func (a *ArgoResource) Filter(
-	filterOptions FilterOptions,
+	appSelectionOptions ApplicationSelectionOptions,
 ) bool {
 
 	// First check selected annotation
@@ -108,8 +93,8 @@ func (a *ArgoResource) Filter(
 	}
 
 	// Then check selectors
-	if len(filterOptions.Selector) > 0 {
-		selected, reason := a.filterBySelectors(filterOptions.Selector)
+	if len(appSelectionOptions.Selector) > 0 {
+		selected, reason := a.filterBySelectors(appSelectionOptions.Selector)
 		if !selected {
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
 			return false
@@ -117,8 +102,8 @@ func (a *ArgoResource) Filter(
 	}
 
 	// Then check files changed
-	if len(filterOptions.FilesChanged) > 0 {
-		selected, reason := a.filterByFilesChanged(filterOptions.FilesChanged, filterOptions.IgnoreInvalidWatchPattern, filterOptions.WatchIfNoWatchPatternFound)
+	if len(appSelectionOptions.FilesChanged) > 0 {
+		selected, reason := a.filterByFilesChanged(appSelectionOptions.FilesChanged, appSelectionOptions.IgnoreInvalidWatchPattern, appSelectionOptions.WatchIfNoWatchPatternFound)
 		if !selected {
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
 			return false
