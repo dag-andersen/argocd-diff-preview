@@ -5,36 +5,36 @@ Summary:
 Total: 1 files changed
 
 Added (1):
-+ ignore-annotation-example (+81)
++ label-selectors-example (+81)
 ```
 
 <details>
-<summary>ignore-annotation-example (examples/ignore-annotation/app.yaml)</summary>
+<summary>label-selectors-example (examples/label-selectors/app.yaml)</summary>
 <br>
 
 ```diff
-@@ Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml) @@
+@@ Application added: label-selectors-example (examples/label-selectors/app.yaml) @@
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
 +  labels:
-+    app.kubernetes.io/instance: ignore-annotation-example
++    app.kubernetes.io/instance: label-selectors-example
 +    app.kubernetes.io/managed-by: Helm
 +    app.kubernetes.io/name: myApp
 +    app.kubernetes.io/version: 1.16.0
 +    helm.sh/chart: myApp-0.1.0
 +  name: super-app-name
-+  namespace: default
++  namespace: some-namespace
 +spec:
-+  replicas: 1
++  replicas: 5
 +  selector:
 +    matchLabels:
-+      app.kubernetes.io/instance: ignore-annotation-example
++      app.kubernetes.io/instance: label-selectors-example
 +      app.kubernetes.io/name: myApp
 +  template:
 +    metadata:
 +      labels:
-+        app.kubernetes.io/instance: ignore-annotation-example
++        app.kubernetes.io/instance: label-selectors-example
 +        app.kubernetes.io/managed-by: Helm
 +        app.kubernetes.io/name: myApp
 +        app.kubernetes.io/version: 1.16.0
@@ -65,13 +65,13 @@ Added (1):
 +kind: Service
 +metadata:
 +  labels:
-+    app.kubernetes.io/instance: ignore-annotation-example
++    app.kubernetes.io/instance: label-selectors-example
 +    app.kubernetes.io/managed-by: Helm
 +    app.kubernetes.io/name: myApp
 +    app.kubernetes.io/version: 1.16.0
 +    helm.sh/chart: myApp-0.1.0
 +  name: super-app-name
-+  namespace: default
++  namespace: some-namespace
 +spec:
 +  ports:
 +  - name: http
@@ -79,7 +79,7 @@ Added (1):
 +    protocol: TCP
 +    targetPort: http
 +  selector:
-+    app.kubernetes.io/instance: ignore-annotation-example
++    app.kubernetes.io/instance: label-selectors-example
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
 +---
@@ -88,20 +88,20 @@ Added (1):
 +kind: ServiceAccount
 +metadata:
 +  labels:
-+    app.kubernetes.io/instance: ignore-annotation-example
++    app.kubernetes.io/instance: label-selectors-example
 +    app.kubernetes.io/managed-by: Helm
 +    app.kubernetes.io/name: myApp
 +    app.kubernetes.io/version: 1.16.0
 +    helm.sh/chart: myApp-0.1.0
 +  name: super-app-name
-+  namespace: default
++  namespace: some-namespace
 ```
 
 </details>
 
 _Skipped resources_: 
-- Applications: `2` (base) -> `3` (target)
-- ApplicationSets: `1` (base) -> `0` (target)
+- Applications: `12` (base) -> `11` (target)
+- ApplicationSets: `7` (base) -> `7` (target)
 
 _Stats_:
-[Applications: 41], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 1], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
