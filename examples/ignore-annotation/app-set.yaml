@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: ignore-annotation-appset-example
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - name: staging
+            path: examples/kustomize/my-service/overlay/staging
+          - name: production
+            path: examples/kustomize/my-service/overlay/production
+  template:
+    metadata:
+      name: "ignore-annotation-appset-{{ .name }}"
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+      annotations:
+        argocd-diff-preview/ignore: "true"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        path: "{{ .path }}"
+      destination:
+        name: in-cluster
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
