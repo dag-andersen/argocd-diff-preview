@@ -35,6 +35,10 @@ func main() {
 
 	if err := run(opts); err != nil {
 		log.Error().Msgf("❌ %v", err)
+		helpMessage := extract.GetHelpMessage(err)
+		if helpMessage != "" {
+			log.Info().Msgf("💡 Help: %s", helpMessage)
+		}
 		if !opts.Debug {
 			log.Info().Msg("🕵️ Run with '--debug' for more details")
 		} else {
@@ -193,6 +197,7 @@ func run(opts *Options) error {
 		opts.ArgocdChartURL,
 		opts.ArgocdChartRepoUsername,
 		opts.ArgocdChartRepoPassword,
+		opts.UseArgoCDApi,
 	)
 
 	var argocdInstallationDuration time.Duration

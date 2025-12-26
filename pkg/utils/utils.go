@@ -60,8 +60,9 @@ func UniqueId() string {
 	return fmt.Sprintf("uid-%d", UniqueNumber())
 }
 
+var docSeparatorRegex = regexp.MustCompile(`(?m)^---\s*(?:#.*)?$`)
+
 func SplitYAMLDocuments(manifest string) []string {
-	docSeparatorRegex := regexp.MustCompile(`(?m)^---\s*(?:#.*)?$`)
 	documents := docSeparatorRegex.Split(manifest, -1)
 
 	// Filter out empty or whitespace-only documents
