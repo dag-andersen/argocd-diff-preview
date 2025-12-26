@@ -3,8 +3,6 @@ kind: ApplicationSet
 metadata:
   name: ignore-annotation-appset-example
   namespace: argocd
-  annotations:
-    argocd-diff-preview/ignore: "true"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -20,6 +18,8 @@ spec:
       name: "ignore-annotation-appset-{{ .name }}"
       finalizers:
       - resources-finalizer.argocd.argoproj.io
+      annotations:
+        argocd-diff-preview/ignore: "true"
     spec:
       project: default
       source:
