@@ -34,8 +34,11 @@
   },
   "remoteUser": "root",
   "initializeCommand": "rm -rf bin/",
-  "postCreateCommand": "sudo groupadd docker || true && sudo usermod -aG docker $(whoami) && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind && curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd && rm argocd-linux-amd64",
-  "postStartCommand": "make go-build",
+  "postCreateCommand": {
+    "docker": "make devcontainer-setup-docker",
+    "kind": "make devcontainer-setup-kind",
+    "argocd": "make devcontainer-setup-argocd"
+  },
   "remoteEnv": {
     "GO111MODULE": "on",
     "CGO_ENABLED": "0"
@@ -48,8 +51,7 @@
     9090
   ],
   "containerEnv": {
-    "WORKSPACE": "${containerWorkspaceFolder}",
-    "DOCKER_API_VERSION": "1.43"
+    "WORKSPACE": "${containerWorkspaceFolder}"
   },
   "runArgs": [
     "--privileged",

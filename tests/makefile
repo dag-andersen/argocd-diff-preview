@@ -14,6 +14,10 @@ auto_detect_files_changed := false
 hide_deleted_app_diff := false
 update_expected ?= false
 
+# Detect Docker API version if client is too new for server
+DOCKER_API_VERSION ?= $(shell docker version 2>&1 | sed -n 's/.*Maximum supported API version is \([0-9.]*\).*/\1/p')
+export DOCKER_API_VERSION
+
 pull-base:
 	@rm -rf base-branch || true && mkdir -p base-branch
 	cd base-branch   && git clone https://github.com/$(github_org)/$(gitops_repo).git --depth=1 --branch "$(base_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
@@ -70,6 +74,7 @@ run-single-test-docker: clean pull-base pull-target
 	docker run --network=host \
 		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		$(if $(DOCKER_API_VERSION),-e DOCKER_API_VERSION=$(DOCKER_API_VERSION)) \
 		-v $(PWD)/base-branch:/base-branch \
 		-v $(PWD)/target-branch:/target-branch \
 		-v $(PWD)/output:/output \
