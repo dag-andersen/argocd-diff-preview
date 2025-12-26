@@ -1,63 +1,58 @@
 {
-    "name": "ArgoCD Diff Preview",
-    "image": "mcr.microsoft.com/devcontainers/go:1-bookworm",
-    
-    "features": {
-      "ghcr.io/devcontainers/features/docker-in-docker:2": {
-        "version": "latest"
-      },
-      "ghcr.io/devcontainers/features/github-cli:1": {
-        "version": "latest"
+  "name": "ArgoCD Diff Preview",
+  "image": "mcr.microsoft.com/devcontainers/go:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools",
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.toolsManagement.autoUpdate": true,
+        "go.lintOnSave": "workspace",
+        "go.formatTool": "gofmt",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit"
+        },
+        "files.eol": "\n"
       }
-    },
-  
-    "customizations": {
-      "vscode": {
-        "extensions": [
-          "golang.go",
-          "ms-azuretools.vscode-docker",
-          "redhat.vscode-yaml",
-          "ms-kubernetes-tools.vscode-kubernetes-tools",
-          "eamodio.gitlens",
-          "streetsidesoftware.code-spell-checker"
-        ],
-        "settings": {
-          "go.useLanguageServer": true,
-          "go.toolsManagement.autoUpdate": true,
-          "go.lintOnSave": "workspace",
-          "go.formatTool": "gofmt",
-          "editor.formatOnSave": true,
-          "editor.codeActionsOnSave": {
-            "source.organizeImports": "explicit"
-          },
-          "files.eol": "\n"
-        }
-      }
-    },
-    
-    "remoteUser": "root",
-    
-    "initializeCommand": "rm -rf bin/",
-    "postCreateCommand": "sudo groupadd docker || true && sudo usermod -aG docker $(whoami) && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind && curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd && rm argocd-linux-amd64",
-    "postStartCommand": "make go-build",
-  
-    "remoteEnv": {
-      "GO111MODULE": "on",
-      "CGO_ENABLED": "0"
-    },
-  
-    "mounts": [
-      "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-    ],
-  
-    "forwardPorts": [8080, 9090],
-  
-    "containerEnv": {
-      "WORKSPACE": "${containerWorkspaceFolder}"
-    },
-  
-    "runArgs": [
-      "--privileged",
-      "--network=host"  
-    ]
-  }
+    }
+  },
+  "remoteUser": "root",
+  "initializeCommand": "rm -rf bin/",
+  "postCreateCommand": "sudo groupadd docker || true && sudo usermod -aG docker $(whoami) && curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind && curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd && rm argocd-linux-amd64",
+  "postStartCommand": "make go-build",
+  "remoteEnv": {
+    "GO111MODULE": "on",
+    "CGO_ENABLED": "0"
+  },
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+  "forwardPorts": [
+    8080,
+    9090
+  ],
+  "containerEnv": {
+    "WORKSPACE": "${containerWorkspaceFolder}",
+    "DOCKER_API_VERSION": "1.43"
+  },
+  "runArgs": [
+    "--privileged",
+    "--network=host"
+  ]
+}
