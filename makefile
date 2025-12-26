@@ -9,6 +9,10 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GO_TEST_FLAGS ?=
 
+# Detect Docker API version if client is too new for server
+DOCKER_API_VERSION ?= $(shell docker version 2>&1 | sed -n 's/.*Maximum supported API version is \([0-9.]*\).*/\1/p')
+export DOCKER_API_VERSION
+
 go-build:
 	go build -ldflags="-X 'main.Version=$(VERSION)' -X 'main.Commit=$(COMMIT)' -X 'main.BuildDate=$(BUILD_DATE)'" -o bin/argocd-diff-preview ./cmd
 
@@ -42,6 +46,7 @@ run-with-docker: pull-repository docker-build
 		--network=host \
 		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		$(if $(DOCKER_API_VERSION),-e DOCKER_API_VERSION=$(DOCKER_API_VERSION)) \
 		-v $(PWD)/base-branch:/base-branch \
 		-v $(PWD)/target-branch:/target-branch \
 		-v $(PWD)/output:/output \
@@ -82,3 +87,10 @@ run-integration-tests-docker:
 
 run-integration-tests-go: go-build
 	cd tests && $(MAKE) run-test-all-go
+
+# Run before release
+check-release: run-lint run-unit-tests
+	$(MAKE) run-integration-tests-go
+	$(MAKE) run-integration-tests-docker
+
+-include devcontainer.make
