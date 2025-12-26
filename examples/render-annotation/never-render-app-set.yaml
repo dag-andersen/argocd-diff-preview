@@ -3,8 +3,8 @@ kind: ApplicationSet
 metadata:
   name: never-render-annotation-appset-example
   namespace: argocd
-  annotations:
-    argocd-diff-preview/render: "never"
+  # annotations:
+  #   argocd-diff-preview/render: "never"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -20,6 +20,8 @@ spec:
       name: "never-render-annotation-appset-{{ .name }}"
       finalizers:
       - resources-finalizer.argocd.argoproj.io
+      annotations:
+        argocd-diff-preview/render: "never"
     spec:
       project: default
       source:
