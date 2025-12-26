@@ -30,7 +30,6 @@ run-with-go: go-build pull-repository
 		--base-branch="$(base_branch)" \
 		--target-branch="$(target_branch)" \
 		--repo="$(github_org)/$(gitops_repo)" \
-		--debug \
 		--keep-cluster-alive \
 		--file-regex="$(regex)" \
 		--diff-ignore="$(diff_ignore)" \

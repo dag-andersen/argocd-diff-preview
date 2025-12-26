@@ -2,25 +2,47 @@
 
 Thank you for your interest in contributing to ArgoCD Diff Preview! This document provides guidelines and instructions for contributing to the project.
 
-## Development Environment Setup
+## GitHub Codespaces (Simplest way to get started)
+
+1. Open the repository in GitHub Codespaces:
+
+<p align="center">
+  <img src="./docs/assets/codespaces-1-marked.png" style="max-width: 800px; width: 100%;" />
+</p>
+
+2. Verify the setup works:
+
+```bash
+make run-with-go target_branch=helm-example-3
+```
+
+Output should look similar to like this:
+
+<!-- screenshot of the output of the above command -->
+<p align="center">
+  <img src="./docs/assets/codespaces-3.png" style="max-width: 800px; width: 100%;" />
+</p>
+
+> [!IMPORTANT]
+> If you experience issues with the setup, please open an issue in the repository! 🚀
+
+## Local Development Environment Setup
 
 ### Prerequisites
 
-To develop for ArgoCD Diff Preview, you'll need the following tools:
+**Required:**
+- **Go** (1.21+)
+- **Docker**
+- **Git**
+- **Make**
 
-1. **Go** (version 1.21 or later) - The main programming language used in the project
-2. **Docker** - For building containers and running integration tests
-3. **Git** - For version control
-4. **Make** - For running the project's build scripts
+**Required only when running with Go** (not needed for Docker):
+- [kind](https://kind.sigs.k8s.io/)
+- [kubectl](https://kubernetes.io/docs/reference/kubectl/)
+- [Helm](https://helm.sh/)
+- [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
 
-Additionally, these tools are used by the tool but don't need to be installed directly if you are running the tool with Docker. If you are running the tool with Go, you will need to install them.
-
-- [kind](https://kind.sigs.k8s.io/) - For creating a local Kubernetes cluster
-- [kubectl](https://kubernetes.io/docs/reference/kubectl/) - For interacting with the Kubernetes cluster
-- [Helm](https://helm.sh/) - For installing Argo CD
-- [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) - For interacting with Argo CD
-
-### Setting Up Your Development Environment
+### Setup
 
 1. Clone the repository:
    ```bash
@@ -52,9 +74,9 @@ argocd-diff-preview/
 └── examples/             # Examples used by the integration tests and pull request examples
 ```
 
-## Building the Project
+## Building the tool
 
-### Building the Go Binary
+### Building the tool with Go
 
 ```bash
 make go-build
@@ -62,15 +84,15 @@ make go-build
 
 This will create a binary in the `bin/` directory.
 
-### Building the Docker Image
+### Building the tool with Docker
 
 ```bash
 make docker-build
 ```
 
-## Running the Project Locally
+## Running the tool locally
 
-There are two ways to run the project locally:
+There are two ways to run the tool locally:
 
 ### Using branches from the ArgoCD Diff Preview repository
 
@@ -113,11 +135,13 @@ Using Docker:
 make run-integration-tests-docker
 ```
 
-If you have made changes to the output of the tool, you can update the expected output of the tests by setting the `update_expected` variable to `true`. Example:
+If you have made changes to the output of the tool, you can update the expected output for integration tests by setting the `update_expected` variable to `true`. Example:
 
 ```bash
 make run-integration-tests-docker update_expected=true
 ```
+
+This will update the updated output files in the `tests/integration-test/` directory.
 
 ### Running Unit Tests
 
@@ -126,6 +150,9 @@ To run all unit tests in the project:
 ```bash
 make run-unit-tests
 ```
+
+> [!TIP]
+> Before you create a pull request, please run `make check-release` to verify that the tool works as expected. Feel free to reach out if you need help! 🚀
 
 ## Documentation
 
