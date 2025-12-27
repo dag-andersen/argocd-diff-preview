@@ -10,7 +10,56 @@ The tool follows a simple but powerful approach: spin up a real Argo CD instance
 
 When you run the tool, it follows these steps:
 
-## Step 1: Starts local cluster
+## Step 1: Fetch Applications
+
+The tool collects all resources from the `base-branch` and `target-branch` folders for all YAML files containing:
+
+- `kind: Application`
+- `kind: ApplicationSet`
+
+---
+
+## Step 2: Select/Filter Applications
+
+Before processing, the tool filters which applications to render. By default, all applications are rendered, but you can limit this using several strategies:
+
+| Strategy | How it works |
+|----------|--------------|
+| **Watch patterns** | Add `argocd-diff-preview/watch-pattern` annotation to only render apps when specific files change |
+| **Ignore annotation** | Add `argocd-diff-preview/ignore: "true"` to skip specific applications entirely |
+| **Label selectors** | Use `--selector "team=platform"` to filter by Kubernetes labels |
+| **File path regex** | Use `--file-regex="team-a/"` to filter by the application's file location |
+
+This is especially useful in large monorepos where rendering all applications on every PR would be slow.
+
+→ [**Full documentation on application selection**](./application-selection.md)
+
+!!! note "Early exit if no applications selected"
+    If no applications are selected after filtering, the tool stops here and outputs an empty diff. This avoids spinning up a cluster unnecessarily.
+
+---
+
+## Step 3: Patch Applications
+
+For each Application or ApplicationSet found, it applies the following modifications:
+
+| Modification | Why |
+|--------------|-----|
+| Set `metadata.namespace` to `argocd-diff-preview` | So Argo CD can find and manage the applications |
+| Remove `spec.syncPolicy` | Prevents Argo CD from actually syncing resources to the cluster |
+| Set `spec.project` to `default` | The ephemeral Argo CD only has the `default` project configured |
+| Set `spec.destination.server` to `https://kubernetes.default.svc` | Points to the local cluster (the actual destination doesn't matter since we're only rendering, not syncing) |
+| Set `spec.source.targetRevision` to the branch name | So Argo CD renders manifests from the correct branch |
+| Set `spec.sources[*].targetRevision` to the branch name | Same as above, but for multi-source applications |
+| Set `spec.generators[*].git.revision` to the branch name | For ApplicationSets using Git generators (including nested Matrix/Merge generators) |
+
+<p align="center">
+  <img src="../assets/appset-patching.png" width="800">
+</p>
+
+---
+
+## Step 4: Start local cluster
 
 The tool creates a local ephemeral Kubernetes cluster using one of the supported local cluster tools:
 
@@ -26,7 +75,7 @@ kind create cluster --name argocd-diff-preview
 
 ---
 
-## Step 2: Installs Argo CD
+## Step 5: Install Argo CD
 
 Argo CD is installed using the official [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd). By default, the latest version is installed, but you can specify a version with `--argocd-chart-version`.
 
@@ -46,8 +95,7 @@ helm install my-argo-cd argo/argo-cd --version x.x.x
 
 ---
 
-## Step 3: Applies credentials
-
+## Step 6: Apply credentials
 
 If your repository is private, you need to provide the tool with the necessary credentials.
 
@@ -102,45 +150,6 @@ kubectl apply -f /secrets
 
 ---
 
-## Step 4: Fetches Applications
-
-The tool scans the `base-branch` and `target-branch` folders for all YAML files containing:
-
-- `kind: Application`
-- `kind: ApplicationSet`
-
-## Step 5: Select/Filter Applications
-
-Before processing, the tool filters which applications to render. By default, all applications are rendered, but you can limit this using several strategies:
-
-| Strategy | How it works |
-|----------|--------------|
-| **Watch patterns** | Add `argocd-diff-preview/watch-pattern` annotation to only render apps when specific files change |
-| **Ignore annotation** | Add `argocd-diff-preview/ignore: "true"` to skip specific applications entirely |
-| **Label selectors** | Use `--selector "team=platform"` to filter by Kubernetes labels |
-| **File path regex** | Use `--file-regex="team-a/"` to filter by the application's file location |
-
-This is especially useful in large monorepos where rendering all applications on every PR would be slow.
-
-→ [**Full documentation on application selection**](./application-selection.md)
-
-## Step 6: Patch Applications
-
-For each Application or ApplicationSet found, it applies the following modifications:
-
-| Modification | Why |
-|--------------|-----|
-| Set `metadata.namespace` to `argocd` | So Argo CD can find and manage the applications |
-| Remove `spec.syncPolicy` | Prevents Argo CD from actually syncing resources to the cluster |
-| Set `spec.project` to `default` | The ephemeral Argo CD only has the `default` project configured |
-| Set `spec.destination.server` to `https://kubernetes.default.svc` | Points to the local cluster (the actual destination doesn't matter since we're only rendering, not syncing) |
-| Remove `resources-finalizer.argocd.argoproj.io` finalizer | Allows clean deletion of applications without waiting for resource cleanup |
-| Set `spec.source.targetRevision` to the branch name | So Argo CD renders manifests from the correct branch |
-| Set `spec.sources[*].targetRevision` to the branch name | Same as above, but for multi-source applications |
-| Set `spec.generators[*].git.revision` to the branch name | For ApplicationSets using Git generators (including nested Matrix/Merge generators) |
-
-<!-- ![](./assets/how-it-works/step-4.png) -->
-
 ## Step 7: Generate Applications from ApplicationSets
 
 For each ApplicationSet found, it generates the applications using the Argo CD CLI:
@@ -151,7 +160,7 @@ argocd appset generate <app-set-name>
 
 This returns a list of applications.
 
-These generated applications also go through Steps 5 and 6 (filtering and patching).
+The newly generated applications also go through `Step 2` and `Step 3` (filtering and patching).
 
 ---
 
@@ -174,6 +183,12 @@ At this point, Argo CD starts processing each application - rendering the applic
 The tool will repeatedly check the status of each application and extract the rendered manifests as they become ready.
 
 The tool will poll the applications until they're ready or the timeout is reached (default: 180 seconds).
+
+It practically just waits for the Application to look like this:
+
+<p align="center">
+  <img src="../assets/out-of-sync-applicaiton.png" width="600">
+</p>
 
 ---
 

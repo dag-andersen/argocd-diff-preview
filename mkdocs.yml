@@ -18,8 +18,8 @@ theme:
 
 nav:
 - Overview: index.md
-- How it works: how-it-works.md
 - Demo: demo.md
+- How it works: how-it-works.md
 - Getting started:
   - getting-started/github-actions-workflow.md
   - getting-started/gitlab-cicd.md

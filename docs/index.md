@@ -24,7 +24,7 @@ The safest way to make changes to your Helm Charts and Kustomize Overlays in you
 In short, the tool:
 
 1. Spins up a local cluster and installs Argo CD
-2. Applies your Applications (patched to point to the PR branch)
+2. Applies your Applications (patched to point to the main branch and the PR branch)
 3. Extracts the rendered manifests
 4. Generates a diff and outputs it as Markdown/HTML
 
