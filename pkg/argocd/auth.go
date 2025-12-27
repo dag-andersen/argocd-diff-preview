@@ -73,5 +73,10 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 
+	// Check Argo CD CLI version vs Argo CD Server version
+	if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to check argocd cli version vs server version: %w", err)
+	}
+
 	return time.Since(startTime), nil
 }
