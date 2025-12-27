@@ -86,7 +86,7 @@ The safest way to make changes to you Helm Charts and Kustomize Overlays in your
 
 The most basic example of how to use `argocd-diff-preview` in a GitHub Actions workflow is shown below. In this example, the tool will run on every pull request to the `main` branch, and the diff will be posted as a comment on the pull request.
 
-This example works only if your Git repository is public and you are using public Helm Charts. If you have a private repository or are using private Helm Charts, you need to provide the tool with the necessary credentials. Refer to the [full documentation](https://dag-andersen.github.io/argocd-diff-preview/getting-started/github-actions-workflow/) to learn how to do this.
+This example works only if your Git repository is public and you are using public Helm Charts. If you have a private repository or are using private Helm Charts, you need to provide the tool with the necessary credentials. Refer to the [full documentation](https://dag-andersen.github.io/argocd-diff-preview/getting-started/github-actions-workflow#private-repositories-and-helm-charts) to learn how to do this.
 
 ```yaml
 # .github/workflows/generate-diff.yml

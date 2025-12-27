@@ -10,6 +10,8 @@ theme:
   favicon: assets/logo-head.png
   features:
     - content.action.edit
+    - content.code.copy
+    - content.code.annotate
   palette: 
     # Dark Mode
     scheme: slate
@@ -39,6 +41,8 @@ nav:
 - FAQ: faq.md
 
 markdown_extensions:
+  - toc:
+      permalink: "🔗"
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
