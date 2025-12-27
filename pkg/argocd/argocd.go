@@ -31,24 +31,24 @@ var (
 )
 
 type ArgoCDInstallation struct {
-	K8sClient  *utils.K8sClient
-	Namespace  string
-	Version    string
-	ConfigPath string
-	ChartName  string
-	ChartURL   string
+	K8sClient         *utils.K8sClient
+	Namespace         string
+	Version           string
+	ConfigPath        string
+	ChartName         string
+	ChartURL          string
 	ChartRepoUsername string
 	ChartRepoPassword string
 }
 
 func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
-		K8sClient:  client,
-		Namespace:  namespace,
-		Version:    version,
-		ConfigPath: "argocd-config",
-		ChartName:  repoName,
-		ChartURL:   repoURL,
+		K8sClient:         client,
+		Namespace:         namespace,
+		Version:           version,
+		ConfigPath:        "argocd-config",
+		ChartName:         repoName,
+		ChartURL:          repoURL,
 		ChartRepoUsername: repoUsername,
 		ChartRepoPassword: repoPassword,
 	}
@@ -84,6 +84,11 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	// Login to ArgoCD
 	if err := a.login(); err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
+	}
+
+	// Check Argo CD CLI version vs Argo CD Server version
+	if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to check argocd cli version vs server version: %w", err)
 	}
 
 	if debug {
