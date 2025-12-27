@@ -12,7 +12,7 @@
   Yes, no issues reported
 
 - **Cluster generator**:
-  Yes, but you have to add the ClusterSecrets to the `secrets` folder. Similar to how the secrets are provided [here](./getting-started/github-actions-workflow.md)
+  Yes, but you have to add the ClusterSecrets to the `secrets` folder. Similar to how the secrets are provided [here](./getting-started/github-actions-workflow.md#private-repositories-and-helm-charts)
 
 - **Git generator**:
   Yes, no issues reported
@@ -24,7 +24,7 @@
   Yes, no issues reported
 
 - **Plugin generator**: 
-  Should work, but not tested. Read more on how to install a plugin [here](./getting-started/custom-argo-cd-installation.md). Related Issue: [#40](https://github.com/dag-andersen/argocd-diff-preview/issues/40)
+  Should work, but not tested. Read more on how to install a plugin [here](./getting-started/custom-argo-cd-installation.md#argo-cd-config-management-plugins-cmp). Related Issue: [#40](https://github.com/dag-andersen/argocd-diff-preview/issues/40)
 
 - **Pull Request generator**:
    Should work, but not tested.
@@ -40,7 +40,7 @@
 
 ### Does it work with Config Management Plugins (CMP)
 
-Yes. More info [docs](./getting-started/custom-argo-cd-installation.md)
+Yes. More info [here](./getting-started/custom-argo-cd-installation.md#argo-cd-config-management-plugins-cmp)
 
 ---
 
