@@ -139,6 +139,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+#### Local equivalent
+
+```bash hl_lines="1 2 15"
+git clone https://github.com/<org>/<application-repository> base-branch --depth 1 -q -b main
+git clone https://github.com/<org>/<application-repository> target-branch --depth 1 -q -b pr-branch
+
+mkdir secrets
+# store some secrets in the ./secrets folder
+
+docker run \
+    --network host \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v $(pwd)/output:/output \
+    -v $(pwd)/base-branch:/base-branch \
+    -v $(pwd)/target-branch:/target-branch \
+    -v $(pwd)/secrets:/secrets \
+    -e TARGET_BRANCH=pr-branch \
+    -e REPO=<org>/<application-repository> \
+    dagandersen/argocd-diff-preview:v0.1.20
+```
+
 ### Pipeline in the Resource Repository
 
 This is where it gets interesting:
@@ -147,7 +168,7 @@ This is where it gets interesting:
 - Provide secrets for both repositories  
 - Set `--repo` to the **Resource Repository** (where the PR is)
 
-```yaml title=".github/workflows/diff.yml (Resource Repository)" hl_lines="18-19 24-25 71-73"
+```yaml title=".github/workflows/diff.yml (Resource Repository)" hl_lines="19-21 26-28 73-75"
 name: Argo CD Diff Preview
 
 on:
@@ -162,11 +183,13 @@ jobs:
       pull-requests: write
 
     steps:
-      # ⚠️ Clone the APPLICATION Repository, not this one!
+      # ⚠️ Clone the APPLICATION Repository, not this Resource Repository!
+      # Both clone `main` because there's no PR on the Application Repository
       - uses: actions/checkout@v4
         with:
           repository: <org>/<application-repository>
           token: ${{ secrets.APP_REPO_TOKEN }}
+          ref: main
           path: pull-request
 
       - uses: actions/checkout@v4
@@ -233,6 +256,27 @@ jobs:
 
 !!! warning "Cross-repository access"
     The Resource Repository pipeline needs a Personal Access Token (PAT) or GitHub App token with access to the Application Repository. The default `GITHUB_TOKEN` only has access to the current repository.
+
+#### Local equivalent
+
+```bash hl_lines="1 2 15"
+git clone https://github.com/<org>/<application-repository> base-branch --depth 1 -q -b main
+git clone https://github.com/<org>/<application-repository> target-branch --depth 1 -q -b main
+
+mkdir secrets
+# store some secrets in the ./secrets folder
+
+docker run \
+    --network host \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v $(pwd)/output:/output \
+    -v $(pwd)/base-branch:/base-branch \
+    -v $(pwd)/target-branch:/target-branch \
+    -v $(pwd)/secrets:/secrets \
+    -e TARGET_BRANCH=pr-branch \
+    -e REPO=<org>/<resource-repository> \
+    dagandersen/argocd-diff-preview:v0.1.20
+```
 
 ---
 
