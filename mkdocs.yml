@@ -33,6 +33,7 @@ nav:
   - Self-hosted runner connects with host cluster: reusing-clusters/self-hosted-gh-runner.md
   - Openshift: reusing-clusters/openshift.md
 - generated-applications.md
+- Multi-repo: multi-repo.md
 - Ignore Lines: ignoring-lines.md
 - application-selection.md
 - All Options: options.md

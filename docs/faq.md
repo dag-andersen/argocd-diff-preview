@@ -37,7 +37,6 @@
 
 ---
 
-
 ### Does it work with Config Management Plugins (CMP)
 
 Yes. More info [here](./getting-started/custom-argo-cd-installation.md#argo-cd-config-management-plugins-cmp)
@@ -77,11 +76,11 @@ More info: [docs](./generated-applications.md)
 
 ---
 
-### Does it work with a distributed Argo CD repository setup?
+### Does it work with a distributed Argo CD repository setup? (Multi-repo)
 
-**Short answer:** Maybe... It depends on what you are trying to achieve.
+**Short answer:** Yes
 
-**Longer answer:** The tool is not specifically designed to work with a distributed Argo CD repository setup, where applications and their manifests are spread across multiple repositories.
+**Longer answer:** Yes, but it deepends on how complicated your setup is. Check out the [multi-repo](./multi-repo.md) documentation to learn how to use the tool with a distributed Argo CD repository setup.
 
 ---
 

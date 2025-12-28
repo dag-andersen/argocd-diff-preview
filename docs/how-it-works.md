@@ -59,6 +59,10 @@ For each Application or ApplicationSet found, it applies the following modificat
 
 ---
 
+!!! note "Steps 4-6 are skipped if `--create-cluster false` is provided"
+
+---
+
 ## Step 4: Start local cluster
 
 The tool creates a local ephemeral Kubernetes cluster using one of the supported local cluster tools:
