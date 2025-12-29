@@ -7,7 +7,7 @@ Thank you for your interest in contributing to ArgoCD Diff Preview! This documen
 1. Open the repository in GitHub Codespaces:
 
 <p align="center">
-  <img src="./docs/assets/codespaces-1-marked.png" style="max-width: 800px; width: 100%;" />
+  <img src="./docs/assets/codespaces-1-marked.png" style="max-width: 800px;" />
 </p>
 
 2. Verify the setup works:
@@ -20,7 +20,7 @@ Output should look similar to like this:
 
 <!-- screenshot of the output of the above command -->
 <p align="center">
-  <img src="./docs/assets/codespaces-3.png" style="max-width: 800px; width: 100%;" />
+  <img src="./docs/assets/codespaces-3.png" style="max-width: 800px;" />
 </p>
 
 > [!IMPORTANT]
@@ -163,6 +163,52 @@ make mkdocs
 ```
 
 This will open the documentation in your default browser.
+
+### Illustrations
+
+For most documentation, standard markdown code blocks are sufficient:
+
+~~~markdown
+```yaml
+apiVersion: v1
+kind: ConfigMap
+```
+~~~
+
+Only use the tools below when a plain code block isn't enough - for example, when you need to create a diagram explaining a concept.
+
+| Tool | Use case |
+|------|----------|
+| [Carbon](https://carbon.now.sh) | When you need a code block as an png |
+| [Affinity](https://www.affinity.studio/) | Any illustration/diagram where a code block isn't enough |
+
+#### Code (Carbon)
+
+When you need an illustration including a code snippet. E.g., when you want to draw on top of a code block.
+
+1. Open [Carbon](https://carbon.now.sh)
+2. Import settings from [`docs/assets/carbon-config.json`](/docs/assets/carbon-config.json)
+3. Export as PNG
+
+<p align="center">
+  <img src="./docs/assets/carbon-example.png" style="max-width: 800px;" />
+</p>
+
+#### Advanced Illustrations
+
+For any visual that can't be expressed as a code block, we use _Affinity_.
+
+**File conventions:**
+
+- Store both source (`.af`) and export (`.png`) in `docs/assets/`
+- Name them identically: `appset-patching.af` → `appset-patching.png`
+- One illustration per file
+
+> **Why not use draw.io or similar?** Tools made with tools like draw.io tend to look ugly, and they are overall less powerful.
+
+<p align="center">
+  <img src="./docs/assets/affinity-screenshot.png" style="max-width: 800px;" />
+</p>
 
 ## License
 
