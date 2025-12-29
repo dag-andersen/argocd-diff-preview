@@ -2,6 +2,8 @@
 
 This page explains how to use `argocd-diff-preview` when your Argo CD Applications and their managed Kubernetes resources live in separate repositories.
 
+---
+
 ## Terminology
 
 Let's define the two repositories we're working with:
@@ -13,6 +15,7 @@ Let's define the two repositories we're working with:
 
 If you want diffs triggered by changes in **either** repository, you'll need a pipeline in both.
 
+---
 
 ## Two key rules
 
@@ -32,29 +35,27 @@ docker run \
   -v $(pwd)/main:/base-branch \
   -v $(pwd)/pull-request:/target-branch \
   -v $(pwd)/output:/output \
-  -e REPO=<org>/<repo-with-pr> \       # ⬅️ Must match the repo with the PR
-  -e TARGET_BRANCH=<pr-branch> \       # ⬅️ The branch to redirect applications to
+  -e REPO=<org>/<repo-with-pr> \            ⬅️ Must match the repo with the PR
+  -e TARGET_BRANCH=<pr-branch> \            ⬅️ The branch to redirect applications to
   dagandersen/argocd-diff-preview:v0.1.20
 ```
 
 !!! note "Why does this matter?"
     The tool only redirects applications whose `spec.source.repoURL` matches the `--repo` flag. If you specify the wrong repo, the applications won't point to your PR branch.
 
----
-
 ### Rule 2: Always clone the Application Repository
 
-The `/base-branch` and `/target-branch` folders must contain the **Application Repository** — this is where `argocd-diff-preview` looks for `Application` and `ApplicationSet` manifests.
+The `/base-branch` and `/target-branch` folders must contain the **Application Repository** - this is where `argocd-diff-preview` looks for `Application` and `ApplicationSet` manifests.
 
 This means even when running a pipeline in the Resource Repository, you still need to clone the Application Repository into these folders.
 
 ---
 
-## Example pipelines
+## GitHub Workflows Examples
 
 ### Pipeline in the Application Repository
 
-This is the standard setup — nothing unusual here:
+This is the standard setup - nothing unusual here:
 
 - Clone the Application Repository (this repo)
 - Provide secrets for both repositories
@@ -126,9 +127,9 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            -v $(pwd)/secrets:/secrets \                                         ⬅️ Mount the secrets folder
-            -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \        ⬅️ The PR branch on the Application Repository
-            -e REPO=${{ github.repository }} \                                   ⬅️ Application Repository
+            -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
+            -e TARGET_BRANCH=<pr-branch> \             ⬅️ The PR branch on the Application Repository
+            -e REPO=<org>/<application-repository> \   ⬅️ Application Repository
             dagandersen/argocd-diff-preview:v0.1.20
 
       - name: Post diff as comment
@@ -155,7 +156,7 @@ docker run \
     -v $(pwd)/base-branch:/base-branch \
     -v $(pwd)/target-branch:/target-branch \
     -v $(pwd)/secrets:/secrets \
-    -e TARGET_BRANCH=pr-branch \
+    -e TARGET_BRANCH=<pr-branch> \
     -e REPO=<org>/<application-repository> \
     dagandersen/argocd-diff-preview:v0.1.20
 ```
@@ -184,7 +185,7 @@ jobs:
 
     steps:
       # ⚠️ Clone the APPLICATION Repository, not this Resource Repository!
-      # Both clone `main` because there's no PR on the Application Repository
+      # Both clone `main` because the PR is not on the Application Repository
       - uses: actions/checkout@v4
         with:
           repository: <org>/<application-repository>
@@ -241,9 +242,9 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            -v $(pwd)/secrets:/secrets \                                         ⬅️ Mount the secrets folder
-            -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \        ⬅️ The PR branch on the Resource Repository
-            -e REPO=<org>/<resource-repository> \                                ⬅️ Resource Repository (where the PR is!)
+            -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
+            -e TARGET_BRANCH=<pr-branch> \             ⬅️ The PR branch on the Resource Repository
+            -e REPO=<org>/<resource-repository> \      ⬅️ Resource Repository (where the PR is!)
             dagandersen/argocd-diff-preview:v0.1.20
 
       - name: Post diff as comment
@@ -273,7 +274,7 @@ docker run \
     -v $(pwd)/base-branch:/base-branch \
     -v $(pwd)/target-branch:/target-branch \
     -v $(pwd)/secrets:/secrets \
-    -e TARGET_BRANCH=pr-branch \
+    -e TARGET_BRANCH=<pr-branch> \
     -e REPO=<org>/<resource-repository> \
     dagandersen/argocd-diff-preview:v0.1.20
 ```
