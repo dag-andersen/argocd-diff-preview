@@ -32,19 +32,19 @@ In short, the tool:
 
 ## Features
 
-- **Accurate diffs** — Renders manifests using Argo CD itself, so the diff is as accurate as possible
-- **Complete isolation** — No access to your real cluster or Argo CD instance required
-- **Run locally** — Test changes before opening a pull request
-- **Private repos & charts** — Works with private Git repositories and Helm charts
-- **Multi-source applications** — Full support for Argo CD multi-source apps
-- **ApplicationSets** — Supports List, Git, Matrix, Merge, and other generators
-- **Config Management Plugins** — Use custom CMPs via Argo CD Helm chart configuration
-- **External chart visibility** — See exactly what changed when updating a Helm chart version (e.g., Nginx). [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
-- **Smart filtering** — Filter applications by file path, regex, labels, or change detection. [Documentation](./application-selection.md)
-- **Diff noise filtering** — Ignore version bumps, generated values, or other noisy changes with `--diff-ignore`
-- **Multiple output formats** — Generates Markdown (for PR comments), HTML, and full YAML manifests
-- **Reuse existing clusters** — Skip cluster creation by connecting to a pre-installed Argo CD instance (~60s faster). [Documentation](./reusing-clusters/connecting.md)
-- **Dry run mode** — Preview which applications would be rendered without creating a cluster
+- **Accurate diffs** - Renders manifests using Argo CD itself, so the diff is as accurate as possible
+- **Complete isolation** - No access to your real cluster or Argo CD instance required
+- **Run locally** - Test changes before opening a pull request
+- **Private repos & charts** - Works with private Git repositories and Helm charts
+- **Multi-source applications** - Full support for Argo CD multi-source apps
+- **ApplicationSets** - Supports List, Git, Matrix, Merge, and other generators
+- **Config Management Plugins** - Use custom CMPs via Argo CD Helm chart configuration
+- **External chart visibility** - See exactly what changed when updating a Helm chart version (e.g., Nginx). [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
+- **Smart filtering** - Filter applications by file path, regex, labels, or change detection. [Documentation](./application-selection.md)
+- **Diff noise filtering** - Ignore version bumps, generated values, or other noisy changes with `--diff-ignore`
+- **Multiple output formats** - Generates Markdown (for PR comments), HTML, and full YAML manifests
+- **Reuse existing clusters** - Skip cluster creation by connecting to a pre-installed Argo CD instance (~60s faster). [Documentation](./reusing-clusters/connecting.md)
+- **Dry run mode** - Preview which applications would be rendered without creating a cluster
 
 ## Why do we need this?
 
