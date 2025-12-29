@@ -123,7 +123,18 @@ make run-with-docker target_branch=<your-branch-name> github_org=<your-username>
 
 ArgoCD Diff Preview uses integration tests to verify functionality. These tests create ephemeral Kubernetes clusters and test the application against various test scenarios.
 
+### Running Unit Tests
+
+To run all unit tests in the project:
+
+```bash
+make run-unit-tests
+```
+
 ### Running All Integration Tests
+
+> [!NOTE]
+> Some users have reported issues running the integration tests locally due to file permissions. If you experience any problems, we recommend using the GitHub Codespaces setup. See [#255](https://github.com/dag-andersen/argocd-diff-preview/issues/255) for details.
 
 Using Go:
 ```bash
@@ -142,14 +153,6 @@ make run-integration-tests-docker update_expected=true
 ```
 
 This will update the updated output files in the `tests/integration-test/` directory.
-
-### Running Unit Tests
-
-To run all unit tests in the project:
-
-```bash
-make run-unit-tests
-```
 
 > [!TIP]
 > Before you create a pull request, please run `make check-release` to verify that the tool works as expected. Feel free to reach out if you need help! 🚀
