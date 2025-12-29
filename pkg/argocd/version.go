@@ -8,6 +8,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	maxMajorVersionDriftAllowed = 0
+	maxMinorVersionDriftAllowed = 3
+)
+
 // Check Argo CD CLI version vs Argo CD Server version
 func (a *ArgoCDInstallation) CheckArgoCDCLIVersionVsServerVersion() error {
 	out, err := a.runArgocdCommand("version", "-o", "json")
@@ -40,9 +45,10 @@ func (a *ArgoCDInstallation) CheckArgoCDCLIVersionVsServerVersion() error {
 		return fmt.Errorf("failed to extract major minor version from server version: %w", err)
 	}
 
-	if clientMajor != serverMajor {
+	majorDrift, minorDrift := checkVersionDrift(clientMajor, clientMinor, serverMajor, serverMinor)
+	if majorDrift {
 		log.Warn().Msgf("⚠️ Argo CD CLI major version (%d.%d) differs from server major version (%d.%d). This may cause compatibility issues.", clientMajor, clientMinor, serverMajor, serverMinor)
-	} else if abs(clientMinor-serverMinor) >= 3 {
+	} else if minorDrift {
 		log.Warn().Msgf("⚠️ Argo CD CLI minor version (%d.%d) differs significantly from server minor version (%d.%d). This may cause compatibility issues.", clientMajor, clientMinor, serverMajor, serverMinor)
 	}
 
@@ -75,4 +81,12 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// checkVersionDrift checks if there's a significant version drift between client and server
+// Returns: majorDrift (bool), minorDrift (bool)
+func checkVersionDrift(clientMajor, clientMinor, serverMajor, serverMinor int) (bool, bool) {
+	majorDrift := abs(clientMajor-serverMajor) > maxMajorVersionDriftAllowed
+	minorDrift := abs(clientMinor-serverMinor) > maxMinorVersionDriftAllowed
+	return majorDrift, minorDrift
 }
