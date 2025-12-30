@@ -1,0 +1,242 @@
+package extract
+
+import (
+	"testing"
+)
+
+func TestFromString(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		expected    []SkipResourceRule
+		expectError bool
+	}{
+		{
+			name:     "single rule",
+			input:    "apps:Deployment:my-app",
+			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+		},
+		{
+			name:  "multiple rules",
+			input: "apps:Deployment:my-app,core:Secret:my-secret",
+			expected: []SkipResourceRule{
+				{Group: "apps", Kind: "Deployment", Name: "my-app"},
+				{Group: "core", Kind: "Secret", Name: "my-secret"},
+			},
+		},
+		{
+			name:     "rule with wildcards",
+			input:    "*:Secret:*",
+			expected: []SkipResourceRule{{Group: "*", Kind: "Secret", Name: "*"}},
+		},
+		{
+			name:     "all wildcards",
+			input:    "*:*:*",
+			expected: []SkipResourceRule{{Group: "*", Kind: "*", Name: "*"}},
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: nil,
+		},
+		{
+			name:     "whitespace only",
+			input:    "   ",
+			expected: nil,
+		},
+		{
+			name:     "rule with whitespace",
+			input:    "  apps : Deployment : my-app  ",
+			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+		},
+		{
+			name:  "multiple rules with whitespace",
+			input: " apps:Deployment:app1 , core:ConfigMap:config ",
+			expected: []SkipResourceRule{
+				{Group: "apps", Kind: "Deployment", Name: "app1"},
+				{Group: "core", Kind: "ConfigMap", Name: "config"},
+			},
+		},
+		{
+			name:        "invalid format - missing part",
+			input:       "apps:Deployment",
+			expectError: true,
+		},
+		{
+			name:        "invalid format - too many parts",
+			input:       "apps:Deployment:my-app:extra",
+			expectError: true,
+		},
+		{
+			name:        "invalid format - one valid one invalid",
+			input:       "apps:Deployment:my-app,invalid",
+			expectError: true,
+		},
+		{
+			name:     "trailing comma",
+			input:    "apps:Deployment:my-app,",
+			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+		},
+		{
+			name:     "leading comma",
+			input:    ",apps:Deployment:my-app",
+			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := FromString(tt.input)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("got %d rules, want %d", len(result), len(tt.expected))
+				return
+			}
+
+			for i, rule := range result {
+				if rule.Group != tt.expected[i].Group {
+					t.Errorf("rule[%d].Group = %q, want %q", i, rule.Group, tt.expected[i].Group)
+				}
+				if rule.Kind != tt.expected[i].Kind {
+					t.Errorf("rule[%d].Kind = %q, want %q", i, rule.Kind, tt.expected[i].Kind)
+				}
+				if rule.Name != tt.expected[i].Name {
+					t.Errorf("rule[%d].Name = %q, want %q", i, rule.Name, tt.expected[i].Name)
+				}
+			}
+		})
+	}
+}
+
+func TestSkipResourceRule_Matches(t *testing.T) {
+	tests := []struct {
+		name     string
+		rule     SkipResourceRule
+		group    string
+		kind     string
+		resName  string
+		expected bool
+	}{
+		{
+			name:     "exact match",
+			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			group:    "apps",
+			kind:     "Deployment",
+			resName:  "my-app",
+			expected: true,
+		},
+		{
+			name:     "group mismatch",
+			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			group:    "core",
+			kind:     "Deployment",
+			resName:  "my-app",
+			expected: false,
+		},
+		{
+			name:     "kind mismatch",
+			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			group:    "apps",
+			kind:     "StatefulSet",
+			resName:  "my-app",
+			expected: false,
+		},
+		{
+			name:     "name mismatch",
+			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			group:    "apps",
+			kind:     "Deployment",
+			resName:  "other-app",
+			expected: false,
+		},
+		{
+			name:     "wildcard group",
+			rule:     SkipResourceRule{Group: "*", Kind: "Deployment", Name: "my-app"},
+			group:    "apps",
+			kind:     "Deployment",
+			resName:  "my-app",
+			expected: true,
+		},
+		{
+			name:     "wildcard kind",
+			rule:     SkipResourceRule{Group: "apps", Kind: "*", Name: "my-app"},
+			group:    "apps",
+			kind:     "StatefulSet",
+			resName:  "my-app",
+			expected: true,
+		},
+		{
+			name:     "wildcard name",
+			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "*"},
+			group:    "apps",
+			kind:     "Deployment",
+			resName:  "any-app",
+			expected: true,
+		},
+		{
+			name:     "all wildcards",
+			rule:     SkipResourceRule{Group: "*", Kind: "*", Name: "*"},
+			group:    "anything",
+			kind:     "Whatever",
+			resName:  "some-name",
+			expected: true,
+		},
+		{
+			name:     "wildcard group and name",
+			rule:     SkipResourceRule{Group: "*", Kind: "Secret", Name: "*"},
+			group:    "core",
+			kind:     "Secret",
+			resName:  "my-secret",
+			expected: true,
+		},
+		{
+			name:     "wildcard group and name - kind mismatch",
+			rule:     SkipResourceRule{Group: "*", Kind: "Secret", Name: "*"},
+			group:    "core",
+			kind:     "ConfigMap",
+			resName:  "my-config",
+			expected: false,
+		},
+		{
+			name:     "empty group matches empty",
+			rule:     SkipResourceRule{Group: "", Kind: "Pod", Name: "my-pod"},
+			group:    "",
+			kind:     "Pod",
+			resName:  "my-pod",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.rule.Matches(tt.group, tt.kind, tt.resName)
+			if result != tt.expected {
+				t.Errorf("Matches(%q, %q, %q) = %v, want %v",
+					tt.group, tt.kind, tt.resName, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSkipResourceRule_String(t *testing.T) {
+	rule := SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"}
+	expected := "Group: apps, Kind: Deployment, Name: my-app"
+	result := rule.String()
+
+	if result != expected {
+		t.Errorf("String() = %q, want %q", result, expected)
+	}
+}
+

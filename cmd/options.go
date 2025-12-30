@@ -12,11 +12,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k3d"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
 )
 
 var (
@@ -56,6 +57,7 @@ var (
 	DefaultWatchIfNoWatchPatternFound = false
 	DefaultIgnoreInvalidWatchPattern  = false
 	DefaultHideDeletedAppDiff         = false
+	DefaultSkipResourceRules          = ""
 )
 
 type Options struct {
@@ -93,12 +95,14 @@ type Options struct {
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
 	HideDeletedAppDiff         bool   `mapstructure:"hide-deleted-app-diff"`
+	SkipResourceRules          string `mapstructure:"skip-resource-rules"`
 
 	// We'll store the parsed data in these fields
 	parsedFileRegex         *string
-	parsedSelectors         []selector.Selector
+	parsedSelectors         []app_selector.Selector
 	parsedFilesChanged      []string
 	parsedRedirectRevisions []string
+	parsedSkipResourceRules []extract.SkipResourceRule
 	clusterProvider         cluster.Provider
 }
 
@@ -170,6 +174,12 @@ func Parse() *Options {
 			// Parse files changed
 			opts.parsedFilesChanged = opts.ParseFilesChanged()
 
+			// Parse skip resource rules
+			opts.parsedSkipResourceRules, err = extract.FromString(opts.SkipResourceRules)
+			if err != nil {
+				return fmt.Errorf("failed to parse skip resource rules: %w", err)
+			}
+
 			// Parse redirect revisions
 			opts.parsedRedirectRevisions = opts.ParseRedirectRevisions()
 
@@ -237,6 +247,7 @@ func Parse() *Options {
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
 	viper.SetDefault("hide-deleted-app-diff", DefaultHideDeletedAppDiff)
+	viper.SetDefault("skip-resource-rules", DefaultSkipResourceRules)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -248,6 +259,7 @@ func Parse() *Options {
 	rootCmd.Flags().StringP("file-regex", "r", "", "Regex to select/filter files. Example: /apps_.*\\.yaml")
 	rootCmd.Flags().StringP("diff-ignore", "i", "", "Ignore lines in diff. Example: v[1,9]+.[1,9]+.[1,9]+ for ignoring version changes")
 	rootCmd.Flags().StringP("line-count", "c", fmt.Sprintf("%d", DefaultLineCount), "Generate diffs with <n> lines of context")
+	rootCmd.Flags().StringP("skip-resource-rules", "s", DefaultSkipResourceRules, "Skip resource rules. Example: 'group:kind:name',group:kind:name")
 
 	// Argo CD related
 	rootCmd.Flags().String("argocd-chart-version", "", "Argo CD Helm Chart version")
@@ -316,11 +328,11 @@ func (o *Options) CheckRequired() []string {
 }
 
 // ParseSelectors parses the selector string into a slice of Selectors
-func (o *Options) ParseSelectors() ([]selector.Selector, error) {
-	var selectors []selector.Selector
+func (o *Options) ParseSelectors() ([]app_selector.Selector, error) {
+	var selectors []app_selector.Selector
 	if o.Selector != "" {
 		for s := range strings.SplitSeq(o.Selector, ",") {
-			selector, err := selector.FromString(strings.TrimSpace(s))
+			selector, err := app_selector.FromString(strings.TrimSpace(s))
 			if err != nil {
 				return nil, err
 			}
@@ -328,6 +340,14 @@ func (o *Options) ParseSelectors() ([]selector.Selector, error) {
 		}
 	}
 	return selectors, nil
+}
+
+// ParseSkipResourceRules parses the skip-resource-rules string into a slice of SkipResourceRules
+func (o *Options) ParseSkipResourceRules() ([]extract.SkipResourceRule, error) {
+	if o.SkipResourceRules == "" {
+		return nil, nil
+	}
+	return extract.FromString(o.SkipResourceRules)
 }
 
 // ParseFilesChanged parses the files-changed string into a slice of strings
@@ -509,7 +529,7 @@ func (o *Options) GetFileRegex() *string {
 }
 
 // GetSelectors returns the parsed selectors
-func (o *Options) GetSelectors() []selector.Selector {
+func (o *Options) GetSelectors() []app_selector.Selector {
 	return o.parsedSelectors
 }
 

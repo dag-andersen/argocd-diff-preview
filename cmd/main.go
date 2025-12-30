@@ -302,6 +302,7 @@ func run(opts *Options) error {
 		targetApps.SelectedApps,
 		uniqueID,
 		deleteAfterProcessing,
+		opts.parsedSkipResourceRules,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")

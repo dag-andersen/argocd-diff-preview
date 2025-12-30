@@ -11,7 +11,7 @@ import (
 
 // processYamlOutput parses a YAML chunk into an unstructured.Unstructured
 // A chunk is a single YAML object, e.g. a Deployment, Service, etc.
-func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
+func processYamlOutput(chunk string, skipResourceRules []SkipResourceRule) ([]unstructured.Unstructured, error) {
 
 	documents := utils.SplitYAMLDocuments(chunk)
 
@@ -35,10 +35,22 @@ func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
 		// Check if this is a valid Kubernetes resource
 		apiVersion, found, _ := unstructured.NestedString(yamlObj, "apiVersion")
 		kind, kindFound, _ := unstructured.NestedString(yamlObj, "kind")
-
-		if !found || !kindFound || apiVersion == "" || kind == "" {
+		name, nameFound, _ := unstructured.NestedString(yamlObj, "metadata", "name")
+		if !found || !kindFound || !nameFound || apiVersion == "" || kind == "" || name == "" {
 			log.Debug().Msgf("Found manifest with no apiVersion or kind: %s", doc)
 			continue
+		}
+
+		// Check if the manifest matches the skip resource rules
+		if len(skipResourceRules) > 0 {
+
+			group := groupFromAPIVersion(apiVersion)
+			for _, skipResourceRule := range skipResourceRules {
+				if skipResourceRule.Matches(group, kind, name) {
+					log.Debug().Msgf("Skipping manifest %s because it matches the skip resource rule [%s]", doc, skipResourceRule.String())
+					break
+				}
+			}
 		}
 
 		manifests = append(manifests, unstructured.Unstructured{Object: yamlObj})

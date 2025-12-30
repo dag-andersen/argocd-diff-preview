@@ -75,6 +75,7 @@ func RenderApplicaitonsFromBothBranches(
 	targetApps []argoapplication.ArgoResource,
 	prefix string,
 	deleteAfterProcessing bool,
+	skipResourceRules []SkipResourceRule,
 ) ([]ExtractedApp, []ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
@@ -92,7 +93,7 @@ func RenderApplicaitonsFromBothBranches(
 	apps := append(baseApps, targetApps...)
 
 	log.Debug().Msg("Applied manifest for both branches")
-	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix, deleteAfterProcessing)
+	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix, deleteAfterProcessing, skipResourceRules)
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -119,6 +120,7 @@ func getResourcesFromApps(
 	timeout uint64,
 	prefix string,
 	deleteAfterProcessing bool,
+	skipResourceRules []SkipResourceRule,
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	startTime := time.Now()
 
@@ -141,7 +143,7 @@ func getResourcesFromApps(
 		wg.Add(1)         // Add to wait group
 		go func(app argoapplication.ArgoResource) {
 			defer wg.Done() // Signal completion when goroutine ends
-			result, k8sName, err := getResourcesFromApp(argocd, app, timeout, prefix)
+			result, k8sName, err := getResourcesFromApp(argocd, app, timeout, prefix, skipResourceRules)
 			results <- struct {
 				app ExtractedApp
 				err error
@@ -230,7 +232,13 @@ func getResourcesFromApps(
 
 // getResourcesFromApp extracts a single application from the cluster
 // returns the extracted app, the k8s resource name, and an error
-func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string) (ExtractedApp, string, error) {
+func getResourcesFromApp(
+	argocd *argocdPkg.ArgoCDInstallation,
+	app argoapplication.ArgoResource,
+	timeout uint64,
+	prefix string,
+	skipResourceRules []SkipResourceRule,
+) (ExtractedApp, string, error) {
 
 	// Store ID (kubernetes resource name) before we add a prefix and hash
 	uniqueIdBeforeModifications := app.Id
@@ -299,7 +307,7 @@ func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 			log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")
 
 			manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
-			manifestsContent, err := processYamlOutput(manifests)
+			manifestsContent, err := processYamlOutput(manifests, skipResourceRules)
 			if err != nil {
 				log.Error().Err(err).Str("App", app.GetLongName()).Msg("Failed to process YAML")
 				return result, "", fmt.Errorf("failed to process YAML: %w", err)
