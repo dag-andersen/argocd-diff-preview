@@ -14,33 +14,33 @@ import (
 func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 	tests := []struct {
 		name          string
-		appObj        map[string]interface{}
+		appObj        map[string]any
 		expectedRules []ignoreDifferenceRule
 		expectedCount int
 	}{
 		{
 			name: "Application with spec.ignoreDifferences",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      "test-controller",
 					"namespace": "argocd",
 				},
-				"spec": map[string]interface{}{
-					"ignoreDifferences": []interface{}{
-						map[string]interface{}{
+				"spec": map[string]any{
+					"ignoreDifferences": []any{
+						map[string]any{
 							"group":        "admissionregistration.k8s.io",
 							"kind":         "ValidatingWebhookConfiguration",
 							"name":         "example-webhook-validations",
-							"jsonPointers": []interface{}{"/webhooks/0/clientConfig/caBundle"},
+							"jsonPointers": []any{"/webhooks/0/clientConfig/caBundle"},
 						},
-						map[string]interface{}{
+						map[string]any{
 							"group":        "",
 							"kind":         "Secret",
 							"name":         "example-webhook-ca-keypair",
 							"namespace":    "example-system",
-							"jsonPointers": []interface{}{"/data"},
+							"jsonPointers": []any{"/data"},
 						},
 					},
 				},
@@ -64,20 +64,20 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 		},
 		{
 			name: "ApplicationSet with template.spec.ignoreDifferences",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "ApplicationSet",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      "test-appset",
 					"namespace": "argocd",
 				},
-				"spec": map[string]interface{}{
-					"template": map[string]interface{}{
-						"spec": map[string]interface{}{
-							"ignoreDifferences": []interface{}{
-								map[string]interface{}{
+				"spec": map[string]any{
+					"template": map[string]any{
+						"spec": map[string]any{
+							"ignoreDifferences": []any{
+								map[string]any{
 									"kind":         "Deployment",
-									"jsonPointers": []interface{}{"/metadata/annotations"},
+									"jsonPointers": []any{"/metadata/annotations"},
 								},
 							},
 						},
@@ -94,14 +94,14 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 		},
 		{
 			name: "Application with jqPathExpressions",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"spec": map[string]interface{}{
-					"ignoreDifferences": []interface{}{
-						map[string]interface{}{
+				"spec": map[string]any{
+					"ignoreDifferences": []any{
+						map[string]any{
 							"kind":              "Deployment",
-							"jqPathExpressions": []interface{}{".spec.template.spec.containers[].image"},
+							"jqPathExpressions": []any{".spec.template.spec.containers[].image"},
 						},
 					},
 				},
@@ -116,15 +116,15 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 		},
 		{
 			name: "Mixed jsonPointers and jqPathExpressions",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"spec": map[string]interface{}{
-					"ignoreDifferences": []interface{}{
-						map[string]interface{}{
+				"spec": map[string]any{
+					"ignoreDifferences": []any{
+						map[string]any{
 							"kind":              "Service",
-							"jsonPointers":      []interface{}{"/metadata/labels"},
-							"jqPathExpressions": []interface{}{".spec.ports[].nodePort"},
+							"jsonPointers":      []any{"/metadata/labels"},
+							"jqPathExpressions": []any{".spec.ports[].nodePort"},
 						},
 					},
 				},
@@ -140,11 +140,11 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 		},
 		{
 			name: "Empty ignoreDifferences",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"spec": map[string]interface{}{
-					"ignoreDifferences": []interface{}{},
+				"spec": map[string]any{
+					"ignoreDifferences": []any{},
 				},
 			},
 			expectedRules: []ignoreDifferenceRule{},
@@ -152,24 +152,24 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 		},
 		{
 			name: "No ignoreDifferences field",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"spec":       map[string]interface{}{},
+				"spec":       map[string]any{},
 			},
 			expectedRules: []ignoreDifferenceRule{},
 			expectedCount: 0,
 		},
 		{
 			name: "Invalid rule - missing kind",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"spec": map[string]interface{}{
-					"ignoreDifferences": []interface{}{
-						map[string]interface{}{
+				"spec": map[string]any{
+					"ignoreDifferences": []any{
+						map[string]any{
 							"group":        "apps",
-							"jsonPointers": []interface{}{"/metadata/labels"},
+							"jsonPointers": []any{"/metadata/labels"},
 						},
 					},
 				},
@@ -179,12 +179,12 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 		},
 		{
 			name: "Invalid rule - missing jsonPointers and jqPathExpressions",
-			appObj: map[string]interface{}{
+			appObj: map[string]any{
 				"apiVersion": "argoproj.io/v1alpha1",
 				"kind":       "Application",
-				"spec": map[string]interface{}{
-					"ignoreDifferences": []interface{}{
-						map[string]interface{}{
+				"spec": map[string]any{
+					"ignoreDifferences": []any{
+						map[string]any{
 							"kind": "Deployment",
 						},
 					},
@@ -242,43 +242,43 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 		{
 			name: "JSON pointer deletion from webhook and secret",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "admissionregistration.k8s.io/v1",
 					"kind":       "ValidatingWebhookConfiguration",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "example-webhook-validations",
 					},
-					"webhooks": []interface{}{
-						map[string]interface{}{
-							"clientConfig": map[string]interface{}{
+					"webhooks": []any{
+						map[string]any{
+							"clientConfig": map[string]any{
 								"caBundle": "SOMEBASE64CERT",
-								"service": map[string]interface{}{
+								"service": map[string]any{
 									"name": "webhook-service",
 								},
 							},
 						},
 					},
 				}},
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "Secret",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "example-webhook-ca-keypair",
 						"namespace": "example-system",
 					},
-					"data": map[string]interface{}{
+					"data": map[string]any{
 						"tls.crt": "BASE64DATA",
 						"tls.key": "BASE64KEY",
 					},
 				}},
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "Secret",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name":      "other-secret",
 						"namespace": "example-system",
 					},
-					"data": map[string]interface{}{
+					"data": map[string]any{
 						"password": "abc",
 					},
 				}},
@@ -304,7 +304,7 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, foundSlice)
 				require.GreaterOrEqual(t, len(webhooks), 1)
-				firstWebhook, ok := webhooks[0].(map[string]interface{})
+				firstWebhook, ok := webhooks[0].(map[string]any)
 				require.True(t, ok)
 
 				// caBundle should be gone
@@ -334,21 +334,21 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 		{
 			name: "Array element masking with JSON pointer",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-deployment",
 					},
-					"spec": map[string]interface{}{
-						"template": map[string]interface{}{
-							"spec": map[string]interface{}{
-								"containers": []interface{}{
-									map[string]interface{}{
+					"spec": map[string]any{
+						"template": map[string]any{
+							"spec": map[string]any{
+								"containers": []any{
+									map[string]any{
 										"name":  "app",
 										"image": "nginx:1.20",
 									},
-									map[string]interface{}{
+									map[string]any{
 										"name":  "sidecar",
 										"image": "busybox:latest",
 									},
@@ -371,7 +371,7 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 				require.Len(t, containers, 2)
 
 				// First container should be unchanged
-				firstContainer, ok := containers[0].(map[string]interface{})
+				firstContainer, ok := containers[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "app", firstContainer["name"])
 				assert.Equal(t, "nginx:1.20", firstContainer["image"])
@@ -383,13 +383,13 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 		{
 			name: "No matching rules",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "ConfigMap",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-config",
 					},
-					"data": map[string]interface{}{
+					"data": map[string]any{
 						"key": "value",
 					},
 				}},
@@ -411,10 +411,10 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 		{
 			name: "Empty rules",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "Secret",
-					"data": map[string]interface{}{
+					"data": map[string]any{
 						"key": "value",
 					},
 				}},
@@ -431,21 +431,21 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 		{
 			name: "Multiple JSON pointers on same resource",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-service",
-						"labels": map[string]interface{}{
+						"labels": map[string]any{
 							"app": "test",
 						},
-						"annotations": map[string]interface{}{
+						"annotations": map[string]any{
 							"key": "value",
 						},
 					},
-					"spec": map[string]interface{}{
-						"ports": []interface{}{
-							map[string]interface{}{
+					"spec": map[string]any{
+						"ports": []any{
+							map[string]any{
 								"port":     80,
 								"nodePort": 30080,
 							},
@@ -477,7 +477,7 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 				require.True(t, found)
 				require.Len(t, ports, 1)
 
-				firstPort, ok := ports[0].(map[string]interface{})
+				firstPort, ok := ports[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, int64(80), firstPort["port"])
 				_, exists := firstPort["nodePort"]
@@ -487,27 +487,27 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 		{
 			name: "Group matching with core group",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "Pod",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-pod",
 					},
-					"spec": map[string]interface{}{
-						"containers": []interface{}{
-							map[string]interface{}{
+					"spec": map[string]any{
+						"containers": []any{
+							map[string]any{
 								"name": "app",
 							},
 						},
 					},
 				}},
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-deployment",
 					},
-					"spec": map[string]interface{}{
+					"spec": map[string]any{
 						"replicas": 3,
 					},
 				}},
@@ -544,7 +544,7 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 			manifestsCopy := make([]unstructured.Unstructured, len(tt.manifests))
 			for i, m := range tt.manifests {
 				manifestsCopy[i] = unstructured.Unstructured{
-					Object: deepCopyValue(m.Object).(map[string]interface{}),
+					Object: deepCopyValue(m.Object).(map[string]any),
 				}
 			}
 
@@ -558,23 +558,23 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 	tests := []struct {
 		name     string
-		obj      map[string]interface{}
+		obj      map[string]any
 		pointer  string
-		validate func(t *testing.T, obj map[string]interface{})
+		validate func(t *testing.T, obj map[string]any)
 	}{
 		{
 			name: "Delete simple key",
-			obj: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			obj: map[string]any{
+				"metadata": map[string]any{
 					"name": "test",
-					"labels": map[string]interface{}{
+					"labels": map[string]any{
 						"app": "myapp",
 					},
 				},
 			},
 			pointer: "/metadata/labels",
-			validate: func(t *testing.T, obj map[string]interface{}) {
-				metadata, ok := obj["metadata"].(map[string]interface{})
+			validate: func(t *testing.T, obj map[string]any) {
+				metadata, ok := obj["metadata"].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "test", metadata["name"])
 				_, exists := metadata["labels"]
@@ -583,12 +583,12 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "Delete nested key",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"template": map[string]interface{}{
-						"spec": map[string]interface{}{
-							"containers": []interface{}{
-								map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"template": map[string]any{
+						"spec": map[string]any{
+							"containers": []any{
+								map[string]any{
 									"name":  "app",
 									"image": "nginx",
 								},
@@ -598,7 +598,7 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 				},
 			},
 			pointer: "/spec/template/spec",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				template, found, err := unstructured.NestedMap(obj, "spec", "template")
 				require.NoError(t, err)
 				require.True(t, found)
@@ -608,16 +608,16 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "Mask array element",
-			obj: map[string]interface{}{
-				"items": []interface{}{
+			obj: map[string]any{
+				"items": []any{
 					"first",
 					"second",
 					"third",
 				},
 			},
 			pointer: "/items/1",
-			validate: func(t *testing.T, obj map[string]interface{}) {
-				items, ok := obj["items"].([]interface{})
+			validate: func(t *testing.T, obj map[string]any) {
+				items, ok := obj["items"].([]any)
 				require.True(t, ok)
 				require.Len(t, items, 3)
 				assert.Equal(t, "first", items[0])
@@ -627,17 +627,17 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "Mask nested array element",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"containers": []interface{}{
-						map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"containers": []any{
+						map[string]any{
 							"name": "app",
-							"env": []interface{}{
-								map[string]interface{}{
+							"env": []any{
+								map[string]any{
 									"name":  "VAR1",
 									"value": "val1",
 								},
-								map[string]interface{}{
+								map[string]any{
 									"name":  "VAR2",
 									"value": "val2",
 								},
@@ -647,20 +647,20 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 				},
 			},
 			pointer: "/spec/containers/0/env/1",
-			validate: func(t *testing.T, obj map[string]interface{}) {
-				containers, ok := obj["spec"].(map[string]interface{})["containers"].([]interface{})
+			validate: func(t *testing.T, obj map[string]any) {
+				containers, ok := obj["spec"].(map[string]any)["containers"].([]any)
 				require.True(t, ok)
 				require.Len(t, containers, 1)
 
-				container, ok := containers[0].(map[string]interface{})
+				container, ok := containers[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "app", container["name"])
 
-				env, ok := container["env"].([]interface{})
+				env, ok := container["env"].([]any)
 				require.True(t, ok)
 				require.Len(t, env, 2)
 
-				firstEnv, ok := env[0].(map[string]interface{})
+				firstEnv, ok := env[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "VAR1", firstEnv["name"])
 				assert.Equal(t, "val1", firstEnv["value"])
@@ -670,46 +670,46 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "Invalid pointer - no leading slash",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"key": "value",
 			},
 			pointer: "key",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged
 				assert.Equal(t, "value", obj["key"])
 			},
 		},
 		{
 			name: "Invalid pointer - empty string",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"key": "value",
 			},
 			pointer: "",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged
 				assert.Equal(t, "value", obj["key"])
 			},
 		},
 		{
 			name: "Nonexistent path",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"existing": "value",
 			},
 			pointer: "/nonexistent/path",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged
 				assert.Equal(t, "value", obj["existing"])
 			},
 		},
 		{
 			name: "Array index out of bounds",
-			obj: map[string]interface{}{
-				"items": []interface{}{"one", "two"},
+			obj: map[string]any{
+				"items": []any{"one", "two"},
 			},
 			pointer: "/items/5",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged
-				items, ok := obj["items"].([]interface{})
+				items, ok := obj["items"].([]any)
 				require.True(t, ok)
 				assert.Len(t, items, 2)
 				assert.Equal(t, "one", items[0])
@@ -718,13 +718,13 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "Array index negative",
-			obj: map[string]interface{}{
-				"items": []interface{}{"one", "two"},
+			obj: map[string]any{
+				"items": []any{"one", "two"},
 			},
 			pointer: "/items/-1",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged
-				items, ok := obj["items"].([]interface{})
+				items, ok := obj["items"].([]any)
 				require.True(t, ok)
 				assert.Len(t, items, 2)
 				assert.Equal(t, "one", items[0])
@@ -733,14 +733,14 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "JSON pointer escaping",
-			obj: map[string]interface{}{
-				"path/with~slash": map[string]interface{}{
+			obj: map[string]any{
+				"path/with~slash": map[string]any{
 					"nested~key": "value",
 				},
 			},
 			pointer: "/path~1with~0slash/nested~0key",
-			validate: func(t *testing.T, obj map[string]interface{}) {
-				parent, ok := obj["path/with~slash"].(map[string]interface{})
+			validate: func(t *testing.T, obj map[string]any) {
+				parent, ok := obj["path/with~slash"].(map[string]any)
 				require.True(t, ok)
 				_, exists := parent["nested~key"]
 				assert.False(t, exists)
@@ -748,19 +748,19 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 		},
 		{
 			name: "Root level deletion",
-			obj: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			obj: map[string]any{
+				"metadata": map[string]any{
 					"name": "test",
 				},
-				"spec": map[string]interface{}{
+				"spec": map[string]any{
 					"replicas": 3,
 				},
 			},
 			pointer: "/metadata",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				_, exists := obj["metadata"]
 				assert.False(t, exists)
-				assert.Equal(t, int64(3), obj["spec"].(map[string]interface{})["replicas"])
+				assert.Equal(t, int64(3), obj["spec"].(map[string]any)["replicas"])
 			},
 		},
 	}
@@ -768,7 +768,7 @@ func TestDeleteOrMaskAtJSONPointer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Make a deep copy to avoid test interference
-			objCopy := make(map[string]interface{})
+			objCopy := make(map[string]any)
 			for k, v := range tt.obj {
 				objCopy[k] = deepCopyValue(v)
 			}
@@ -826,16 +826,16 @@ func TestDecodeJSONPointerToken(t *testing.T) {
 }
 
 // Helper function for deep copying values
-func deepCopyValue(v interface{}) interface{} {
+func deepCopyValue(v any) any {
 	switch val := v.(type) {
-	case map[string]interface{}:
-		copy := make(map[string]interface{})
+	case map[string]any:
+		copy := make(map[string]any)
 		for k, v := range val {
 			copy[k] = deepCopyValue(v)
 		}
 		return copy
-	case []interface{}:
-		copy := make([]interface{}, len(val))
+	case []any:
+		copy := make([]any, len(val))
 		for i, v := range val {
 			copy[i] = deepCopyValue(v)
 		}
@@ -968,23 +968,23 @@ func TestGroupFromAPIVersion(t *testing.T) {
 func TestApplyJQPathExpression(t *testing.T) {
 	tests := []struct {
 		name     string
-		obj      map[string]interface{}
+		obj      map[string]any
 		expr     string
-		validate func(t *testing.T, obj map[string]interface{})
+		validate func(t *testing.T, obj map[string]any)
 	}{
 		{
 			name: "Simple field selection",
-			obj: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			obj: map[string]any{
+				"metadata": map[string]any{
 					"name": "test",
-					"labels": map[string]interface{}{
+					"labels": map[string]any{
 						"app": "myapp",
 					},
 				},
 			},
 			expr: ".metadata.labels",
-			validate: func(t *testing.T, obj map[string]interface{}) {
-				metadata, ok := obj["metadata"].(map[string]interface{})
+			validate: func(t *testing.T, obj map[string]any) {
+				metadata, ok := obj["metadata"].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "test", metadata["name"])
 				_, exists := metadata["labels"]
@@ -993,14 +993,14 @@ func TestApplyJQPathExpression(t *testing.T) {
 		},
 		{
 			name: "Array element selection",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"containers": []interface{}{
-						map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"containers": []any{
+						map[string]any{
 							"name":  "app",
 							"image": "nginx:1.20",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":  "sidecar",
 							"image": "busybox:latest",
 						},
@@ -1008,13 +1008,13 @@ func TestApplyJQPathExpression(t *testing.T) {
 				},
 			},
 			expr: ".spec.containers[1]",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				containers, found, err := unstructured.NestedSlice(obj, "spec", "containers")
 				require.NoError(t, err)
 				require.True(t, found)
 				require.Len(t, containers, 2)
 
-				firstContainer, ok := containers[0].(map[string]interface{})
+				firstContainer, ok := containers[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "app", firstContainer["name"])
 
@@ -1023,14 +1023,14 @@ func TestApplyJQPathExpression(t *testing.T) {
 		},
 		{
 			name: "Array slice with all elements",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"containers": []interface{}{
-						map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"containers": []any{
+						map[string]any{
 							"name":  "app",
 							"image": "nginx:1.20",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":  "sidecar",
 							"image": "busybox:latest",
 						},
@@ -1038,20 +1038,20 @@ func TestApplyJQPathExpression(t *testing.T) {
 				},
 			},
 			expr: ".spec.containers[].image",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				containers, found, err := unstructured.NestedSlice(obj, "spec", "containers")
 				require.NoError(t, err)
 				require.True(t, found)
 				require.Len(t, containers, 2)
 
 				// Both containers should have their image fields removed
-				firstContainer, ok := containers[0].(map[string]interface{})
+				firstContainer, ok := containers[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "app", firstContainer["name"])
 				_, exists := firstContainer["image"]
 				assert.False(t, exists)
 
-				secondContainer, ok := containers[1].(map[string]interface{})
+				secondContainer, ok := containers[1].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "sidecar", secondContainer["name"])
 				_, exists = secondContainer["image"]
@@ -1060,17 +1060,17 @@ func TestApplyJQPathExpression(t *testing.T) {
 		},
 		{
 			name: "Nested field selection",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"template": map[string]interface{}{
-						"metadata": map[string]interface{}{
-							"labels": map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"template": map[string]any{
+						"metadata": map[string]any{
+							"labels": map[string]any{
 								"app": "test",
 							},
 						},
-						"spec": map[string]interface{}{
-							"containers": []interface{}{
-								map[string]interface{}{
+						"spec": map[string]any{
+							"containers": []any{
+								map[string]any{
 									"name": "app",
 								},
 							},
@@ -1079,7 +1079,7 @@ func TestApplyJQPathExpression(t *testing.T) {
 				},
 			},
 			expr: ".spec.template.metadata.labels",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				metadata, found, err := unstructured.NestedMap(obj, "spec", "template", "metadata")
 				require.NoError(t, err)
 				require.True(t, found)
@@ -1095,53 +1095,53 @@ func TestApplyJQPathExpression(t *testing.T) {
 		},
 		{
 			name: "Invalid jq expression",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"key": "value",
 			},
 			expr: ".invalid[syntax",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged due to invalid expression
 				assert.Equal(t, "value", obj["key"])
 			},
 		},
 		{
 			name: "Empty expression",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"key": "value",
 			},
 			expr: "",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged
 				assert.Equal(t, "value", obj["key"])
 			},
 		},
 		{
 			name: "Expression with no matches",
-			obj: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			obj: map[string]any{
+				"metadata": map[string]any{
 					"name": "test",
 				},
 			},
 			expr: ".spec.containers",
-			validate: func(t *testing.T, obj map[string]interface{}) {
+			validate: func(t *testing.T, obj map[string]any) {
 				// Should remain unchanged since path doesn't exist
-				assert.Equal(t, "test", obj["metadata"].(map[string]interface{})["name"])
+				assert.Equal(t, "test", obj["metadata"].(map[string]any)["name"])
 			},
 		},
 		{
 			name: "Complex jq expression with select",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"containers": []interface{}{
-						map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"containers": []any{
+						map[string]any{
 							"name":  "app",
 							"image": "nginx:1.20",
-							"ports": []interface{}{
-								map[string]interface{}{
+							"ports": []any{
+								map[string]any{
 									"containerPort": 80,
 									"name":          "http",
 								},
-								map[string]interface{}{
+								map[string]any{
 									"containerPort": 443,
 									"name":          "https",
 								},
@@ -1151,28 +1151,28 @@ func TestApplyJQPathExpression(t *testing.T) {
 				},
 			},
 			expr: ".spec.containers[0].ports[].containerPort",
-			validate: func(t *testing.T, obj map[string]interface{}) {
-				containers, ok := obj["spec"].(map[string]interface{})["containers"].([]interface{})
+			validate: func(t *testing.T, obj map[string]any) {
+				containers, ok := obj["spec"].(map[string]any)["containers"].([]any)
 				require.True(t, ok)
 				require.Len(t, containers, 1)
 
-				container, ok := containers[0].(map[string]interface{})
+				container, ok := containers[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "app", container["name"])
 				assert.Equal(t, "nginx:1.20", container["image"])
 
-				ports, ok := container["ports"].([]interface{})
+				ports, ok := container["ports"].([]any)
 				require.True(t, ok)
 				require.Len(t, ports, 2)
 
 				// Both ports should have containerPort removed but name should remain
-				firstPort, ok := ports[0].(map[string]interface{})
+				firstPort, ok := ports[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "http", firstPort["name"])
 				_, exists := firstPort["containerPort"]
 				assert.False(t, exists)
 
-				secondPort, ok := ports[1].(map[string]interface{})
+				secondPort, ok := ports[1].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "https", secondPort["name"])
 				_, exists = secondPort["containerPort"]
@@ -1184,7 +1184,7 @@ func TestApplyJQPathExpression(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Make a deep copy to avoid test interference
-			objCopy := make(map[string]interface{})
+			objCopy := make(map[string]any)
 			for k, v := range tt.obj {
 				objCopy[k] = deepCopyValue(v)
 			}
@@ -1205,21 +1205,21 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 		{
 			name: "JQ path expression on deployment containers",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "apps/v1",
 					"kind":       "Deployment",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-deployment",
 					},
-					"spec": map[string]interface{}{
-						"template": map[string]interface{}{
-							"spec": map[string]interface{}{
-								"containers": []interface{}{
-									map[string]interface{}{
+					"spec": map[string]any{
+						"template": map[string]any{
+							"spec": map[string]any{
+								"containers": []any{
+									map[string]any{
 										"name":  "app",
 										"image": "nginx:1.20",
 									},
-									map[string]interface{}{
+									map[string]any{
 										"name":  "sidecar",
 										"image": "busybox:latest",
 									},
@@ -1242,13 +1242,13 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 				require.Len(t, containers, 2)
 
 				// Both containers should have image removed but names should remain
-				firstContainer, ok := containers[0].(map[string]interface{})
+				firstContainer, ok := containers[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "app", firstContainer["name"])
 				_, exists := firstContainer["image"]
 				assert.False(t, exists)
 
-				secondContainer, ok := containers[1].(map[string]interface{})
+				secondContainer, ok := containers[1].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, "sidecar", secondContainer["name"])
 				_, exists = secondContainer["image"]
@@ -1258,22 +1258,22 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 		{
 			name: "Mixed JSON pointers and JQ path expressions",
 			manifests: []unstructured.Unstructured{
-				{Object: map[string]interface{}{
+				{Object: map[string]any{
 					"apiVersion": "v1",
 					"kind":       "Service",
-					"metadata": map[string]interface{}{
+					"metadata": map[string]any{
 						"name": "test-service",
-						"labels": map[string]interface{}{
+						"labels": map[string]any{
 							"app": "test",
 						},
 					},
-					"spec": map[string]interface{}{
-						"ports": []interface{}{
-							map[string]interface{}{
+					"spec": map[string]any{
+						"ports": []any{
+							map[string]any{
 								"port":     80,
 								"nodePort": 30080,
 							},
-							map[string]interface{}{
+							map[string]any{
 								"port":     443,
 								"nodePort": 30443,
 							},
@@ -1295,19 +1295,19 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 				assert.False(t, found)
 
 				// NodePorts should be removed by JQ expression but ports should remain
-				spec, ok := manifests[0].Object["spec"].(map[string]interface{})
+				spec, ok := manifests[0].Object["spec"].(map[string]any)
 				require.True(t, ok)
-				ports, ok := spec["ports"].([]interface{})
+				ports, ok := spec["ports"].([]any)
 				require.True(t, ok)
 				require.Len(t, ports, 2)
 
-				firstPort, ok := ports[0].(map[string]interface{})
+				firstPort, ok := ports[0].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, 80, firstPort["port"])
 				_, exists := firstPort["nodePort"]
 				assert.False(t, exists)
 
-				secondPort, ok := ports[1].(map[string]interface{})
+				secondPort, ok := ports[1].(map[string]any)
 				require.True(t, ok)
 				assert.Equal(t, 443, secondPort["port"])
 				_, exists = secondPort["nodePort"]
@@ -1322,7 +1322,7 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 			manifestsCopy := make([]unstructured.Unstructured, len(tt.manifests))
 			for i, m := range tt.manifests {
 				manifestsCopy[i] = unstructured.Unstructured{
-					Object: deepCopyValue(m.Object).(map[string]interface{}),
+					Object: deepCopyValue(m.Object).(map[string]any),
 				}
 			}
 

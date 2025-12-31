@@ -2,6 +2,7 @@ package extract
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -342,20 +343,21 @@ data:
 func TestProcessYamlOutput_EdgeCases(t *testing.T) {
 	t.Run("very large manifest", func(t *testing.T) {
 		// Create a manifest with many labels
-		input := `apiVersion: v1
+		var input strings.Builder
+		input.WriteString(`apiVersion: v1
 kind: ConfigMap
 metadata:
   name: large-config
-  labels:`
+  labels:`)
 
 		// Add many labels to test performance
-		for i := 0; i < 100; i++ {
-			input += "\n    label" + fmt.Sprintf("%d", i) + ": value" + fmt.Sprintf("%d", i)
+		for i := range 100 {
+			fmt.Fprintf(&input, "\n    label%d: value%d", i, i)
 		}
 
-		input += "\ndata:\n  key: value"
+		input.WriteString("\ndata:\n  key: value")
 
-		result, err := processYamlOutput(input)
+		result, err := processYamlOutput(input.String())
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 

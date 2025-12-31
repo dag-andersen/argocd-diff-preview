@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -64,12 +65,7 @@ var ignoreFolders = []string{
 
 // shouldIgnoreFolder checks if a folder should be ignored based on its name
 func shouldIgnoreFolder(folderName string) bool {
-	for _, ignoreFolder := range ignoreFolders {
-		if folderName == ignoreFolder {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ignoreFolders, folderName)
 }
 
 // getDirectoryHashes recursively walks a directory and returns a map of relative file paths to their SHA-256 hashes

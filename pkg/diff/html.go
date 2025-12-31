@@ -110,24 +110,23 @@ func (h *HTMLSection) printHTMLSection() string {
 	rows.Grow(len(h.content) + len(h.commentHeader) + htmlOverhead)
 
 	// Add comment header
-	rows.WriteString(fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(h.commentHeader)))
+	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(h.commentHeader))
 
 	// Process content lines
-	lines := strings.Split(h.content, "\n")
-	for _, line := range lines {
+	for line := range strings.Lines(h.content) {
 		if len(line) == 0 {
-			rows.WriteString(fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
 			continue
 		}
 		switch line[0] {
 		case '@':
-			rows.WriteString(fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
 		case '-':
-			rows.WriteString(fmt.Sprintf(htmlLine, "removed_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "removed_line", html.EscapeString(line))
 		case '+':
-			rows.WriteString(fmt.Sprintf(htmlLine, "added_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "added_line", html.EscapeString(line))
 		default:
-			rows.WriteString(fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
 		}
 	}
 	s = strings.ReplaceAll(s, "%rows%", rows.String())
@@ -136,7 +135,6 @@ func (h *HTMLSection) printHTMLSection() string {
 }
 
 func (h *HTMLOutput) printDiff() string {
-
 	var sectionsDiff strings.Builder
 
 	for _, section := range h.sections {

@@ -85,8 +85,7 @@ func ClusterExists(clusterName string) bool {
 		return false
 	}
 
-	clusters := strings.Split(strings.TrimSpace(output), "\n")
-	for _, cluster := range clusters {
+	for cluster := range strings.Lines(strings.TrimSpace(output)) {
 		if cluster == clusterName {
 			return true
 		}
