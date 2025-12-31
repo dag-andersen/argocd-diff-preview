@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-service-app-set
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - list:
+      elements:
+      - env: production
+      - env: staging
+  template:
+    metadata:
+      name: 'my-service-app-set-{{.env}}'
+    spec:
+      project: default
+      destination:
+        name: in-cluster
+        namespace: 'my-service-app-set-{{.env}}'
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview
+        targetRevision: HEAD
+        path: 'examples/kustomize/my-service/overlay/{{.env}}/'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
