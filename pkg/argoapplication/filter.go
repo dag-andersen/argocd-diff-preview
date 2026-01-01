@@ -20,7 +20,7 @@ const (
 )
 
 type ApplicationSelectionOptions struct {
-	FileRegex                  *string
+	FileRegex                  *regexp.Regexp
 	Selector                   []app_selector.Selector
 	FilesChanged               []string
 	IgnoreInvalidWatchPattern  bool

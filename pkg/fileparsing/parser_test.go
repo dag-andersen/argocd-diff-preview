@@ -3,6 +3,7 @@ package fileparsing
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
@@ -61,8 +62,8 @@ metadata:
 	})
 
 	t.Run("WithFileRegex", func(t *testing.T) {
-		regex := "test1.yaml"
-		files := GetYamlFiles(tempDir, &regex)
+		regex := regexp.MustCompile("test1.yaml")
+		files := GetYamlFiles(tempDir, regex)
 		assert.Len(t, files, 1)
 		assert.Contains(t, files, "test1.yaml")
 	})

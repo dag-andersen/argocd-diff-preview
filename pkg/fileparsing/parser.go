@@ -14,7 +14,7 @@ import (
 )
 
 // GetYamlFiles gets all YAML files in a directory
-func GetYamlFiles(directory string, fileRegex *string) []string {
+func GetYamlFiles(directory string, fileRegex *regexp.Regexp) []string {
 	log.Debug().Msgf("Fetching all files in dir: %s", directory)
 
 	var yamlFiles []string
@@ -40,8 +40,7 @@ func GetYamlFiles(directory string, fileRegex *string) []string {
 
 		// Check regex if provided
 		if fileRegex != nil {
-			matched, err := regexp.MatchString(*fileRegex, relPath)
-			if err != nil || !matched {
+			if !fileRegex.MatchString(relPath) {
 				return nil
 			}
 		}
@@ -57,7 +56,7 @@ func GetYamlFiles(directory string, fileRegex *string) []string {
 
 	if fileRegex != nil {
 		log.Debug().Msgf("Found %d yaml files in dir '%s' matching regex: %s",
-			len(yamlFiles), directory, *fileRegex)
+			len(yamlFiles), directory, fileRegex.String())
 	} else {
 		log.Debug().Msgf("Found %d yaml files in dir '%s'",
 			len(yamlFiles), directory)
