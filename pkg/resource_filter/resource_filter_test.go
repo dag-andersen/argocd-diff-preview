@@ -2,6 +2,8 @@ package resource_filter
 
 import (
 	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestFromString(t *testing.T) {
@@ -232,10 +234,237 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 
 func TestSkipResourceRule_String(t *testing.T) {
 	rule := SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"}
-	expected := "Group: apps, Kind: Deployment, Name: my-app"
+	expected := "[Group: apps, Kind: Deployment, Name: my-app]"
 	result := rule.String()
 
 	if result != expected {
 		t.Errorf("String() = %q, want %q", result, expected)
+	}
+}
+
+func TestGroupFromAPIVersion(t *testing.T) {
+	tests := []struct {
+		name       string
+		apiVersion string
+		expected   string
+	}{
+		{
+			name:       "apps/v1",
+			apiVersion: "apps/v1",
+			expected:   "apps",
+		},
+		{
+			name:       "networking.k8s.io/v1",
+			apiVersion: "networking.k8s.io/v1",
+			expected:   "networking.k8s.io",
+		},
+		{
+			name:       "core v1 (no group)",
+			apiVersion: "v1",
+			expected:   "",
+		},
+		{
+			name:       "custom group",
+			apiVersion: "custom.example.com/v1beta1",
+			expected:   "custom.example.com",
+		},
+		{
+			name:       "empty string",
+			apiVersion: "",
+			expected:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := groupFromAPIVersion(tt.apiVersion)
+			if result != tt.expected {
+				t.Errorf("groupFromAPIVersion(%q) = %q, want %q", tt.apiVersion, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMatchesAnySkipRule(t *testing.T) {
+	tests := []struct {
+		name     string
+		manifest *unstructured.Unstructured
+		rules    []SkipResourceRule
+		expected bool
+	}{
+		{
+			name: "empty rules returns false",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    []SkipResourceRule{},
+			expected: false,
+		},
+		{
+			name: "nil rules returns false",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    nil,
+			expected: false,
+		},
+		{
+			name: "single rule matches",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+			expected: true,
+		},
+		{
+			name: "single rule does not match",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "apps", Kind: "StatefulSet", Name: "my-app"}},
+			expected: false,
+		},
+		{
+			name: "multiple rules - first matches",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules: []SkipResourceRule{
+				{Group: "apps", Kind: "Deployment", Name: "my-app"},
+				{Group: "core", Kind: "Secret", Name: "my-secret"},
+			},
+			expected: true,
+		},
+		{
+			name: "multiple rules - second matches",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata":   map[string]any{"name": "my-secret"},
+				},
+			},
+			rules: []SkipResourceRule{
+				{Group: "apps", Kind: "Deployment", Name: "my-app"},
+				{Group: "", Kind: "Secret", Name: "my-secret"},
+			},
+			expected: true,
+		},
+		{
+			name: "multiple rules - none match",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules: []SkipResourceRule{
+				{Group: "apps", Kind: "StatefulSet", Name: "my-app"},
+				{Group: "core", Kind: "Secret", Name: "my-secret"},
+			},
+			expected: false,
+		},
+		{
+			name: "wildcard group matches",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "*", Kind: "Deployment", Name: "my-app"}},
+			expected: true,
+		},
+		{
+			name: "wildcard kind matches",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "apps", Kind: "*", Name: "my-app"}},
+			expected: true,
+		},
+		{
+			name: "wildcard name matches",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata":   map[string]any{"name": "my-app"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "*"}},
+			expected: true,
+		},
+		{
+			name: "all wildcards matches anything",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "random.io/v1",
+					"kind":       "CustomResource",
+					"metadata":   map[string]any{"name": "anything"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "*", Kind: "*", Name: "*"}},
+			expected: true,
+		},
+		{
+			name: "core resource (v1 apiVersion)",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "ConfigMap",
+					"metadata":   map[string]any{"name": "my-config"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "", Kind: "ConfigMap", Name: "my-config"}},
+			expected: true,
+		},
+		{
+			name: "core resource with wildcard group",
+			manifest: &unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Secret",
+					"metadata":   map[string]any{"name": "my-secret"},
+				},
+			},
+			rules:    []SkipResourceRule{{Group: "*", Kind: "Secret", Name: "*"}},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := MatchesAnySkipRule(tt.manifest, tt.rules)
+			if result != tt.expected {
+				t.Errorf("MatchesAnySkipRule() = %v, want %v", result, tt.expected)
+			}
+		})
 	}
 }

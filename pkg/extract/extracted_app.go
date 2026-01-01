@@ -38,7 +38,7 @@ func (e *ExtractedApp) FlattenToString(skipResourceRules []resource_filter.SkipR
 	var manifestStrings []string
 	for _, manifest := range e.Manifest {
 		if resource_filter.MatchesAnySkipRule(&manifest, skipResourceRules) {
-			msg := fmt.Sprintf("Skipping manifest %s/%s/%s", manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetName())
+			msg := fmt.Sprintf("Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetName())
 			log.Debug().Msg(msg)
 			manifestStrings = append(manifestStrings, msg)
 			continue
