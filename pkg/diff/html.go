@@ -104,19 +104,19 @@ func (h *HTMLSection) printHTMLSection() string {
 
 	var rows strings.Builder
 	// Pre-allocate capacity based on content length to avoid reallocations
-	// Each line gets wrapped in ~40 chars of HTML + potential HTML escaping expansion
+	// Each line gets ~50 chars of HTML wrapper + up to ~40 chars for HTML escaping expansion
 	estimatedLines := strings.Count(h.content, "\n") + 1
-	htmlOverhead := estimatedLines * 50 // ~40 chars HTML + 10 for escaping expansion
+	htmlOverhead := estimatedLines * 90
 	rows.Grow(len(h.content) + len(h.commentHeader) + htmlOverhead)
 
 	// Add comment header
-	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(h.commentHeader))
+	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
 
 	// Process content lines
 	for line := range strings.Lines(h.content) {
+		line = strings.TrimRight(line, " \t\r\n")
 		if len(line) == 0 {
-			fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
-			continue
+			continue // Skip empty lines
 		}
 		switch line[0] {
 		case '@':
