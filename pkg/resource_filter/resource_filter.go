@@ -1,8 +1,10 @@
-package extract
+package resource_filter
 
 import (
 	"fmt"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // SkipResourceRule represents a rule to skip a difference in the diff
@@ -14,7 +16,7 @@ type SkipResourceRule struct {
 
 // String returns the string representation of the DiffSkipRule
 func (s *SkipResourceRule) String() string {
-	return fmt.Sprintf("Group: %s, Kind: %s, Name: %s", s.Group, s.Kind, s.Name)
+	return fmt.Sprintf("[Group: %s, Kind: %s, Name: %s]", s.Group, s.Kind, s.Name)
 }
 
 // format is --diff-skip-rule="group:kind:name,group:kind:name"
@@ -51,10 +53,29 @@ func FromString(s string) ([]SkipResourceRule, error) {
 	return diffSkipRules, nil
 }
 
-// Matches checks if the DiffSkipRule matches the given group, kind, and name
+// matches checks if the DiffSkipRule matches the given group, kind, and name
 // A "*" in any field matches any value
-func (s *SkipResourceRule) Matches(group, kind, name string) bool {
+func (s *SkipResourceRule) matches(group, kind, name string) bool {
 	return (s.Group == "*" || s.Group == group) &&
 		(s.Kind == "*" || s.Kind == kind) &&
 		(s.Name == "*" || s.Name == name)
+}
+
+func MatchesAnySkipRule(manifest *unstructured.Unstructured, skipResourceRules []SkipResourceRule) bool {
+	group := groupFromAPIVersion(manifest.GetAPIVersion())
+	for _, rule := range skipResourceRules {
+		if rule.matches(group, manifest.GetKind(), manifest.GetName()) {
+			return true
+		}
+	}
+	return false
+}
+
+func groupFromAPIVersion(apiVersion string) string {
+	// formats: "group/version" or "v1" (core)
+	if strings.Contains(apiVersion, "/") {
+		parts := strings.SplitN(apiVersion, "/", 2)
+		return parts[0]
+	}
+	return ""
 }

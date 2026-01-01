@@ -1,4 +1,4 @@
-package extract
+package resource_filter
 
 import (
 	"testing"
@@ -221,7 +221,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := tt.rule.Matches(tt.group, tt.kind, tt.resName)
+			result := tt.rule.matches(tt.group, tt.kind, tt.resName)
 			if result != tt.expected {
 				t.Errorf("Matches(%q, %q, %q) = %v, want %v",
 					tt.group, tt.kind, tt.resName, result, tt.expected)
@@ -239,4 +239,3 @@ func TestSkipResourceRule_String(t *testing.T) {
 		t.Errorf("String() = %q, want %q", result, expected)
 	}
 }
-

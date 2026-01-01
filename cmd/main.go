@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -14,10 +13,10 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"sigs.k8s.io/yaml"
 )
 
 func main() {
@@ -302,19 +301,18 @@ func run(cfg *Config) error {
 		targetApps.SelectedApps,
 		uniqueID,
 		deleteAfterProcessing,
-		cfg.SkipResourceRules,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
 		return err
 	}
 
-	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests)
+	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests, cfg.SkipResourceRules)
 	if err != nil {
 		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
 		return err
 	}
-	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests)
+	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests, cfg.SkipResourceRules)
 	if err != nil {
 		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
 		return err
@@ -378,71 +376,19 @@ func run(cfg *Config) error {
 }
 
 // convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
-func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) ([]diff.AppInfo, error) {
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp, skipResourceRules []resource_filter.SkipResourceRule) ([]diff.AppInfo, error) {
 	appInfos := make([]diff.AppInfo, len(extractedApps))
 	for i, extractedApp := range extractedApps {
-		appInfo, err := convertExtractedAppToAppInfo(extractedApp)
+		manifestString, err := extractedApp.FlattenToString(skipResourceRules)
 		if err != nil {
 			return nil, err
 		}
-		appInfos[i] = appInfo
+		appInfos[i] = diff.AppInfo{
+			Id:          extractedApp.Id,
+			Name:        extractedApp.Name,
+			SourcePath:  extractedApp.SourcePath,
+			FileContent: manifestString,
+		}
 	}
 	return appInfos, nil
-}
-
-// convertExtractedAppToAppInfo converts an ExtractedApp to an AppInfo
-func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) (diff.AppInfo, error) {
-	yamlString, err := convertToYamlString(&extractedApp)
-	if err != nil {
-		log.Error().Msgf("❌ Failed to convert extracted app to yaml string: %s", err)
-		return diff.AppInfo{}, err
-	}
-
-	return diff.AppInfo{
-		Id:          extractedApp.Id,
-		Name:        extractedApp.Name,
-		SourcePath:  extractedApp.SourcePath,
-		FileContent: yamlString,
-	}, nil
-}
-
-// convertToYamlString converts a list of ExtractedApp to a single YAML string
-func convertToYamlString(apps *extract.ExtractedApp) (string, error) {
-	// Sort by API version, then by kind, then by name, with CRDs always at the end
-	sort.SliceStable(apps.Manifest, func(i, j int) bool {
-		apiI := apps.Manifest[i].GetAPIVersion()
-		apiJ := apps.Manifest[j].GetAPIVersion()
-		kindI := apps.Manifest[i].GetKind()
-		kindJ := apps.Manifest[j].GetKind()
-		nameI := apps.Manifest[i].GetName()
-		nameJ := apps.Manifest[j].GetName()
-
-		// CRDs should always be at the end
-		isCRD_I := kindI == "CustomResourceDefinition"
-		isCRD_J := kindJ == "CustomResourceDefinition"
-
-		if isCRD_I != isCRD_J {
-			// If only one is a CRD, the non-CRD comes first
-			return !isCRD_I
-		}
-
-		// Sort by apiVersion first, then by kind, then by name
-		if apiI != apiJ {
-			return apiI < apiJ
-		}
-		if kindI != kindJ {
-			return kindI < kindJ
-		}
-		return nameI < nameJ
-	})
-
-	var manifestStrings []string
-	for _, manifest := range apps.Manifest {
-		manifestString, err := yaml.Marshal(manifest.Object)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal unstructured object: %w", err)
-		}
-		manifestStrings = append(manifestStrings, string(manifestString))
-	}
-	return strings.Join(manifestStrings, "---\n"), nil
 }

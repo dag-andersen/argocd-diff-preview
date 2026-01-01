@@ -14,10 +14,10 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k3d"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 )
 
 var (
@@ -137,7 +137,7 @@ type Config struct {
 	Selectors         []app_selector.Selector
 	FilesChanged      []string
 	RedirectRevisions []string
-	SkipResourceRules []extract.SkipResourceRule
+	SkipResourceRules []resource_filter.SkipResourceRule
 	ClusterProvider   cluster.Provider
 }
 
@@ -371,7 +371,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	cfg.FilesChanged = o.parseFilesChanged()
 
 	// Parse skip resource rules
-	cfg.SkipResourceRules, err = extract.FromString(o.SkipResourceRules)
+	cfg.SkipResourceRules, err = resource_filter.FromString(o.SkipResourceRules)
 	if err != nil {
 		return nil, fmt.Errorf("invalid skip-resource-rules: %w", err)
 	}
@@ -589,5 +589,12 @@ func (o *Config) LogConfig() {
 	}
 	if o.HideDeletedAppDiff {
 		log.Info().Msgf("✨ - hide-deleted-app-diff: %t", o.HideDeletedAppDiff)
+	}
+	if len(o.SkipResourceRules) > 0 {
+		skipResourceRuleStrings := make([]string, len(o.SkipResourceRules))
+		for i, skipResourceRule := range o.SkipResourceRules {
+			skipResourceRuleStrings[i] = skipResourceRule.String()
+		}
+		log.Info().Msgf("✨ - skip-resource-rules: %s", strings.Join(skipResourceRuleStrings, ", "))
 	}
 }

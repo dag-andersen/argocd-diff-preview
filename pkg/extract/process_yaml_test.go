@@ -304,7 +304,7 @@ data:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := processYamlOutput(tt.input, nil)
+			result, err := processYamlOutput(tt.input)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -357,7 +357,7 @@ metadata:
 
 		input.WriteString("\ndata:\n  key: value")
 
-		result, err := processYamlOutput(input.String(), nil)
+		result, err := processYamlOutput(input.String())
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
@@ -377,7 +377,7 @@ metadata:
 data:
   key: dmFsdWU=`
 
-		result, err := processYamlOutput(input, nil)
+		result, err := processYamlOutput(input)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
@@ -397,7 +397,7 @@ metadata:
 data:
   greeting: "Hello 世界"`
 
-		result, err := processYamlOutput(input, nil)
+		result, err := processYamlOutput(input)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
@@ -423,7 +423,7 @@ spec:
     matchLabels:
       app: test`
 
-		result, err := processYamlOutput(input, nil)
+		result, err := processYamlOutput(input)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 
