@@ -129,11 +129,11 @@ func Parse() *Options {
 			// Check required options
 			errors := opts.CheckRequired()
 			if len(errors) > 0 {
-				var errorMsg = ""
+				var errorMsg strings.Builder
 				for _, err := range errors {
-					errorMsg += fmt.Sprintf("'%s', ", err)
+					fmt.Fprintf(&errorMsg, "'%s', ", err)
 				}
-				return fmt.Errorf("error parsing command line flags: %s", errorMsg)
+				return fmt.Errorf("error parsing command line flags: %s", errorMsg.String())
 			}
 
 			// Configure logging based on debug mode and log format
@@ -150,8 +150,8 @@ func Parse() *Options {
 				}
 			}
 			if opts.LogFormat == "human" {
-				consoleWriter.FormatFieldName = func(i interface{}) string { return fmt.Sprintf("(%s: ", i) }
-				consoleWriter.FormatFieldValue = func(i interface{}) string { return fmt.Sprintf("%s)", i) }
+				consoleWriter.FormatFieldName = func(i any) string { return fmt.Sprintf("(%s: ", i) }
+				consoleWriter.FormatFieldValue = func(i any) string { return fmt.Sprintf("%s)", i) }
 			}
 			log.Logger = log.Output(consoleWriter)
 
@@ -319,7 +319,7 @@ func (o *Options) CheckRequired() []string {
 func (o *Options) ParseSelectors() ([]selector.Selector, error) {
 	var selectors []selector.Selector
 	if o.Selector != "" {
-		for _, s := range strings.Split(o.Selector, ",") {
+		for s := range strings.SplitSeq(o.Selector, ",") {
 			selector, err := selector.FromString(strings.TrimSpace(s))
 			if err != nil {
 				return nil, err

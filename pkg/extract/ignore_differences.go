@@ -56,8 +56,8 @@ func parseIgnoreDifferencesFromApp(app argoapplication.ArgoResource) []ignoreDif
 	return rules
 }
 
-func parseSingleIgnoreRule(item interface{}) (ignoreDifferenceRule, bool) {
-	m, ok := item.(map[string]interface{})
+func parseSingleIgnoreRule(item any) (ignoreDifferenceRule, bool) {
+	m, ok := item.(map[string]any)
 	if !ok {
 		return ignoreDifferenceRule{}, false
 	}
@@ -75,14 +75,14 @@ func parseSingleIgnoreRule(item interface{}) (ignoreDifferenceRule, bool) {
 	if v, ok := m["namespace"].(string); ok {
 		rule.Namespace = v
 	}
-	if v, ok := m["jsonPointers"].([]interface{}); ok {
+	if v, ok := m["jsonPointers"].([]any); ok {
 		for _, p := range v {
 			if s, ok := p.(string); ok {
 				rule.JSONPointers = append(rule.JSONPointers, s)
 			}
 		}
 	}
-	if v, ok := m["jqPathExpressions"].([]interface{}); ok {
+	if v, ok := m["jqPathExpressions"].([]any); ok {
 		for _, p := range v {
 			if s, ok := p.(string); ok {
 				rule.JQPathExpressions = append(rule.JQPathExpressions, s)
@@ -129,7 +129,7 @@ func applyIgnoreDifferencesToManifests(manifests []unstructured.Unstructured, ru
 
 // applyJQPathExpression evaluates a jq expression and deletes/masks values at returned paths.
 // The provided expression is wrapped with jq's path(<expr>) helper to obtain token arrays.
-func applyJQPathExpression(obj map[string]interface{}, expr string) {
+func applyJQPathExpression(obj map[string]any, expr string) {
 	if expr == "" {
 		return
 	}
@@ -155,11 +155,11 @@ func applyJQPathExpression(obj map[string]interface{}, expr string) {
 		}
 
 		// Expect a single path (array of tokens). If it's an array of arrays, handle each.
-		if arr, ok := v.([]interface{}); ok {
+		if arr, ok := v.([]any); ok {
 			applyTokens(obj, arr)
 			continue
 		}
-		if arrs, ok := v.([][]interface{}); ok {
+		if arrs, ok := v.([][]any); ok {
 			for _, tokens := range arrs {
 				applyTokens(obj, tokens)
 			}
@@ -169,12 +169,12 @@ func applyJQPathExpression(obj map[string]interface{}, expr string) {
 
 // applyTokens traverses obj following jq path tokens and removes the final map key
 // or masks the final array element.
-func applyTokens(obj map[string]interface{}, tokens []interface{}) {
-	var parent interface{} = obj
+func applyTokens(obj map[string]any, tokens []any) {
+	var parent any = obj
 	for i, tok := range tokens {
 		last := i == len(tokens)-1
 		switch cur := parent.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			key, ok := tok.(string)
 			if !ok {
 				return
@@ -188,7 +188,7 @@ func applyTokens(obj map[string]interface{}, tokens []interface{}) {
 				return
 			}
 			parent = next
-		case []interface{}:
+		case []any:
 			var idx int
 			switch n := tok.(type) {
 			case int:
@@ -243,7 +243,7 @@ func groupFromAPIVersion(apiVersion string) string {
 // deleteOrMaskAtJSONPointer applies a JSON Pointer (RFC 6901) to obj.
 // If the target is a map key, it deletes the key. If it's an array index,
 // it replaces the element with a masked value. Invalid pointers are ignored.
-func deleteOrMaskAtJSONPointer(obj map[string]interface{}, pointer string) {
+func deleteOrMaskAtJSONPointer(obj map[string]any, pointer string) {
 	if pointer == "" {
 		return
 	}
@@ -254,14 +254,14 @@ func deleteOrMaskAtJSONPointer(obj map[string]interface{}, pointer string) {
 
 	// Split and unescape tokens
 	tokens := strings.Split(pointer, "/")[1:]
-	var parent interface{} = obj
+	var parent any = obj
 
 	for i, rawTok := range tokens {
 		tok := decodeJSONPointerToken(rawTok)
 		last := i == len(tokens)-1
 
 		switch cur := parent.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			if last {
 				delete(cur, tok)
 				return
@@ -273,7 +273,7 @@ func deleteOrMaskAtJSONPointer(obj map[string]interface{}, pointer string) {
 			}
 			parent = next
 
-		case []interface{}:
+		case []any:
 			// Token must be an index
 			idx, err := strconv.Atoi(tok)
 			if err != nil || idx < 0 || idx >= len(cur) {

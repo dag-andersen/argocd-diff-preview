@@ -20,7 +20,7 @@ func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
 	for _, doc := range documents {
 
 		// Create a new map to hold the parsed YAML
-		var yamlObj map[string]interface{}
+		var yamlObj map[string]any
 		err := yaml.Unmarshal([]byte(doc), &yamlObj)
 		if err != nil {
 			log.Debug().Msgf("Failed to parse YAML: \n%s", doc)

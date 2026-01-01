@@ -1,6 +1,7 @@
 package argoapplication
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
@@ -1080,19 +1081,20 @@ spec:
 
 func getMultiSourceYamlApp(t *testing.T, annotation string, paths ...string) *unstructured.Unstructured {
 	var node unstructured.Unstructured
-	yamlText := `
+	var yamlText strings.Builder
+	yamlText.WriteString(`
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   annotations:
     argocd.argoproj.io/manifest-generate-paths: "` + annotation + `"
 spec:
-  sources:`
+  sources:`)
 	for _, path := range paths {
-		yamlText += `
-    - path: "` + path + `"`
+		yamlText.WriteString(`
+    - path: "` + path + `"`)
 	}
-	if err := yaml.Unmarshal([]byte(yamlText), &node); err != nil {
+	if err := yaml.Unmarshal([]byte(yamlText.String()), &node); err != nil {
 		t.Fatalf("Error unmarshalling YAML: %v", err)
 	}
 	return &node

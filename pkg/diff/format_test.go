@@ -294,10 +294,10 @@ func TestLargeDiff(t *testing.T) {
 	var newLines []string
 
 	// Create 500 different lines in old and new content
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		oldLines = append(oldLines, fmt.Sprintf("old line %d", i))
 	}
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		newLines = append(newLines, fmt.Sprintf("new line %d", i))
 	}
 
