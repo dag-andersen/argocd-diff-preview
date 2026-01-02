@@ -1,12 +1,16 @@
-# Filter output
+# Filter Diff Output
 
-## Ignore specific lines in the diff preview
+This page explains how to reduce noise in your diff output by ignoring specific lines or entire resources.
 
-Since this tool only highlights diffs between branches, it is important to stay up to date with your main branch. If your main branch is updated often with new tags for you container images, it can be hard to keep up with the newest changes.
+---
 
-### *Example 1:*
+## Ignore specific lines
 
-You might see a lot of previews including simple changes like `image: my-image:v1.0.0` to `image: my-image:v1.0.1`.
+Use the `--diff-ignore` option to hide lines matching a regex pattern.
+
+### Example: Image tag changes
+
+Since this tool highlights diffs between branches, it's important to stay up to date with your main branch. If your main branch is updated frequently with new container image tags, you'll see a lot of noise in the diff - changes like `image: my-image:v1.0.0` → `image: my-image:v1.0.1` will appear in every PR:
 
 ```diff
 diff --git base/deployment target/deployment
@@ -20,15 +24,17 @@ diff --git base/deployment target/deployment
             - containerPort: 80
 ```
 
-To avoid this, you can ignore lines in the diff by using the `--diff-ignore` option.
+To hide these, use a regex that matches version strings:
 
 ```bash
-argocd-diff-preview --diff-ignore="v[1,9]+.[1,9]+.[1,9]+"
+argocd-diff-preview --diff-ignore="v[0-9]+\.[0-9]+\.[0-9]+"
 ```
 
-### *Example 2:*
+---
 
-In some cases, Helm Charts generate new values each time they are installed. When this happens, the diff will appear in every pull request. To avoid this, you can ignore these values by using the `--diff-ignore` option.
+### Example: Helm-generated values
+
+Some Helm charts generate new values on every install (certificates, random strings, etc.). These appear in every PR even when nothing meaningful changed:
 
 ```diff
    name: example-name
@@ -49,24 +55,33 @@ In some cases, Helm Charts generate new values each time they are installed. Whe
 argocd-diff-preview --diff-ignore="caBundle"
 ```
 
-This will hide all lines that contain the word `caBundle`.
+This hides all lines containing the word `caBundle`.
 
-## Ignore specific resources in the diff preview
+---
 
-You can also ignore specific resources in the diff preview by using the `--skip-resource-rules="group:kind:name,group:kind:name"` option.
+## Ignore resources
 
-The format is `group:kind:name`, where `group` and `name` are optional. An empty group means "core" group. "*" means any value.
+Use `--ignore-resources` to exclude entire resources from the diff. The format is:
 
-### *Example*
-
-```bash
-argocd-diff-preview --skip-resource-rules="apps:Deployment:deploy-from-folder-two, *:CustomResourceDefinition:*,:ConfigMap:argocd-cm
+```
+group:kind:name
 ```
 
-This will hide:
-- all resources of kind `Deployment` in the group `apps` with the name `deploy-from-folder-two`
-- all CustomResourceDefinitions
-- all ConfigMaps (in the core group) named `argocd-cm`
+| Component | Description |
+|-----------|-------------|
+| `group` | API group (empty = core group, `*` = any) |
+| `kind` | Resource kind (`*` = any) |
+| `name` | Resource name (`*` = any) |
 
+### Example
 
+```bash
+argocd-diff-preview --ignore-resources="apps:Deployment:my-deploy,*:CustomResourceDefinition:*,:ConfigMap:argocd-cm"
+```
+
+This hides:
+
+- The Deployment named `my-deploy` in the `apps` group
+- All CustomResourceDefinitions (any group)
+- The ConfigMap named `argocd-cm` in the core group
 
