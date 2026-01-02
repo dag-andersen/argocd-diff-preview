@@ -37,12 +37,17 @@ func (e *ExtractedApp) FlattenToString(ignoreResourceRules []resource_filter.Ign
 	e.sortManifests()
 	var manifestStrings []string
 	for _, manifest := range e.Manifest {
-		if resource_filter.MatchesAnyIgnoreRule(&manifest, ignoreResourceRules) {
-			msg := fmt.Sprintf("Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetName())
-			log.Debug().Msg(msg)
-			manifestStrings = append(manifestStrings, msg)
-			continue
+
+		// If there are ignore resource rules, check if the manifest should be ignored
+		if len(ignoreResourceRules) > 0 {
+			if resource_filter.MatchesAnyIgnoreRule(&manifest, ignoreResourceRules) {
+				msg := fmt.Sprintf("Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetName())
+				log.Debug().Msg(msg)
+				manifestStrings = append(manifestStrings, msg)
+				continue
+			}
 		}
+
 		manifestString, err := yaml.Marshal(manifest.Object)
 		if err != nil {
 			log.Error().Msgf("❌ Failed to convert extracted app to yaml string: %s", err)
