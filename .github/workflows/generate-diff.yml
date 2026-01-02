@@ -43,7 +43,6 @@ jobs:
 
       - name: Post diff as comment
         run: |
-          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md --edit-last || \
-          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md
+          gh pr comment ${{ github.event.number }} --repo ${{ github.repository }} --body-file output/diff.md --edit-last --create-if-none
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

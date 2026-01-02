@@ -58,6 +58,7 @@ var (
 	DefaultIgnoreInvalidWatchPattern  = false
 	DefaultHideDeletedAppDiff         = false
 	DefaultIgnoreResourceRules        = ""
+	DefaultArgocdLoginOptions         = ""
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -92,6 +93,7 @@ type RawOptions struct {
 	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
 	ArgocdChartRepoUsername    string `mapstructure:"argocd-chart-repo-username"`
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
+	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -128,6 +130,7 @@ type Config struct {
 	ArgocdChartURL             string
 	ArgocdChartRepoUsername    string
 	ArgocdChartRepoPassword    string
+	ArgocdLoginOptions         string
 	LogFormat                  string
 	Title                      string
 	HideDeletedAppDiff         bool
@@ -213,6 +216,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-chart-url", DefaultArgocdChartURL)
 	viper.SetDefault("argocd-chart-repo-username", DefaultArgocdChartRepoUsername)
 	viper.SetDefault("argocd-chart-repo-password", DefaultArgocdChartRepoPassword)
+	viper.SetDefault("argocd-login-options", DefaultArgocdLoginOptions)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -238,6 +242,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("argocd-chart-url", DefaultArgocdChartURL, "Argo CD Helm Chart URL")
 	rootCmd.Flags().String("argocd-chart-repo-username", DefaultArgocdChartRepoUsername, "Argo CD Helm Repo User Name")
 	rootCmd.Flags().String("argocd-chart-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
+	rootCmd.Flags().String("argocd-login-options", DefaultArgocdLoginOptions, "Additional options to pass to 'argocd login' command")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
@@ -340,6 +345,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		ArgocdChartURL:             o.ArgocdChartURL,
 		ArgocdChartRepoUsername:    o.ArgocdChartRepoUsername,
 		ArgocdChartRepoPassword:    o.ArgocdChartRepoPassword,
+		ArgocdLoginOptions:         o.ArgocdLoginOptions,
 		LogFormat:                  o.LogFormat,
 		Title:                      o.Title,
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
@@ -583,6 +589,9 @@ func (o *Config) LogConfig() {
 	}
 	if o.ArgocdChartRepoPassword != DefaultArgocdChartRepoPassword {
 		log.Info().Msgf("✨ - argocd-chart-repo-password: *********")
+	}
+	if o.ArgocdLoginOptions != DefaultArgocdLoginOptions {
+		log.Info().Msgf("✨ - argocd-login-options: %s", o.ArgocdLoginOptions)
 	}
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)
