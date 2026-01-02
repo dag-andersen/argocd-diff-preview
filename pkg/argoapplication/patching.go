@@ -2,6 +2,7 @@ package argoapplication
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
@@ -233,7 +234,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 	}
 
 	// Handle single source
-	if source, ok := specMap["source"].(map[string]interface{}); ok {
+	if source, ok := specMap["source"].(map[string]any); ok {
 		if err := a.redirectSourceMap(source, repo, branch, redirectRevisions); err != nil {
 			return err
 		}
@@ -241,9 +242,9 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 
 	// Handle multiple sources
 	if sourcesInterface, ok := specMap["sources"]; ok {
-		if sources, ok := sourcesInterface.([]interface{}); ok {
+		if sources, ok := sourcesInterface.([]any); ok {
 			for _, sourceInterface := range sources {
-				if source, ok := sourceInterface.(map[string]interface{}); ok {
+				if source, ok := sourceInterface.(map[string]any); ok {
 					if err := a.redirectSourceMap(source, repo, branch, redirectRevisions); err != nil {
 						return err
 					}
@@ -261,7 +262,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 }
 
 // Helper function to redirect a single source
-func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, branch string, redirectRevisions []string) error {
+func (a *ArgoResource) redirectSourceMap(source map[string]any, repo, branch string, redirectRevisions []string) error {
 	// Skip helm charts
 	if _, hasChart := source["chart"]; hasChart {
 		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Found helm chart")
@@ -294,7 +295,7 @@ func (a *ArgoResource) redirectSourceMap(source map[string]interface{}, repo, br
 		return nil
 	}
 
-	shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, targetRev)
+	shouldRedirect := len(redirectRevisions) == 0 || slices.Contains(redirectRevisions, targetRev)
 
 	if shouldRedirect {
 		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Redirecting targetRevision from '%s' to '%s'", targetRev, branch)
@@ -329,7 +330,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 }
 
 // processGenerators processes a slice of generators recursively
-func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch string, redirectRevisions []string, parent string, level int) error {
+func (a *ArgoResource) processGenerators(generators []any, repo, branch string, redirectRevisions []string, parent string, level int) error {
 	// Limit nesting level to prevent infinite recursion
 	if level > 2 {
 		return fmt.Errorf("too many levels of nested matrix generators in ApplicationSet: %s", a.Name)
@@ -337,14 +338,14 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 
 	// Process each generator
 	for i, genInterface := range generators {
-		gen, ok := genInterface.(map[string]interface{})
+		gen, ok := genInterface.(map[string]any)
 		if !ok {
 			continue
 		}
 
 		// Check for matrix generator
 		if matrixGen, hasMatrix := gen["matrix"]; hasMatrix {
-			matrixMap, ok := matrixGen.(map[string]interface{})
+			matrixMap, ok := matrixGen.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -359,7 +360,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Nested generators found")
 
-			nestedGenSlice, ok := nestedGens.([]interface{})
+			nestedGenSlice, ok := nestedGens.([]any)
 			if !ok {
 				continue
 			}
@@ -381,7 +382,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 
 		// Check for merge generator
 		if mergeGen, hasMerge := gen["merge"]; hasMerge {
-			mergeMap, ok := mergeGen.(map[string]interface{})
+			mergeMap, ok := mergeGen.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -396,7 +397,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msg("Nested generators found in merge")
 
-			nestedGenSlice, ok := nestedGens.([]interface{})
+			nestedGenSlice, ok := nestedGens.([]any)
 			if !ok {
 				continue
 			}
@@ -412,7 +413,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 
 		// Check for git generator
 		if gitGen, hasGit := gen["git"]; hasGit {
-			gitMap, ok := gitGen.(map[string]interface{})
+			gitMap, ok := gitGen.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -433,7 +434,7 @@ func (a *ArgoResource) processGenerators(generators []interface{}, repo, branch 
 			}
 
 			// Check if we should redirect this revision
-			shouldRedirect := len(redirectRevisions) == 0 || contains(redirectRevisions, revision)
+			shouldRedirect := len(redirectRevisions) == 0 || slices.Contains(redirectRevisions, revision)
 			if shouldRedirect {
 				gitMap["revision"] = branch
 				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Str("branch", branch).
@@ -449,11 +450,3 @@ func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
-func contains(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == str {
-			return true
-		}
-	}
-	return false
-}

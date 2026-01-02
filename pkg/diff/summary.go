@@ -25,31 +25,31 @@ func buildSummary(changedFiles []Diff) string {
 		}
 	}
 
-	summaryBuilder.WriteString(fmt.Sprintf("Total: %d files changed\n", addedFilesCount+deletedFilesCount+modifiedFilesCount))
+	fmt.Fprintf(&summaryBuilder, "Total: %d files changed\n", addedFilesCount+deletedFilesCount+modifiedFilesCount)
 
 	if 0 < addedFilesCount {
-		summaryBuilder.WriteString(fmt.Sprintf("\nAdded (%d):\n", addedFilesCount))
+		fmt.Fprintf(&summaryBuilder, "\nAdded (%d):\n", addedFilesCount)
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Insert {
-				summaryBuilder.WriteString(fmt.Sprintf("+ %s%s\n", diff.prettyName(), diff.changeStats()))
+				fmt.Fprintf(&summaryBuilder, "+ %s%s\n", diff.prettyName(), diff.changeStats())
 			}
 		}
 	}
 
 	if 0 < deletedFilesCount {
-		summaryBuilder.WriteString(fmt.Sprintf("\nDeleted (%d):\n", deletedFilesCount))
+		fmt.Fprintf(&summaryBuilder, "\nDeleted (%d):\n", deletedFilesCount)
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Delete {
-				summaryBuilder.WriteString(fmt.Sprintf("- %s%s\n", diff.prettyName(), diff.changeStats()))
+				fmt.Fprintf(&summaryBuilder, "- %s%s\n", diff.prettyName(), diff.changeStats())
 			}
 		}
 	}
 
 	if 0 < modifiedFilesCount {
-		summaryBuilder.WriteString(fmt.Sprintf("\nModified (%d):\n", modifiedFilesCount))
+		fmt.Fprintf(&summaryBuilder, "\nModified (%d):\n", modifiedFilesCount)
 		for _, diff := range changedFiles {
 			if diff.action == merkletrie.Modify {
-				summaryBuilder.WriteString(fmt.Sprintf("± %s%s\n", diff.prettyName(), diff.changeStats()))
+				fmt.Fprintf(&summaryBuilder, "± %s%s\n", diff.prettyName(), diff.changeStats())
 			}
 		}
 	}

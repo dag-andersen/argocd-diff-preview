@@ -190,20 +190,6 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	return changeInfo{content: buffer.String(), addedLines: addedLines, deletedLines: deletedLines}
 }
 
-// Helper functions for min/max
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
 func formatNewFileDiff(content string, contextLines uint, ignorePattern *string) changeInfo {

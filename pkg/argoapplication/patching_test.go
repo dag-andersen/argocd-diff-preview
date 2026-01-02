@@ -549,7 +549,7 @@ func TestRedirectGenerators(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse YAML
-			var node map[string]interface{}
+			var node map[string]any
 			err := yaml.Unmarshal([]byte(tt.yaml), &node)
 			assert.NoError(t, err)
 
@@ -729,7 +729,7 @@ spec:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Parse YAML
-			var node map[string]interface{}
+			var node map[string]any
 			err := yaml.Unmarshal([]byte(tt.yaml), &node)
 			assert.NoError(t, err)
 
@@ -764,7 +764,7 @@ spec:
 
 // normalizeYAML normalizes YAML strings by parsing and re-marshaling
 func normalizeYAML(yamlStr string) string {
-	var node map[string]interface{}
+	var node map[string]any
 	err := yaml.Unmarshal([]byte(yamlStr), &node)
 	if err != nil {
 		return yamlStr

@@ -10,6 +10,8 @@ theme:
   favicon: assets/logo-head.png
   features:
     - content.action.edit
+    - content.code.copy
+    - content.code.annotate
   palette: 
     # Dark Mode
     scheme: slate
@@ -19,6 +21,7 @@ theme:
 nav:
 - Overview: index.md
 - Demo: demo.md
+- How it works: how-it-works.md
 - Getting started:
   - getting-started/github-actions-workflow.md
   - getting-started/gitlab-cicd.md
@@ -30,6 +33,7 @@ nav:
   - Self-hosted runner connects with host cluster: reusing-clusters/self-hosted-gh-runner.md
   - Openshift: reusing-clusters/openshift.md
 - generated-applications.md
+- Multi-repo: multi-repo.md
 - Ignore Lines: ignoring-lines.md
 - application-selection.md
 - All Options: options.md
@@ -38,6 +42,8 @@ nav:
 - FAQ: faq.md
 
 markdown_extensions:
+  - toc:
+      permalink: "🔗"
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span

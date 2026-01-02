@@ -178,7 +178,7 @@ func TestFilterDuplicates_Performance(t *testing.T) {
 
 	// Create many apps
 	var appsList []argoapplication.ArgoResource
-	for i := 0; i < numApps; i++ {
+	for i := range numApps {
 		app := createTestArgoResource("Application",
 			fmt.Sprintf("app%d", i),
 			fmt.Sprintf("app%d.yaml", i),
@@ -190,7 +190,7 @@ func TestFilterDuplicates_Performance(t *testing.T) {
 
 	// Create duplicates (first half of apps)
 	var duplicates []*unstructured.Unstructured
-	for i := 0; i < numDuplicates; i++ {
+	for i := range numDuplicates {
 		duplicates = append(duplicates, appsList[i].Yaml)
 	}
 

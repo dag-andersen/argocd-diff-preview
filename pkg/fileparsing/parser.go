@@ -127,7 +127,7 @@ func processYamlChunk(filename, chunk string, branch git.BranchType) (*Resource,
 	}
 
 	// Create a new map to hold the parsed YAML
-	var yamlObj map[string]interface{}
+	var yamlObj map[string]any
 	err := yaml.Unmarshal([]byte(chunk), &yamlObj)
 	if err != nil {
 		log.Debug().Err(err).Msgf("⚠️ Failed to parse YAML in file '%s'", filename)

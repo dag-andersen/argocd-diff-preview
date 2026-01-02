@@ -9,6 +9,10 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 GO_TEST_FLAGS ?=
 
+# Detect Docker API version if client is too new for server
+DOCKER_API_VERSION ?= $(shell docker version 2>&1 | sed -n 's/.*Maximum supported API version is \([0-9.]*\).*/\1/p')
+export DOCKER_API_VERSION
+
 go-build:
 	go build -ldflags="-X 'main.Version=$(VERSION)' -X 'main.Commit=$(COMMIT)' -X 'main.BuildDate=$(BUILD_DATE)'" -o bin/argocd-diff-preview ./cmd
 
@@ -26,7 +30,6 @@ run-with-go: go-build pull-repository
 		--base-branch="$(base_branch)" \
 		--target-branch="$(target_branch)" \
 		--repo="$(github_org)/$(gitops_repo)" \
-		--debug \
 		--keep-cluster-alive \
 		--file-regex="$(regex)" \
 		--diff-ignore="$(diff_ignore)" \
@@ -42,6 +45,7 @@ run-with-docker: pull-repository docker-build
 		--network=host \
 		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		$(if $(DOCKER_API_VERSION),-e DOCKER_API_VERSION=$(DOCKER_API_VERSION)) \
 		-v $(PWD)/base-branch:/base-branch \
 		-v $(PWD)/target-branch:/target-branch \
 		-v $(PWD)/output:/output \

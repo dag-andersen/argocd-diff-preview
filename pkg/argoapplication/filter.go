@@ -198,9 +198,7 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 
 func (a *ArgoResource) filterByAnnotationWatchPattern(watchPattern string, filesChanged []string, ignoreInvalidWatchPattern bool) (bool, string) {
 
-	patternsList := strings.Split(watchPattern, ",")
-
-	for _, pattern := range patternsList {
+	for pattern := range strings.SplitSeq(watchPattern, ",") {
 		pattern = strings.TrimSpace(pattern)
 
 		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Checking if files changed matches watch-pattern: %s", pattern)
@@ -222,10 +220,8 @@ func (a *ArgoResource) filterByAnnotationWatchPattern(watchPattern string, files
 
 		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("watch-pattern '%s' is valid. Checking if files changed matches watch-pattern", pattern)
 
-		for _, file := range filesChanged {
-			if regex.MatchString(file) {
-				return true, fmt.Sprintf("files changed matches watch-pattern '%s'", watchPattern)
-			}
+		if slices.ContainsFunc(filesChanged, regex.MatchString) {
+			return true, fmt.Sprintf("files changed matches watch-pattern '%s'", watchPattern)
 		}
 	}
 

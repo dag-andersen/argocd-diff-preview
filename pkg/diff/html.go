@@ -104,30 +104,29 @@ func (h *HTMLSection) printHTMLSection() string {
 
 	var rows strings.Builder
 	// Pre-allocate capacity based on content length to avoid reallocations
-	// Each line gets wrapped in ~40 chars of HTML + potential HTML escaping expansion
+	// Each line gets ~50 chars of HTML wrapper + up to ~40 chars for HTML escaping expansion
 	estimatedLines := strings.Count(h.content, "\n") + 1
-	htmlOverhead := estimatedLines * 50 // ~40 chars HTML + 10 for escaping expansion
+	htmlOverhead := estimatedLines * 90
 	rows.Grow(len(h.content) + len(h.commentHeader) + htmlOverhead)
 
 	// Add comment header
-	rows.WriteString(fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(h.commentHeader)))
+	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
 
 	// Process content lines
-	lines := strings.Split(h.content, "\n")
-	for _, line := range lines {
+	for line := range strings.Lines(h.content) {
+		line = strings.TrimRight(line, " \t\r\n")
 		if len(line) == 0 {
-			rows.WriteString(fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line)))
-			continue
+			continue // Skip empty lines
 		}
 		switch line[0] {
 		case '@':
-			rows.WriteString(fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
 		case '-':
-			rows.WriteString(fmt.Sprintf(htmlLine, "removed_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "removed_line", html.EscapeString(line))
 		case '+':
-			rows.WriteString(fmt.Sprintf(htmlLine, "added_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "added_line", html.EscapeString(line))
 		default:
-			rows.WriteString(fmt.Sprintf(htmlLine, "normal_line", html.EscapeString(line)))
+			fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
 		}
 	}
 	s = strings.ReplaceAll(s, "%rows%", rows.String())
@@ -136,7 +135,6 @@ func (h *HTMLSection) printHTMLSection() string {
 }
 
 func (h *HTMLOutput) printDiff() string {
-
 	var sectionsDiff strings.Builder
 
 	for _, section := range h.sections {

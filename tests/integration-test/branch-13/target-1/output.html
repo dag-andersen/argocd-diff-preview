@@ -61,8 +61,7 @@ ignore-annotation-example (examples/ignore-annotation/app.yaml)
 <div class="diff_container">
 <table>
 	
-	<tr class="comment_line"><td><pre>@@ Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml) @@
-</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml) @@</pre></td></tr>
 	<tr class="added_line"><td><pre>+apiVersion: apps/v1</pre></td></tr>
 	<tr class="added_line"><td><pre>+kind: Deployment</pre></td></tr>
 	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
@@ -144,15 +143,14 @@ ignore-annotation-example (examples/ignore-annotation/app.yaml)
 	<tr class="added_line"><td><pre>+    helm.sh/chart: myApp-0.1.0</pre></td></tr>
 	<tr class="added_line"><td><pre>+  name: super-app-name</pre></td></tr>
 	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
-	<tr class="normal_line"><td><pre></pre></td></tr>
 </table>
 </div>
 </details>
 </div>
 
 <pre>_Skipped resources_: 
-- Applications: `2` (base) -> `1` (target)
-- ApplicationSets: `0` (base) -> `0` (target)</pre>
+- Applications: `2` (base) -> `3` (target)
+- ApplicationSets: `1` (base) -> `0` (target)</pre>
 <br>
 
 <pre>_Stats_:

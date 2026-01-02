@@ -471,8 +471,8 @@ func (c *K8sClient) CreateNamespace(namespace string) (bool, error) {
 
 	// Namespace doesn't exist, create it
 	_, err = c.clientSet.Resource(namespaceRes).Create(context.Background(), &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"metadata": map[string]interface{}{
+		Object: map[string]any{
+			"metadata": map[string]any{
 				"name": namespace,
 			},
 		},
@@ -529,7 +529,7 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 	}
 
 	// get value from path
-	value, ok := result.Object["data"].(map[string]interface{})[key]
+	value, ok := result.Object["data"].(map[string]any)[key]
 	if !ok {
 		return "", fmt.Errorf("key %s not found in secret %s", key, name)
 	}
@@ -687,7 +687,7 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 				// Check for Available condition
 				isAvailable := false
 				for _, conditionUnstructured := range conditions {
-					condition, ok := conditionUnstructured.(map[string]interface{})
+					condition, ok := conditionUnstructured.(map[string]any)
 					if !ok {
 						continue
 					}

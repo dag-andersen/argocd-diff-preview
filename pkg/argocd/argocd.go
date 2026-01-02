@@ -115,6 +115,11 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
+	// Check Argo CD CLI version vs Argo CD Server version
+	if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to check argocd cli version vs server version: %w", err)
+	}
+
 	if debug {
 		// Get ConfigMaps
 		configMaps, err := a.K8sClient.GetConfigMaps(a.Namespace, "argocd-cmd-params-cm", "argocd-cm")

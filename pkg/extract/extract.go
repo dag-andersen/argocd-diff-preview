@@ -158,7 +158,7 @@ func getResourcesFromApps(
 		}
 	}()
 
-	for i := 0; i < len(apps); i++ {
+	for range len(apps) {
 		result := <-results
 		if result.err != nil {
 			if firstError == nil {
