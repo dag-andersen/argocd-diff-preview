@@ -1,0 +1,9 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - unused
+    - ineffassign
+    - staticcheck
+    - modernize
