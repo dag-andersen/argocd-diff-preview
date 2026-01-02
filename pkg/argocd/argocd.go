@@ -39,9 +39,10 @@ type ArgoCDInstallation struct {
 	ChartURL          string
 	ChartRepoUsername string
 	ChartRepoPassword string
+	LoginOptions      string
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:         client,
 		Namespace:         namespace,
@@ -51,6 +52,7 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 		ChartURL:          repoURL,
 		ChartRepoUsername: repoUsername,
 		ChartRepoPassword: repoPassword,
+		LoginOptions:      loginOptions,
 	}
 }
 
@@ -301,9 +303,11 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("argocd command failed: %s: %w", string(exitErr.Stderr), err)
+			if errorMessage := strings.TrimSpace(string(exitErr.Stderr)); errorMessage != "" {
+				return "", fmt.Errorf("argocd command failed: %s: %w", errorMessage, err)
+			}
 		}
-		return "", fmt.Errorf("argocd command failed: %s: %w", string(output), err)
+		return "", fmt.Errorf("argocd command failed: %s: %w", strings.TrimSpace(string(output)), err)
 	}
 	return string(output), nil
 }

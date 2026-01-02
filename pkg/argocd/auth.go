@@ -2,6 +2,7 @@ package argocd
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -37,7 +38,14 @@ func (a *ArgoCDInstallation) login() error {
 	maxAttempts := 10
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("Login attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err := a.runArgocdCommand("login", "--insecure", "--username", "admin", "--password", password)
+
+		// Build login command arguments
+		args := []string{"login", "--insecure", "--username", "admin", "--password", password}
+		if a.LoginOptions != "" {
+			args = append(args, strings.Fields(a.LoginOptions)...)
+		}
+
+		out, err := a.runArgocdCommand(args...)
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
