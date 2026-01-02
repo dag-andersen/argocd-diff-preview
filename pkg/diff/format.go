@@ -190,7 +190,6 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	return changeInfo{content: buffer.String(), addedLines: addedLines, deletedLines: deletedLines}
 }
 
-
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
 func formatNewFileDiff(content string, contextLines uint, ignorePattern *string) changeInfo {
 	// For new files, we diff from empty string to the content
