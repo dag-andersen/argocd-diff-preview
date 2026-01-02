@@ -55,6 +55,7 @@ run-single-test-go: clean pull-base pull-target
 		--keep-cluster-alive \
 		--auto-detect-files-changed="$(auto_detect_files_changed)" \
 		--ignore-resources="$(ignore_resources)" \
+		--argocd-login-options="$(argocd_login_options)" \
 		--use-argocd-api="$(use_argocd_api)" \
 		--debug
 	mkdir -p ./$(target_branch)$(suffix)/
@@ -111,6 +112,7 @@ endif
 		-e USE_ARGOCD_API="$(use_argocd_api)" \
 		-e KEEP_CLUSTER_ALIVE=true \
 		-e IGNORE_RESOURCES="$(ignore_resources)" \
+		-e ARGOCD_LOGIN_OPTIONS="$(argocd_login_options)" \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
@@ -128,7 +130,7 @@ endif
 run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-1" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-2" diff_ignore="image"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target base_branch=integration-test/branch-1/base suffix="-3" hide_deleted_app_diff="true"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-3" hide_deleted_app_diff="true" argocd_login_options="--insecure"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target  base_branch=integration-test/branch-2/base 
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target  base_branch=integration-test/branch-3/base 
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target  base_branch=integration-test/branch-4/base  title="integration-test/branch-4"

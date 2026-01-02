@@ -196,6 +196,7 @@ func run(cfg *Config) error {
 		cfg.ArgocdChartURL,
 		cfg.ArgocdChartRepoUsername,
 		cfg.ArgocdChartRepoPassword,
+		cfg.ArgocdLoginOptions,
 		cfg.UseArgoCDApi,
 	)
 

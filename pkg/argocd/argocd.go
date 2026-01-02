@@ -48,18 +48,19 @@ type ArgoCDApiConnection struct {
 }
 
 type ArgoCDInstallation struct {
-	K8sClient           *utils.K8sClient
-	Namespace           string
-	Version             string
-	ConfigPath          string
-	ChartName           string
-	ChartURL            string
-	ChartRepoUsername   string
-	ChartRepoPassword   string
+	K8sClient         *utils.K8sClient
+	Namespace         string
+	Version           string
+	ConfigPath        string
+	ChartName         string
+	ChartURL          string
+	ChartRepoUsername string
+	ChartRepoPassword string
+	LoginOptions      string
 	ArgoCDApiConnection *ArgoCDApiConnection // nil if API is not used
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, useAPI bool) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, useAPI bool) *ArgoCDInstallation {
 	var argocdApiConnection *ArgoCDApiConnection
 	if useAPI {
 		argocdApiConnection = &ArgoCDApiConnection{
@@ -71,14 +72,15 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 	}
 
 	return &ArgoCDInstallation{
-		K8sClient:           client,
-		Namespace:           namespace,
-		Version:             version,
-		ConfigPath:          "argocd-config",
-		ChartName:           repoName,
-		ChartURL:            repoURL,
-		ChartRepoUsername:   repoUsername,
-		ChartRepoPassword:   repoPassword,
+		K8sClient:         client,
+		Namespace:         namespace,
+		Version:           version,
+		ConfigPath:        "argocd-config",
+		ChartName:         repoName,
+		ChartURL:          repoURL,
+		ChartRepoUsername: repoUsername,
+		ChartRepoPassword: repoPassword,
+		LoginOptions:      loginOptions,
 		ArgoCDApiConnection: argocdApiConnection,
 	}
 }
@@ -349,9 +351,11 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("argocd command failed: %s: %w", string(exitErr.Stderr), err)
+			if errorMessage := strings.TrimSpace(string(exitErr.Stderr)); errorMessage != "" {
+				return "", fmt.Errorf("argocd command failed: %s: %w", errorMessage, err)
+			}
 		}
-		return "", fmt.Errorf("argocd command failed: %s: %w", string(output), err)
+		return "", fmt.Errorf("argocd command failed: %s: %w", strings.TrimSpace(string(output)), err)
 	}
 	return string(output), nil
 }
