@@ -53,6 +53,7 @@ run-single-test-go: clean pull-base pull-target
 		--max-diff-length="$(max_diff_length)" \
 		--keep-cluster-alive \
 		--auto-detect-files-changed="$(auto_detect_files_changed)" \
+		--ignore-resources="$(ignore_resources)" \
 		--debug
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
@@ -102,6 +103,7 @@ run-single-test-docker: clean pull-base pull-target
 		-e CREATE_CLUSTER="$(create_cluster)" \
 		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		-e KEEP_CLUSTER_ALIVE=true \
+		-e IGNORE_RESOURCES="$(ignore_resources)" \
 		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
@@ -140,6 +142,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-10/target base_branch=integration-test/branch-10/base suffix="-1" files_changed="examples/ignore-differences/app.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-11/target base_branch=integration-test/branch-11/base suffix="-1"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-12/target base_branch=integration-test/branch-12/base suffix="-1" auto_detect_files_changed="true" diff_ignore="annotations"
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-12/target base_branch=integration-test/branch-12/base suffix="-2" auto_detect_files_changed="true" diff_ignore="annotations" ignore_resources="*:CustomResourceDefinition:*,:ConfigMap:argocd-cm"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-13/target base_branch=integration-test/branch-13/base suffix="-1"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-13/target base_branch=integration-test/branch-13/base suffix="-2" selector="team=your-team"
 

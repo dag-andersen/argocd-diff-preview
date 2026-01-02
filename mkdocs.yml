@@ -34,10 +34,10 @@ nav:
   - Openshift: reusing-clusters/openshift.md
 - generated-applications.md
 - Multi-repo: multi-repo.md
-- Ignore Lines: ignoring-lines.md
 - application-selection.md
-- All Options: options.md
+- Filter Output: filter-output.md
 - Output formats: output.md
+- All Options: options.md
 - Troubleshooting: troubleshooting.md
 - FAQ: faq.md
 
