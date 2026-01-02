@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/selector"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -20,8 +20,8 @@ const (
 )
 
 type ApplicationSelectionOptions struct {
-	FileRegex                  *string
-	Selector                   []selector.Selector
+	FileRegex                  *regexp.Regexp
+	Selector                   []app_selector.Selector
 	FilesChanged               []string
 	IgnoreInvalidWatchPattern  bool
 	WatchIfNoWatchPatternFound bool
@@ -129,7 +129,7 @@ func (a *ArgoResource) filterByIgnoreAnnotation() (bool, string) {
 }
 
 // filterBySelectors checks if the application matches the given selectors
-func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) (bool, string) {
+func (a *ArgoResource) filterBySelectors(selectors []app_selector.Selector) (bool, string) {
 	// Early return if no YAML
 	if a.Yaml == nil {
 		return false, "no YAML found"
@@ -149,7 +149,7 @@ func (a *ArgoResource) filterBySelectors(selectors []selector.Selector) (bool, s
 		}
 
 		matches := labelValue == s.Value
-		if (s.Operator == selector.Eq && !matches) || (s.Operator == selector.Ne && matches) {
+		if (s.Operator == app_selector.Eq && !matches) || (s.Operator == app_selector.Ne && matches) {
 			return false, fmt.Sprintf("label does not match selector: '%s'", s.String())
 		}
 	}

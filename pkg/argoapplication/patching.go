@@ -449,4 +449,3 @@ func (a *ArgoResource) processGenerators(generators []any, repo, branch string, 
 func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
-

@@ -18,26 +18,6 @@ import (
 // const worker count
 const maxWorkers = 40
 
-// contains a app name, source path, and extracted manifest
-type ExtractedApp struct {
-	Id         string
-	Name       string
-	SourcePath string
-	Manifest   []unstructured.Unstructured
-	Branch     git.BranchType
-}
-
-// CreateExtractedApp creates an ExtractedApp from an ArgoResource
-func CreateExtractedApp(id string, name string, sourcePath string, manifest []unstructured.Unstructured, branch git.BranchType) ExtractedApp {
-	return ExtractedApp{
-		Id:         id,
-		Name:       name,
-		SourcePath: sourcePath,
-		Manifest:   manifest,
-		Branch:     branch,
-	}
-}
-
 // RenderApplicaitonsFromBothBranches extracts resources from both base and target branches
 // by applying their manifests to the cluster and capturing the resulting resources
 func RenderApplicaitonsFromBothBranches(
@@ -200,7 +180,13 @@ func getResourcesFromApps(
 
 // getResourcesFromApp extracts a single application from the cluster
 // returns the extracted app, the k8s resource name, and an error
-func getResourcesFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, timeout uint64, prefix string, namespacedScopedResources map[string]bool) (ExtractedApp, string, error) {
+func getResourcesFromApp(
+	argocd *argocdPkg.ArgoCDInstallation,
+	app argoapplication.ArgoResource,
+	timeout uint64,
+	prefix string,
+	namespacedScopedResources map[string]bool,
+) (ExtractedApp, string, error) {
 
 	// Store ID (kubernetes resource name) before we add a prefix and hash
 	uniqueIdBeforeModifications := app.Id

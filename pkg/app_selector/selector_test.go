@@ -1,4 +1,4 @@
-package selector
+package app_selector
 
 import (
 	"testing"

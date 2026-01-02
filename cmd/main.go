@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -14,17 +13,17 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
-	"sigs.k8s.io/yaml"
 )
 
 func main() {
 	startTime := time.Now()
 
-	opts := Parse()
-	if opts == nil {
+	cfg := Parse()
+	if cfg == nil {
 		return
 	}
 
@@ -33,13 +32,13 @@ func main() {
 		log.Info().Msgf("✨ Total execution time: %s", duration.Round(time.Second))
 	}()
 
-	if err := run(opts); err != nil {
+	if err := run(cfg); err != nil {
 		log.Error().Msgf("❌ %v", err)
 		helpMessage := extract.GetHelpMessage(err)
 		if helpMessage != "" {
 			log.Info().Msgf("💡 Help: %s", helpMessage)
 		}
-		if !opts.Debug {
+		if !cfg.Debug {
 			log.Info().Msg("🕵️ Run with '--debug' for more details")
 		} else {
 			log.Info().Msg("🐛 If you believe this error is caused by a bug, please open an issue on GitHub")
@@ -48,28 +47,28 @@ func main() {
 	}
 }
 
-func run(opts *Options) error {
+func run(cfg *Config) error {
 	startTime := time.Now()
 
-	// Get the parsed values from the options
-	fileRegex := opts.GetFileRegex()
-	selectors := opts.GetSelectors()
-	filesChanged := opts.GetFilesChanged()
-	redirectRevisions := opts.GetRedirectRevisions()
-	clusterProvider := opts.GetClusterProvider()
+	// Get values directly from the config - no getters needed
+	fileRegex := cfg.FileRegex
+	selectors := cfg.Selectors
+	filesChanged := cfg.FilesChanged
+	redirectRevisions := cfg.RedirectRevisions
+	clusterProvider := cfg.ClusterProvider
 
 	// Create unique ID only consisting of lowercase letters of 5 characters
 	uniqueID := uuid.New().String()[:5]
 
-	if !opts.CreateCluster && !opts.DryRun {
+	if !cfg.CreateCluster && !cfg.DryRun {
 		log.Info().Msgf("🔑 Unique ID for this run: %s", uniqueID)
 	}
 
 	// Create branches
-	baseBranch := git.NewBranch(opts.BaseBranch, git.Base)
-	targetBranch := git.NewBranch(opts.TargetBranch, git.Target)
+	baseBranch := git.NewBranch(cfg.BaseBranch, git.Base)
+	targetBranch := git.NewBranch(cfg.TargetBranch, git.Target)
 
-	if opts.AutoDetectFilesChanged && len(filesChanged) == 0 {
+	if cfg.AutoDetectFilesChanged && len(filesChanged) == 0 {
 		log.Info().Msg("🔍 Auto-detecting changed files")
 		cf, duration, err := fileparsing.ListChangedFiles(baseBranch.FolderName(), targetBranch.FolderName())
 		if err != nil {
@@ -87,17 +86,17 @@ func run(opts *Options) error {
 		Selector:                   selectors,
 		FileRegex:                  fileRegex,
 		FilesChanged:               filesChanged,
-		IgnoreInvalidWatchPattern:  opts.IgnoreInvalidWatchPattern,
-		WatchIfNoWatchPatternFound: opts.WatchIfNoWatchPatternFound,
+		IgnoreInvalidWatchPattern:  cfg.IgnoreInvalidWatchPattern,
+		WatchIfNoWatchPatternFound: cfg.WatchIfNoWatchPatternFound,
 	}
 
 	// Get applications for both branches
 	baseApps, targetApps, err := argoapplication.GetApplicationsForBranches(
-		opts.ArgocdNamespace,
+		cfg.ArgocdNamespace,
 		baseBranch,
 		targetBranch,
 		appSelectionOptions,
-		opts.Repo,
+		cfg.Repo,
 		redirectRevisions,
 	)
 	if err != nil {
@@ -108,7 +107,7 @@ func run(opts *Options) error {
 	baseApps, targetApps = duplicates.RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps)
 
 	// If dry-run is enabled, show which applications would be processed and exit
-	if opts.DryRun {
+	if cfg.DryRun {
 		log.Info().Msg("💨 This is a dry run. The following application[sets] would be processed:")
 		if len(baseApps.SelectedApps) > 0 {
 			log.Info().Msgf("👇 Base Branch ('%s'):", baseBranch.Name)
@@ -139,12 +138,12 @@ func run(opts *Options) error {
 		log.Info().Msg("👀 Found no applications to process in either branch")
 
 		// Write a message to the output file when no applications are found
-		if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
-			log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
+		if err := utils.CreateFolder(cfg.OutputFolder, true); err != nil {
+			log.Error().Msgf("❌ Failed to create output folder: %s", cfg.OutputFolder)
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(opts.Title, opts.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
@@ -153,7 +152,7 @@ func run(opts *Options) error {
 	}
 
 	var clusterCreationDuration time.Duration
-	if opts.CreateCluster {
+	if cfg.CreateCluster {
 		// Create cluster and install Argo CD
 		duration, err := clusterProvider.CreateCluster()
 		if err != nil {
@@ -164,8 +163,8 @@ func run(opts *Options) error {
 	}
 
 	defer func() {
-		if opts.CreateCluster {
-			if !opts.KeepClusterAlive {
+		if cfg.CreateCluster {
+			if !cfg.KeepClusterAlive {
 				clusterProvider.DeleteCluster(true)
 			} else {
 				log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
@@ -181,9 +180,9 @@ func run(opts *Options) error {
 	}
 
 	// Delete old applications
-	if !opts.CreateCluster {
+	if !cfg.CreateCluster {
 		ageInMinutes := 20
-		if err := k8sClient.DeleteAllApplicationsOlderThan(opts.ArgocdNamespace, ageInMinutes); err != nil {
+		if err := k8sClient.DeleteAllApplicationsOlderThan(cfg.ArgocdNamespace, ageInMinutes); err != nil {
 			log.Error().Msgf("❌ Failed to delete old applications")
 			return err
 		}
@@ -191,19 +190,19 @@ func run(opts *Options) error {
 
 	argocd := argocd.New(
 		k8sClient,
-		opts.ArgocdNamespace,
-		opts.ArgocdChartVersion,
-		opts.ArgocdChartName,
-		opts.ArgocdChartURL,
-		opts.ArgocdChartRepoUsername,
-		opts.ArgocdChartRepoPassword,
-		opts.UseArgoCDApi,
+		cfg.ArgocdNamespace,
+		cfg.ArgocdChartVersion,
+		cfg.ArgocdChartName,
+		cfg.ArgocdChartURL,
+		cfg.ArgocdChartRepoUsername,
+		cfg.ArgocdChartRepoPassword,
+		cfg.UseArgoCDApi,
 	)
 
 	var argocdInstallationDuration time.Duration
-	if opts.CreateCluster {
+	if cfg.CreateCluster {
 		// Install Argo CD
-		duration, err := argocd.Install(opts.Debug, opts.SecretsFolder)
+		duration, err := argocd.Install(cfg.Debug, cfg.SecretsFolder)
 		if err != nil {
 			log.Error().Msgf("❌ Failed to install Argo CD")
 			return err
@@ -231,10 +230,10 @@ func run(opts *Options) error {
 		targetApps,
 		baseBranch,
 		targetBranch,
-		opts.Repo,
+		cfg.Repo,
 		tempFolder,
 		redirectRevisions,
-		opts.Debug,
+		cfg.Debug,
 		appSelectionOptions,
 	)
 	if err != nil {
@@ -252,12 +251,12 @@ func run(opts *Options) error {
 		log.Info().Msg("👀 Found no applications to render")
 
 		// Write a message to the output file when no applications are found
-		if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
-			log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
+		if err := utils.CreateFolder(cfg.OutputFolder, true); err != nil {
+			log.Error().Msgf("❌ Failed to create output folder: %s", cfg.OutputFolder)
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(opts.Title, opts.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
@@ -269,8 +268,8 @@ func run(opts *Options) error {
 	baseApps.SelectedApps = argoapplication.UniqueIds(baseApps.SelectedApps, baseBranch)
 	targetApps.SelectedApps = argoapplication.UniqueIds(targetApps.SelectedApps, targetBranch)
 
-	if err := utils.CreateFolder(opts.OutputFolder, true); err != nil {
-		log.Error().Msgf("❌ Failed to create output folder: %s", opts.OutputFolder)
+	if err := utils.CreateFolder(cfg.OutputFolder, true); err != nil {
+		log.Error().Msgf("❌ Failed to create output folder: %s", cfg.OutputFolder)
 		return err
 	}
 
@@ -281,7 +280,7 @@ func run(opts *Options) error {
 	}
 
 	// For debugging purposes, we can still write the manifests to files
-	if opts.Debug {
+	if cfg.Debug {
 		// Generate application manifests as strings
 		baseManifest := argoapplication.ApplicationsToString(baseApps.SelectedApps)
 		targetManifest := argoapplication.ApplicationsToString(targetApps.SelectedApps)
@@ -299,10 +298,10 @@ func run(opts *Options) error {
 	selectionInfo := diff.ConvertArgoSelectionToSelectionInfo(baseApps, targetApps)
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
-	deleteAfterProcessing := !opts.CreateCluster
+	deleteAfterProcessing := !cfg.CreateCluster
 	baseManifests, targetManifests, extractDuration, err := extract.RenderApplicaitonsFromBothBranches(
 		argocd,
-		opts.Timeout,
+		cfg.Timeout,
 		baseApps.SelectedApps,
 		targetApps.SelectedApps,
 		uniqueID,
@@ -313,12 +312,12 @@ func run(opts *Options) error {
 		return err
 	}
 
-	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests)
+	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests, cfg.IgnoreResourceRules)
 	if err != nil {
 		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
 		return err
 	}
-	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests)
+	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests, cfg.IgnoreResourceRules)
 	if err != nil {
 		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
 		return err
@@ -338,11 +337,11 @@ func run(opts *Options) error {
 				targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
 			}
 		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n---\n")); err != nil {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", cfg.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n---\n")); err != nil {
 			log.Error().Msg("❌ Failed to write base manifests")
 			return err
 		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", opts.OutputFolder, targetBranch.FolderName()), strings.Join(targetAppCombinedYaml, "\n---\n")); err != nil {
+		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", cfg.OutputFolder, targetBranch.FolderName()), strings.Join(targetAppCombinedYaml, "\n---\n")); err != nil {
 			log.Error().Msg("❌ Failed to write target manifests")
 			return err
 		}
@@ -359,16 +358,16 @@ func run(opts *Options) error {
 
 	// Generate diff between base and target branches
 	if err := diff.GenerateDiff(
-		opts.Title,
-		opts.OutputFolder,
+		cfg.Title,
+		cfg.OutputFolder,
 		baseBranch,
 		targetBranch,
 		baseAppInfos,
 		targetAppInfos,
-		&opts.DiffIgnore,
-		opts.LineCount,
-		opts.MaxDiffLength,
-		opts.HideDeletedAppDiff,
+		&cfg.DiffIgnore,
+		cfg.LineCount,
+		cfg.MaxDiffLength,
+		cfg.HideDeletedAppDiff,
 		statsInfo,
 		selectionInfo,
 	); err != nil {
@@ -382,71 +381,19 @@ func run(opts *Options) error {
 }
 
 // convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
-func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp) ([]diff.AppInfo, error) {
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp, ignoreResourceRules []resource_filter.IgnoreResourceRule) ([]diff.AppInfo, error) {
 	appInfos := make([]diff.AppInfo, len(extractedApps))
 	for i, extractedApp := range extractedApps {
-		appInfo, err := convertExtractedAppToAppInfo(extractedApp)
+		manifestString, err := extractedApp.FlattenToString(ignoreResourceRules)
 		if err != nil {
 			return nil, err
 		}
-		appInfos[i] = appInfo
+		appInfos[i] = diff.AppInfo{
+			Id:          extractedApp.Id,
+			Name:        extractedApp.Name,
+			SourcePath:  extractedApp.SourcePath,
+			FileContent: manifestString,
+		}
 	}
 	return appInfos, nil
-}
-
-// convertExtractedAppToAppInfo converts an ExtractedApp to an AppInfo
-func convertExtractedAppToAppInfo(extractedApp extract.ExtractedApp) (diff.AppInfo, error) {
-	yamlString, err := convertToYamlString(&extractedApp)
-	if err != nil {
-		log.Error().Msgf("❌ Failed to convert extracted app to yaml string: %s", err)
-		return diff.AppInfo{}, err
-	}
-
-	return diff.AppInfo{
-		Id:          extractedApp.Id,
-		Name:        extractedApp.Name,
-		SourcePath:  extractedApp.SourcePath,
-		FileContent: yamlString,
-	}, nil
-}
-
-// convertToYamlString converts a list of ExtractedApp to a single YAML string
-func convertToYamlString(apps *extract.ExtractedApp) (string, error) {
-	// Sort by API version, then by kind, then by name, with CRDs always at the end
-	sort.SliceStable(apps.Manifest, func(i, j int) bool {
-		apiI := apps.Manifest[i].GetAPIVersion()
-		apiJ := apps.Manifest[j].GetAPIVersion()
-		kindI := apps.Manifest[i].GetKind()
-		kindJ := apps.Manifest[j].GetKind()
-		nameI := apps.Manifest[i].GetName()
-		nameJ := apps.Manifest[j].GetName()
-
-		// CRDs should always be at the end
-		isCRD_I := kindI == "CustomResourceDefinition"
-		isCRD_J := kindJ == "CustomResourceDefinition"
-
-		if isCRD_I != isCRD_J {
-			// If only one is a CRD, the non-CRD comes first
-			return !isCRD_I
-		}
-
-		// Sort by apiVersion first, then by kind, then by name
-		if apiI != apiJ {
-			return apiI < apiJ
-		}
-		if kindI != kindJ {
-			return kindI < kindJ
-		}
-		return nameI < nameJ
-	})
-
-	var manifestStrings []string
-	for _, manifest := range apps.Manifest {
-		manifestString, err := yaml.Marshal(manifest.Object)
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal unstructured object: %w", err)
-		}
-		manifestStrings = append(manifestStrings, string(manifestString))
-	}
-	return strings.Join(manifestStrings, "---\n"), nil
 }

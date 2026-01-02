@@ -35,8 +35,8 @@ func processYamlOutput(chunk string) ([]unstructured.Unstructured, error) {
 		// Check if this is a valid Kubernetes resource
 		apiVersion, found, _ := unstructured.NestedString(yamlObj, "apiVersion")
 		kind, kindFound, _ := unstructured.NestedString(yamlObj, "kind")
-
-		if !found || !kindFound || apiVersion == "" || kind == "" {
+		name, nameFound, _ := unstructured.NestedString(yamlObj, "metadata", "name")
+		if !found || !kindFound || !nameFound || apiVersion == "" || kind == "" || name == "" {
 			log.Debug().Msgf("Found manifest with no apiVersion or kind: %s", doc)
 			continue
 		}

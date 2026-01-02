@@ -221,7 +221,7 @@ The tool compares the two sets of manifests and generates a diff. The comparison
 - **Modified applications** - Changed between branches
 - **Unchanged applications** - No differences (not shown in output)
 
-The diff respects the `--diff-ignore` option to filter out noisy changes. Documentation: [Ignore specific lines in the diff preview](./ignoring-lines.md)
+The diff respects the `--diff-ignore` option to filter out noisy changes. Documentation: [Ignore specific lines in the diff preview](./filter-output.md#ignore-specific-lines)
 
 ---
 
