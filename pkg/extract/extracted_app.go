@@ -33,11 +33,11 @@ func CreateExtractedApp(id string, name string, sourcePath string, manifest []un
 	}
 }
 
-func (e *ExtractedApp) FlattenToString(skipResourceRules []resource_filter.SkipResourceRule) (string, error) {
+func (e *ExtractedApp) FlattenToString(ignoreResourceRules []resource_filter.IgnoreResourceRule) (string, error) {
 	e.sortManifests()
 	var manifestStrings []string
 	for _, manifest := range e.Manifest {
-		if resource_filter.MatchesAnySkipRule(&manifest, skipResourceRules) {
+		if resource_filter.MatchesAnyIgnoreRule(&manifest, ignoreResourceRules) {
 			msg := fmt.Sprintf("Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetName())
 			log.Debug().Msg(msg)
 			manifestStrings = append(manifestStrings, msg)

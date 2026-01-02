@@ -10,18 +10,18 @@ func TestFromString(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
-		expected    []SkipResourceRule
+		expected    []IgnoreResourceRule
 		expectError bool
 	}{
 		{
 			name:     "single rule",
 			input:    "apps:Deployment:my-app",
-			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+			expected: []IgnoreResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
 		},
 		{
 			name:  "multiple rules",
 			input: "apps:Deployment:my-app,core:Secret:my-secret",
-			expected: []SkipResourceRule{
+			expected: []IgnoreResourceRule{
 				{Group: "apps", Kind: "Deployment", Name: "my-app"},
 				{Group: "core", Kind: "Secret", Name: "my-secret"},
 			},
@@ -29,12 +29,12 @@ func TestFromString(t *testing.T) {
 		{
 			name:     "rule with wildcards",
 			input:    "*:Secret:*",
-			expected: []SkipResourceRule{{Group: "*", Kind: "Secret", Name: "*"}},
+			expected: []IgnoreResourceRule{{Group: "*", Kind: "Secret", Name: "*"}},
 		},
 		{
 			name:     "all wildcards",
 			input:    "*:*:*",
-			expected: []SkipResourceRule{{Group: "*", Kind: "*", Name: "*"}},
+			expected: []IgnoreResourceRule{{Group: "*", Kind: "*", Name: "*"}},
 		},
 		{
 			name:     "empty string",
@@ -49,12 +49,12 @@ func TestFromString(t *testing.T) {
 		{
 			name:     "rule with whitespace",
 			input:    "  apps : Deployment : my-app  ",
-			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+			expected: []IgnoreResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
 		},
 		{
 			name:  "multiple rules with whitespace",
 			input: " apps:Deployment:app1 , core:ConfigMap:config ",
-			expected: []SkipResourceRule{
+			expected: []IgnoreResourceRule{
 				{Group: "apps", Kind: "Deployment", Name: "app1"},
 				{Group: "core", Kind: "ConfigMap", Name: "config"},
 			},
@@ -77,12 +77,12 @@ func TestFromString(t *testing.T) {
 		{
 			name:     "trailing comma",
 			input:    "apps:Deployment:my-app,",
-			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+			expected: []IgnoreResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
 		},
 		{
 			name:     "leading comma",
 			input:    ",apps:Deployment:my-app",
-			expected: []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+			expected: []IgnoreResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
 		},
 	}
 
@@ -122,10 +122,10 @@ func TestFromString(t *testing.T) {
 	}
 }
 
-func TestSkipResourceRule_Matches(t *testing.T) {
+func TestIgnoreResourceRule_Matches(t *testing.T) {
 	tests := []struct {
 		name     string
-		rule     SkipResourceRule
+		rule     IgnoreResourceRule
 		group    string
 		kind     string
 		resName  string
@@ -133,7 +133,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 	}{
 		{
 			name:     "exact match",
-			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			rule:     IgnoreResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
 			group:    "apps",
 			kind:     "Deployment",
 			resName:  "my-app",
@@ -141,7 +141,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "group mismatch",
-			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			rule:     IgnoreResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
 			group:    "core",
 			kind:     "Deployment",
 			resName:  "my-app",
@@ -149,7 +149,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "kind mismatch",
-			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			rule:     IgnoreResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
 			group:    "apps",
 			kind:     "StatefulSet",
 			resName:  "my-app",
@@ -157,7 +157,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "name mismatch",
-			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
+			rule:     IgnoreResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"},
 			group:    "apps",
 			kind:     "Deployment",
 			resName:  "other-app",
@@ -165,7 +165,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "wildcard group",
-			rule:     SkipResourceRule{Group: "*", Kind: "Deployment", Name: "my-app"},
+			rule:     IgnoreResourceRule{Group: "*", Kind: "Deployment", Name: "my-app"},
 			group:    "apps",
 			kind:     "Deployment",
 			resName:  "my-app",
@@ -173,7 +173,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "wildcard kind",
-			rule:     SkipResourceRule{Group: "apps", Kind: "*", Name: "my-app"},
+			rule:     IgnoreResourceRule{Group: "apps", Kind: "*", Name: "my-app"},
 			group:    "apps",
 			kind:     "StatefulSet",
 			resName:  "my-app",
@@ -181,7 +181,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "wildcard name",
-			rule:     SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "*"},
+			rule:     IgnoreResourceRule{Group: "apps", Kind: "Deployment", Name: "*"},
 			group:    "apps",
 			kind:     "Deployment",
 			resName:  "any-app",
@@ -189,7 +189,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "all wildcards",
-			rule:     SkipResourceRule{Group: "*", Kind: "*", Name: "*"},
+			rule:     IgnoreResourceRule{Group: "*", Kind: "*", Name: "*"},
 			group:    "anything",
 			kind:     "Whatever",
 			resName:  "some-name",
@@ -197,7 +197,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "wildcard group and name",
-			rule:     SkipResourceRule{Group: "*", Kind: "Secret", Name: "*"},
+			rule:     IgnoreResourceRule{Group: "*", Kind: "Secret", Name: "*"},
 			group:    "core",
 			kind:     "Secret",
 			resName:  "my-secret",
@@ -205,7 +205,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "wildcard group and name - kind mismatch",
-			rule:     SkipResourceRule{Group: "*", Kind: "Secret", Name: "*"},
+			rule:     IgnoreResourceRule{Group: "*", Kind: "Secret", Name: "*"},
 			group:    "core",
 			kind:     "ConfigMap",
 			resName:  "my-config",
@@ -213,7 +213,7 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 		},
 		{
 			name:     "empty group matches empty",
-			rule:     SkipResourceRule{Group: "", Kind: "Pod", Name: "my-pod"},
+			rule:     IgnoreResourceRule{Group: "", Kind: "Pod", Name: "my-pod"},
 			group:    "",
 			kind:     "Pod",
 			resName:  "my-pod",
@@ -232,8 +232,8 @@ func TestSkipResourceRule_Matches(t *testing.T) {
 	}
 }
 
-func TestSkipResourceRule_String(t *testing.T) {
-	rule := SkipResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"}
+func TestIgnoreResourceRule_String(t *testing.T) {
+	rule := IgnoreResourceRule{Group: "apps", Kind: "Deployment", Name: "my-app"}
 	expected := "[Group: apps, Kind: Deployment, Name: my-app]"
 	result := rule.String()
 
@@ -289,7 +289,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 	tests := []struct {
 		name     string
 		manifest *unstructured.Unstructured
-		rules    []SkipResourceRule
+		rules    []IgnoreResourceRule
 		expected bool
 	}{
 		{
@@ -301,7 +301,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules:    []SkipResourceRule{},
+			rules:    []IgnoreResourceRule{},
 			expected: false,
 		},
 		{
@@ -325,7 +325,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
+			rules:    []IgnoreResourceRule{{Group: "apps", Kind: "Deployment", Name: "my-app"}},
 			expected: true,
 		},
 		{
@@ -337,7 +337,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "apps", Kind: "StatefulSet", Name: "my-app"}},
+			rules:    []IgnoreResourceRule{{Group: "apps", Kind: "StatefulSet", Name: "my-app"}},
 			expected: false,
 		},
 		{
@@ -349,7 +349,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules: []SkipResourceRule{
+			rules: []IgnoreResourceRule{
 				{Group: "apps", Kind: "Deployment", Name: "my-app"},
 				{Group: "core", Kind: "Secret", Name: "my-secret"},
 			},
@@ -364,7 +364,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-secret"},
 				},
 			},
-			rules: []SkipResourceRule{
+			rules: []IgnoreResourceRule{
 				{Group: "apps", Kind: "Deployment", Name: "my-app"},
 				{Group: "", Kind: "Secret", Name: "my-secret"},
 			},
@@ -379,7 +379,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules: []SkipResourceRule{
+			rules: []IgnoreResourceRule{
 				{Group: "apps", Kind: "StatefulSet", Name: "my-app"},
 				{Group: "core", Kind: "Secret", Name: "my-secret"},
 			},
@@ -394,7 +394,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "*", Kind: "Deployment", Name: "my-app"}},
+			rules:    []IgnoreResourceRule{{Group: "*", Kind: "Deployment", Name: "my-app"}},
 			expected: true,
 		},
 		{
@@ -406,7 +406,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "apps", Kind: "*", Name: "my-app"}},
+			rules:    []IgnoreResourceRule{{Group: "apps", Kind: "*", Name: "my-app"}},
 			expected: true,
 		},
 		{
@@ -418,7 +418,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-app"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "apps", Kind: "Deployment", Name: "*"}},
+			rules:    []IgnoreResourceRule{{Group: "apps", Kind: "Deployment", Name: "*"}},
 			expected: true,
 		},
 		{
@@ -430,7 +430,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "anything"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "*", Kind: "*", Name: "*"}},
+			rules:    []IgnoreResourceRule{{Group: "*", Kind: "*", Name: "*"}},
 			expected: true,
 		},
 		{
@@ -442,7 +442,7 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-config"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "", Kind: "ConfigMap", Name: "my-config"}},
+			rules:    []IgnoreResourceRule{{Group: "", Kind: "ConfigMap", Name: "my-config"}},
 			expected: true,
 		},
 		{
@@ -454,16 +454,16 @@ func TestMatchesAnySkipRule(t *testing.T) {
 					"metadata":   map[string]any{"name": "my-secret"},
 				},
 			},
-			rules:    []SkipResourceRule{{Group: "*", Kind: "Secret", Name: "*"}},
+			rules:    []IgnoreResourceRule{{Group: "*", Kind: "Secret", Name: "*"}},
 			expected: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := MatchesAnySkipRule(tt.manifest, tt.rules)
+			result := MatchesAnyIgnoreRule(tt.manifest, tt.rules)
 			if result != tt.expected {
-				t.Errorf("MatchesAnySkipRule() = %v, want %v", result, tt.expected)
+				t.Errorf("MatchesAnyIgnoreRule() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

@@ -7,30 +7,30 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// SkipResourceRule represents a rule to skip a difference in the diff
-type SkipResourceRule struct {
+// IgnoreResourceRule represents a rule to skip a difference in the diff
+type IgnoreResourceRule struct {
 	Group string
 	Kind  string
 	Name  string
 }
 
-// String returns the string representation of the DiffSkipRule
-func (s *SkipResourceRule) String() string {
+// String returns the string representation of the IgnoreResourceRule
+func (s *IgnoreResourceRule) String() string {
 	return fmt.Sprintf("[Group: %s, Kind: %s, Name: %s]", s.Group, s.Kind, s.Name)
 }
 
-// format is --diff-skip-rule="group:kind:name,group:kind:name"
+// format is --ignore-resources="group:kind:name,group:kind:name"
 // * means any value
 
-// FromString creates a new DiffSkipRule from a string representation
-func FromString(s string) ([]SkipResourceRule, error) {
+// FromString creates a new IgnoreResourceRule from a string representation
+func FromString(s string) ([]IgnoreResourceRule, error) {
 	if strings.TrimSpace(s) == "" {
 		return nil, nil
 	}
 
 	rules := strings.Split(s, ",")
 
-	var diffSkipRules []SkipResourceRule
+	var ignoreResourceRules []IgnoreResourceRule
 
 	for _, rule := range rules {
 		rule = strings.TrimSpace(rule)
@@ -40,30 +40,30 @@ func FromString(s string) ([]SkipResourceRule, error) {
 
 		parts := strings.Split(rule, ":")
 		if len(parts) != 3 {
-			return nil, fmt.Errorf("invalid diff skip rule format: %s (expected group:kind:name)", rule)
+			return nil, fmt.Errorf("invalid ignore resource rule format: %s (expected group:kind:name)", rule)
 		}
 
-		diffSkipRules = append(diffSkipRules, SkipResourceRule{
+		ignoreResourceRules = append(ignoreResourceRules, IgnoreResourceRule{
 			Group: strings.TrimSpace(parts[0]),
 			Kind:  strings.TrimSpace(parts[1]),
 			Name:  strings.TrimSpace(parts[2]),
 		})
 	}
 
-	return diffSkipRules, nil
+	return ignoreResourceRules, nil
 }
 
-// matches checks if the DiffSkipRule matches the given group, kind, and name
+// matches checks if the IgnoreResourceRule matches the given group, kind, and name
 // A "*" in any field matches any value
-func (s *SkipResourceRule) matches(group, kind, name string) bool {
+func (s *IgnoreResourceRule) matches(group, kind, name string) bool {
 	return (s.Group == "*" || s.Group == group) &&
 		(s.Kind == "*" || s.Kind == kind) &&
 		(s.Name == "*" || s.Name == name)
 }
 
-func MatchesAnySkipRule(manifest *unstructured.Unstructured, skipResourceRules []SkipResourceRule) bool {
+func MatchesAnyIgnoreRule(manifest *unstructured.Unstructured, ignoreResourceRules []IgnoreResourceRule) bool {
 	group := groupFromAPIVersion(manifest.GetAPIVersion())
-	for _, rule := range skipResourceRules {
+	for _, rule := range ignoreResourceRules {
 		if rule.matches(group, manifest.GetKind(), manifest.GetName()) {
 			return true
 		}

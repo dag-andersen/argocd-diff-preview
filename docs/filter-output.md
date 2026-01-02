@@ -1,4 +1,6 @@
-# Ignore specific lines in the diff preview
+# Filter output
+
+## Ignore specific lines in the diff preview
 
 Since this tool only highlights diffs between branches, it is important to stay up to date with your main branch. If your main branch is updated often with new tags for you container images, it can be hard to keep up with the newest changes.
 
@@ -48,3 +50,23 @@ argocd-diff-preview --diff-ignore="caBundle"
 ```
 
 This will hide all lines that contain the word `caBundle`.
+
+## Ignore specific resources in the diff preview
+
+You can also ignore specific resources in the diff preview by using the `--skip-resource-rules="group:kind:name,group:kind:name"` option.
+
+The format is `group:kind:name`, where `group` and `name` are optional. An empty group means "core" group. "*" means any value.
+
+### *Example*
+
+```bash
+argocd-diff-preview --skip-resource-rules="apps:Deployment:deploy-from-folder-two, *:CustomResourceDefinition:*,:ConfigMap:argocd-cm
+```
+
+This will hide:
+- all resources of kind `Deployment` in the group `apps` with the name `deploy-from-folder-two`
+- all CustomResourceDefinitions
+- all ConfigMaps (in the core group) named `argocd-cm`
+
+
+

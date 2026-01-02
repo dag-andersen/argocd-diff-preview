@@ -307,12 +307,12 @@ func run(cfg *Config) error {
 		return err
 	}
 
-	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests, cfg.SkipResourceRules)
+	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests, cfg.IgnoreResourceRules)
 	if err != nil {
 		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
 		return err
 	}
-	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests, cfg.SkipResourceRules)
+	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests, cfg.IgnoreResourceRules)
 	if err != nil {
 		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
 		return err
@@ -376,10 +376,10 @@ func run(cfg *Config) error {
 }
 
 // convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
-func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp, skipResourceRules []resource_filter.SkipResourceRule) ([]diff.AppInfo, error) {
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp, ignoreResourceRules []resource_filter.IgnoreResourceRule) ([]diff.AppInfo, error) {
 	appInfos := make([]diff.AppInfo, len(extractedApps))
 	for i, extractedApp := range extractedApps {
-		manifestString, err := extractedApp.FlattenToString(skipResourceRules)
+		manifestString, err := extractedApp.FlattenToString(ignoreResourceRules)
 		if err != nil {
 			return nil, err
 		}

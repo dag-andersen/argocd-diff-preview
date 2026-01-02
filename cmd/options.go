@@ -57,7 +57,7 @@ var (
 	DefaultWatchIfNoWatchPatternFound = false
 	DefaultIgnoreInvalidWatchPattern  = false
 	DefaultHideDeletedAppDiff         = false
-	DefaultSkipResourceRules          = ""
+	DefaultIgnoreResourceRules        = ""
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -96,7 +96,7 @@ type RawOptions struct {
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
 	HideDeletedAppDiff         bool   `mapstructure:"hide-deleted-app-diff"`
-	SkipResourceRules          string `mapstructure:"skip-resource-rules"`
+	IgnoreResourceRules        string `mapstructure:"ignore-resources"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -133,12 +133,12 @@ type Config struct {
 	HideDeletedAppDiff         bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
-	FileRegex         *regexp.Regexp
-	Selectors         []app_selector.Selector
-	FilesChanged      []string
-	RedirectRevisions []string
-	SkipResourceRules []resource_filter.SkipResourceRule
-	ClusterProvider   cluster.Provider
+	FileRegex           *regexp.Regexp
+	Selectors           []app_selector.Selector
+	FilesChanged        []string
+	RedirectRevisions   []string
+	IgnoreResourceRules []resource_filter.IgnoreResourceRule
+	ClusterProvider     cluster.Provider
 }
 
 // Parse parses command line flags and environment variables, returning a validated Config
@@ -217,7 +217,7 @@ func Parse() *Config {
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
 	viper.SetDefault("hide-deleted-app-diff", DefaultHideDeletedAppDiff)
-	viper.SetDefault("skip-resource-rules", DefaultSkipResourceRules)
+	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -229,7 +229,7 @@ func Parse() *Config {
 	rootCmd.Flags().StringP("file-regex", "r", "", "Regex to select/filter files. Example: /apps_.*\\.yaml")
 	rootCmd.Flags().StringP("diff-ignore", "i", "", "Ignore lines in diff. Example: v[1,9]+.[1,9]+.[1,9]+ for ignoring version changes")
 	rootCmd.Flags().StringP("line-count", "c", fmt.Sprintf("%d", DefaultLineCount), "Generate diffs with <n> lines of context")
-	rootCmd.Flags().String("skip-resource-rules", DefaultSkipResourceRules, "Skip resource rules. Example: 'group:kind:name',group:kind:name")
+	rootCmd.Flags().String("ignore-resources", DefaultIgnoreResourceRules, "Ignore resources in diff. Example: 'group:kind:name',group:kind:name")
 
 	// Argo CD related
 	rootCmd.Flags().String("argocd-chart-version", "", "Argo CD Helm Chart version")
@@ -371,9 +371,9 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	cfg.FilesChanged = o.parseFilesChanged()
 
 	// Parse skip resource rules
-	cfg.SkipResourceRules, err = resource_filter.FromString(o.SkipResourceRules)
+	cfg.IgnoreResourceRules, err = resource_filter.FromString(o.IgnoreResourceRules)
 	if err != nil {
-		return nil, fmt.Errorf("invalid skip-resource-rules: %w", err)
+		return nil, fmt.Errorf("invalid ignore-resources: %w", err)
 	}
 
 	// Parse redirect revisions
@@ -590,11 +590,11 @@ func (o *Config) LogConfig() {
 	if o.HideDeletedAppDiff {
 		log.Info().Msgf("✨ - hide-deleted-app-diff: %t", o.HideDeletedAppDiff)
 	}
-	if len(o.SkipResourceRules) > 0 {
-		skipResourceRuleStrings := make([]string, len(o.SkipResourceRules))
-		for i, skipResourceRule := range o.SkipResourceRules {
-			skipResourceRuleStrings[i] = skipResourceRule.String()
+	if len(o.IgnoreResourceRules) > 0 {
+		ignoreResourceRuleStrings := make([]string, len(o.IgnoreResourceRules))
+		for i, ignoreResourceRule := range o.IgnoreResourceRules {
+			ignoreResourceRuleStrings[i] = ignoreResourceRule.String()
 		}
-		log.Info().Msgf("✨ - skip-resource-rules: %s", strings.Join(skipResourceRuleStrings, ", "))
+		log.Info().Msgf("✨ - ignore-resources: %s", strings.Join(ignoreResourceRuleStrings, ", "))
 	}
 }
