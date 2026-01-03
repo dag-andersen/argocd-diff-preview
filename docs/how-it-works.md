@@ -45,7 +45,7 @@ For each Application or ApplicationSet found, it applies the following modificat
 
 | Modification | Why |
 |--------------|-----|
-| Set `metadata.namespace` to `argocd-diff-preview` | So Argo CD can find and manage the applications |
+| Set `metadata.namespace` to `argocd` | So Argo CD can find and manage the applications. This is overridden by the `--argocd-namespace` flag.|
 | Remove `spec.syncPolicy` | Prevents Argo CD from actually syncing resources to the cluster |
 | Set `spec.project` to `default` | The ephemeral Argo CD only has the `default` project configured |
 | Set `spec.destination.server` to `https://kubernetes.default.svc` | Points to the local cluster (the actual destination doesn't matter since we're only rendering, not syncing) |
