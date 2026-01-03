@@ -30,7 +30,7 @@ func (a *ArgoCDInstallation) CheckArgoCDCLIVersionVsServerVersion() error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("failed to check argocd cli version vs server version after %d attempts: %w", maxRetries, err)
+		return fmt.Errorf("command 'argocd version -o json' failed: %w", err)
 	}
 
 	type versionInfo struct {

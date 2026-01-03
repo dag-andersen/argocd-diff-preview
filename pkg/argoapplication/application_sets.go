@@ -63,6 +63,8 @@ func ConvertAppSetsToAppsInBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
+	log.Debug().Msgf("🤖 Converted ApplicationSets to Applications in %s", time.Since(startTime).Round(time.Second))
+
 	return baseApps, targetApps, time.Since(startTime), nil
 }
 
