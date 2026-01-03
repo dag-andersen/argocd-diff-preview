@@ -37,7 +37,7 @@ docker run \
   -v $(pwd)/output:/output \
   -e REPO=<org>/<repo-with-pr> \            ⬅️ Must match the repo with the PR
   -e TARGET_BRANCH=<pr-branch> \            ⬅️ The branch to redirect applications to
-  dagandersen/argocd-diff-preview:v0.1.20
+  dagandersen/argocd-diff-preview:v0.1.21
 ```
 
 !!! note "Why does this matter?"
@@ -130,7 +130,7 @@ jobs:
             -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
             -e TARGET_BRANCH=<pr-branch> \             ⬅️ The PR branch on the Application Repository
             -e REPO=<org>/<application-repository> \   ⬅️ Application Repository
-            dagandersen/argocd-diff-preview:v0.1.20
+            dagandersen/argocd-diff-preview:v0.1.21
 
       - name: Post diff as comment
         run: |
@@ -158,7 +158,7 @@ docker run \
     -v $(pwd)/secrets:/secrets \
     -e TARGET_BRANCH=<pr-branch> \
     -e REPO=<org>/<application-repository> \
-    dagandersen/argocd-diff-preview:v0.1.20
+    dagandersen/argocd-diff-preview:v0.1.21
 ```
 
 ### Pipeline in the Resource Repository
@@ -245,7 +245,7 @@ jobs:
             -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
             -e TARGET_BRANCH=<pr-branch> \             ⬅️ The PR branch on the Resource Repository
             -e REPO=<org>/<resource-repository> \      ⬅️ Resource Repository (where the PR is!)
-            dagandersen/argocd-diff-preview:v0.1.20
+            dagandersen/argocd-diff-preview:v0.1.21
 
       - name: Post diff as comment
         run: |
@@ -276,7 +276,7 @@ docker run \
     -v $(pwd)/secrets:/secrets \
     -e TARGET_BRANCH=<pr-branch> \
     -e REPO=<org>/<resource-repository> \
-    dagandersen/argocd-diff-preview:v0.1.20
+    dagandersen/argocd-diff-preview:v0.1.21
 ```
 
 ---
