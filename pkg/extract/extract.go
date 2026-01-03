@@ -289,6 +289,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
 	var manifests string
+	extractionTimer := time.Now()
 	if argocd.UseAPI() {
 		output, err := argocd.GetManifestsFromAPI(app.Id)
 		if err != nil {
@@ -307,11 +308,11 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	}
 
 	if strings.TrimSpace(manifests) == "" {
-		log.Debug().Str("App", app.GetLongName()).Msg("No manifests found for application")
+		log.Debug().Str("App", app.GetLongName()).Msgf("No manifests found for application in %s", time.Since(extractionTimer).Round(time.Second))
 		return []unstructured.Unstructured{}, nil
 	}
 
-	log.Debug().Str("App", app.GetLongName()).Msg("Extracted manifests from Application")
+	log.Debug().Str("App", app.GetLongName()).Msgf("Extracted manifests from Application in %s", time.Since(extractionTimer).Round(time.Second))
 
 	// Replace all application IDs with the application name (relevant for annotations)
 	manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
