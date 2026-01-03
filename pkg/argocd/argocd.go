@@ -304,10 +304,10 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if errorMessage := strings.TrimSpace(string(exitErr.Stderr)); errorMessage != "" {
-				return "", fmt.Errorf("argocd command failed: %s: %w", errorMessage, err)
+				return "", fmt.Errorf("argocd command failed with error: %s: %w", errorMessage, err)
 			}
 		}
-		return "", fmt.Errorf("argocd command failed: %s: %w", strings.TrimSpace(string(output)), err)
+		return "", fmt.Errorf("argocd command failed with output: %s: %w", strings.TrimSpace(string(output)), err)
 	}
 	return string(output), nil
 }

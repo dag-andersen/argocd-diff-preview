@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -15,9 +16,21 @@ var (
 
 // Check Argo CD CLI version vs Argo CD Server version
 func (a *ArgoCDInstallation) CheckArgoCDCLIVersionVsServerVersion() error {
-	out, err := a.runArgocdCommand("version", "-o", "json")
+	var out string
+	var err error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		out, err = a.runArgocdCommand("version", "-o", "json")
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries {
+			log.Debug().Msgf("argocd version command failed (attempt %d/%d), retrying in 1s: %v", attempt, maxRetries, err)
+			time.Sleep(1 * time.Second)
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("failed to check argocd cli version vs server version: %w", err)
+		return fmt.Errorf("failed to check argocd cli version vs server version after %d attempts: %w", maxRetries, err)
 	}
 
 	type versionInfo struct {
