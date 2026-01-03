@@ -90,7 +90,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 
 	// Check Argo CD CLI version vs Argo CD Server version
 	if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
-		return time.Since(startTime), fmt.Errorf("failed to check argocd cli version vs server version: %w", err)
+		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD CLI and Server versions. Can't verify if the CLI version is compatible with the server version.")
 	}
 
 	if debug {
@@ -304,10 +304,10 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if errorMessage := strings.TrimSpace(string(exitErr.Stderr)); errorMessage != "" {
-				return "", fmt.Errorf("argocd command failed: %s: %w", errorMessage, err)
+				return "", fmt.Errorf("argocd command failed with error: %s: %w", errorMessage, err)
 			}
 		}
-		return "", fmt.Errorf("argocd command failed: %s: %w", strings.TrimSpace(string(output)), err)
+		return "", fmt.Errorf("argocd command failed with output: %s: %w", strings.TrimSpace(string(output)), err)
 	}
 	return string(output), nil
 }
