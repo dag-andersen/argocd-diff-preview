@@ -22,7 +22,7 @@ spec:
       source:
         repoURL: https://github.com/dag-andersen/argocd-diff-preview
         targetRevision: HEAD
-        path: 'examples/use-cases/refactoring/my-service/overlay/{{.env}}/'
+        path: 'examples/use-cases/appset-refactoring/my-service/overlay/{{.env}}/'
       syncPolicy:
         automated:
           prune: true
