@@ -11,6 +11,7 @@ The following examples are a selection of possible `argocd-diff-preview` use-cas
 ## Run the examples locally
 
 **Prerequisites**
+
 * Docker
 * Git
 
