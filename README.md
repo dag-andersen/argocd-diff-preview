@@ -156,13 +156,20 @@ Rendering manifests for all applications in your repository on every pull reques
 - [Rendering the TRUE Argo CD diff on your PRs](https://dev.to/dag-andersen/rendering-the-true-argo-cd-diff-on-your-prs-10bk)
 - [Argo CD: Previewing Pull Request changes in SECONDS! 🥵⚡️⏰](https://dev.to/dag-andersen/argo-cd-previewing-pull-requests-changes-in-seconds-241g)
 
-## ArgoCon 2024 Talk
+## Talks
 
-<img align="right" src="./docs/assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` was presented at ArgoCon 2024 in Utah, US. The talk covered current tools and methods for visualizing code changes in GitOps workflows and introduced this new approach, which uses ephemeral clusters to render accurate diffs directly on your pull requests.
+### ArgoCon NA 2024
 
-- Talk description: [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](
-https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
+<img align="right" src="./docs/assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` was presented at ArgoCon 2024 in Salt Lake City, US. The talk covered current tools and methods for visualizing code changes in GitOps workflows and introduced a new approach using ephemeral clusters to render accurate diffs directly on pull requests.
+
+- Talk description: [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
 - Talk recording: [YouTube](https://youtu.be/3aeP__qPSms)
+
+### ArgoCon EU 2026
+
+`argocd-diff-preview` will be presented at ArgoCon EU 2026 in Amsterdam, The Netherlands. This talk shows how you can reduce preview times from minutes to seconds by connecting to a pre-configured Argo CD instance instead of spinning up ephemeral clusters. Includes real-world examples from [Egmont](https://www.egmont.com/) and [TangoMe](https://www.tango.me/).
+
+- Talk description: [Argo CD: Previewing Pull Request Changes in SECONDS!](https://colocatedeventseu2026.sched.com/event/2DY8T/argo-cd-previewing-pull-request-changes-in-seconds-dag-bjerre-andersen-egmont-sergey-shevchenko-tangome)
 
 ## All Contributors
 
