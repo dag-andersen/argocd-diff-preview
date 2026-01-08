@@ -1,6 +1,6 @@
 # Connecting to a cluster with Argo CD pre-installed
 
-![](../assets/reusing-cluster-from-outside.png)
+![](../assets/reusing-cluster-from-outside-dark.png)
 
 Instead of spinning up an ephemeral cluster for each diff preview, you can connect to a cluster with Argo CD already installed. This saves approximately `60`–`90` seconds per run.
 

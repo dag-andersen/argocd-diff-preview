@@ -19,31 +19,32 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 
 ![](./assets/flow_dark.png)
 
-The safest way to make changes to your Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
+The safest way to make changes to your Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
-In short, the tool:
+The tool supports **three approaches** for generating previews:
 
-1. Spins up a local cluster and installs Argo CD
-2. Applies your Applications (patched to point to the main branch and the PR branch)
-3. Extracts the rendered manifests
-4. Generates a diff and outputs it as Markdown/HTML
+| Approach | Best For | Overhead |
+|----------|----------|----------|
+| [**Ephemeral Cluster**](./getting-started/github-actions-workflow.md) (Default) | Getting started, complete isolation | ~60-90s |
+| [**Pre-installed Argo CD**](./reusing-clusters/connecting.md) | Teams prioritizing speed | <10s |
+| [**Pre-installed Argo CD + Self-Hosted Runner**](./reusing-clusters/self-hosted-gh-runner.md) | Speed + security | <10s |
 
-→ [**Read the full breakdown**](./how-it-works.md)
+Check out [How it works](./how-it-works.md)
 
 ## Features
 
 - **Accurate diffs** - Renders manifests using Argo CD itself, so the diff is as accurate as possible
-- **Complete isolation** - No access to your real cluster or Argo CD instance required
+- **Complete isolation** - Run with ephemeral clusters - no access to your real cluster or Argo CD instance required
+- **Connect to pre-installed Argo CD** - Skip cluster creation for faster execution (~60-90s saved). [[Docs]](./reusing-clusters/connecting.md)
 - **Run locally** - Test changes before opening a pull request
 - **Private repos & charts** - Works with private Git repositories and Helm charts
 - **Multi-source applications** - Full support for Argo CD multi-source apps
 - **ApplicationSets** - Supports List, Git, Matrix, Merge, and other generators
 - **Config Management Plugins** - Use custom CMPs via Argo CD Helm chart configuration
 - **External chart visibility** - See exactly what changed when updating a Helm chart version (e.g., Nginx). [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
-- **Smart filtering** - Filter applications by file path, regex, labels, or change detection. [Documentation](./application-selection.md)
+- **Smart filtering** - Filter applications by file path, regex, labels, or change detection. [[Docs]](./application-selection.md)
 - **Diff noise filtering** - Ignore version bumps, generated values, or other noisy changes with `--diff-ignore`
 - **Multiple output formats** - Generates Markdown (for PR comments), HTML, and full YAML manifests
-- **Reuse existing clusters** - Skip cluster creation by connecting to a pre-installed Argo CD instance (~60s faster). [Documentation](./reusing-clusters/connecting.md)
 - **Dry run mode** - Preview which applications would be rendered without creating a cluster
 
 ## Why do we need this?
@@ -54,13 +55,25 @@ Mentally parsing Helm templates and Kustomize patches is hard without rendering 
 
 In the field of GitOps and infrastructure as code, all configurations are checked into Git and modified through PRs. The code changes in the PR are reviewed by a human, who needs to understand the changes made to the configuration. This is hard when the configuration is generated through templating tools like Kustomize and Helm.
 
-## ArgoCon 2024 Talk
+## Blog Posts
 
-<img align="right" src="./assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` was presented at ArgoCon 2024 in Utah, US. The talk covered current tools and methods for visualizing code changes in GitOps workflows and introduced this new approach, which uses ephemeral clusters to render accurate diffs directly on your pull requests.
+- [Rendering the TRUE Argo CD diff on your PRs](https://dev.to/dag-andersen/rendering-the-true-argo-cd-diff-on-your-prs-10bk)
+- [Argo CD: Previewing Pull Request changes in SECONDS! 🥵⚡️⏰](https://dev.to/dag-andersen/argo-cd-previewing-pull-requests-changes-in-seconds-241g)
 
-- Talk description: [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](
-https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
+## Talks
+
+### ArgoCon NA 2024
+
+<img align="right" src="./assets/ArgoConLogoOrange.svg" width="30%"> `argocd-diff-preview` was presented at ArgoCon 2024 in Salt Lake City, US. The talk covered current tools and methods for visualizing code changes in GitOps workflows and introduced a new approach using ephemeral clusters to render accurate diffs directly on pull requests.
+
+- Talk description: [GitOps Safety: Rendering Accurate ArgoCD Diffs Directly on Pull Requests](https://colocatedeventsna2024.sched.com/event/1izsL/gitops-safety-rendering-accurate-argocd-diffs-directly-on-pull-requests-dag-bjerre-andersen-visma-regina-voloshin-octopus-deploy)
 - Talk recording: [YouTube](https://youtu.be/3aeP__qPSms)
+
+### ArgoCon EU 2026
+
+`argocd-diff-preview` will be presented at ArgoCon EU 2026 in Amsterdam, The Netherlands. This talk shows how you can reduce preview times from minutes to seconds by connecting to a pre-configured Argo CD instance instead of spinning up ephemeral clusters. Includes real-world examples from [Egmont](https://www.egmont.com/) and [TangoMe](https://www.tango.me/).
+
+- Talk description: [Argo CD: Previewing Pull Request Changes in SECONDS!](https://colocatedeventseu2026.sched.com/event/2DY8T/argo-cd-previewing-pull-request-changes-in-seconds-dag-bjerre-andersen-egmont-sergey-shevchenko-tangome)
 
 ## Contributing
 

@@ -32,20 +32,22 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 
 The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. This can be done by spinning up an ephemeral cluster (or connecting to a pre-configured cluster) in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
+Check out [How it works](https://dag-andersen.github.io/argocd-diff-preview/how-it-works/)
+
 ## Features
 
 - **Accurate diffs** - Renders manifests using Argo CD itself, so the diff is as accurate as possible
-- **Complete isolation** - No access to your real cluster or Argo CD instance required
+- **Complete isolation** - Run with ephemeral clusters - no access to your real cluster or Argo CD instance required
+- **Connect to pre-installed Argo CD** - Skip cluster creation for faster execution (~60-90s saved)
 - **Run locally** - Test changes before opening a pull request
 - **Private repos & charts** - Works with private Git repositories and Helm charts
 - **Multi-source applications** - Full support for Argo CD multi-source apps
 - **ApplicationSets** - Supports List, Git, Matrix, Merge, and other generators
 - **Config Management Plugins** - Use custom CMPs via Argo CD Helm chart configuration
 - **External chart visibility** - See exactly what changed when updating a Helm chart version (e.g., Nginx). [PR example](https://github.com/dag-andersen/argocd-diff-preview/pull/15)
-- **Smart filtering** - Filter applications by file path, regex, labels, or change detection. [Documentation](https://dag-andersen.github.io/argocd-diff-preview/application-selection/)
+- **Smart filtering** - Filter applications by file path, regex, labels, or change detection.
 - **Diff noise filtering** - Ignore version bumps, generated values, or other noisy changes with `--diff-ignore`
 - **Multiple output formats** - Generates Markdown (for PR comments), HTML, and full YAML manifests
-- **Reuse existing clusters** - Skip cluster creation by connecting to a pre-configured Argo CD instance (~60s faster). [Documentation](https://dag-andersen.github.io/argocd-diff-preview/reusing-clusters/connecting/)
 - **Dry run mode** - Preview which applications would be rendered without creating a cluster
 
 ---
