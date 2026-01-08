@@ -22,9 +22,15 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 
 ## Overview
 
+### Using ephemeral clusters
+
 ![](./docs/assets/flow_dark.png)
 
-The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. This can be done by spinning up an ephemeral cluster in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
+### Using pre-configured clusters
+
+![](./docs/assets/reusing-cluster-from-outside-dark.png)
+
+The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. This can be done by spinning up an ephemeral cluster (or connecting to a pre-configured cluster) in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
 ## Features
 
@@ -39,7 +45,7 @@ The safest way to make changes to you Helm Charts and Kustomize Overlays in your
 - **Smart filtering** - Filter applications by file path, regex, labels, or change detection. [Documentation](https://dag-andersen.github.io/argocd-diff-preview/application-selection/)
 - **Diff noise filtering** - Ignore version bumps, generated values, or other noisy changes with `--diff-ignore`
 - **Multiple output formats** - Generates Markdown (for PR comments), HTML, and full YAML manifests
-- **Reuse existing clusters** - Skip cluster creation by connecting to a pre-installed Argo CD instance (~60s faster). [Documentation](https://dag-andersen.github.io/argocd-diff-preview/reusing-clusters/connecting/)
+- **Reuse existing clusters** - Skip cluster creation by connecting to a pre-configured Argo CD instance (~60s faster). [Documentation](https://dag-andersen.github.io/argocd-diff-preview/reusing-clusters/connecting/)
 - **Dry run mode** - Preview which applications would be rendered without creating a cluster
 
 ---
