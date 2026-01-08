@@ -2,9 +2,17 @@
 
 This page describes how `argocd-diff-preview` works under the hood.
 
+The tool follows a simple but powerful approach: use a real Argo CD instance to render your manifests and compare the results between branches. This ensures the diff is 100% accurate - exactly what Argo CD would produce in your real cluster.
+
+## Modes
+
+#### Ephemeral Cluster Mode
+
 ![](./assets/flow_dark.png)
 
-The tool follows a simple but powerful approach: spin up a real Argo CD instance, let it render your manifests, and compare the results between branches. This ensures the diff is 100% accurate - exactly what Argo CD would produce in your real cluster.
+#### Pre-installed Argo CD Mode
+
+![](./assets/reusing-cluster-from-outside-dark.png)
 
 ---
 
@@ -30,9 +38,7 @@ Before processing, the tool filters which applications to render. By default, al
 | **Label selectors** | Use `--selector "team=platform"` to filter by Kubernetes labels |
 | **File path regex** | Use `--file-regex="team-a/"` to filter by the application's file location |
 
-This is especially useful in large monorepos where rendering all applications on every PR would be slow.
-
-→ [**Full documentation on application selection**](./application-selection.md)
+This is especially useful in large monorepos where rendering all applications on every PR would be slow. See [Application Selection](./application-selection.md) for more details.
 
 !!! note "Early exit if no applications selected"
     If no applications are selected after filtering, the tool stops here and outputs an empty diff. This avoids spinning up a cluster unnecessarily.
@@ -59,7 +65,8 @@ For each Application or ApplicationSet found, it applies the following modificat
 
 ---
 
-!!! note "Steps 4-6 are skipped if `--create-cluster false` is provided"
+!!! note "Steps 4-6: Ephemeral Cluster Mode Only"
+    Steps 4, 5, and 6 only apply when using the default ephemeral cluster mode. If you're connecting to a pre-installed Argo CD instance with `--create-cluster=false`, these steps are skipped and the tool connects directly to your pre-installed Argo CD.
 
 ---
 
