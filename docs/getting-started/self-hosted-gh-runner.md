@@ -10,7 +10,7 @@ This guide covers two main approaches for using self-hosted runners with `argocd
 
 This approach creates a temporary cluster for each diff preview run while reusing credentials from your existing Argo CD installation. It provides isolation for the diff preview while not storing the credentials in your CI/CD pipeline.
 
-![](../assets/flows/self-hosted-ephemeral.png)
+![](../assets/flows/ephemeral-self-hosted-runner-flow.png)
 
 ### How It Works
 
