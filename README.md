@@ -24,11 +24,11 @@ In the field of GitOps and infrastructure as code, all configurations are checke
 
 ### Using ephemeral clusters
 
-![](./docs/assets/flows/ephemeral-flow.png)
+![](./docs/assets/flows/ephemeral-flow-dark.png)
 
 ### Using pre-configured clusters
 
-![](./docs/assets/flows/external-cluster-flow.png)
+![](./docs/assets/flows/external-cluster-flow-dark.png)
 
 The safest way to make changes to you Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. This can be done by spinning up an ephemeral cluster (or connecting to a pre-configured cluster) in your automated pipelines. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
