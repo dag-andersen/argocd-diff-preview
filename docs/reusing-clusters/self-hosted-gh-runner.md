@@ -6,7 +6,7 @@ Instead of creating a temporary cluster for each diff preview, your self-hosted 
 
 Imagine something like this:
 
-![](../assets/reusing-cluster-with-arc-runner.png)
+![](../assets/flows/self-hosted-runner-flow.png)
 
 ## How It Works
 

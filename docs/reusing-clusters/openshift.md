@@ -6,7 +6,7 @@ Utilizing the Openshift GitOps operator for managing the pre-installed ArgoCD in
 
 Imagine something like this:
 
-![](../assets/openshift-reusing-cluster-with-gitlab-runner.png)
+![](../assets/flows/openshift-flow.png)
 
 ## How it works
 

@@ -17,7 +17,7 @@ Argo CD Diff Preview is a tool that renders the diff between two branches in a G
 
 ## Overview
 
-![](./assets/flow_dark.png)
+![](./assets/flows/ephemeral-flow.png)
 
 The safest way to make changes to your Helm Charts and Kustomize Overlays in your GitOps repository is to let Argo CD render them for you. Since the diff is rendered by Argo CD itself, it is as accurate as possible.
 
