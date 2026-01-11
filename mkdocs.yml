@@ -22,6 +22,7 @@ nav:
 - Overview: index.md
 - Demo: demo.md
 - How it works: how-it-works.md
+- Examples: examples.md
 - Getting started:
   - getting-started/github-actions-workflow.md
   - getting-started/gitlab-cicd.md
