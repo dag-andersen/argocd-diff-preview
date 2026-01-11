@@ -89,7 +89,5 @@ run-integration-tests-go: go-build
 
 # Run before release
 check-release: run-lint run-unit-tests
-	$(MAKE) run-integration-tests-go
-	$(MAKE) run-integration-tests-docker
-
--include devcontainer.make
+	$(MAKE) run-integration-tests-go use_argocd_api=false
+	$(MAKE) run-integration-tests-docker use_argocd_api=true
