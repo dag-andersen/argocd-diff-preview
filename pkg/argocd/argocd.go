@@ -3,7 +3,6 @@ package argocd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -85,6 +84,10 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 	}
 }
 
+func (a *ArgoCDInstallation) UseAPI() bool {
+	return a.ArgoCDApiConnection != nil
+}
+
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
 	startTime := time.Now()
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
@@ -117,9 +120,11 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
-	// Check Argo CD CLI version vs Argo CD Server version
-	if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
-		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD CLI and Server versions. Can't verify if the CLI version is compatible with the server version.")
+	// Check Argo CD CLI version vs Argo CD Server version (only when not using API mode)
+	if !a.UseAPI() {
+		if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
+			log.Error().Err(err).Msgf("❌ Failed to detect Argo CD CLI and Server versions. Can't verify if the CLI version is compatible with the server version.")
+		}
 	}
 
 	if debug {
@@ -132,18 +137,22 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", configMaps)
 	}
 
-	// Add extra permissions to the default AppProject
-	if _, err := a.runArgocdCommand("proj", "add-source-namespace", "default", "*"); err != nil {
+	if err := addSourceNamespaceToDefaultAppProject(a); err != nil {
 		log.Error().Err(err).Msg("❌ Failed to add extra permissions to the default AppProject")
 		return time.Since(startTime), fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
-	} else {
-		log.Debug().Msgf("Argo CD extra permissions added successfully")
 	}
 
 	duration := time.Since(startTime)
 	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
 	return duration, nil
+}
+
+func addSourceNamespaceToDefaultAppProject(a *ArgoCDInstallation) error {
+	if a.UseAPI() {
+		return addSourceNamespaceToDefaultAppProjectAPI(a)
+	}
+	return a.addSourceNamespaceToDefaultAppProjectCLI()
 }
 
 // installWithHelm installs ArgoCD using Helm
@@ -345,36 +354,46 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 	return valuesFiles, nil
 }
 
-func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
-	cmd := exec.Command("argocd", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if errorMessage := strings.TrimSpace(string(exitErr.Stderr)); errorMessage != "" {
-				return "", fmt.Errorf("argocd command failed with error: %s: %w", errorMessage, err)
-			}
+// login performs login to ArgoCD
+// Uses the API if UseAPI() is true, otherwise uses the CLI
+func (a *ArgoCDInstallation) login() error {
+	if a.UseAPI() {
+		return a.loginViaAPI()
+	}
+	return a.loginViaCLI()
+}
+
+// OnlyLogin performs only the login step without installing ArgoCD
+func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
+	startTime := time.Now()
+
+	// Login to ArgoCD
+	if err := a.login(); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
+	}
+
+	log.Info().Msg("🦑 Logged in to Argo CD successfully")
+
+	// Check Argo CD CLI version vs Argo CD Server version (only when not using API mode)
+	if !a.UseAPI() {
+		if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
+			log.Error().Err(err).Msgf("❌ Failed to detect Argo CD CLI and Server versions. Can't verify if the CLI version is compatible with the server version.")
 		}
-		return "", fmt.Errorf("argocd command failed with output: %s: %w", strings.TrimSpace(string(output)), err)
 	}
-	return string(output), nil
+
+	return time.Since(startTime), nil
 }
 
-func (a *ArgoCDInstallation) UseAPI() bool {
-	return a.ArgoCDApiConnection != nil
-}
-
-// AppsetGenerate runs 'argocd appset generate' on a file and returns the output
+// AppsetGenerate generates applications from an ApplicationSet
+// Uses the API if available, otherwise falls back to the CLI
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
-	out, err := a.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
-	if err != nil {
-		return "", fmt.Errorf("failed to run argocd appset generate: %w", err)
+	if a.UseAPI() {
+		return a.appsetGenerateAPI(appSetPath)
 	}
-
-	return out, nil
+	return a.appsetGenerateCLI(appSetPath)
 }
 
-// AppsetGenerateWithRetry runs 'argocd appset generate' on a file and returns the output with retry
+// AppsetGenerateWithRetry runs AppsetGenerate with retry logic
 func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttempts int) (string, error) {
 
 	var err error
@@ -397,34 +416,20 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 }
 
 // GetManifests returns the manifests for an application
+// Uses the API if available, otherwise falls back to the CLI
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
-	out, err := a.runArgocdCommand("app", "manifests", appName)
-	if err != nil {
-		exists, _ := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
-		if !exists {
-			log.Warn().Msgf("App '%s' does not exist", appName)
-		}
-
-		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
+	if a.UseAPI() {
+		return a.getManifestsAPI(appName)
 	}
-
-	if strings.TrimSpace(out) == "" {
-		log.Debug().Msgf("No manifests found with `argocd app manifests %s`", appName)
-		return "", true, nil
-	}
-
-	return out, true, nil
+	return a.getManifestsCLI(appName)
 }
 
+// RefreshApp triggers a refresh of an application by setting the refresh annotation
 func (a *ArgoCDInstallation) RefreshApp(appName string) error {
-	_, err := a.runArgocdCommand("app", "get", appName, "--refresh")
-	if err != nil {
-		return fmt.Errorf("failed to refresh app: %w", err)
-	}
-
-	return nil
+	return a.K8sClient.SetArgoCDAppRefreshAnnotation(a.Namespace, appName)
 }
 
+// EnsureArgoCdIsReady waits for ArgoCD deployments to be ready
 func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
 	timeout := 300 * time.Second
 	// Wait for deployment to be ready

@@ -113,7 +113,7 @@ endif
 		-e KEEP_CLUSTER_ALIVE=true \
 		-e IGNORE_RESOURCES="$(ignore_resources)" \
 		-e ARGOCD_LOGIN_OPTIONS="$(argocd_login_options)" \
-		argocd-diff-preview
+		argocd-diff-preview --debug
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
 	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html
@@ -131,8 +131,8 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-1" line_count=3 kind_options="--name tests --config=./kind-config/options.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-2" diff_ignore="image"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-1/target  base_branch=integration-test/branch-1/base  suffix="-3" hide_deleted_app_diff="true" argocd_login_options="--insecure"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target  base_branch=integration-test/branch-2/base 
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target  base_branch=integration-test/branch-3/base 
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-2/target  base_branch=integration-test/branch-2/base
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-3/target  base_branch=integration-test/branch-3/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-4/target  base_branch=integration-test/branch-4/base  title="integration-test/branch-4"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-1" files_changed="examples/helm/values/filtered.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-2" files_changed="examples/helm/applications/watch-pattern/valid-regex.yaml"
@@ -143,7 +143,7 @@ run-test-all-with-%:
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-7" file_regex="this-does-not-exist\.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-8" watch_if_no_watch_pattern_found="true" files_changed="something/else.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-5/target  base_branch=integration-test/branch-5/base  suffix="-9" watch_if_no_watch_pattern_found="true" auto_detect_files_changed="true" use_argocd_api="true"
-	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target  base_branch=integration-test/branch-6/base  
+	$(MAKE) run-single-test-$* target_branch=integration-test/branch-6/target  base_branch=integration-test/branch-6/base
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-7/target  base_branch=integration-test/branch-7/base  files_changed="examples/helm/values/filtered.yaml" create_cluster=true
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-8/target  base_branch=integration-test/branch-8/base  files_changed="examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml"
 	$(MAKE) run-single-test-$* target_branch=integration-test/branch-9/target  base_branch=integration-test/branch-9/base  suffix="-1" max_diff_length=10000

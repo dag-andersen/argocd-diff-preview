@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -218,6 +219,13 @@ func getResourcesFromApp(
 			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application %s", app.GetLongName())
 		}
 
+		// If Application is still marked, then we need to wait for it to be refreshed
+		if isMarked, _ := argocd.K8sClient.IsApplicationMarkedForRefresh(argocd.Namespace, app.Id); isMarked {
+			log.Debug().Str("App", app.GetLongName()).Msg("Waiting for Application to be refreshed")
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
 		manifestsContent, err := getManifestsFromApp(argocd, app, namespacedScopedResources)
 
 		// If the application is seemingly empty, check the application status and refresh and try again
@@ -225,7 +233,7 @@ func getResourcesFromApp(
 		for attempts < 2 && err == nil && len(manifestsContent) == 0 {
 			attempts++
 
-			argoErrMessage, internalError := argoapplication.GetErrorStatusFromApplication(argocd, app)
+			reconsiled, argoErrMessage, internalError := argoapplication.GetErrorStatusFromApplication(argocd, app)
 			log.Debug().Str("App", app.GetLongName()).Msgf("Application is empty. Argo CD Error: %v, Internal Error: %v", argoErrMessage, internalError)
 			if argoErrMessage != nil {
 				if argocd.UseAPI() && isExpectedError(argoErrMessage.Error()) {
@@ -240,6 +248,11 @@ func getResourcesFromApp(
 				break
 			}
 
+			if !reconsiled {
+				err = errors.New("application is not reconciled")
+				break
+			}
+
 			// refresh application just to be sure
 			log.Debug().Str("App", app.GetLongName()).Msg("No manifests and no error found for application, refreshing and trying again just to be sure")
 			if err := argocd.RefreshApp(app.Id); err != nil {
@@ -247,8 +260,9 @@ func getResourcesFromApp(
 			} else {
 				log.Debug().Str("App", app.GetLongName()).Msg("Refreshed application")
 			}
-			manifestsContent, err = getManifestsFromApp(argocd, app, namespacedScopedResources)
+
 			time.Sleep(time.Second)
+			manifestsContent, err = getManifestsFromApp(argocd, app, namespacedScopedResources)
 		}
 
 		// If still no error, return the extracted app
@@ -288,23 +302,13 @@ func getResourcesFromApp(
 func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, namespacedScopedResources map[string]bool) ([]unstructured.Unstructured, error) {
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
-	var manifests string
 	extractionTimer := time.Now()
-	if argocd.UseAPI() {
-		output, err := argocd.GetManifestsFromAPI(app.Id)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get manifests for application %s with Argo API: %w", app.GetLongName(), err)
-		}
-		manifests = output
-	} else {
-		output, exists, err := argocd.GetManifests(app.Id)
-		if !exists {
-			return nil, fmt.Errorf("%s", string(errorApplicationNotFound))
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to get manifests for application %s with Argo CLI: %w", app.GetLongName(), err)
-		}
-		manifests = output
+	manifests, exists, err := argocd.GetManifests(app.Id)
+	if !exists {
+		return nil, fmt.Errorf("%s", string(errorApplicationNotFound))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
 	}
 
 	if strings.TrimSpace(manifests) == "" {
