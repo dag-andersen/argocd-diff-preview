@@ -200,6 +200,9 @@ func run(cfg *Config) error {
 		cfg.UseArgoCDApi,
 	)
 
+	// Ensure port forward is stopped when we exit (if API mode is used)
+	defer argocd.StopPortForward()
+
 	var argocdInstallationDuration time.Duration
 	if cfg.CreateCluster {
 		// Install Argo CD

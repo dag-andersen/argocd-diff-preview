@@ -111,6 +111,11 @@ func (a *ArgoCDInstallation) portForwardToArgoCD() error {
 
 // StopPortForward stops the port forward to ArgoCD server if it's active
 func (a *ArgoCDInstallation) StopPortForward() {
+	// Safe to call even when not using API mode
+	if a.ArgoCDApiConnection == nil {
+		return
+	}
+
 	connection := a.ArgoCDApiConnection
 	connection.portForwardMutex.Lock()
 	defer connection.portForwardMutex.Unlock()
