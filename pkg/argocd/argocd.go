@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
@@ -31,61 +30,38 @@ var (
 	}
 )
 
-const (
-	// remotePort is the port that the ArgoCD server pod listens on
-	remotePort = 8080
-	localPort  = 8081
-)
-
-type ArgoCDApiConnection struct {
-	apiServerURL         string // Constructed API server URL (e.g., "http://localhost:8081")
-	authToken            string // Cached authentication token
-	portForwardActive    bool
-	portForwardMutex     sync.Mutex
-	portForwardStopChan  chan struct{}
-	portForwardLocalPort int // Local port for port forwarding (e.g., 8081)
-}
-
 type ArgoCDInstallation struct {
-	K8sClient           *utils.K8sClient
-	Namespace           string
-	Version             string
-	ConfigPath          string
-	ChartName           string
-	ChartURL            string
-	ChartRepoUsername   string
-	ChartRepoPassword   string
-	LoginOptions        string
-	ArgoCDApiConnection *ArgoCDApiConnection // nil if API is not used
+	K8sClient         *utils.K8sClient
+	Namespace         string
+	Version           string
+	ConfigPath        string
+	ChartName         string
+	ChartURL          string
+	ChartRepoUsername string
+	ChartRepoPassword string
+	LoginOptions      string
+	useAPI            bool       // true if using API mode, false for CLI mode
+	operations        Operations // CLI or API implementation
 }
 
 func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, useAPI bool) *ArgoCDInstallation {
-	var argocdApiConnection *ArgoCDApiConnection
-	if useAPI {
-		argocdApiConnection = &ArgoCDApiConnection{
-			portForwardLocalPort: localPort,
-			apiServerURL:         fmt.Sprintf("http://localhost:%d", localPort),
-		}
-	} else {
-		argocdApiConnection = nil
-	}
-
 	return &ArgoCDInstallation{
-		K8sClient:           client,
-		Namespace:           namespace,
-		Version:             version,
-		ConfigPath:          "argocd-config",
-		ChartName:           repoName,
-		ChartURL:            repoURL,
-		ChartRepoUsername:   repoUsername,
-		ChartRepoPassword:   repoPassword,
-		LoginOptions:        loginOptions,
-		ArgoCDApiConnection: argocdApiConnection,
+		K8sClient:         client,
+		Namespace:         namespace,
+		Version:           version,
+		ConfigPath:        "argocd-config",
+		ChartName:         repoName,
+		ChartURL:          repoURL,
+		ChartRepoUsername: repoUsername,
+		ChartRepoPassword: repoPassword,
+		LoginOptions:      loginOptions,
+		useAPI:            useAPI,
+		operations:        NewOperations(useAPI, client, namespace, loginOptions),
 	}
 }
 
 func (a *ArgoCDInstallation) UseAPI() bool {
-	return a.ArgoCDApiConnection != nil
+	return a.useAPI
 }
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
@@ -116,12 +92,12 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	}
 
 	// Login to ArgoCD
-	if err := a.login(); err != nil {
+	if err := a.operations.Login(); err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
 	// Check Argo CD version compatibility
-	if err := a.CheckArgoCDVersionCompatibility(); err != nil {
+	if err := a.operations.CheckVersionCompatibility(); err != nil {
 		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the library version is compatible with the server version.")
 	}
 
@@ -135,29 +111,17 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 		log.Debug().Msgf("🔧 ConfigMap argocd-cmd-params-cm and argocd-cm:\n%s", configMaps)
 	}
 
-	if err := addSourceNamespaceToDefaultAppProject(a); err != nil {
+	if err := a.operations.AddSourceNamespaceToDefaultAppProject(); err != nil {
 		log.Error().Err(err).Msg("❌ Failed to add extra permissions to the default AppProject")
 		return time.Since(startTime), fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
+	} else {
+		log.Debug().Msgf("Argo CD extra permissions added successfully")
 	}
 
 	duration := time.Since(startTime)
 	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
 	return duration, nil
-}
-
-func (a *ArgoCDInstallation) CheckArgoCDVersionCompatibility() error {
-	if a.UseAPI() {
-		return a.CheckArgoCDLibVersionVsServerVersion()
-	}
-	return a.CheckArgoCDCLIVersionVsServerVersion()
-}
-
-func addSourceNamespaceToDefaultAppProject(a *ArgoCDInstallation) error {
-	if a.UseAPI() {
-		return addSourceNamespaceToDefaultAppProjectAPI(a)
-	}
-	return a.addSourceNamespaceToDefaultAppProjectCLI()
 }
 
 // installWithHelm installs ArgoCD using Helm
@@ -359,28 +323,19 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 	return valuesFiles, nil
 }
 
-// login performs login to ArgoCD
-// Uses the API if UseAPI() is true, otherwise uses the CLI
-func (a *ArgoCDInstallation) login() error {
-	if a.UseAPI() {
-		return a.loginViaAPI()
-	}
-	return a.loginViaCLI()
-}
-
 // OnlyLogin performs only the login step without installing ArgoCD
 func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 	startTime := time.Now()
 
 	// Login to ArgoCD
-	if err := a.login(); err != nil {
+	if err := a.operations.Login(); err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 
 	// Check Argo CD version compatibility
-	if err := a.CheckArgoCDVersionCompatibility(); err != nil {
+	if err := a.operations.CheckVersionCompatibility(); err != nil {
 		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the library version is compatible with the server version.")
 	}
 
@@ -388,12 +343,8 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 }
 
 // AppsetGenerate generates applications from an ApplicationSet
-// Uses the API if available, otherwise falls back to the CLI
 func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
-	if a.UseAPI() {
-		return a.appsetGenerateAPI(appSetPath)
-	}
-	return a.appsetGenerateCLI(appSetPath)
+	return a.operations.AppsetGenerate(appSetPath)
 }
 
 // AppsetGenerateWithRetry runs AppsetGenerate with retry logic
@@ -419,12 +370,8 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 }
 
 // GetManifests returns the manifests for an application
-// Uses the API if available, otherwise falls back to the CLI
 func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
-	if a.UseAPI() {
-		return a.getManifestsAPI(appName)
-	}
-	return a.getManifestsCLI(appName)
+	return a.operations.GetManifests(appName)
 }
 
 // RefreshApp triggers a refresh of an application by setting the refresh annotation
@@ -445,4 +392,10 @@ func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
 	}
 
 	return nil
+}
+
+// Cleanup performs any necessary cleanup (e.g., stopping port forwards).
+// This delegates to the operations implementation.
+func (a *ArgoCDInstallation) Cleanup() {
+	a.operations.Cleanup()
 }

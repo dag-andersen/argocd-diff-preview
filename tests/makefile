@@ -56,8 +56,7 @@ run-single-test-go: clean pull-base pull-target
 		--auto-detect-files-changed="$(auto_detect_files_changed)" \
 		--ignore-resources="$(ignore_resources)" \
 		--argocd-login-options="$(argocd_login_options)" \
-		--use-argocd-api="$(use_argocd_api)" \
-		--debug
+		--use-argocd-api="$(use_argocd_api)"
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
 	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html
@@ -113,7 +112,7 @@ endif
 		-e KEEP_CLUSTER_ALIVE=true \
 		-e IGNORE_RESOURCES="$(ignore_resources)" \
 		-e ARGOCD_LOGIN_OPTIONS="$(argocd_login_options)" \
-		argocd-diff-preview --debug
+		argocd-diff-preview
 	mkdir -p ./$(target_branch)$(suffix)/
 	cat ./output/diff.md | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.md
 	cat ./output/diff.html | sed 's/[0-9][0-9m]*s\]/Xs]/g' > ./output/diff-2.html

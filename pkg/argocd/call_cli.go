@@ -1,19 +1,28 @@
 package argocd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 )
 
+// CLIOperations implements the Operations interface using the ArgoCD CLI.
+type CLIOperations struct {
+	k8sClient    *utils.K8sClient
+	namespace    string
+	loginOptions string
+}
+
 // runArgocdCommand executes an argocd CLI command with port forwarding
-func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
+func (c *CLIOperations) runArgocdCommand(args ...string) (string, error) {
 	cmd := exec.Command("argocd", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", a.Namespace))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", c.namespace))
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -26,12 +35,12 @@ func (a *ArgoCDInstallation) runArgocdCommand(args ...string) (string, error) {
 	return string(output), nil
 }
 
-// loginViaCLI performs login to ArgoCD using the CLI
-func (a *ArgoCDInstallation) loginViaCLI() error {
+// Login performs login to ArgoCD using the CLI
+func (c *CLIOperations) Login() error {
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
 	// Get initial admin password
-	password, err := a.getInitialPassword()
+	password, err := getInitialPassword(c.k8sClient, c.namespace)
 	if err != nil {
 		return err
 	}
@@ -44,11 +53,11 @@ func (a *ArgoCDInstallation) loginViaCLI() error {
 
 		// Build login command arguments
 		args := []string{"login", "--insecure", "--username", username, "--password", password}
-		if a.LoginOptions != "" {
-			args = append(args, strings.Fields(a.LoginOptions)...)
+		if c.loginOptions != "" {
+			args = append(args, strings.Fields(c.loginOptions)...)
 		}
 
-		out, err := a.runArgocdCommand(args...)
+		out, err := c.runArgocdCommand(args...)
 		if err == nil {
 			log.Debug().Msgf("Login successful on attempt %d. Output: %s", attempt, out)
 			break
@@ -65,7 +74,7 @@ func (a *ArgoCDInstallation) loginViaCLI() error {
 	}
 
 	log.Debug().Msg("Verifying login by listing applications...")
-	if _, errList := a.runArgocdCommand("app", "list"); errList != nil {
+	if _, errList := c.runArgocdCommand("app", "list"); errList != nil {
 		log.Error().Err(errList).Msg("❌ Failed to list applications after login (verification step).")
 		return fmt.Errorf("login verification failed (unable to list applications): %w", errList)
 	}
@@ -73,9 +82,9 @@ func (a *ArgoCDInstallation) loginViaCLI() error {
 	return nil
 }
 
-// appsetGenerateCLI runs 'argocd appset generate' on a file and returns the output
-func (a *ArgoCDInstallation) appsetGenerateCLI(appSetPath string) (string, error) {
-	out, err := a.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
+// AppsetGenerate runs 'argocd appset generate' on a file and returns the output
+func (c *CLIOperations) AppsetGenerate(appSetPath string) (string, error) {
+	out, err := c.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
 	if err != nil {
 		return "", fmt.Errorf("failed to run argocd appset generate: %w", err)
 	}
@@ -83,11 +92,11 @@ func (a *ArgoCDInstallation) appsetGenerateCLI(appSetPath string) (string, error
 	return out, nil
 }
 
-// getManifestsCLI returns the manifests for an application using the CLI
-func (a *ArgoCDInstallation) getManifestsCLI(appName string) (string, bool, error) {
-	out, err := a.runArgocdCommand("app", "manifests", appName)
+// GetManifests returns the manifests for an application using the CLI
+func (c *CLIOperations) GetManifests(appName string) (string, bool, error) {
+	out, err := c.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
-		exists, _ := a.K8sClient.CheckIfResourceExists(ApplicationGVR, a.Namespace, appName)
+		exists, _ := c.k8sClient.CheckIfResourceExists(ApplicationGVR, c.namespace, appName)
 		if !exists {
 			log.Warn().Msgf("App '%s' does not exist", appName)
 		}
@@ -103,9 +112,69 @@ func (a *ArgoCDInstallation) getManifestsCLI(appName string) (string, bool, erro
 	return out, true, nil
 }
 
-func (a *ArgoCDInstallation) addSourceNamespaceToDefaultAppProjectCLI() error {
-	if _, err := a.runArgocdCommand("proj", "add-source-namespace", "default", "*"); err != nil {
+// AddSourceNamespaceToDefaultAppProject adds "*" to the sourceNamespaces of the default AppProject
+func (c *CLIOperations) AddSourceNamespaceToDefaultAppProject() error {
+	if _, err := c.runArgocdCommand("proj", "add-source-namespace", "default", "*"); err != nil {
 		return fmt.Errorf("failed to add extra permissions to the default AppProject: %w", err)
 	}
 	return nil
+}
+
+// CheckVersionCompatibility checks Argo CD CLI version vs Argo CD Server version
+func (c *CLIOperations) CheckVersionCompatibility() error {
+	var out string
+	var err error
+	maxRetries := 3
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		out, err = c.runArgocdCommand("version", "-o", "json")
+		if err == nil {
+			break
+		}
+		if attempt < maxRetries {
+			log.Debug().Msgf("argocd version command failed (attempt %d/%d), retrying in 1s: %v", attempt, maxRetries, err)
+			time.Sleep(1 * time.Second)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("command 'argocd version -o json' failed: %w", err)
+	}
+
+	type versionInfo struct {
+		Version string `json:"Version"`
+	}
+
+	type argocdVersionOutput struct {
+		Client versionInfo `json:"client"`
+		Server versionInfo `json:"server"`
+	}
+
+	var versionOutput argocdVersionOutput
+	if err := json.Unmarshal([]byte(out), &versionOutput); err != nil {
+		return fmt.Errorf("failed to parse argocd version output: %w", err)
+	}
+
+	log.Debug().Msgf("Argo CD Version: [CLI: '%s', Server: '%s']", versionOutput.Client.Version, versionOutput.Server.Version)
+
+	clientMajor, clientMinor, err := extractMajorMinorVersion(versionOutput.Client.Version)
+	if err != nil {
+		return fmt.Errorf("failed to extract major minor version from cli version: %w", err)
+	}
+	serverMajor, serverMinor, err := extractMajorMinorVersion(versionOutput.Server.Version)
+	if err != nil {
+		return fmt.Errorf("failed to extract major minor version from server version: %w", err)
+	}
+
+	majorDrift, minorDrift := checkVersionDrift(clientMajor, clientMinor, serverMajor, serverMinor)
+	if majorDrift {
+		log.Warn().Msgf("⚠️ Argo CD CLI major version (%d.%d) differs from server major version (%d.%d). This may cause compatibility issues.", clientMajor, clientMinor, serverMajor, serverMinor)
+	} else if minorDrift {
+		log.Warn().Msgf("⚠️ Argo CD CLI minor version (%d.%d) differs significantly from server minor version (%d.%d). This may cause compatibility issues.", clientMajor, clientMinor, serverMajor, serverMinor)
+	}
+
+	return nil
+}
+
+// Cleanup is a no-op for CLI mode (no resources to clean up)
+func (c *CLIOperations) Cleanup() {
+	// No-op: CLI mode doesn't have resources that need cleanup
 }

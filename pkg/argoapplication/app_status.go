@@ -6,6 +6,7 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
+	"github.com/rs/zerolog/log"
 )
 
 func isErrorCondition(condType string) bool {
@@ -21,6 +22,7 @@ func GetErrorStatusFromApplication(argocd *argocd.ArgoCDInstallation, app ArgoRe
 	}
 
 	if application.Status.ReconciledAt == nil { // not reconciled yet
+		log.Debug().Str("App", app.GetLongName()).Msg("Application is not reconciled yet")
 		return false, nil, nil
 	}
 

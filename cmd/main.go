@@ -200,8 +200,8 @@ func run(cfg *Config) error {
 		cfg.UseArgoCDApi,
 	)
 
-	// Ensure port forward is stopped when we exit (if API mode is used)
-	defer argocd.StopPortForward()
+	// Ensure cleanup is performed when we exit (e.g., stopping port forwards)
+	defer argocd.Cleanup()
 
 	var argocdInstallationDuration time.Duration
 	if cfg.CreateCluster {
