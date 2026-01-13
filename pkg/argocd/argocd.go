@@ -120,11 +120,9 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 		return time.Since(startTime), fmt.Errorf("failed to login: %w", err)
 	}
 
-	// Check Argo CD CLI version vs Argo CD Server version (only when not using API mode)
-	if !a.UseAPI() {
-		if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
-			log.Error().Err(err).Msgf("❌ Failed to detect Argo CD CLI and Server versions. Can't verify if the CLI version is compatible with the server version.")
-		}
+	// Check Argo CD version compatibility
+	if err := a.CheckArgoCDVersionCompatibility(); err != nil {
+		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the library version is compatible with the server version.")
 	}
 
 	if debug {
@@ -146,6 +144,13 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 	log.Info().Msgf("🦑 Argo CD installed successfully in %s", duration.Round(time.Second))
 
 	return duration, nil
+}
+
+func (a *ArgoCDInstallation) CheckArgoCDVersionCompatibility() error {
+	if a.UseAPI() {
+		return a.CheckArgoCDLibVersionVsServerVersion()
+	}
+	return a.CheckArgoCDCLIVersionVsServerVersion()
 }
 
 func addSourceNamespaceToDefaultAppProject(a *ArgoCDInstallation) error {
@@ -374,11 +379,9 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 
 	log.Info().Msg("🦑 Logged in to Argo CD successfully")
 
-	// Check Argo CD CLI version vs Argo CD Server version (only when not using API mode)
-	if !a.UseAPI() {
-		if err := a.CheckArgoCDCLIVersionVsServerVersion(); err != nil {
-			log.Error().Err(err).Msgf("❌ Failed to detect Argo CD CLI and Server versions. Can't verify if the CLI version is compatible with the server version.")
-		}
+	// Check Argo CD version compatibility
+	if err := a.CheckArgoCDVersionCompatibility(); err != nil {
+		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the library version is compatible with the server version.")
 	}
 
 	return time.Since(startTime), nil

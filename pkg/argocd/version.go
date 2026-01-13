@@ -1,8 +1,12 @@
 package argocd
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -13,6 +17,24 @@ var (
 	maxMajorVersionDriftAllowed = 0
 	maxMinorVersionDriftAllowed = 3
 )
+
+// getArgoCDLibVersion returns the version of the ArgoCD library from go.mod.
+// Returns "unknown" if the version cannot be determined.
+func getArgoCDLibVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+
+	for _, dep := range info.Deps {
+		// Match github.com/argoproj/argo-cd/v2 or v3, etc.
+		if strings.HasPrefix(dep.Path, "github.com/argoproj/argo-cd/") {
+			return dep.Version
+		}
+	}
+
+	return "unknown"
+}
 
 // Check Argo CD CLI version vs Argo CD Server version
 func (a *ArgoCDInstallation) CheckArgoCDCLIVersionVsServerVersion() error {
@@ -102,4 +124,87 @@ func checkVersionDrift(clientMajor, clientMinor, serverMajor, serverMinor int) (
 	majorDrift := abs(clientMajor-serverMajor) > maxMajorVersionDriftAllowed
 	minorDrift := abs(clientMinor-serverMinor) > maxMinorVersionDriftAllowed
 	return majorDrift, minorDrift
+}
+
+// CheckArgoCDLibVersionVsServerVersion compares the ArgoCD library version (from go.mod)
+// against the ArgoCD server version. This is used when running in API mode instead of CLI mode.
+func (a *ArgoCDInstallation) CheckArgoCDLibVersionVsServerVersion() error {
+	libVersion := getArgoCDLibVersion()
+	if libVersion == "unknown" {
+		return fmt.Errorf("failed to determine ArgoCD library version from build info")
+	}
+
+	serverVersion, err := a.getServerVersion()
+	if err != nil {
+		return fmt.Errorf("failed to get server version: %w", err)
+	}
+
+	log.Error().Msgf("Argo CD Version: [Lib: '%s', Server: '%s']", libVersion, serverVersion)
+
+	libMajor, libMinor, err := extractMajorMinorVersion(libVersion)
+	if err != nil {
+		return fmt.Errorf("failed to extract major minor version from lib version: %w", err)
+	}
+	serverMajor, serverMinor, err := extractMajorMinorVersion(serverVersion)
+	if err != nil {
+		return fmt.Errorf("failed to extract major minor version from server version: %w", err)
+	}
+
+	majorDrift, minorDrift := checkVersionDrift(libMajor, libMinor, serverMajor, serverMinor)
+	if majorDrift {
+		log.Warn().Msgf("⚠️ Argo CD library major version (%d.%d) differs from server major version (%d.%d). This may cause compatibility issues.", libMajor, libMinor, serverMajor, serverMinor)
+	} else if minorDrift {
+		log.Warn().Msgf("⚠️ Argo CD library minor version (%d.%d) differs significantly from server minor version (%d.%d). This may cause compatibility issues.", libMajor, libMinor, serverMajor, serverMinor)
+	}
+
+	return nil
+}
+
+// getServerVersion fetches the ArgoCD server version via the API
+func (a *ArgoCDInstallation) getServerVersion() (string, error) {
+	// Ensure port forward is active
+	if err := a.portForwardToArgoCD(); err != nil {
+		return "", fmt.Errorf("failed to set up port forward: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/version", a.ArgoCDApiConnection.apiServerURL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to make request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var versionResponse struct {
+		Version string `json:"Version"`
+	}
+
+	if err := json.Unmarshal(body, &versionResponse); err != nil {
+		return "", fmt.Errorf("failed to parse version response: %w", err)
+	}
+
+	return versionResponse.Version, nil
 }
