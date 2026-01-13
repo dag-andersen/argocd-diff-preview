@@ -98,7 +98,7 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 
 	// Check Argo CD version compatibility
 	if err := a.operations.CheckVersionCompatibility(); err != nil {
-		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the library version is compatible with the server version.")
+		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the client version is compatible with the server version.")
 	}
 
 	if debug {
@@ -336,7 +336,7 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 
 	// Check Argo CD version compatibility
 	if err := a.operations.CheckVersionCompatibility(); err != nil {
-		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the library version is compatible with the server version.")
+		log.Error().Err(err).Msgf("❌ Failed to detect Argo CD version compatibility. Can't verify if the client version is compatible with the server version.")
 	}
 
 	return time.Since(startTime), nil

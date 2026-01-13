@@ -169,26 +169,6 @@ func (c *K8sClient) SetArgoCDAppRefreshAnnotation(namespace string, name string)
 	return nil
 }
 
-// IsApplicationMarkedForRefresh checks if an ArgoCD application has the refresh annotation set
-func (c *K8sClient) IsApplicationMarkedForRefresh(namespace string, name string) (bool, error) {
-	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-
-	// Get the current application
-	app, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return false, fmt.Errorf("failed to get application %s: %w", name, err)
-	}
-
-	// Check if the refresh annotation exists
-	annotations := app.GetAnnotations()
-	if annotations == nil {
-		return false, nil
-	}
-
-	_, exists := annotations["argocd.argoproj.io/refresh"]
-	return exists, nil
-}
-
 // DeleteArgoCDApplication deletes a single ArgoCD application by name
 func (c *K8sClient) DeleteArgoCDApplication(namespace string, name string) error {
 	if strings.TrimSpace(name) == "" {
