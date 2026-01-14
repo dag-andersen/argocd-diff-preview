@@ -242,11 +242,11 @@ func getResourcesFromApp(
 
 		// If we got no error, check if we can get the error status from the application itself
 		if err == nil {
-			log.Debug().Str("App", app.GetLongName()).Msgf("Application is empty. Reconsiled: %v, Argo CD Error: %v, Internal Error: %v", reconsiled, argoErrMessage, internalError)
+			log.Debug().Str("App", app.GetLongName()).Msg("Application seems to be empty. Will check for other errors.")
 			// Otherise, the application might be empty, check the application status and update.
 			if argoErrMessage != nil {
-				if argocd.UseAPI() && isExpectedError(argoErrMessage.Error()) {
-					log.Debug().Str("App", app.GetLongName()).Err(argoErrMessage).Msgf("Expected error because Argo CD is running with '--use-argocd-api=true' and Argo CD may be running with 'createClusterRoles: false'")
+				if isExpected, reason := argocd.IsExpectedError(argoErrMessage.Error()); isExpected {
+					log.Debug().Str("App", app.GetLongName()).Err(argoErrMessage).Msgf("Expected error: %s", reason)
 				} else {
 					err = argoErrMessage
 				}
@@ -259,6 +259,7 @@ func getResourcesFromApp(
 
 		// If still got no error anywhere, return the extracted app. We assume the application was just empty.
 		if err == nil {
+			log.Warn().Str("App", app.GetLongName()).Msg("⚠️ No manifests found for application")
 			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
 		}

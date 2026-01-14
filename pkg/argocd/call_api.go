@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -651,4 +652,31 @@ func (a *APIOperations) stopPortForward() {
 		connection.portForwardActive = false
 		connection.portForwardStopChan = nil
 	}
+}
+
+// expectedErrorPattern pairs a regex pattern with a human-readable reason
+type expectedErrorPattern struct {
+	pattern *regexp.Regexp
+	reason  string
+}
+
+// expectedErrorPatterns contains regex patterns for errors that are expected
+// when running with 'createClusterRoles: false' in API mode.
+var expectedErrorPatterns = []expectedErrorPattern{
+	{
+		pattern: regexp.MustCompile(`.*Failed to load live state: failed to get cluster info for .*?: error synchronizing cache state : failed to sync cluster .*?: failed to load initial state of resource.*`),
+		reason:  "Argo CD is probably running with 'createClusterRoles: false' and cannot access cluster-level resources",
+	},
+}
+
+// IsExpectedError checks if an error message matches expected error patterns.
+// In API mode, certain errors are expected when running with 'createClusterRoles: false'.
+// Returns: (isExpected, reason)
+func (a *APIOperations) IsExpectedError(errorMessage string) (bool, string) {
+	for _, ep := range expectedErrorPatterns {
+		if ep.pattern.MatchString(errorMessage) {
+			return true, ep.reason
+		}
+	}
+	return false, ""
 }

@@ -399,3 +399,11 @@ func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
 func (a *ArgoCDInstallation) Cleanup() {
 	a.operations.Cleanup()
 }
+
+// IsExpectedError checks if an error message is expected for the current mode.
+// In API mode, certain errors are expected when running with 'createClusterRoles: false'.
+// In CLI mode, this always returns false.
+// Returns: (isExpected, reason)
+func (a *ArgoCDInstallation) IsExpectedError(errorMessage string) (bool, string) {
+	return a.operations.IsExpectedError(errorMessage)
+}

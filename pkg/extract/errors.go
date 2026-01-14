@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -76,27 +75,4 @@ var timeoutMessages = []string{
 	"=git-upload-pack",
 	"DeadlineExceeded",
 	string(errorApplicationNotFound),
-}
-
-// Expected errors when running with 'createClusterRoles: false'
-var expectedErrorPatterns = []string{
-	`.*Failed to load live state: failed to get cluster info for .*?: error synchronizing cache state : failed to sync cluster .*?: failed to load initial state of resource.*`,
-	// `.*Failed to load live state: namespace ".*" for .* ".*" is not managed`,
-}
-var compiledExpectedErrors []*regexp.Regexp
-
-func init() {
-	compiledExpectedErrors = make([]*regexp.Regexp, len(expectedErrorPatterns))
-	for i, pattern := range expectedErrorPatterns {
-		compiledExpectedErrors[i] = regexp.MustCompile(pattern)
-	}
-}
-
-func isExpectedError(errorMessage string) bool {
-	for _, regex := range compiledExpectedErrors {
-		if regex.MatchString(errorMessage) {
-			return true
-		}
-	}
-	return false
 }

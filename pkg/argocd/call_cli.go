@@ -178,3 +178,9 @@ func (c *CLIOperations) CheckVersionCompatibility() error {
 func (c *CLIOperations) Cleanup() {
 	// No-op: CLI mode doesn't have resources that need cleanup
 }
+
+// IsExpectedError always returns false for CLI mode.
+// Expected errors only occur in API mode when running with 'createClusterRoles: false'.
+func (c *CLIOperations) IsExpectedError(errorMessage string) (bool, string) {
+	return false, ""
+}

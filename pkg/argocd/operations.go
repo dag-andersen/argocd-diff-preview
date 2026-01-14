@@ -37,6 +37,12 @@ type Operations interface {
 
 	// Cleanup performs any necessary cleanup (e.g., stopping port forwards)
 	Cleanup()
+
+	// IsExpectedError checks if an error message is expected for this mode.
+	// In API mode, certain errors are expected when running with 'createClusterRoles: false'.
+	// In CLI mode, this always returns false.
+	// Returns: (isExpected, reason)
+	IsExpectedError(errorMessage string) (bool, string)
 }
 
 // apiConnection holds the state for API mode connections
