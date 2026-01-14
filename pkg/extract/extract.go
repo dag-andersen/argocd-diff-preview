@@ -215,7 +215,7 @@ func getResourcesFromApp(
 	for {
 		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application %s", app.GetLongName())
+			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s'", app.GetLongName())
 		}
 
 		reconsiled, isMarkedForRefresh, argoErrMessage, internalError, err := argoapplication.GetApplicationStatus(argocd, app)
@@ -282,7 +282,7 @@ func getResourcesFromApp(
 
 		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application %s", app.GetLongName())
+			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s'", app.GetLongName())
 		}
 
 		// Sleep before next iteration

@@ -1,6 +1,7 @@
 package argocd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,12 +20,18 @@ type CLIOperations struct {
 	loginOptions string
 }
 
-// runArgocdCommand executes an argocd CLI command with port forwarding
+// runArgocdCommand executes an argocd CLI command with port forwarding and a 60-second timeout
 func (c *CLIOperations) runArgocdCommand(args ...string) (string, error) {
-	cmd := exec.Command("argocd", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "argocd", args...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", c.namespace))
 	output, err := cmd.Output()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("argocd command timed out after 60 seconds: %w", err)
+		}
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if errorMessage := strings.TrimSpace(string(exitErr.Stderr)); errorMessage != "" {
 				return "", fmt.Errorf("argocd command failed with error: %s: %w", errorMessage, err)

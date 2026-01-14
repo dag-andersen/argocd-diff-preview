@@ -40,7 +40,7 @@ func GetApplicationStatus(argocd *argocd.ArgoCDInstallation, app ArgoResource) (
 			}
 		}
 	default:
-		internalError = fmt.Errorf("application '%s' sync status is not set", app.GetLongName())
+		internalError = fmt.Errorf("sync status is not set")
 	}
 
 	return reconciled, isMarkedForRefresh, argoErrMessage, internalError, nil
