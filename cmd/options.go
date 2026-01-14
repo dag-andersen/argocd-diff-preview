@@ -400,6 +400,13 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		}
 	}
 
+	// Check if argocd CLI is installed when not using API mode
+	if !cfg.UseArgoCDApi && !cfg.DryRun {
+		if _, err := exec.LookPath("argocd"); err != nil {
+			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--use-argocd-api=true' to use the API instead")
+		}
+	}
+
 	return cfg, nil
 }
 
