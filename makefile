@@ -93,14 +93,14 @@ run-integration-tests-go: go-build
 
 # Run before release	
 check-release: run-lint run-unit-tests
-	$(MAKE) run-integration-tests-go use_argocd_api=true
+	$(MAKE) run-integration-tests-go use_argocd_api=false
 	$(MAKE) run-integration-tests-docker use_argocd_api=true
 
 # Loop the above commands until one fails
 check-release-repeat:
 	@i=1; while true; do \
 		echo "⭐⭐⭐⭐⭐ Iteration $$i ⭐⭐⭐⭐⭐"; \
-		$(MAKE) run-integration-tests-go use_argocd_api=true || exit 1; \
+		$(MAKE) run-integration-tests-go use_argocd_api=false || exit 1; \
 		$(MAKE) run-integration-tests-docker use_argocd_api=true || exit 1; \
 		i=$$((i + 1)); \
 	done
