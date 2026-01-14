@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
@@ -115,39 +116,57 @@ func (c *K8sClient) CheckIfResourceExists(gvr schema.GroupVersionResource, names
 	return true, nil
 }
 
-func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
-	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-
-	result, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	// convert result to string
-	resultString, err := json.Marshal(result)
-	if err != nil {
-		return "", err
-	}
-
-	return string(resultString), nil
-}
-
 // GetArgoCDApplication gets a single ArgoCD application by name
-func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (string, error) {
+func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (*v1alpha1.Application, error) {
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
 	result, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// convert result to string
-	resultString, err := json.Marshal(result)
+	// Convert unstructured to typed Application
+	var app v1alpha1.Application
+	resultJSON, err := json.Marshal(result.Object)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to marshal unstructured object: %w", err)
 	}
 
-	return string(resultString), nil
+	if err := json.Unmarshal(resultJSON, &app); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal to Application: %w", err)
+	}
+
+	return &app, nil
+}
+
+// SetArgoCDAppRefreshAnnotation sets the refresh annotation on an ArgoCD application to trigger a refresh
+func (c *K8sClient) SetArgoCDAppRefreshAnnotation(namespace string, name string) error {
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+
+	// Get the current application
+	app, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get application %s: %w", name, err)
+	}
+
+	// Get current annotations or create new map
+	annotations := app.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	// Set the refresh annotation
+	annotations["argocd.argoproj.io/refresh"] = "normal"
+	app.SetAnnotations(annotations)
+
+	// Update the application
+	_, err = c.clientSet.Resource(applicationRes).Namespace(namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update application %s with refresh annotation: %w", name, err)
+	}
+
+	log.Debug().Msgf("Set refresh annotation on application %s", name)
+	return nil
 }
 
 // DeleteArgoCDApplication deletes a single ArgoCD application by name

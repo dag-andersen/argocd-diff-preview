@@ -1,6 +1,9 @@
 # Override this file with values
 createClusterRoles: false
+applicationSet:
+  replicas: 0
 controller:
+  # replicas: 0
   readinessProbe:
     initialDelaySeconds: 0
     periodSeconds: 1

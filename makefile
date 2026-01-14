@@ -3,10 +3,12 @@ github_org ?= dag-andersen
 base_branch := main
 docker_file := Dockerfile
 argocd_namespace := argocd-diff-preview
-timeout := 120
+timeout := 60
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+use_argocd_api ?= false
+
 GO_TEST_FLAGS ?=
 
 # Detect Docker API version if client is too new for server
@@ -38,7 +40,8 @@ run-with-go: go-build pull-repository
 		--argocd-namespace="$(argocd_namespace)" \
 		--files-changed="$(files_changed)" \
 		--line-count="$(line_count)" \
-		--redirect-target-revisions="HEAD"
+		--redirect-target-revisions="HEAD" \
+		--use-argocd-api="$(use_argocd_api)"
 
 run-with-docker: pull-repository docker-build
 	docker run \
@@ -63,7 +66,8 @@ run-with-docker: pull-repository docker-build
 		-e LINE_COUNT="$(line_count)" \
 		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		image \
-		--argocd-namespace="$(argocd_namespace)"
+		--argocd-namespace="$(argocd_namespace)" \
+		--use-argocd-api="$(use_argocd_api)"
 
 mkdocs:
 	python3 -m venv venv \
@@ -87,7 +91,16 @@ run-integration-tests-docker:
 run-integration-tests-go: go-build
 	cd tests && $(MAKE) run-test-all-go
 
-# Run before release
+# Run before release	
 check-release: run-lint run-unit-tests
-	$(MAKE) run-integration-tests-go use_argocd_api=false
+	$(MAKE) run-integration-tests-go use_argocd_api=true
 	$(MAKE) run-integration-tests-docker use_argocd_api=true
+
+# Loop the above commands until one fails
+check-release-repeat:
+	@i=1; while true; do \
+		echo "⭐⭐⭐⭐⭐ Iteration $$i ⭐⭐⭐⭐⭐"; \
+		$(MAKE) run-integration-tests-go use_argocd_api=true || exit 1; \
+		$(MAKE) run-integration-tests-docker use_argocd_api=true || exit 1; \
+		i=$$((i + 1)); \
+	done

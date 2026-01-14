@@ -200,6 +200,9 @@ func run(cfg *Config) error {
 		cfg.UseArgoCDApi,
 	)
 
+	// Ensure cleanup is performed when we exit (e.g., stopping port forwards)
+	defer argocd.Cleanup()
+
 	var argocdInstallationDuration time.Duration
 	if cfg.CreateCluster {
 		// Install Argo CD

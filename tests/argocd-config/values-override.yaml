@@ -4,9 +4,11 @@ notifications:
   enabled: false
 dex:
   enabled: false
-configs:
-  params:
-    reposerver.git.request.timeout: "150s"
+applicationSet:
+  replicas: 0
+# configs:
+#   params:
+#     reposerver.git.request.timeout: "20s"
 # Readiness probe settings have been adjusted to start checks immediately (initialDelaySeconds: 0)
 # The failureThreshold is increased to ensure the total time before a pod is marked unhealthy remains similar to the default
 # This default duration is calculated using the original values from values.yaml for (initialDelaySeconds + failureThreshold * periodSeconds)
@@ -25,13 +27,6 @@ server:
     timeoutSeconds: 1
     failureThreshold: 40
 repoServer:
-  readinessProbe:
-    initialDelaySeconds: 0
-    periodSeconds: 1
-    successThreshold: 1
-    timeoutSeconds: 1
-    failureThreshold: 40
-applicationSet:
   readinessProbe:
     initialDelaySeconds: 0
     periodSeconds: 1
