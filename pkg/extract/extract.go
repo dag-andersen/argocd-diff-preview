@@ -2,6 +2,7 @@ package extract
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -212,23 +213,27 @@ func getResourcesFromApp(
 
 	startTime := time.Now()
 
+	triedRefreshing := false
+
+	loopCount := -1 // -1 means we haven't started the loop yet
 	for {
+		loopCount++
+
 		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
 			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s'", app.GetLongName())
 		}
 
-		reconsiled, isMarkedForRefresh, argoErrMessage, internalError, err := argoapplication.GetApplicationStatus(argocd, app)
+		reconciled, isMarkedForRefresh, argoErrMessage, internalError, err := argoapplication.GetApplicationStatus(argocd, app)
+		log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msgf("Application status: [reconciled: %v], [Marked for refresh: %v], [Argo CD Error: %v], [Internal Error: %v], [err: %v]", reconciled, isMarkedForRefresh, argoErrMessage, internalError, err != nil)
 		if err != nil {
 			return ExtractedApp{}, k8sName, err
 		}
 
-		log.Debug().Str("App", app.GetLongName()).Msgf("Application status: [Reconsiled: %v], [Marked for refresh: %v], [Argo CD Error: %v], [Internal Error: %v]", reconsiled, isMarkedForRefresh, argoErrMessage, internalError)
-
 		// If Application is still marked for refresh, then we need to wait for it to be refreshed
 		if isMarkedForRefresh {
-			log.Debug().Str("App", app.GetLongName()).Msg("Waiting for Application to be refreshed")
-			time.Sleep(2 * time.Second)
+			log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msg("Waiting for Application to be refreshed")
+			time.Sleep(time.Second)
 			continue
 		}
 
@@ -236,35 +241,49 @@ func getResourcesFromApp(
 
 		// If we got manifests with no error, return the extracted app.Ignore all errors
 		if err == nil && len(manifestsContent) > 0 {
+			log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msgf("Successfully extracted %d manifests from application", len(manifestsContent))
 			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
 		}
 
-		// If we got no error, check if we can get the error status from the application itself
+		// If we got no error and no manifests, check if we can get the error status from the application itself
 		if err == nil {
-			log.Debug().Str("App", app.GetLongName()).Msg("Application seems to be empty. Will check for other errors.")
-			// Otherise, the application might be empty, check the application status and update.
+			// Otherwise, the application might be empty, check the application status and update.
 			if argoErrMessage != nil {
 				if isExpected, reason := argocd.IsExpectedError(argoErrMessage.Error()); isExpected {
-					log.Debug().Str("App", app.GetLongName()).Err(argoErrMessage).Msgf("Expected error: %s", reason)
+					log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Err(argoErrMessage).Msgf("Expected error: %s", reason)
 				} else {
 					err = argoErrMessage
 				}
 			} else if internalError != nil {
 				err = internalError
-			} else if !reconsiled {
+			} else if !reconciled {
 				err = fmt.Errorf("application is not reconciled")
 			}
 		}
 
-		// If still got no error anywhere, return the extracted app. We assume the application was just empty.
+		// If still got no error anywhere, lets try to refresh the application and try to extract the manifests again.
+		// Only refresh if we haven't tried refreshing yet.
+		if err == nil && !triedRefreshing {
+			log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msg("Application seems to be empty and with no error. Will try to refresh it just to be sure.")
+			if err := argocd.RefreshApp(app.Id); err != nil {
+				log.Debug().Err(err).Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msg("Failed to refresh application")
+			} else {
+				log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msg("Requested refresh of application because it was empty and with no error")
+				triedRefreshing = true
+				time.Sleep(time.Second)
+				continue
+			}
+		}
+
+		// If still got no error anywhere and already tried refreshing, return the extracted app. We assume the application was just empty.
 		if err == nil {
 			log.Warn().Str("App", app.GetLongName()).Msg("⚠️ No manifests found for application")
 			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
 		}
 
-		log.Debug().Err(err).Str("App", app.GetLongName()).Msg("Failed to get manifests from application")
+		log.Debug().Str("loop", strconv.Itoa(loopCount)).Err(err).Str("App", app.GetLongName()).Msg("Failed to get manifests from application")
 
 		// Check if the error is a known error
 		errMsg := err.Error()
@@ -277,6 +296,7 @@ func getResourcesFromApp(
 				log.Error().Err(err).Str("App", app.GetLongName()).Msg("⚠️ Failed to refresh application")
 			} else {
 				log.Info().Str("App", app.GetLongName()).Msg("🔄 Requested refresh of application")
+				triedRefreshing = true
 			}
 		}
 

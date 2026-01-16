@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,13 +15,7 @@ func addApplicationPrefix(a *argoapplication.ArgoResource, prefix string) error 
 		return nil
 	}
 
-	var branchShortName string
-	switch a.Branch {
-	case git.Base:
-		branchShortName = "b"
-	case git.Target:
-		branchShortName = "t"
-	}
+	branchShortName := a.Branch.ShortName()
 
 	maxKubernetesNameLength := 53
 

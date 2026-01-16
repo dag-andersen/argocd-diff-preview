@@ -165,7 +165,6 @@ func (c *K8sClient) SetArgoCDAppRefreshAnnotation(namespace string, name string)
 		return fmt.Errorf("failed to update application %s with refresh annotation: %w", name, err)
 	}
 
-	log.Debug().Msgf("Set refresh annotation on application %s", name)
 	return nil
 }
 

@@ -112,7 +112,7 @@ func (c *CLIOperations) GetManifests(appName string) (string, bool, error) {
 	}
 
 	if strings.TrimSpace(out) == "" {
-		log.Debug().Msgf("No manifests found with `argocd app manifests %s`", appName)
+		log.Debug().Msgf("No manifests found with `argocd app manifests '%s'`", appName)
 		return "", true, nil
 	}
 
