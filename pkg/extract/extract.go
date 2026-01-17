@@ -8,14 +8,27 @@ import (
 	"time"
 
 	"github.com/argoproj/argo-cd/v3/common"
+	"github.com/argoproj/argo-cd/v3/controller"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	argocdPkg "github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
+
+// resourceInfoProvider implements kubeutil.ResourceInfoProvider interface
+// to provide namespace scope information for Kubernetes resources
+type resourceInfoProvider struct {
+	namespacedByGk map[schema.GroupKind]bool
+}
+
+// IsNamespaced returns true if the given GroupKind is namespaced
+func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
+	return p.namespacedByGk[gk], nil
+}
 
 // const worker count
 const maxWorkers = 40
@@ -65,13 +78,12 @@ func getResourcesFromApps(
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	startTime := time.Now()
 
-	var namespacedScopedResources map[string]bool
-	if argocd.UseAPI() {
-		nsr, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
-		}
-		namespacedScopedResources = nsr
+	// Get list of namespaced resources for namespace normalization
+	// This is needed because `argocd app manifests --revision` returns raw manifests
+	// without namespace normalization that the controller cache would normally provide
+	namespacedScopedResources, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
 	}
 
 	log.Info().Msgf("🤖 Rendering Applications (timeout in %d seconds)", timeout)
@@ -187,7 +199,7 @@ func getResourcesFromApp(
 	app argoapplication.ArgoResource,
 	timeout uint64,
 	prefix string,
-	namespacedScopedResources map[string]bool,
+	namespacedScopedResources map[schema.GroupKind]bool,
 ) (ExtractedApp, string, error) {
 
 	// Store ID (kubernetes resource name) before we add a prefix and hash
@@ -311,7 +323,7 @@ func getResourcesFromApp(
 	}
 }
 
-func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, namespacedScopedResources map[string]bool) ([]unstructured.Unstructured, error) {
+func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, namespacedScopedResources map[schema.GroupKind]bool) ([]unstructured.Unstructured, error) {
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
 	extractionTimer := time.Now()
@@ -351,23 +363,11 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		return nil, fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
 	}
 
-	if argocd.UseAPI() {
-		// set the namespace if not set
-		for _, manifest := range manifestsContent {
-			if manifest.GetNamespace() == "" {
-				// namespace specified in ArgoCD application - spec.destination.namespace
-				namespace, found, err := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
-				if err != nil {
-					return nil, fmt.Errorf("failed to get namespace from application: %w", err)
-				}
-				if found {
-					key := fmt.Sprintf("%s/%s", manifest.GetKind(), manifest.GetAPIVersion())
-					if namespaced, found := namespacedScopedResources[key]; found && namespaced {
-						manifest.SetNamespace(namespace)
-					}
-				}
-			}
-		}
+	// Normalize namespaces and deduplicate resources (same logic as Argo CD controller)
+	destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
+	manifestsContent, err = normalizeNamespaces(manifestsContent, destNamespace, namespacedScopedResources, app.GetLongName())
+	if err != nil {
+		return nil, err
 	}
 
 	// remove Helm hooks resources
@@ -381,6 +381,46 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 
 	// Parse the first non-empty manifest from the string
 	return manifestsContent, nil
+}
+
+// normalizeNamespaces uses Argo CD's DeduplicateTargetObjects to normalize namespaces on manifests.
+// This adds the destination namespace to namespaced resources that don't have one,
+// clears namespace from cluster-scoped resources, and deduplicates resources with the same key.
+// This matches the behavior of Argo CD's controller when processing target objects.
+func normalizeNamespaces(
+	manifests []unstructured.Unstructured,
+	destNamespace string,
+	namespacedResources map[schema.GroupKind]bool,
+	appName string,
+) ([]unstructured.Unstructured, error) {
+	if destNamespace == "" {
+		return manifests, nil
+	}
+
+	// Convert to pointer slice for DeduplicateTargetObjects
+	ptrManifests := make([]*unstructured.Unstructured, len(manifests))
+	for i := range manifests {
+		ptrManifests[i] = &manifests[i]
+	}
+
+	provider := &resourceInfoProvider{namespacedByGk: namespacedResources}
+	deduplicatedManifests, conditions, err := controller.DeduplicateTargetObjects(destNamespace, ptrManifests, provider)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize namespaces: %w", err)
+	}
+
+	// Log any duplicate resource warnings
+	for _, cond := range conditions {
+		log.Warn().Str("App", appName).Msgf("Duplicate resource warning: %s", cond.Message)
+	}
+
+	// Convert back to value slice
+	result := make([]unstructured.Unstructured, len(deduplicatedManifests))
+	for i, ptr := range deduplicatedManifests {
+		result[i] = *ptr
+	}
+
+	return result, nil
 }
 
 func verifyNoDuplicateAppIds(apps []argoapplication.ArgoResource) error {

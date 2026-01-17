@@ -568,9 +568,10 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 }
 
 // GetListOfNamespacedScopedResources returns metadata about all namespaced resource types
-// Returns a map where the key is "kind/apiVersion" and the value is always true (indicating the resource is namespaced)
-func (c *K8sClient) GetListOfNamespacedScopedResources() (map[string]bool, error) {
-	namespacedScopedResources := make(map[string]bool)
+// Returns a map where the key is schema.GroupKind and the value is true (indicating the resource is namespaced)
+// This format matches the interface expected by Argo CD's kubeutil.ResourceInfoProvider
+func (c *K8sClient) GetListOfNamespacedScopedResources() (map[schema.GroupKind]bool, error) {
+	namespacedScopedResources := make(map[schema.GroupKind]bool)
 
 	// Get all API resources from the cluster
 	_, apiResourceLists, err := c.discoveryClient.ServerGroupsAndResources()
@@ -580,6 +581,13 @@ func (c *K8sClient) GetListOfNamespacedScopedResources() (map[string]bool, error
 
 	// Iterate through all resource groups and versions
 	for _, apiResourceList := range apiResourceLists {
+		// Parse GroupVersion to extract the group
+		gv, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Failed to parse GroupVersion: %s", apiResourceList.GroupVersion)
+			continue
+		}
+
 		// Check each resource in the API group
 		for _, apiResource := range apiResourceList.APIResources {
 			// Skip if this is a cluster-scoped resource (not namespaced)
@@ -592,11 +600,14 @@ func (c *K8sClient) GetListOfNamespacedScopedResources() (map[string]bool, error
 				continue
 			}
 
-			// Create key as "Kind/apiVersion"
-			key := fmt.Sprintf("%s/%s", apiResource.Kind, apiResourceList.GroupVersion)
+			// Create key as schema.GroupKind
+			gk := schema.GroupKind{
+				Group: gv.Group,
+				Kind:  apiResource.Kind,
+			}
 
 			// Store with value true (indicating this resource is namespaced)
-			namespacedScopedResources[key] = true
+			namespacedScopedResources[gk] = true
 		}
 	}
 
