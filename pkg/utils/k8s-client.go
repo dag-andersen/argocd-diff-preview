@@ -156,7 +156,7 @@ func (c *K8sClient) SetArgoCDAppRefreshAnnotation(namespace string, name string)
 	}
 
 	// Set the refresh annotation
-	annotations["argocd.argoproj.io/refresh"] = "normal"
+	annotations[v1alpha1.AnnotationKeyRefresh] = "normal"
 	app.SetAnnotations(annotations)
 
 	// Update the application

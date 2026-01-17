@@ -25,7 +25,7 @@ func GetApplicationStatus(argocd *argocd.ArgoCDInstallation, app ArgoResource) (
 	// Check if the refresh annotation exists
 	annotations := application.GetAnnotations()
 	if annotations != nil {
-		_, exists := annotations["argocd.argoproj.io/refresh"]
+		_, exists := annotations[v1alpha1.AnnotationKeyRefresh]
 		isMarkedForRefresh = exists
 	}
 

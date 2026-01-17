@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/rs/zerolog/log"
@@ -14,9 +15,8 @@ import (
 )
 
 const (
-	annotationWatchPattern                = "argocd-diff-preview/watch-pattern"
-	annotationIgnore                      = "argocd-diff-preview/ignore"
-	annotationArgoCDManifestGeneratePaths = "argocd.argoproj.io/manifest-generate-paths"
+	annotationWatchPattern = "argocd-diff-preview/watch-pattern"
+	annotationIgnore       = "argocd-diff-preview/ignore"
 )
 
 type ApplicationSelectionOptions struct {
@@ -175,7 +175,7 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 	}
 
 	watchPattern, watchPatternExists := annotations[annotationWatchPattern]
-	manifestGeneratePaths, manifestGeneratePathsExists := annotations[annotationArgoCDManifestGeneratePaths]
+	manifestGeneratePaths, manifestGeneratePathsExists := annotations[v1alpha1.AnnotationKeyManifestGeneratePaths]
 
 	// Check if we effectively have no watch patterns (either no annotation or empty/whitespace-only values)
 	effectiveWatchPattern := strings.TrimSpace(watchPattern)
@@ -236,7 +236,7 @@ func (a *ArgoResource) filterByManifestGeneratePaths(manifestGeneratePaths strin
 	paths := strings.Split(manifestGeneratePaths, ";")
 
 	if len(paths) == 0 {
-		return false, fmt.Sprintf("no '%s' annotation found", annotationArgoCDManifestGeneratePaths)
+		return false, fmt.Sprintf("no '%s' annotation found", v1alpha1.AnnotationKeyManifestGeneratePaths)
 	}
 
 	var refreshPaths []string

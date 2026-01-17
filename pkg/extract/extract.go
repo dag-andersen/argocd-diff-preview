@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/argoproj/argo-cd/v3/common"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -412,7 +413,7 @@ func removeArgoCDTrackingID(a []unstructured.Unstructured) error {
 		}
 
 		for key := range annotations {
-			if key == "argocd.argoproj.io/tracking-id" {
+			if key == common.AnnotationKeyAppInstance {
 				delete(annotations, key)
 			}
 		}
