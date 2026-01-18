@@ -276,6 +276,14 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 
+	// Clean up cluster after all tests complete
+	t.Cleanup(func() {
+		t.Log("Cleaning up: deleting kind cluster...")
+		if err := deleteKindCluster(); err != nil {
+			t.Logf("Warning: failed to delete kind cluster: %v", err)
+		}
+	})
+
 	// Create a copy of testCases to shuffle
 	shuffledCases := make([]TestCase, len(testCases))
 	copy(shuffledCases, testCases)
@@ -296,6 +304,14 @@ func TestIntegration(t *testing.T) {
 			runTestCase(t, tc, createCluster)
 		})
 	}
+}
+
+// deleteKindCluster deletes the kind cluster used for testing
+func deleteKindCluster() error {
+	cmd := exec.Command("kind", "delete", "cluster", "--name", "argocd-diff-preview")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // runTestCase executes a single test case
@@ -774,17 +790,25 @@ func showDiff(t *testing.T, filename, expected, actual string) {
 
 // TestSingleCase allows running a single test case by name
 // Usage: TEST_CASE="branch-1/target-1" go test -run TestSingleCase ./...
-// Note: Assumes cluster already exists (createCluster=false)
+// Creates a new cluster by default, deletes it after the test
 func TestSingleCase(t *testing.T) {
 	caseName := os.Getenv("TEST_CASE")
 	if caseName == "" {
 		t.Skip("TEST_CASE environment variable not set")
 	}
 
+	// Clean up cluster after test completes
+	t.Cleanup(func() {
+		t.Log("Cleaning up: deleting kind cluster...")
+		if err := deleteKindCluster(); err != nil {
+			t.Logf("Warning: failed to delete kind cluster: %v", err)
+		}
+	})
+
 	for _, tc := range testCases {
 		if tc.Name == caseName {
-			// When running a single test, assume cluster already exists
-			runTestCase(t, tc, false)
+			// When running a single test, create a new cluster
+			runTestCase(t, tc, true)
 			return
 		}
 	}
