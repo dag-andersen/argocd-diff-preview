@@ -336,7 +336,7 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 
 		if attempt < maxAttempts {
 			log.Debug().Msgf("Waiting 1s before next appset generate attempt (%d/%d)...", attempt+1, maxAttempts)
-			log.Warn().Err(err).Msgf("Appset generate attempt %d/%d failed.", attempt, maxAttempts)
+			log.Warn().Err(err).Msgf("⚠️ Appset generate attempt %d/%d failed.", attempt, maxAttempts)
 			time.Sleep(1 * time.Second)
 		}
 	}
