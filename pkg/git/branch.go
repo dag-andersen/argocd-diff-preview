@@ -19,6 +19,16 @@ const (
 	Target BranchType = "target"
 )
 
+func (b BranchType) ShortName() string {
+	switch b {
+	case Base:
+		return "b"
+	case Target:
+		return "t"
+	}
+	return "?"
+}
+
 // NewBranch creates a new Branch instance
 func NewBranch(name string, branchType BranchType) *Branch {
 	return &Branch{

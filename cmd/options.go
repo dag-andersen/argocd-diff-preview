@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -51,6 +52,7 @@ var (
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
+	DefaultUseArgoCDApi               = false
 	DefaultKeepClusterAlive           = false
 	DefaultDryRun                     = false
 	DefaultAutoDetectFilesChanged     = false
@@ -94,6 +96,7 @@ type RawOptions struct {
 	ArgocdChartRepoUsername    string `mapstructure:"argocd-chart-repo-username"`
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
 	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
+	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -134,6 +137,7 @@ type Config struct {
 	LogFormat                  string
 	Title                      string
 	HideDeletedAppDiff         bool
+	UseArgoCDApi               bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -217,6 +221,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-chart-repo-username", DefaultArgocdChartRepoUsername)
 	viper.SetDefault("argocd-chart-repo-password", DefaultArgocdChartRepoPassword)
 	viper.SetDefault("argocd-login-options", DefaultArgocdLoginOptions)
+	viper.SetDefault("use-argocd-api", DefaultUseArgoCDApi)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -254,6 +259,7 @@ func Parse() *Config {
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
+	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
@@ -349,6 +355,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		LogFormat:                  o.LogFormat,
 		Title:                      o.Title,
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
+		UseArgoCDApi:               o.UseArgoCDApi,
 	}
 
 	var err error
@@ -390,6 +397,13 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		cfg.ClusterProvider, err = o.parseClusterType()
 		if err != nil {
 			return nil, fmt.Errorf("invalid cluster configuration: %w", err)
+		}
+	}
+
+	// Check if argocd CLI is installed when not using API mode
+	if !cfg.UseArgoCDApi && !cfg.DryRun {
+		if _, err := exec.LookPath("argocd"); err != nil {
+			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--use-argocd-api=true' to use the API instead")
 		}
 	}
 
@@ -521,6 +535,9 @@ func (o *Config) LogConfig() {
 			if o.ClusterProvider.GetName() == "k3d" && o.K3dOptions != "" {
 				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
+		}
+		if o.UseArgoCDApi {
+			log.Info().Msgf("✨ - use-argocd-api: %t", o.UseArgoCDApi)
 		}
 	}
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 )
 
@@ -16,13 +15,7 @@ func addApplicationPrefix(a *argoapplication.ArgoResource, prefix string) error 
 		return nil
 	}
 
-	var branchShortName string
-	switch a.Branch {
-	case git.Base:
-		branchShortName = "b"
-	case git.Target:
-		branchShortName = "t"
-	}
+	branchShortName := a.Branch.ShortName()
 
 	maxKubernetesNameLength := 53
 
@@ -42,15 +35,4 @@ func addApplicationPrefix(a *argoapplication.ArgoResource, prefix string) error 
 	a.Yaml.SetName(newId)
 
 	return nil
-}
-
-// removeApplicationPrefix removes the prefix from the application name
-// returns the old id and an error
-func removeApplicationPrefix(a *argoapplication.ArgoResource, prefix string) (string, error) {
-	// remove the branch short name, and two dashes.
-	oldId := a.Id
-	newId := a.Id[len(prefix)+len("-x-"):]
-	a.Id = newId
-	a.Yaml.SetName(newId)
-	return oldId, nil
 }

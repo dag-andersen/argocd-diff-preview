@@ -36,7 +36,7 @@ func NewArgoResource(yaml *unstructured.Unstructured, kind ApplicationKind, id s
 }
 
 func (a *ArgoResource) GetLongName() string {
-	return fmt.Sprintf("%s [%s]", a.Name, a.FileName)
+	return fmt.Sprintf("%s [%s|%s]", a.Name, a.Branch.ShortName(), a.FileName)
 }
 
 // AsString returns the YAML representation of the resource

@@ -31,8 +31,12 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) (time.Dur
 
 	// Check if docker is running
 	if output, err := runCommand("docker", "ps"); err != nil {
-		log.Error().Msg("❌ Docker is not running")
-		return time.Since(startTime), fmt.Errorf("docker is not running: %s", output)
+		if strings.Contains(output, "Is the docker daemon running?") {
+			log.Error().Msg("❌ Docker is not running")
+		} else {
+			log.Error().Msgf("❌ Docker threw error: %s", output)
+		}
+		return time.Since(startTime), fmt.Errorf("docker threw error: %s", output)
 	}
 
 	log.Info().Msg("🚀 Creating k3d cluster...")
