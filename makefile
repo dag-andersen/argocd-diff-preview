@@ -25,6 +25,9 @@ pull-repository:
 	cd target-branch && git clone https://github.com/$(github_org)/$(gitops_repo).git --depth=1 --branch "$(target_branch)" && cp -r $(gitops_repo)/. . && rm -rf .git && echo "*" > .gitignore && rm -rf $(gitops_repo) && cd -
 
 docker-build:
+	docker build . -f $(docker_file) -t image
+
+docker-build-release:
 	docker build . -f $(docker_file) -t image --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg BUILD_DATE=$(BUILD_DATE)
 
 run-with-go: go-build pull-repository
@@ -44,7 +47,9 @@ run-with-go: go-build pull-repository
 		--use-argocd-api="$(use_argocd_api)"
 
 run-with-docker: pull-repository docker-build
+	docker rm argocd-diff-preview || true
 	docker run \
+		--name="argocd-diff-preview" \
 		--network=host \
 		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
