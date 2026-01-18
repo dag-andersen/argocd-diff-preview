@@ -29,8 +29,9 @@ nav:
   - getting-started/custom-argo-cd-installation.md
   - Self-hosted Github Runners: getting-started/self-hosted-gh-runner.md
 - Reusing clusters:
-  - Connect to an already running cluster: reusing-clusters/connecting.md
+  - Connect to cluster with Argo CD pre-installed: reusing-clusters/connecting.md
   - Self-hosted runner connects with host cluster: reusing-clusters/self-hosted-gh-runner.md
+  - Lockdown Mode: reusing-clusters/lockdown-mode.md
   - Openshift: reusing-clusters/openshift.md
 - generated-applications.md
 - Multi-repo: multi-repo.md

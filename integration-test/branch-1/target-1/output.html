@@ -1,0 +1,116 @@
+<html>
+<head>
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Total: 2 files changed
+
+Deleted (1):
+- folder2 (-19)
+
+Modified (1):
+± nginx-ingress (+1|-1)</pre>
+
+<div class="diffs">
+<details>
+<summary>
+folder2 (examples/git-generator/app/app-set.yaml)
+</summary>
+<div class="diff_container">
+<table>
+	
+	<tr class="comment_line"><td><pre>@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: deploy-from-folder-two</pre></td></tr>
+	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  replicas: 2</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  selector:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    matchLabels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      app: myapp</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  template:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app: myapp</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      containers:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      - image: dag-andersen/myapp:latest</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        name: myapp</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        ports:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
+</table>
+</div>
+</details>
+
+<details>
+<summary>
+nginx-ingress (examples/helm/applications/nginx.yaml)
+</summary>
+<div class="diff_container">
+<table>
+	
+	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@</pre></td></tr>
+	<tr class="normal_line"><td><pre>               fieldPath: metadata.namespace</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - name: LD_PRELOAD</pre></td></tr>
+	<tr class="normal_line"><td><pre>           value: /usr/local/lib/libmimalloc.so</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        image: registry.k8s.io/ingress-nginx/controller:v1.10.0@sha256:42b3f0e5d0846876b1791cd3afeb5f1cbbe4259d6f35651dcc1b5c980925379c</pre></td></tr>
+	<tr class="added_line"><td><pre>+        image: registry.k8s.io/ingress-nginx/controller:v1.11.1@sha256:e6439a12b52076965928e83b7b56aae6731231677b01e81818bce7fa5c60161a</pre></td></tr>
+	<tr class="normal_line"><td><pre>         imagePullPolicy: IfNotPresent</pre></td></tr>
+	<tr class="normal_line"><td><pre>         lifecycle:</pre></td></tr>
+	<tr class="normal_line"><td><pre>           preStop:</pre></td></tr>
+</table>
+</div>
+</details>
+</div>
+
+<pre>_Stats_:
+[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>

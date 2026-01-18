@@ -86,8 +86,10 @@ More info: [docs](./generated-applications.md)
 
 ### How do I speed up the tool?
 
-**Short answer:** Limit the number of applications rendered.
+**Short answer:** Connect to a pre-installed Argo CD instance and limit the number of applications rendered.
 
-**Longer answer:** Rendering the manifests for all applications in the repository on each pull request can be time-consuming. Limiting the number of applications rendered can significantly speed up the process. By default, `argocd-diff-preview` renders all applications in the repository.
+**Longer answer:** There are two main ways to speed up the tool:
 
-Check out the [full documentation](./application-selection.md) to learn how to limit the number of applications rendered.
+1. **Connect to a pre-installed Argo CD instance**: Instead of creating an ephemeral cluster for each run, connect to a pre-installed Argo CD instance. This saves ~60-90 seconds per run. See [Connecting to a cluster with Argo CD pre-installed](./reusing-clusters/connecting.md).
+
+2. **Limit applications rendered**: Rendering the manifests for all applications in the repository on each pull request can be time-consuming. Limiting the number of applications rendered can significantly speed up the process. By default, `argocd-diff-preview` renders all applications in the repository. Check out [Application Selection](./application-selection.md) to learn how to limit the number of applications rendered.

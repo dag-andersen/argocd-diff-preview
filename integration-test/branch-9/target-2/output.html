@@ -1,0 +1,559 @@
+<html>
+<head>
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Total: 1 files changed
+
+Deleted (1):
+- nginx-ingress (-480)</pre>
+
+<div class="diffs">
+<details>
+<summary>
+nginx-ingress (examples/external-chart/nginx.yaml)
+</summary>
+<div class="diff_container">
+<table>
+	
+	<tr class="comment_line"><td><pre>@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: admissionregistration.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ValidatingWebhookConfiguration</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: admission-webhook</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-admission</pre></td></tr>
+	<tr class="removed_line"><td><pre>-webhooks:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- admissionReviewVersions:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  clientConfig:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    service:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      name: nginx-ingress-ingress-nginx-controller-admission</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      path: /networking/v1/ingresses</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  failurePolicy: Fail</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  matchPolicy: Equivalent</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: validate.nginx.ingress.kubernetes.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  rules:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    apiVersions:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    - v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    operations:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    - CREATE</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    - UPDATE</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    - ingresses</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  sideEffects: None</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  minReadySeconds: 0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  replicas: 1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  revisionHistoryLimit: 10</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  selector:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    matchLabels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  template:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      containers:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      - args:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - /nginx-ingress-controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --publish-service=$(POD_NAMESPACE)/nginx-ingress-ingress-nginx-controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --election-id=nginx-ingress-ingress-nginx-leader</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --controller-class=k8s.io/ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --ingress-class=test</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --configmap=$(POD_NAMESPACE)/nginx-ingress-ingress-nginx-controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --validating-webhook=:8443</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --validating-webhook-certificate=/usr/local/certificates/cert</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --validating-webhook-key=/usr/local/certificates/key</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --enable-metrics=false</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        env:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - name: POD_NAME</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          valueFrom:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            fieldRef:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-              fieldPath: metadata.name</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - name: POD_NAMESPACE</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          valueFrom:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            fieldRef:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-              fieldPath: metadata.namespace</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - name: LD_PRELOAD</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          value: /usr/local/lib/libmimalloc.so</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        image: registry.k8s.io/ingress-nginx/controller:v1.10.0@sha256:42b3f0e5d0846876b1791cd3afeb5f1cbbe4259d6f35651dcc1b5c980925379c</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        imagePullPolicy: IfNotPresent</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        lifecycle:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          preStop:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            exec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-              command:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-              - /wait-shutdown</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        livenessProbe:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          failureThreshold: 5</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          httpGet:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            path: /healthz</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            port: 10254</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            scheme: HTTP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          initialDelaySeconds: 10</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          periodSeconds: 10</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          successThreshold: 1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          timeoutSeconds: 1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        name: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        ports:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          name: http</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          protocol: TCP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - containerPort: 443</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          name: https</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          protocol: TCP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - containerPort: 8443</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          name: webhook</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          protocol: TCP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        readinessProbe:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          failureThreshold: 3</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          httpGet:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            path: /healthz</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            port: 10254</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            scheme: HTTP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          initialDelaySeconds: 10</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          periodSeconds: 10</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          successThreshold: 1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          timeoutSeconds: 1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          requests:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            cpu: 100m</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            memory: 90Mi</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        securityContext:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          allowPrivilegeEscalation: false</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          capabilities:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            add:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            - NET_BIND_SERVICE</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            drop:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            - ALL</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          readOnlyRootFilesystem: false</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          runAsNonRoot: true</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          runAsUser: 101</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          seccompProfile:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-            type: RuntimeDefault</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        volumeMounts:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - mountPath: /usr/local/certificates/</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          name: webhook-cert</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          readOnly: true</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      dnsPolicy: ClusterFirst</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      nodeSelector:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        kubernetes.io/os: linux</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      serviceAccountName: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      terminationGracePeriodSeconds: 300</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      volumes:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      - name: webhook-cert</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        secret:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          secretName: nginx-ingress-ingress-nginx-admission</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: networking.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: IngressClass</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  controller: k8s.io/ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ClusterRole</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-rules:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - configmaps</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - endpoints</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - nodes</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - pods</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - secrets</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - namespaces</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - coordination.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - leases</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - nodes</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - services</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - ingresses</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - events</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - create</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - patch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - ingresses/status</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - update</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - ingressclasses</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - discovery.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - endpointslices</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ClusterRoleBinding</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-roleRef:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  kind: ClusterRole</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-subjects:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- kind: ServiceAccount</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: Role</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>-rules:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - namespaces</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - configmaps</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - pods</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - secrets</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - endpoints</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - services</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - ingresses</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - ingresses/status</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - update</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - networking.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - ingressclasses</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - coordination.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resourceNames:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - nginx-ingress-ingress-nginx-leader</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - leases</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - update</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - coordination.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - leases</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - create</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - events</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - create</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - patch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - discovery.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - endpointslices</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: RoleBinding</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>-roleRef:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  kind: Role</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-subjects:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- kind: ServiceAccount</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-data:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  allow-snippet-annotations: &#34;false&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ConfigMap</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  ipFamilies:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - IPv4</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  ipFamilyPolicy: SingleStack</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  ports:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - appProtocol: http</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    name: http</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    port: 80</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    protocol: TCP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    targetPort: http</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - appProtocol: https</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    name: https</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    port: 443</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    protocol: TCP</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    targetPort: https</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  selector:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  type: LoadBalancer</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-controller-admission</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  ports:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - appProtocol: https</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    name: https-webhook</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    port: 443</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    targetPort: webhook</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  selector:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  type: ClusterIP</pre></td></tr>
+	<tr class="removed_line"><td><pre>----</pre></td></tr>
+	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-automountServiceAccountToken: true</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ServiceAccount</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  labels:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/component: controller</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/managed-by: Helm</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: 1.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
+</table>
+</div>
+</details>
+</div>
+
+<pre>_Skipped resources_: 
+- Applications: `10` (base) -> `9` (target)
+- ApplicationSets: `6` (base) -> `3` (target)</pre>
+<br>
+
+<pre>_Stats_:
+[Applications: 1], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>

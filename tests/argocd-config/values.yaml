@@ -1,6 +1,0 @@
-# Override this file with values
-
-# example
-# configs:
-#   cm:
-#     kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm

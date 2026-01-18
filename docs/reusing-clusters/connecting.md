@@ -1,6 +1,6 @@
 # Connecting to a cluster with Argo CD pre-installed
 
-![](../assets/reusing-cluster-from-outside.png)
+![](../assets/flows/external-cluster-flow.png)
 
 Instead of spinning up an ephemeral cluster for each diff preview, you can connect to a cluster with Argo CD already installed. This saves approximately `60`–`90` seconds per run.
 
@@ -62,7 +62,7 @@ docker run \
   -v $(pwd)/target-branch:/target-branch \
   -e TARGET_BRANCH=helm-example-3 \
   -e REPO=dag-andersen/argocd-diff-preview \
-  dagandersen/argocd-diff-preview:v0.1.20 \
+  dagandersen/argocd-diff-preview:v0.1.21 \
   --argocd-namespace=argocd-diff-preview \
   --create-cluster=false
 ```

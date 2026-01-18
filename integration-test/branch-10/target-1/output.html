@@ -1,0 +1,61 @@
+<html>
+<head>
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>No changes found</pre>
+
+<div class="diffs">
+No changes found
+</div>
+
+<pre>_Stats_:
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>

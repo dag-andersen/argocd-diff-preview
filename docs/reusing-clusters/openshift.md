@@ -6,7 +6,7 @@ Utilizing the Openshift GitOps operator for managing the pre-installed ArgoCD in
 
 Imagine something like this:
 
-![](../assets/openshift-reusing-cluster-with-gitlab-runner.png)
+![](../assets/flows/openshift-flow.png)
 
 ## How it works
 
@@ -140,7 +140,7 @@ RUN curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases
     argocd version || true
 
 # argocd-diff-preview CLI
-RUN curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.20/argocd-diff-preview-Linux-x86_64.tar.gz && \
+RUN curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.21/argocd-diff-preview-Linux-x86_64.tar.gz && \
     tar -xvf argocd-diff-preview-Linux-x86_64.tar.gz && \
     mv argocd-diff-preview /usr/local/bin && \
     argocd-diff-preview --version

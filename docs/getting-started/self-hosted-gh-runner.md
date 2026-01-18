@@ -10,7 +10,7 @@ This guide covers two main approaches for using self-hosted runners with `argocd
 
 This approach creates a temporary cluster for each diff preview run while reusing credentials from your existing Argo CD installation. It provides isolation for the diff preview while not storing the credentials in your CI/CD pipeline.
 
-![](../assets/self-hosted-ephemeral.png)
+![](../assets/flows/ephemeral-self-hosted-runner-flow.png)
 
 ### How It Works
 
@@ -112,7 +112,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.20
+            dagandersen/argocd-diff-preview:v0.1.21
 
       - name: Post diff as comment
         run: |
@@ -174,6 +174,6 @@ Add the `--kind-options` flag to your workflow to use the custom configuration:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.20 \
+            dagandersen/argocd-diff-preview:v0.1.21 \
             --kind-options '--config /base-branch/hack/kind.yaml'
 ```
