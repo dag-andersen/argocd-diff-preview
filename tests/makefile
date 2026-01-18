@@ -76,7 +76,7 @@ docker-build:
 run-single-test-docker: clean pull-base pull-target
 	docker rm argocd-diff-preview || true
 ifeq ($(use_argocd_api),true)
-	$(eval ARGOCD_CONFIG_VOLUME := -v $(PWD)/api-call/argocd-config/values.yaml:/argocd-config/values.yaml)
+	$(eval ARGOCD_CONFIG_VOLUME := -v $(PWD)/createClusterRoles.yaml:/argocd-config/values.yaml)
 else
 	$(eval ARGOCD_CONFIG_VOLUME :=)
 endif
