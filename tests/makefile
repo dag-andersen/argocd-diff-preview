@@ -73,7 +73,9 @@ docker-build:
 	docker build -f ../$(docker_file) -t argocd-diff-preview ..
 
 run-single-test-docker: clean pull-base pull-target
+	docker rm argocd-diff-preview || true
 	docker run --network=host \
+		--name="argocd-diff-preview" \
 		-v ~/.kube:/root/.kube \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		$(if $(DOCKER_API_VERSION),-e DOCKER_API_VERSION=$(DOCKER_API_VERSION)) \

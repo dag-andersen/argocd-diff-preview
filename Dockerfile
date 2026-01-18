@@ -1,11 +1,6 @@
 # Build stage
 FROM golang:1-bookworm AS build
 
-# Build arguments for version information
-ARG VERSION=dev
-ARG COMMIT=unknown
-ARG BUILD_DATE=unknown
-
 # https://docs.docker.com/reference/dockerfile/#automatic-platform-args-in-the-global-scope
 ARG TARGETARCH
 
@@ -18,25 +13,28 @@ COPY go.mod go.sum ./
 # Download dependencies (base cache)
 RUN go mod download
 
+# Install kind and Argo CD (these are stable and should be cached)
+RUN apt-get update && apt-get install -y curl
+RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-${TARGETARCH} && \
+    chmod +x ./kind
+RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
+    install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
+    rm argocd-linux-${TARGETARCH}
+
 # Copy source code - only what's needed
 COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
+
+# Build arguments for version information (declared late to maximize cache hits)
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 # Build the application with version information
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X 'main.Version=${VERSION}' -X 'main.Commit=${COMMIT}' -X 'main.BuildDate=${BUILD_DATE}'" \
     -trimpath \
     -o argocd-diff-preview ./cmd
-
-# install kind
-RUN apt-get update && apt-get install -y curl
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-${TARGETARCH} && \
-    chmod +x ./kind
-
-# Install Argo CD
-RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
-    install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
-    rm argocd-linux-${TARGETARCH}
 
 FROM gcr.io/distroless/static-debian12 AS final
 
