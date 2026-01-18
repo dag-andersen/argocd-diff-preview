@@ -316,16 +316,17 @@ func deleteKindCluster() error {
 
 // runTestCase executes a single test case
 // createCluster indicates whether this test should create a new cluster (true for first test)
+// Both Go binary and Docker run from repo root for consistency
 func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
-	// Set up test directories
-	baseBranchDir := "base-branch"
-	targetBranchDir := "target-branch"
-	outputDir := "output"
+	// All directories are at repo root (parent of tests/)
+	baseBranchDir := "../base-branch"
+	targetBranchDir := "../target-branch"
+	outputDir := "../output"
 
 	// Clean up from previous runs
 	cleanup(baseBranchDir, targetBranchDir, outputDir)
 
-	// Clone the repositories
+	// Clone the repositories to repo root
 	if err := cloneBranch(tc.BaseBranch, baseBranchDir); err != nil {
 		t.Fatalf("Failed to clone base branch: %v", err)
 	}
@@ -344,7 +345,7 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 		t.Fatalf("Failed to run tool: %v", err)
 	}
 
-	// Check if output files were created
+	// Check if output files were created (at repo root)
 	mdPath := filepath.Join(outputDir, "diff.md")
 	htmlPath := filepath.Join(outputDir, "diff.html")
 
@@ -468,12 +469,34 @@ func buildDockerImage() error {
 }
 
 // runWithGoBinary executes the test using the Go binary
+// Runs from repo root directory so it can find argocd-config/
 func runWithGoBinary(tc TestCase, createCluster bool) error {
 	args := buildArgs(tc, createCluster)
 
-	cmd := exec.Command(*binaryPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Get repo root (parent of tests/)
+	repoRoot, err := filepath.Abs("..")
+	if err != nil {
+		return fmt.Errorf("failed to get repo root: %w", err)
+	}
+
+	// Convert binary path to absolute since we're changing working directory
+	absBinaryPath, err := filepath.Abs(*binaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute binary path: %w", err)
+	}
+
+	cmd := exec.Command(absBinaryPath, args...)
+	cmd.Dir = repoRoot // Run from repo root so it finds argocd-config/
+
+	// Try to get TTY for real-time output (Go test captures stdout/stderr)
+	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
+		cmd.Stdout = tty
+		cmd.Stderr = tty
+		defer func() { _ = tty.Close() }()
+	} else {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 
 	return cmd.Run()
 }
@@ -497,14 +520,15 @@ func getDockerAPIVersion() string {
 }
 
 // runWithDocker executes the test using Docker
+// Mounts volumes from repo root directory
 func runWithDocker(tc TestCase, createCluster bool) error {
 	// Remove any existing container (ignore error - container may not exist)
 	_ = exec.Command("docker", "rm", "-f", "argocd-diff-preview").Run()
 
-	// Get current working directory for volume mounts
-	pwd, err := os.Getwd()
+	// Get repo root (parent of tests/) for volume mounts
+	repoRoot, err := filepath.Abs("..")
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("failed to get repo root: %w", err)
 	}
 
 	// Get home directory for .kube mount
@@ -522,12 +546,13 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		"--name=argocd-diff-preview",
 		"-v", fmt.Sprintf("%s/.kube:/root/.kube", homeDir),
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
-		"-v", fmt.Sprintf("%s/base-branch:/base-branch", pwd),
-		"-v", fmt.Sprintf("%s/target-branch:/target-branch", pwd),
-		"-v", fmt.Sprintf("%s/output:/output", pwd),
-		"-v", fmt.Sprintf("%s/secrets:/secrets", pwd),
-		"-v", fmt.Sprintf("%s/temp:/temp", pwd),
-		"-v", fmt.Sprintf("%s/kind-config:/kind-config", pwd),
+		"-v", fmt.Sprintf("%s/base-branch:/base-branch", repoRoot),
+		"-v", fmt.Sprintf("%s/target-branch:/target-branch", repoRoot),
+		"-v", fmt.Sprintf("%s/output:/output", repoRoot),
+		"-v", fmt.Sprintf("%s/secrets:/secrets", repoRoot),
+		"-v", fmt.Sprintf("%s/temp:/temp", repoRoot),
+		"-v", fmt.Sprintf("%s/kind-config:/kind-config", repoRoot),
+		"-v", fmt.Sprintf("%s/argocd-config:/argocd-config", repoRoot),
 	}
 
 	// Pass Docker API version if needed (when client is newer than server)
@@ -591,8 +616,16 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	}
 
 	cmd := exec.Command("docker", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+
+	// Try to get TTY for real-time output (Go test captures stdout/stderr)
+	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
+		cmd.Stdout = tty
+		cmd.Stderr = tty
+		defer func() { _ = tty.Close() }()
+	} else {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
 
 	return cmd.Run()
 }
