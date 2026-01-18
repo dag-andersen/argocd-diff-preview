@@ -103,12 +103,12 @@ func (c *CLIOperations) AppsetGenerate(appSetPath string) (string, error) {
 func (c *CLIOperations) GetManifests(appName string) (string, bool, error) {
 	out, err := c.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
-		exists, _ := c.k8sClient.CheckIfResourceExists(ApplicationGVR, c.namespace, appName)
-		if !exists {
+		if exists, err := c.k8sClient.CheckIfResourceExists(ApplicationGVR, c.namespace, appName); !exists && err != nil {
 			log.Warn().Msgf("App '%s' does not exist", appName)
+			return "", false, fmt.Errorf("app '%s' does not exist: %w", appName, err)
 		}
 
-		return "", exists, fmt.Errorf("failed to get manifests for app: %w", err)
+		return "", true, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
 	if strings.TrimSpace(out) == "" {
