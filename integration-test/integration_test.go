@@ -1,4 +1,4 @@
-package tests
+package integration_test
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -16,11 +17,12 @@ import (
 
 // Flags for test configuration
 var (
-	update      = flag.Bool("update", false, "update golden files with actual output")
-	useDocker   = flag.Bool("docker", false, "use Docker instead of Go binary")
-	debug       = flag.Bool("debug", false, "enable debug mode for the tool")
-	binaryPath  = flag.String("binary", "../bin/argocd-diff-preview", "path to the Go binary")
-	dockerImage = flag.String("image", "argocd-diff-preview", "Docker image name to use")
+	update        = flag.Bool("update", false, "update expected output files with actual output")
+	useDocker     = flag.Bool("docker", false, "use Docker instead of Go binary")
+	debug         = flag.Bool("debug", false, "enable debug mode for the tool")
+	createCluster = flag.Bool("create-cluster", false, "force creation of a new cluster (deletes existing one)")
+	binaryPath    = flag.String("binary", "./bin/argocd-diff-preview", "path to the Go binary (relative to repo root)")
+	dockerImage   = flag.String("image", "argocd-diff-preview", "Docker image name to use")
 )
 
 // Test configuration constants
@@ -254,17 +256,17 @@ func normalizeOutput(s string) string {
 
 // TestIntegration runs all integration tests
 func TestIntegration(t *testing.T) {
-	// Ensure we're in the tests directory
+	// Ensure we're in the integration-test directory
 	testDir, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Failed to get working directory: %v", err)
 	}
 
-	// Check if we're in the tests directory, if not, change to it
-	if !strings.HasSuffix(testDir, "/tests") && !strings.HasSuffix(testDir, "\\tests") {
-		testDir = filepath.Join(testDir, "tests")
+	// Check if we're in the integration-test directory, if not, change to it
+	if !strings.HasSuffix(testDir, "/integration-test") && !strings.HasSuffix(testDir, "\\integration-test") {
+		testDir = filepath.Join(testDir, "integration-test")
 		if err := os.Chdir(testDir); err != nil {
-			t.Fatalf("Failed to change to tests directory: %v", err)
+			t.Fatalf("Failed to change to integration-test directory: %v", err)
 		}
 	}
 
@@ -296,13 +298,50 @@ func TestIntegration(t *testing.T) {
 
 	t.Logf("Running %d tests in randomized order", len(shuffledCases))
 
+	// Track how many tests since last cluster creation
+	testsSinceClusterCreation := 0
+
 	// Run each test case
-	// Every 8th test creates a new cluster (tests 0, 8, 16, etc.)
 	for i, tc := range shuffledCases {
-		createCluster := i%8 == 0
+		// Create cluster if: first test, every 8th test, or no cluster exists
+		// This handles the case where a test exits early without creating a cluster
+		createCluster := testsSinceClusterCreation == 0 || testsSinceClusterCreation >= 8 || !kindClusterExists()
+		if createCluster {
+			testsSinceClusterCreation = 0
+		}
+
+		// Print separator to TTY for visibility between test runs
+		printToTTY(fmt.Sprintf("\n\n========== 🧪 TEST %d/%d: %s (createCluster=%v) ==========\n\n", i+1, len(shuffledCases), tc.Name, createCluster))
 		t.Run(tc.Name, func(t *testing.T) {
 			runTestCase(t, tc, createCluster)
 		})
+
+		testsSinceClusterCreation++
+
+		// Stop on first failure (fail fast)
+		if t.Failed() {
+			printToTTY("\n❌ Stopping test run due to failure\n")
+			break
+		}
+	}
+}
+
+// kindClusterExists checks if the kind cluster exists
+func kindClusterExists() bool {
+	cmd := exec.Command("kind", "get", "clusters")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	// Check if our cluster name is in the list
+	return slices.Contains(strings.Split(strings.TrimSpace(string(output)), "\n"), "argocd-diff-preview")
+}
+
+// printToTTY prints directly to TTY for real-time visibility (bypasses Go test output capture)
+func printToTTY(msg string) {
+	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
+		_, _ = tty.WriteString(msg)
+		_ = tty.Close()
 	}
 }
 
@@ -318,7 +357,7 @@ func deleteKindCluster() error {
 // createCluster indicates whether this test should create a new cluster (true for first test)
 // Both Go binary and Docker run from repo root for consistency
 func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
-	// All directories are at repo root (parent of tests/)
+	// All directories are at repo root (parent of integration-test/)
 	baseBranchDir := "../base-branch"
 	targetBranchDir := "../target-branch"
 	outputDir := "../output"
@@ -462,7 +501,12 @@ func copyFile(src, dst string) error {
 
 // buildDockerImage builds the Docker image
 func buildDockerImage() error {
-	cmd := exec.Command("docker", "build", "-f", "../Dockerfile", "-t", *dockerImage, "..")
+	repoRoot, err := filepath.Abs("..")
+	if err != nil {
+		return fmt.Errorf("failed to get repo root: %w", err)
+	}
+	cmd := exec.Command("docker", "build", "-f", "Dockerfile", "-t", *dockerImage, ".")
+	cmd.Dir = repoRoot
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -473,17 +517,14 @@ func buildDockerImage() error {
 func runWithGoBinary(tc TestCase, createCluster bool) error {
 	args := buildArgs(tc, createCluster)
 
-	// Get repo root (parent of tests/)
+	// Get repo root (parent of integration-test/)
 	repoRoot, err := filepath.Abs("..")
 	if err != nil {
 		return fmt.Errorf("failed to get repo root: %w", err)
 	}
 
-	// Convert binary path to absolute since we're changing working directory
-	absBinaryPath, err := filepath.Abs(*binaryPath)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute binary path: %w", err)
-	}
+	// Binary path is relative to repo root
+	absBinaryPath := filepath.Join(repoRoot, *binaryPath)
 
 	cmd := exec.Command(absBinaryPath, args...)
 	cmd.Dir = repoRoot // Run from repo root so it finds argocd-config/
@@ -525,7 +566,7 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	// Remove any existing container (ignore error - container may not exist)
 	_ = exec.Command("docker", "rm", "-f", "argocd-diff-preview").Run()
 
-	// Get repo root (parent of tests/) for volume mounts
+	// Get repo root (parent of integration-test/) for volume mounts
 	repoRoot, err := filepath.Abs("..")
 	if err != nil {
 		return fmt.Errorf("failed to get repo root: %w", err)
@@ -719,12 +760,12 @@ func getExpectedDir(tc TestCase) string {
 	parts := strings.Split(tc.TargetBranch, "/")
 	branchName := parts[1] // "branch-1", "branch-2", etc.
 
-	// Build the expected directory path
+	// Build the expected directory path (relative to integration-test/ folder)
 	suffix := tc.Suffix
 	if suffix == "" {
 		suffix = ""
 	}
-	return filepath.Join("integration-test", branchName, "target"+suffix)
+	return filepath.Join(branchName, "target"+suffix)
 }
 
 // compareOutput compares actual output with expected output
@@ -823,25 +864,43 @@ func showDiff(t *testing.T, filename, expected, actual string) {
 
 // TestSingleCase allows running a single test case by name
 // Usage: TEST_CASE="branch-1/target-1" go test -run TestSingleCase ./...
-// Creates a new cluster by default, deletes it after the test
+// Reuses existing cluster if one exists, unless -create-cluster flag is set
 func TestSingleCase(t *testing.T) {
 	caseName := os.Getenv("TEST_CASE")
 	if caseName == "" {
 		t.Skip("TEST_CASE environment variable not set")
 	}
 
-	// Clean up cluster after test completes
+	// Delete existing cluster if -create-cluster flag is set
+	if *createCluster {
+		t.Log("Flag -create-cluster set, deleting existing cluster if any...")
+		_ = deleteKindCluster()
+	}
+
+	// Check if cluster already exists
+	clusterExists := kindClusterExists()
+	if clusterExists {
+		t.Log("Using existing kind cluster 'argocd-diff-preview'")
+	} else {
+		t.Log("No existing cluster found, will create a new one")
+	}
+
+	// Only clean up cluster if we created it (i.e., it didn't exist before)
 	t.Cleanup(func() {
-		t.Log("Cleaning up: deleting kind cluster...")
-		if err := deleteKindCluster(); err != nil {
-			t.Logf("Warning: failed to delete kind cluster: %v", err)
+		if !clusterExists {
+			t.Log("Cleaning up: deleting kind cluster...")
+			if err := deleteKindCluster(); err != nil {
+				t.Logf("Warning: failed to delete kind cluster: %v", err)
+			}
+		} else {
+			t.Log("Keeping existing cluster alive")
 		}
 	})
 
 	for _, tc := range testCases {
 		if tc.Name == caseName {
-			// When running a single test, create a new cluster
-			runTestCase(t, tc, true)
+			// Create cluster only if one doesn't already exist
+			runTestCase(t, tc, !clusterExists)
 			return
 		}
 	}
