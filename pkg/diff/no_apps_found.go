@@ -25,9 +25,15 @@ func WriteNoAppsFoundMessage(
 	message := getNoAppsFoundMessage(selectors, changedFiles)
 	markdown := generateNoAppsFoundMarkdown(title, message)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
+	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
 
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
-		return fmt.Errorf("failed to write no apps found message: %w", err)
+		return fmt.Errorf("failed to write no apps found message to markdown: %w", err)
+	}
+
+	// Write the same content to HTML file for consistency
+	if err := utils.WriteFile(htmlPath, markdown); err != nil {
+		return fmt.Errorf("failed to write no apps found message to html: %w", err)
 	}
 
 	return nil
