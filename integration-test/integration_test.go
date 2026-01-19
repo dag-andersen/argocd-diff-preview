@@ -339,7 +339,11 @@ func TestIntegration(t *testing.T) {
 		}
 
 		// Print separator to TTY for visibility between test runs
-		printToTTY(fmt.Sprintf("\n\n========== 🧪 TEST %d/%d: %s (createCluster=%v) ==========\n\n", i+1, len(shuffledCases), tc.Name, createCluster))
+		runMode := "go"
+		if *useDocker {
+			runMode = "docker"
+		}
+		printToTTY(fmt.Sprintf("\n\n========== 🧪 TEST %d/%d: %s (createCluster = %v, mode = %s) ==========\n\n", i+1, len(shuffledCases), tc.Name, createCluster, runMode))
 		t.Run(tc.Name, func(t *testing.T) {
 			runTestCase(t, tc, createCluster)
 		})
@@ -615,11 +619,16 @@ func runWithGoBinary(tc TestCase, createCluster bool) error {
 // getDockerAPIVersion detects if Docker client is too new for server
 // and returns the maximum supported API version, or empty string if not needed
 func getDockerAPIVersion() string {
-	cmd := exec.Command("docker", "version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ""
+	// First check if DOCKER_API_VERSION is already set in the environment
+	if version := os.Getenv("DOCKER_API_VERSION"); version != "" {
+		return version
 	}
+
+	cmd := exec.Command("docker", "version")
+	// Use CombinedOutput to capture both stdout and stderr
+	// Note: This command may fail with non-zero exit code when API versions mismatch,
+	// but the error message still contains the maximum supported version
+	output, _ := cmd.CombinedOutput()
 
 	// Look for "Maximum supported API version is X.XX" in output
 	re := regexp.MustCompile(`Maximum supported API version is ([0-9.]+)`)
