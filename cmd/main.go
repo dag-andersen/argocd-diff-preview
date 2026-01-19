@@ -167,7 +167,7 @@ func run(cfg *Config) error {
 			if !cfg.KeepClusterAlive {
 				clusterProvider.DeleteCluster(true)
 			} else {
-				log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+				log.Info().Msg("🧟 Cluster will be kept alive after the tool finishes")
 			}
 		}
 	}()

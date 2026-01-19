@@ -97,6 +97,13 @@ run-integration-tests-go: go-build
 run-integration-tests-docker: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker ./...
 
+# Run integration tests with the Argo CD API
+run-integration-tests-go-with-api: go-build
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -use-argocd-api ./...
+
+run-integration-tests-docker-with-api: go-build
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -use-argocd-api ./...
+
 # Update golden files for integration tests
 update-integration-tests: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -update ./...
@@ -106,14 +113,14 @@ update-integration-tests-docker: go-build
 
 # Run before release	
 check-release: run-lint run-unit-tests
-	$(MAKE) run-integration-tests-go use_argocd_api=false
-	$(MAKE) run-integration-tests-docker use_argocd_api=true
+	$(MAKE) run-integration-tests-go
+	$(MAKE) run-integration-tests-docker-with-api
 
 # Loop the above commands until one fails
 check-release-repeat:
 	@i=1; while true; do \
 		echo "⭐⭐⭐⭐⭐ Iteration $$i ⭐⭐⭐⭐⭐"; \
-		$(MAKE) run-integration-tests-go use_argocd_api=false || exit 1; \
-		$(MAKE) run-integration-tests-docker use_argocd_api=true || exit 1; \
+		$(MAKE) run-integration-tests-go || exit 1; \
+		$(MAKE) run-integration-tests-docker-with-api || exit 1; \
 		i=$$((i + 1)); \
 	done
