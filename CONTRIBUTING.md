@@ -68,7 +68,7 @@ Output should look similar to like this:
 argocd-diff-preview/
 ├── cmd/                  # Main application entry points
 ├── pkg/                  # Core application logic
-├── tests/                # Integration tests
+├── integration-test/     # Integration tests and expected outputs
 ├── docs/                 # Documentation
 ├── argocd-config/        # Argo CD configuraiton that is installed with Argo CD
 └── examples/             # Examples used by the integration tests and pull request examples
@@ -146,16 +146,37 @@ Using Docker:
 make run-integration-tests-docker
 ```
 
-If you have made changes to the output of the tool, you can update the expected output for integration tests by setting the `update_expected` variable to `true`. Example:
+### Running a Single Integration Test
+
+Useful for debugging specific test cases. Reuses existing cluster if available:
 
 ```bash
-make run-integration-tests-docker update_expected=true
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase ./...
 ```
 
-This will update the updated output files in the `tests/integration-test/` directory.
+With Docker:
+```bash
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -docker ./...
+```
+
+Force all tests to use the ArgoCD API instead of CLI:
+```bash
+cd integration-test && go test -v -timeout 60m -run TestIntegration -use-argocd-api ./...
+```
+
+### Updating Expected Outputs
+
+If you have made changes to the output of the tool, you can update the expected output files:
+
+```bash
+make update-integration-tests          # Update with Go binary
+make update-integration-tests-docker   # Update with Docker
+```
+
+This will update the output files in the `integration-test/` directory.
 
 > [!TIP]
-> Before you create a pull request, please run `make check-release` to verify that the tool works as expected. Feel free to reach out if you need help! 🚀
+> Before you create a pull request, please run `make check-release` to verify that the tool works as expected. This runs linting, unit tests, and integration tests. Feel free to reach out if you need help! 🚀
 
 ## Documentation
 
