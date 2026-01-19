@@ -549,11 +549,16 @@ func runWithGoBinary(tc TestCase, createCluster bool) error {
 // getDockerAPIVersion detects if Docker client is too new for server
 // and returns the maximum supported API version, or empty string if not needed
 func getDockerAPIVersion() string {
-	cmd := exec.Command("docker", "version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ""
+	// First check if DOCKER_API_VERSION is already set in the environment
+	if version := os.Getenv("DOCKER_API_VERSION"); version != "" {
+		return version
 	}
+
+	cmd := exec.Command("docker", "version")
+	// Use CombinedOutput to capture both stdout and stderr
+	// Note: This command may fail with non-zero exit code when API versions mismatch,
+	// but the error message still contains the maximum supported version
+	output, _ := cmd.CombinedOutput()
 
 	// Look for "Maximum supported API version is X.XX" in output
 	re := regexp.MustCompile(`Maximum supported API version is ([0-9.]+)`)
