@@ -14,16 +14,30 @@ make run-with-docker target_branch=<branch> # Run with Docker
 ## Test Commands
 
 ```bash
-# Unit tests
+# Unit tests (runs on cmd/ and pkg/ directories only)
 make run-unit-tests              # Run all unit tests
 go test ./pkg/diff/...           # Run tests for specific package
 go test -run TestDiff_prettyName ./pkg/diff/...  # Run single test by name
-go test -race ./...              # Run with race detection
 
 # Integration tests
 make run-integration-tests-go    # Integration tests with Go binary
 make run-integration-tests-docker # Integration tests with Docker
-make run-integration-tests-docker update_expected=true  # Update expected outputs
+
+# Run a single integration test (useful for debugging)
+# Reuses existing cluster if available, otherwise creates a new one
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase ./...
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -docker ./...
+
+# Force all tests to use the ArgoCD API instead of CLI
+cd integration-test && go test -v -timeout 60m -run TestIntegration -use-argocd-api ./...
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -use-argocd-api ./...
+
+# Force new cluster creation for single test
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -create-cluster ./...
+
+# Update expected outputs (when test output changes intentionally)
+make update-integration-tests    # Update with Go binary
+make update-integration-tests-docker  # Update with Docker
 
 # Pre-release check (lint + unit + integration)
 make check-release
@@ -58,17 +72,17 @@ if err != nil {
 
 ```
 argocd-diff-preview/
-├── cmd/           # CLI entry point (main.go, options.go)
-├── pkg/           # Core logic
-│   ├── argocd/    # Argo CD installation
-│   ├── diff/      # Diff generation
-│   ├── extract/   # Resource extraction
-│   ├── cluster/   # Cluster provider interface
+├── cmd/               # CLI entry point (main.go, options.go)
+├── pkg/               # Core logic
+│   ├── argocd/        # Argo CD installation
+│   ├── diff/          # Diff generation
+│   ├── extract/       # Resource extraction
+│   ├── cluster/       # Cluster provider interface
 │   ├── kind/, k3d/, minikube/  # Cluster implementations
 │   └── git/, utils/
-├── tests/         # Integration tests
-├── docs/          # MkDocs documentation
-└── examples/      # Test fixtures
+├── integration-test/  # Integration tests and expected outputs
+├── docs/              # MkDocs documentation
+└── examples/          # Test fixtures
 ```
 
 ## Main Challenges when building a tool like this
