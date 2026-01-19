@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: argocd-diff-preview-argocd
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+  - list:
+      elements:
+        - cluster: my-cluster
+          namespace: argocd-diff-preview
+          env: argocd
+        - cluster: my-cluster
+          namespace: argocd-diff-preview-test
+          env: argocd-test
+  template:
+    metadata:
+      name: "argocd-diff-preview-{{ .env }}"
+      labels:
+        environment: "{{ .env }}"
+    spec:
+      project: my-cluster
+      sources:
+        - repoURL: 'https://github.com/dag-andersen/argocd-diff-preview.git'
+          targetRevision: main
+          ref: values
+        - chart: argo-cd
+          repoURL: https://argoproj.github.io/argo-helm
+          targetRevision: '9.3.0'
+          helm:
+            releaseName: "{{ .env }}"
+            valueFiles:
+              - $values/experiment/{{ .env }}/values.yaml
+      destination:
+        name: "{{ .cluster }}" 
+        namespace: "{{ .namespace }}" 
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=truef
+          - PruneLast=true
