@@ -311,7 +311,11 @@ func TestIntegration(t *testing.T) {
 		}
 
 		// Print separator to TTY for visibility between test runs
-		printToTTY(fmt.Sprintf("\n\n========== 🧪 TEST %d/%d: %s (createCluster=%v) ==========\n\n", i+1, len(shuffledCases), tc.Name, createCluster))
+		runMode := "go"
+		if *useDocker {
+			runMode = "docker"
+		}
+		printToTTY(fmt.Sprintf("\n\n========== 🧪 TEST %d/%d: %s (createCluster = %v, mode = %s) ==========\n\n", i+1, len(shuffledCases), tc.Name, createCluster, runMode))
 		t.Run(tc.Name, func(t *testing.T) {
 			runTestCase(t, tc, createCluster)
 		})

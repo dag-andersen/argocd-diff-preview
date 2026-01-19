@@ -14,11 +14,10 @@ make run-with-docker target_branch=<branch> # Run with Docker
 ## Test Commands
 
 ```bash
-# Unit tests
+# Unit tests (runs on cmd/ and pkg/ directories only)
 make run-unit-tests              # Run all unit tests
 go test ./pkg/diff/...           # Run tests for specific package
 go test -run TestDiff_prettyName ./pkg/diff/...  # Run single test by name
-go test -race ./...              # Run with race detection
 
 # Integration tests
 make run-integration-tests-go    # Integration tests with Go binary
@@ -28,6 +27,10 @@ make run-integration-tests-docker # Integration tests with Docker
 # Reuses existing cluster if available, otherwise creates a new one
 cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase ./...
 cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -docker ./...
+
+# Force all tests to use the ArgoCD API instead of CLI
+cd integration-test && go test -v -timeout 60m -run TestIntegration -use-argocd-api ./...
+cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -use-argocd-api ./...
 
 # Force new cluster creation for single test
 cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -run TestSingleCase -create-cluster ./...
