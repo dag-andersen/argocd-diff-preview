@@ -90,7 +90,7 @@ run-unit-tests:
 # go test -coverprofile=coverage.out ./...
 # go tool cover -html=coverage.out
 
-# New Go-based integration tests
+# New Go-based integration tests (live test spins up Kind cluster with ArgoCD)
 run-integration-tests-go: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration ./...
 

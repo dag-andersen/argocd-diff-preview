@@ -444,6 +444,22 @@ func labelApplicationWithRunID(a *argoapplication.ArgoResource, runID string) er
 	return nil
 }
 
+// NormalizeManifests applies ignoreDifferences and removes ArgoCD tracking IDs
+func NormalizeManifests(manifests []unstructured.Unstructured, app argoapplication.ArgoResource) ([]unstructured.Unstructured, error) {
+	if app.Yaml != nil {
+		rules := parseIgnoreDifferencesFromApp(app)
+		if len(rules) > 0 {
+			applyIgnoreDifferencesToManifests(manifests, rules)
+		}
+	}
+
+	if err := removeArgoCDTrackingID(manifests); err != nil {
+		return nil, err
+	}
+
+	return manifests, nil
+}
+
 // removeArgoCDTrackingID removes the "argocd.argoproj.io/tracking-id" annotation from the application
 func removeArgoCDTrackingID(a []unstructured.Unstructured) error {
 	for _, obj := range a {

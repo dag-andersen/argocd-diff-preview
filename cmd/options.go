@@ -65,6 +65,10 @@ var (
 	DefaultArgocdLoginOptions         = ""
 	DefaultDisableClientThrottling    = false
 	DefaultArgocdAuthToken            = ""
+	DefaultCompareLive                = false
+	DefaultLiveArgocdURL              = ""
+	DefaultLiveArgocdToken            = ""
+	DefaultLiveArgocdInsecure         = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -108,6 +112,10 @@ type RawOptions struct {
 	HideDeletedAppDiff         bool   `mapstructure:"hide-deleted-app-diff"`
 	IgnoreResourceRules        string `mapstructure:"ignore-resources"`
 	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
+	CompareLive                bool   `mapstructure:"compare-live"`
+	LiveArgocdURL              string `mapstructure:"live-argocd-url"`
+	LiveArgocdToken            string `mapstructure:"live-argocd-token"`
+	LiveArgocdInsecure         bool   `mapstructure:"live-argocd-insecure"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -146,6 +154,10 @@ type Config struct {
 	HideDeletedAppDiff         bool
 	DisableClientThrottling    bool
 	UseArgoCDApi               bool
+	CompareLive                bool
+	LiveArgocdURL              string
+	LiveArgocdToken            string
+	LiveArgocdInsecure         bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -237,6 +249,10 @@ func Parse() *Config {
 	viper.SetDefault("hide-deleted-app-diff", DefaultHideDeletedAppDiff)
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
+	viper.SetDefault("compare-live", DefaultCompareLive)
+	viper.SetDefault("live-argocd-url", DefaultLiveArgocdURL)
+	viper.SetDefault("live-argocd-token", DefaultLiveArgocdToken)
+	viper.SetDefault("live-argocd-insecure", DefaultLiveArgocdInsecure)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -259,6 +275,13 @@ func Parse() *Config {
 	rootCmd.Flags().String("argocd-chart-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
 	rootCmd.Flags().String("argocd-auth-token", DefaultArgocdAuthToken, "Argo CD Auth Token for API access")
 	rootCmd.Flags().String("argocd-login-options", DefaultArgocdLoginOptions, "Additional options to pass to 'argocd login' command")
+
+	// Live comparison mode - compare PR against remote ArgoCD instance
+	rootCmd.Flags().Bool("compare-live", DefaultCompareLive, "Compare target branch against live state from a remote ArgoCD instance")
+	rootCmd.Flags().String("live-argocd-url", DefaultLiveArgocdURL, "URL of the remote ArgoCD instance (e.g., https://argocd.example.com)")
+	rootCmd.Flags().String("live-argocd-token", DefaultLiveArgocdToken, "API token for authenticating with the remote ArgoCD instance")
+	rootCmd.Flags().Bool("live-argocd-insecure", DefaultLiveArgocdInsecure, "Skip TLS certificate verification for remote ArgoCD (use for self-signed certs)")
+
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
@@ -321,7 +344,8 @@ func Parse() *Config {
 // checkRequired validates that required fields are present
 func (o *RawOptions) checkRequired() []string {
 	var errors []string
-	if o.BaseBranch == "" {
+	// In live comparison mode, base-branch is not required (we use live state instead)
+	if o.BaseBranch == "" && !o.CompareLive {
 		errors = append(errors, "base-branch")
 	}
 	if o.TargetBranch == "" {
@@ -329,6 +353,15 @@ func (o *RawOptions) checkRequired() []string {
 	}
 	if o.Repo == "" {
 		errors = append(errors, "repo")
+	}
+	// Validate live comparison requirements
+	if o.CompareLive {
+		if o.LiveArgocdURL == "" {
+			errors = append(errors, "live-argocd-url (required when --compare-live is enabled)")
+		}
+		if o.LiveArgocdToken == "" {
+			errors = append(errors, "live-argocd-token (required when --compare-live is enabled)")
+		}
 	}
 	return errors
 }
@@ -370,6 +403,10 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
 		DisableClientThrottling:    o.DisableClientThrottling,
 		UseArgoCDApi:               o.UseArgoCDApi,
+		CompareLive:                o.CompareLive,
+		LiveArgocdURL:              o.LiveArgocdURL,
+		LiveArgocdToken:            o.LiveArgocdToken,
+		LiveArgocdInsecure:         o.LiveArgocdInsecure,
 	}
 
 	var err error
@@ -559,7 +596,19 @@ func (o *Config) LogConfig() {
 		}
 	}
 
-	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
+	// Log live comparison mode
+	if o.CompareLive {
+		log.Info().Msgf("✨ - compare-live: %t (comparing against remote ArgoCD)", o.CompareLive)
+		log.Info().Msgf("✨ - live-argocd-url: %s", o.LiveArgocdURL)
+		log.Info().Msgf("✨ - live-argocd-token: ********")
+		if o.LiveArgocdInsecure {
+			log.Info().Msgf("✨ - live-argocd-insecure: %t (skipping TLS verification)", o.LiveArgocdInsecure)
+		}
+	}
+
+	if !o.CompareLive {
+		log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
+	}
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
 	log.Info().Msgf("✨ - output-folder: %s", o.OutputFolder)
