@@ -1,7 +1,7 @@
 # Lockdown Mode (Namespace-Scoped Argo CD)
 
 !!! warning "Beta Feature"
-    This feature is currently in beta and only available in the [experimental release](https://github.com/dag-andersen/argocd-diff-preview/releases/tag/v0.1.20-experimental-lock-down-v3). Please report any issues on [GitHub](https://github.com/dag-andersen/argocd-diff-preview/issues).
+    This feature is currently in beta and only available in the [experimental release](https://github.com/dag-andersen/argocd-diff-preview/releases/tag/v0.1.20-experimental-lock-down-v3). Please report any issues on [GitHub](https://github.com/dag-andersen/argocd-diff-preview/issues/250).
 
 By default, Argo CD is installed with cluster-wide permissions, meaning it can read and manage resources across all namespaces. However, some organizations require a more restricted setup where Argo CD only has permissions within a single namespace. This is often referred to as "namespace-scoped" or "lockdown mode".
 
