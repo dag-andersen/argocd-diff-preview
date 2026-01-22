@@ -59,6 +59,7 @@ var (
 	DefaultHideDeletedAppDiff         = false
 	DefaultIgnoreResourceRules        = ""
 	DefaultArgocdLoginOptions         = ""
+	DefaultDisableClientThrottling    = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -99,6 +100,7 @@ type RawOptions struct {
 	Title                      string `mapstructure:"title"`
 	HideDeletedAppDiff         bool   `mapstructure:"hide-deleted-app-diff"`
 	IgnoreResourceRules        string `mapstructure:"ignore-resources"`
+	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -134,6 +136,7 @@ type Config struct {
 	LogFormat                  string
 	Title                      string
 	HideDeletedAppDiff         bool
+	DisableClientThrottling    bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -222,6 +225,7 @@ func Parse() *Config {
 	viper.SetDefault("dry-run", DefaultDryRun)
 	viper.SetDefault("hide-deleted-app-diff", DefaultHideDeletedAppDiff)
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
+	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -260,6 +264,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("kind-internal", DefaultKindInternal, "kind internal kubeconfig mode (only for kind)")
 	rootCmd.Flags().String("k3d-options", DefaultK3dOptions, "k3d options (only for k3d)")
 	rootCmd.Flags().Bool("keep-cluster-alive", DefaultKeepClusterAlive, "Keep cluster alive after the tool finishes")
+	rootCmd.Flags().Bool("disable-client-throttling", DefaultDisableClientThrottling, "Disable client-side throttling (rely on API Priority and Fairness instead)")
 
 	// Other options
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
@@ -349,6 +354,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		LogFormat:                  o.LogFormat,
 		Title:                      o.Title,
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
+		DisableClientThrottling:    o.DisableClientThrottling,
 	}
 
 	var err error
@@ -605,5 +611,8 @@ func (o *Config) LogConfig() {
 			ignoreResourceRuleStrings[i] = ignoreResourceRule.String()
 		}
 		log.Info().Msgf("✨ - ignore-resources: %s", strings.Join(ignoreResourceRuleStrings, ", "))
+	}
+	if o.DisableClientThrottling {
+		log.Info().Msgf("✨ - disable-client-throttling: %t (relying on API Priority and Fairness)", o.DisableClientThrottling)
 	}
 }
