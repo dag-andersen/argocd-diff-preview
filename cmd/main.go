@@ -173,7 +173,7 @@ func run(cfg *Config) error {
 	}()
 
 	// create k8s client
-	k8sClient, err := utils.NewK8sClient()
+	k8sClient, err := utils.NewK8sClient(cfg.DisableClientThrottling)
 	if err != nil {
 		log.Error().Err(err).Msgf("❌ Failed to create k8s client")
 		return err
