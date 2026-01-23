@@ -34,6 +34,10 @@ func main() {
 
 	if err := run(cfg); err != nil {
 		log.Error().Msgf("❌ %v", err)
+		helpMessage := extract.GetHelpMessage(err)
+		if helpMessage != "" {
+			log.Info().Msgf("💡 Help: %s", helpMessage)
+		}
 		if !cfg.Debug {
 			log.Info().Msg("🕵️ Run with '--debug' for more details")
 		} else {
@@ -163,7 +167,7 @@ func run(cfg *Config) error {
 			if !cfg.KeepClusterAlive {
 				clusterProvider.DeleteCluster(true)
 			} else {
-				log.Info().Msg("🧟‍♂️ Cluster will be kept alive after the tool finishes")
+				log.Info().Msg("🧟 Cluster will be kept alive after the tool finishes")
 			}
 		}
 	}()
@@ -193,7 +197,11 @@ func run(cfg *Config) error {
 		cfg.ArgocdChartRepoUsername,
 		cfg.ArgocdChartRepoPassword,
 		cfg.ArgocdLoginOptions,
+		cfg.UseArgoCDApi,
 	)
+
+	// Ensure cleanup is performed when we exit (e.g., stopping port forwards)
+	defer argocd.Cleanup()
 
 	var argocdInstallationDuration time.Duration
 	if cfg.CreateCluster {

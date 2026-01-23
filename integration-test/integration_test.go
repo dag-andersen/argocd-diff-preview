@@ -21,6 +21,7 @@ var (
 	useDocker     = flag.Bool("docker", false, "use Docker instead of Go binary")
 	debug         = flag.Bool("debug", false, "enable debug mode for the tool")
 	createCluster = flag.Bool("create-cluster", false, "force creation of a new cluster (deletes existing one)")
+	useArgocdApi  = flag.Bool("use-argocd-api", false, "force all tests to use the Argo CD API instead of CLI")
 	binaryPath    = flag.String("binary", "./bin/argocd-diff-preview", "path to the Go binary (relative to repo root)")
 	dockerImage   = flag.String("image", "argocd-diff-preview", "Docker image name to use")
 )
@@ -57,6 +58,9 @@ type TestCase struct {
 	HideDeletedAppDiff         string
 	IgnoreResources            string
 	ArgocdLoginOptions         string
+	UseArgocdApi               string // "true" = force enable, "false" = force disable, "" = use global flag
+	DisableClusterRoles        string // Mount createClusterRoles.yaml (sets createClusterRoles: false)
+	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
 // testCases defines all integration test cases matching the Makefile
@@ -166,6 +170,7 @@ var testCases = []TestCase{
 		Suffix:                     "-9",
 		WatchIfNoWatchPatternFound: "true",
 		AutoDetectFilesChanged:     "true",
+		UseArgocdApi:               "true",
 	},
 	{
 		Name:         "branch-6/target",
@@ -208,10 +213,11 @@ var testCases = []TestCase{
 		FilesChanged: "examples/ignore-differences/app.yaml",
 	},
 	{
-		Name:         "branch-11/target-1",
-		TargetBranch: "integration-test/branch-11/target",
-		BaseBranch:   "integration-test/branch-11/base",
-		Suffix:       "-1",
+		Name:                   "branch-11/target-1",
+		TargetBranch:           "integration-test/branch-11/target",
+		BaseBranch:             "integration-test/branch-11/base",
+		Suffix:                 "-1",
+		AutoDetectFilesChanged: "true",
 	},
 	{
 		Name:                   "branch-12/target-1",
@@ -242,6 +248,24 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-13/base",
 		Suffix:       "-2",
 		Selector:     "team=your-team",
+	},
+	// This test verifies that disabling cluster roles without using the API fails.
+	// When createClusterRoles: false is set but --use-argocd-api is not used,
+	// the tool should fail because it can't access cluster resources via CLI.
+	// NOTE: This test MUST create a new cluster because the role changes only take
+	// effect when ArgoCD is installed during cluster creation.
+	// NOTE: UseArgocdApi is explicitly set to "false" to override the global flag,
+	// because this test specifically tests the failure case without the API.
+	{
+		Name:                   "branch-1/target-no-cluster-roles",
+		TargetBranch:           "integration-test/branch-1/target",
+		BaseBranch:             "integration-test/branch-1/base",
+		Suffix:                 "-no-cluster-roles",
+		DisableClusterRoles:    "true",
+		CreateCluster:          "true",
+		UseArgocdApi:           "false",
+		AutoDetectFilesChanged: "true",
+		ExpectFailure:          true,
 	},
 }
 
@@ -276,6 +300,10 @@ func TestIntegration(t *testing.T) {
 		if err := buildDockerImage(); err != nil {
 			t.Fatalf("Failed to build Docker image: %v", err)
 		}
+	}
+
+	if err := deleteKindCluster(); err != nil {
+		t.Logf("Warning: failed to delete kind cluster: %v", err)
 	}
 
 	// Clean up cluster after all tests complete
@@ -361,6 +389,11 @@ func deleteKindCluster() error {
 // createCluster indicates whether this test should create a new cluster (true for first test)
 // Both Go binary and Docker run from repo root for consistency
 func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
+	// Force cluster creation if the test case requires it (e.g., for testing role changes)
+	if tc.CreateCluster == "true" {
+		createCluster = true
+	}
+
 	// All directories are at repo root (parent of integration-test/)
 	baseBranchDir := "../base-branch"
 	targetBranchDir := "../target-branch"
@@ -384,6 +417,16 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 	} else {
 		err = runWithGoBinary(tc, createCluster)
 	}
+
+	// Handle expected failures
+	if tc.ExpectFailure {
+		if err != nil {
+			t.Logf("Test failed as expected: %v", err)
+			return // Success - we expected it to fail
+		}
+		t.Fatalf("Expected test to fail, but it succeeded")
+	}
+
 	if err != nil {
 		t.Fatalf("Failed to run tool: %v", err)
 	}
@@ -527,6 +570,33 @@ func runWithGoBinary(tc TestCase, createCluster bool) error {
 		return fmt.Errorf("failed to get repo root: %w", err)
 	}
 
+	// If DisableClusterRoles is set, temporarily replace argocd-config/values.yaml
+	// with the createClusterRoles.yaml file (which sets createClusterRoles: false)
+	if tc.DisableClusterRoles == "true" {
+		valuesPath := filepath.Join(repoRoot, "argocd-config", "values.yaml")
+		createClusterRolesPath := filepath.Join(repoRoot, "integration-test", "createClusterRoles.yaml")
+
+		// Backup original values.yaml
+		originalContent, err := os.ReadFile(valuesPath)
+		if err != nil {
+			return fmt.Errorf("failed to read original values.yaml: %w", err)
+		}
+
+		// Copy createClusterRoles.yaml to values.yaml
+		newContent, err := os.ReadFile(createClusterRolesPath)
+		if err != nil {
+			return fmt.Errorf("failed to read createClusterRoles.yaml: %w", err)
+		}
+		if err := os.WriteFile(valuesPath, newContent, 0644); err != nil {
+			return fmt.Errorf("failed to write values.yaml: %w", err)
+		}
+
+		// Restore original values.yaml after the test
+		defer func() {
+			_ = os.WriteFile(valuesPath, originalContent, 0644)
+		}()
+	}
+
 	// Binary path is relative to repo root
 	absBinaryPath := filepath.Join(repoRoot, *binaryPath)
 
@@ -602,7 +672,12 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		"-v", fmt.Sprintf("%s/secrets:/secrets", repoRoot),
 		"-v", fmt.Sprintf("%s/temp:/temp", repoRoot),
 		"-v", fmt.Sprintf("%s/kind-config:/kind-config", repoRoot),
-		"-v", fmt.Sprintf("%s/argocd-config:/argocd-config", repoRoot),
+	}
+
+	// Mount argocd-config: when use_argocd_api is true or DisableClusterRoles is set,
+	// mount the special createClusterRoles.yaml file
+	if tc.UseArgocdApi == "true" || *useArgocdApi || tc.DisableClusterRoles == "true" {
+		args = append(args, "-v", fmt.Sprintf("%s/integration-test/createClusterRoles.yaml:/argocd-config/values.yaml", repoRoot))
 	}
 
 	// Pass Docker API version if needed (when client is newer than server)
@@ -650,12 +725,18 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	if tc.KindOptions != "" {
 		args = append(args, "-e", fmt.Sprintf("KIND_OPTIONS=%s", tc.KindOptions))
 	}
+	// UseArgocdApi: "true" = force enable, "false" = force disable, "" = use global flag
+	if tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi) {
+		args = append(args, "-e", "USE_ARGOCD_API=true")
+	}
 
 	// Set CREATE_CLUSTER based on the createCluster parameter (overrides tc.CreateCluster)
 	args = append(args, "-e", fmt.Sprintf("CREATE_CLUSTER=%t", createCluster))
 
-	// Always keep cluster alive (tests reuse the cluster)
-	args = append(args, "-e", "KEEP_CLUSTER_ALIVE=true")
+	// Keep cluster alive unless test expects failure (cluster may be in broken state)
+	if !tc.ExpectFailure {
+		args = append(args, "-e", "KEEP_CLUSTER_ALIVE=true")
+	}
 
 	// Add image and namespace argument
 	args = append(args, *dockerImage)
@@ -691,7 +772,11 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 		"--line-count", getLineCount(tc),
 		"--max-diff-length", getMaxDiffLength(tc),
 		"--title", getTitle(tc),
-		"--keep-cluster-alive",
+	}
+
+	// Don't keep cluster alive for tests that expect failure (cluster may be in broken state)
+	if !tc.ExpectFailure {
+		args = append(args, "--keep-cluster-alive")
 	}
 
 	if *debug {
@@ -727,6 +812,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	}
 	if tc.KindOptions != "" {
 		args = append(args, "--kind-options", tc.KindOptions)
+	}
+	// UseArgocdApi: "true" = force enable, "false" = force disable, "" = use global flag
+	if tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi) {
+		args = append(args, "--use-argocd-api")
 	}
 
 	// Set --create-cluster based on the createCluster parameter (overrides tc.CreateCluster)

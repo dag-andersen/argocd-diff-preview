@@ -5,20 +5,27 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
 	"k8s.io/client-go/util/homedir"
 	"sigs.k8s.io/yaml"
 
@@ -31,6 +38,7 @@ type K8sClient struct {
 	discoveryClient       discovery.DiscoveryInterface
 	cachedDiscoveryClient *disk.CachedDiscoveryClient
 	mapper                *restmapper.DeferredDiscoveryRESTMapper
+	config                *rest.Config
 }
 
 func NewK8sClient(disableClientThrottling bool) (*K8sClient, error) {
@@ -104,6 +112,7 @@ func NewK8sClient(disableClientThrottling bool) (*K8sClient, error) {
 		discoveryClient:       discoveryClient,
 		cachedDiscoveryClient: cachedDiscoveryClient,
 		mapper:                mapper,
+		config:                config,
 	}, nil
 }
 
@@ -115,39 +124,56 @@ func (c *K8sClient) CheckIfResourceExists(gvr schema.GroupVersionResource, names
 	return true, nil
 }
 
-func (c *K8sClient) GetArgoCDApplications(namespace string) (string, error) {
-	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-
-	result, err := c.clientSet.Resource(applicationRes).Namespace(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return "", err
-	}
-
-	// convert result to string
-	resultString, err := json.Marshal(result)
-	if err != nil {
-		return "", err
-	}
-
-	return string(resultString), nil
-}
-
 // GetArgoCDApplication gets a single ArgoCD application by name
-func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (string, error) {
+func (c *K8sClient) GetArgoCDApplication(namespace string, name string) (*v1alpha1.Application, error) {
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
 	result, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// convert result to string
-	resultString, err := json.Marshal(result)
+	// Convert unstructured to typed Application
+	var app v1alpha1.Application
+	resultJSON, err := json.Marshal(result.Object)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to marshal unstructured object: %w", err)
 	}
 
-	return string(resultString), nil
+	if err := json.Unmarshal(resultJSON, &app); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal to Application: %w", err)
+	}
+
+	return &app, nil
+}
+
+// SetArgoCDAppRefreshAnnotation sets the refresh annotation on an ArgoCD application to trigger a refresh
+func (c *K8sClient) SetArgoCDAppRefreshAnnotation(namespace string, name string) error {
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+
+	// Get the current application
+	app, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get application %s: %w", name, err)
+	}
+
+	// Get current annotations or create new map
+	annotations := app.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	// Set the refresh annotation
+	annotations[v1alpha1.AnnotationKeyRefresh] = "normal"
+	app.SetAnnotations(annotations)
+
+	// Update the application
+	_, err = c.clientSet.Resource(applicationRes).Namespace(namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to update application %s with refresh annotation: %w", name, err)
+	}
+
+	return nil
 }
 
 // DeleteArgoCDApplication deletes a single ArgoCD application by name
@@ -549,6 +575,53 @@ func (c *K8sClient) GetSecretValue(namespace string, name string, key string) (s
 	return string(decoded), nil
 }
 
+// GetListOfNamespacedScopedResources returns metadata about all namespaced resource types
+// Returns a map where the key is schema.GroupKind and the value is true (indicating the resource is namespaced)
+// This format matches the interface expected by Argo CD's kubeutil.ResourceInfoProvider
+func (c *K8sClient) GetListOfNamespacedScopedResources() (map[schema.GroupKind]bool, error) {
+	namespacedScopedResources := make(map[schema.GroupKind]bool)
+
+	// Get all API resources from the cluster
+	_, apiResourceLists, err := c.discoveryClient.ServerGroupsAndResources()
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover API resources: %w", err)
+	}
+
+	// Iterate through all resource groups and versions
+	for _, apiResourceList := range apiResourceLists {
+		// Parse GroupVersion to extract the group
+		gv, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Failed to parse GroupVersion: %s", apiResourceList.GroupVersion)
+			continue
+		}
+
+		// Check each resource in the API group
+		for _, apiResource := range apiResourceList.APIResources {
+			// Skip if this is a cluster-scoped resource (not namespaced)
+			if !apiResource.Namespaced {
+				continue
+			}
+
+			// Skip subresources (e.g., "pods/log", "deployments/scale")
+			if strings.Contains(apiResource.Name, "/") {
+				continue
+			}
+
+			// Create key as schema.GroupKind
+			gk := schema.GroupKind{
+				Group: gv.Group,
+				Kind:  apiResource.Kind,
+			}
+
+			// Store with value true (indicating this resource is namespaced)
+			namespacedScopedResources[gk] = true
+		}
+	}
+
+	return namespacedScopedResources, nil
+}
+
 // WaitForDeploymentReady waits for a deployment to be available
 // Looks for deployments with label app.kubernetes.io/name={name}
 func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSeconds int) error {
@@ -680,4 +753,136 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 			time.Sleep(pollInterval)
 		}
 	}
+}
+
+// GetConfig returns the rest.Config used by the client
+func (c *K8sClient) GetConfig() *rest.Config {
+	return c.config
+}
+
+// PortForwardToPod sets up a port forward to a pod in the specified namespace
+// Returns a channel that will be closed when the port forward is ready, a stop channel to terminate the forward,
+// and an error if the setup fails
+func (c *K8sClient) PortForwardToPod(namespace, podName string, localPort, remotePort int, readyChan chan struct{}, stopChan chan struct{}) error {
+	// Create a Kubernetes clientset for pod operations
+	clientset, err := kubernetes.NewForConfig(c.config)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes clientset: %w", err)
+	}
+
+	// Build the URL for port forwarding
+	req := clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Namespace(namespace).
+		Name(podName).
+		SubResource("portforward")
+
+	// Create SPDY transport for the connection
+	transport, upgrader, err := spdy.RoundTripperFor(c.config)
+	if err != nil {
+		return fmt.Errorf("failed to create SPDY round tripper: %w", err)
+	}
+
+	// Create dialer
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+
+	// Set up port forwarding
+	ports := []string{fmt.Sprintf("%d:%d", localPort, remotePort)}
+
+	// Use io.Discard instead of os.Stdout/os.Stderr to avoid cluttering logs
+	// Create port forwarder
+	fw, err := portforward.New(dialer, ports, stopChan, readyChan, io.Discard, io.Discard)
+	if err != nil {
+		return fmt.Errorf("failed to create port forwarder: %w", err)
+	}
+
+	// Create error channel to capture ForwardPorts errors
+	errChan := make(chan error, 1)
+
+	// Start port forwarding in a goroutine
+	go func() {
+		if err := fw.ForwardPorts(); err != nil {
+			log.Error().Err(err).Msg("Port forward failed")
+			errChan <- err
+		}
+	}()
+
+	return nil
+}
+
+// GetServiceNameByLabel finds a service in the namespace with the specified label selector
+// Returns the name of the first matching service, or an error if no service is found
+func (c *K8sClient) GetServiceNameByLabel(namespace, labelSelector string) (string, error) {
+	// Create a Kubernetes clientset
+	clientset, err := kubernetes.NewForConfig(c.config)
+	if err != nil {
+		return "", fmt.Errorf("failed to create kubernetes clientset: %w", err)
+	}
+
+	// List services matching the label selector
+	services, err := clientset.CoreV1().Services(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: labelSelector,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to list services with label %s: %w", labelSelector, err)
+	}
+
+	if len(services.Items) == 0 {
+		return "", fmt.Errorf("no services found with label %s in namespace %s", labelSelector, namespace)
+	}
+
+	// Return the first matching service name
+	serviceName := services.Items[0].Name
+	log.Debug().Msgf("Found service %s with label %s in namespace %s", serviceName, labelSelector, namespace)
+	return serviceName, nil
+}
+
+// PortForwardToService sets up a port forward to a service by finding a pod for that service
+// Returns a channel that will be closed when the port forward is ready, a stop channel to terminate the forward,
+// and an error if the setup fails
+func (c *K8sClient) PortForwardToService(namespace, serviceName string, localPort, remotePort int, readyChan chan struct{}, stopChan chan struct{}) error {
+	// Create a Kubernetes clientset
+	clientset, err := kubernetes.NewForConfig(c.config)
+	if err != nil {
+		return fmt.Errorf("failed to create kubernetes clientset: %w", err)
+	}
+
+	// Get the service to find its selector
+	service, err := clientset.CoreV1().Services(namespace).Get(context.Background(), serviceName, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get service %s: %w", serviceName, err)
+	}
+
+	// Build label selector from service selector
+	selector := metav1.FormatLabelSelector(&metav1.LabelSelector{MatchLabels: service.Spec.Selector})
+
+	// Find pods matching the service selector
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list pods for service %s: %w", serviceName, err)
+	}
+
+	if len(pods.Items) == 0 {
+		return fmt.Errorf("no pods found for service %s with selector %s", serviceName, selector)
+	}
+
+	// Find a running pod
+	var targetPod *corev1.Pod
+	for i := range pods.Items {
+		if pods.Items[i].Status.Phase == corev1.PodRunning {
+			targetPod = &pods.Items[i]
+			break
+		}
+	}
+
+	if targetPod == nil {
+		return fmt.Errorf("no running pods found for service %s", serviceName)
+	}
+
+	log.Debug().Msgf("Using pod %s for port forwarding to service %s", targetPod.Name, serviceName)
+
+	// Forward to the selected pod
+	return c.PortForwardToPod(namespace, targetPod.Name, localPort, remotePort, readyChan, stopChan)
 }

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -1055,7 +1056,7 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 
 			annotations, _, err := unstructured.NestedStringMap(ttc.app.Object, "metadata", "annotations")
 			assert.NoError(t, err)
-			manifestGeneratePaths := annotations["argocd.argoproj.io/manifest-generate-paths"]
+			manifestGeneratePaths := annotations[v1alpha1.AnnotationKeyManifestGeneratePaths]
 			got, _ := app.filterByManifestGeneratePaths(manifestGeneratePaths, ttc.files)
 			assert.Equal(t, ttc.changeExpected, got)
 		})

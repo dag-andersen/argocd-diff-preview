@@ -1,72 +1,14 @@
 package argocd
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
-
-	"github.com/rs/zerolog/log"
 )
 
 var (
 	maxMajorVersionDriftAllowed = 0
 	maxMinorVersionDriftAllowed = 3
 )
-
-// Check Argo CD CLI version vs Argo CD Server version
-func (a *ArgoCDInstallation) CheckArgoCDCLIVersionVsServerVersion() error {
-	var out string
-	var err error
-	maxRetries := 3
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		out, err = a.runArgocdCommand("version", "-o", "json")
-		if err == nil {
-			break
-		}
-		if attempt < maxRetries {
-			log.Debug().Msgf("argocd version command failed (attempt %d/%d), retrying in 1s: %v", attempt, maxRetries, err)
-			time.Sleep(1 * time.Second)
-		}
-	}
-	if err != nil {
-		return fmt.Errorf("command 'argocd version -o json' failed: %w", err)
-	}
-
-	type versionInfo struct {
-		Version string `json:"Version"`
-	}
-
-	type argocdVersionOutput struct {
-		Client versionInfo `json:"client"`
-		Server versionInfo `json:"server"`
-	}
-
-	var versionOutput argocdVersionOutput
-	if err := json.Unmarshal([]byte(out), &versionOutput); err != nil {
-		return fmt.Errorf("failed to parse argocd version output: %w", err)
-	}
-
-	log.Debug().Msgf("Argo CD Version: [CLI: '%s', Server: '%s']", versionOutput.Client.Version, versionOutput.Server.Version)
-
-	clientMajor, clientMinor, err := extractMajorMinorVersion(versionOutput.Client.Version)
-	if err != nil {
-		return fmt.Errorf("failed to extract major minor version from cli version: %w", err)
-	}
-	serverMajor, serverMinor, err := extractMajorMinorVersion(versionOutput.Server.Version)
-	if err != nil {
-		return fmt.Errorf("failed to extract major minor version from server version: %w", err)
-	}
-
-	majorDrift, minorDrift := checkVersionDrift(clientMajor, clientMinor, serverMajor, serverMinor)
-	if majorDrift {
-		log.Warn().Msgf("⚠️ Argo CD CLI major version (%d.%d) differs from server major version (%d.%d). This may cause compatibility issues.", clientMajor, clientMinor, serverMajor, serverMinor)
-	} else if minorDrift {
-		log.Warn().Msgf("⚠️ Argo CD CLI minor version (%d.%d) differs significantly from server minor version (%d.%d). This may cause compatibility issues.", clientMajor, clientMinor, serverMajor, serverMinor)
-	}
-
-	return nil
-}
 
 // extractMajorMinorVersion extracts the major and minor version from a version string like "v3.2.2+8d0dde1"
 func extractMajorMinorVersion(version string) (int, int, error) {
