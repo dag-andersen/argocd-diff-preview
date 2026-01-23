@@ -198,6 +198,7 @@ func run(cfg *Config) error {
 		cfg.ArgocdChartRepoPassword,
 		cfg.ArgocdLoginOptions,
 		cfg.UseArgoCDApi,
+		cfg.ArgocdAuthToken,
 	)
 
 	// Ensure cleanup is performed when we exit (e.g., stopping port forwards)

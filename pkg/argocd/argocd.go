@@ -44,7 +44,7 @@ type ArgoCDInstallation struct {
 	operations        Operations // CLI or API implementation
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, useAPI bool) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, useAPI bool, authToken string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:         client,
 		Namespace:         namespace,
@@ -56,7 +56,7 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 		ChartRepoPassword: repoPassword,
 		LoginOptions:      loginOptions,
 		useAPI:            useAPI,
-		operations:        NewOperations(useAPI, client, namespace, loginOptions),
+		operations:        NewOperations(useAPI, client, namespace, loginOptions, authToken),
 	}
 }
 

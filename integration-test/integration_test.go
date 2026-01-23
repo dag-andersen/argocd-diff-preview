@@ -58,6 +58,7 @@ type TestCase struct {
 	HideDeletedAppDiff         string
 	IgnoreResources            string
 	ArgocdLoginOptions         string
+	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
 	UseArgocdApi               string // "true" = force enable, "false" = force disable, "" = use global flag
 	DisableClusterRoles        string // Mount createClusterRoles.yaml (sets createClusterRoles: false)
 	ExpectFailure              bool   // If true, the test is expected to fail
@@ -267,6 +268,17 @@ var testCases = []TestCase{
 		AutoDetectFilesChanged: "true",
 		ExpectFailure:          true,
 	},
+	// Test that an invalid auth token causes the tool to fail.
+	// This tests the token authentication path instead of username/password login.
+	{
+		Name:            "branch-1/target-invalid-token",
+		TargetBranch:    "integration-test/branch-1/target",
+		BaseBranch:      "integration-test/branch-1/base",
+		Suffix:          "-invalid-token",
+		ArgocdAuthToken: "abc",
+		FilesChanged:    "examples/helm/applications/nginx.yaml",
+		ExpectFailure:   true,
+	},
 }
 
 // timePattern matches timing information in output that varies between runs
@@ -329,14 +341,17 @@ func TestIntegration(t *testing.T) {
 	// Track how many tests since last cluster creation
 	testsSinceClusterCreation := 0
 
+	// Track if the previous test modified the cluster in a way that requires recreation
+	forceNextClusterCreation := false
+
 	// Run each test case
 	for i, tc := range shuffledCases {
-		// Create cluster if: first test, every 8th test, or no cluster exists
-		// This handles the case where a test exits early without creating a cluster
-		createCluster := testsSinceClusterCreation == 0 || testsSinceClusterCreation >= 8 || !kindClusterExists()
+		// Create cluster if: first test, every 8th test, no cluster exists, or previous test requires it
+		createCluster := testsSinceClusterCreation == 0 || testsSinceClusterCreation >= 8 || !kindClusterExists() || forceNextClusterCreation
 		if createCluster {
 			testsSinceClusterCreation = 0
 		}
+		forceNextClusterCreation = false // Reset for this iteration
 
 		// Print separator to TTY for visibility between test runs
 		runMode := "go"
@@ -349,6 +364,12 @@ func TestIntegration(t *testing.T) {
 		})
 
 		testsSinceClusterCreation++
+
+		// If this test modified the cluster configuration (e.g., disabled cluster roles),
+		// force the next test to create a fresh cluster to avoid polluting other tests.
+		if tc.DisableClusterRoles == "true" {
+			forceNextClusterCreation = true
+		}
 
 		// Stop on first failure (fail fast)
 		if t.Failed() {
@@ -746,6 +767,10 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		args = append(args, fmt.Sprintf("--argocd-login-options=%s", tc.ArgocdLoginOptions))
 	}
 
+	if tc.ArgocdAuthToken != "" {
+		args = append(args, fmt.Sprintf("--argocd-auth-token=%s", tc.ArgocdAuthToken))
+	}
+
 	cmd := exec.Command("docker", args...)
 
 	// Try to get TTY for real-time output (Go test captures stdout/stderr)
@@ -772,6 +797,8 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 		"--line-count", getLineCount(tc),
 		"--max-diff-length", getMaxDiffLength(tc),
 		"--title", getTitle(tc),
+		"--keep-cluster-alive",
+		"--disable-client-throttling",
 	}
 
 	// Don't keep cluster alive for tests that expect failure (cluster may be in broken state)
@@ -823,6 +850,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	if tc.ArgocdLoginOptions != "" {
 		args = append(args, "--argocd-login-options", tc.ArgocdLoginOptions)
+	}
+
+	if tc.ArgocdAuthToken != "" {
+		args = append(args, "--argocd-auth-token", tc.ArgocdAuthToken)
 	}
 
 	return args

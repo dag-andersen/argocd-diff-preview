@@ -53,8 +53,28 @@ func parseAPIError(body []byte, statusCode int) error {
 	return fmt.Errorf("ArgoCD API returned status %d: %s", statusCode, string(body))
 }
 
-// Login performs login to ArgoCD using the HTTP API
+// Login performs login to ArgoCD using the HTTP API.
+// If an auth token was provided during construction, this method will use that token
+// instead of authenticating with username/password.
 func (a *APIOperations) Login() error {
+
+	// Set up port forward to ArgoCD server
+	if err := a.portForwardToArgoCD(); err != nil {
+		return fmt.Errorf("failed to set up port forward: %w", err)
+	}
+
+	// Check if we already have a token (provided during construction)
+	if a.connection.authToken != "" {
+		log.Info().Msg("🔑 Using provided auth token for Argo CD API authentication")
+		// Verify the token by making a simple API call
+		log.Debug().Msg("Verifying token by listing applications...")
+		if err := a.verifyToken(); err != nil {
+			log.Error().Err(err).Msg("❌ Failed to verify provided auth token")
+			return fmt.Errorf("token verification failed: %w", err)
+		}
+		return nil
+	}
+
 	log.Info().Msg("🦑 Logging in to Argo CD via API...")
 
 	// Get initial admin password
@@ -64,11 +84,6 @@ func (a *APIOperations) Login() error {
 	}
 
 	username := "admin"
-
-	// Set up port forward to ArgoCD server
-	if err := a.portForwardToArgoCD(); err != nil {
-		return fmt.Errorf("failed to set up port forward: %w", err)
-	}
 
 	// Prepare the login request payload
 	loginData := map[string]string{
@@ -153,6 +168,47 @@ func (a *APIOperations) Login() error {
 	}
 
 	return fmt.Errorf("failed to login after %d attempts", maxAttempts)
+}
+
+// verifyToken checks if the provided auth token is valid by making a simple API call
+// to list applications. This mirrors the CLI behavior which validates tokens on login.
+func (a *APIOperations) verifyToken() error {
+	url := fmt.Sprintf("%s/api/v1/applications", a.connection.apiServerURL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.connection.authToken))
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make HTTP request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unauthorized: invalid or expired token: %s", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return parseAPIError(body, resp.StatusCode)
+	}
+
+	log.Debug().Msg("Token verification successful")
+	return nil
 }
 
 // GetManifests returns the manifests for an application using the ArgoCD API.

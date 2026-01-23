@@ -41,7 +41,7 @@
   },
   "remoteEnv": {
     "GO111MODULE": "on",
-    "CGO_ENABLED": "0"
+    "CGO_ENABLED": "1"
   },
   "mounts": [
     "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
