@@ -18,7 +18,7 @@ type ExtractedApp struct {
 	Id         string
 	Name       string
 	SourcePath string
-	Manifest   []unstructured.Unstructured
+	Manifests  []unstructured.Unstructured
 	Branch     git.BranchType
 }
 
@@ -28,7 +28,7 @@ func CreateExtractedApp(id string, name string, sourcePath string, manifest []un
 		Id:         id,
 		Name:       name,
 		SourcePath: sourcePath,
-		Manifest:   manifest,
+		Manifests:  manifest,
 		Branch:     branch,
 	}
 }
@@ -36,7 +36,7 @@ func CreateExtractedApp(id string, name string, sourcePath string, manifest []un
 func (e *ExtractedApp) FlattenToString(ignoreResourceRules []resource_filter.IgnoreResourceRule) (string, error) {
 	e.sortManifests()
 	var manifestStrings []string
-	for _, manifest := range e.Manifest {
+	for _, manifest := range e.Manifests {
 
 		// If there are ignore resource rules, check if the manifest should be ignored
 		if len(ignoreResourceRules) > 0 {
@@ -61,13 +61,13 @@ func (e *ExtractedApp) FlattenToString(ignoreResourceRules []resource_filter.Ign
 func (e *ExtractedApp) sortManifests() {
 	// Sort by API version, then by kind, then by name, with CRDs always at the end
 
-	sort.SliceStable(e.Manifest, func(i, j int) bool {
-		apiI := e.Manifest[i].GetAPIVersion()
-		apiJ := e.Manifest[j].GetAPIVersion()
-		kindI := e.Manifest[i].GetKind()
-		kindJ := e.Manifest[j].GetKind()
-		nameI := e.Manifest[i].GetName()
-		nameJ := e.Manifest[j].GetName()
+	sort.SliceStable(e.Manifests, func(i, j int) bool {
+		apiI := e.Manifests[i].GetAPIVersion()
+		apiJ := e.Manifests[j].GetAPIVersion()
+		kindI := e.Manifests[i].GetKind()
+		kindJ := e.Manifests[j].GetKind()
+		nameI := e.Manifests[i].GetName()
+		nameJ := e.Manifests[j].GetName()
 
 		// CRDs should always be at the end
 		isCRD_I := kindI == "CustomResourceDefinition"

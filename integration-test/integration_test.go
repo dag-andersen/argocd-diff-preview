@@ -715,6 +715,7 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	args = append(args, "-e", fmt.Sprintf("MAX_DIFF_LENGTH=%s", getMaxDiffLength(tc)))
 	args = append(args, "-e", fmt.Sprintf("TITLE=%s", getTitle(tc)))
 	args = append(args, "-e", fmt.Sprintf("ARGOCD_NAMESPACE=%s", argocdNamespace))
+	args = append(args, "-e", "DISABLE_CLIENT_THROTTLING=true")
 
 	if tc.FileRegex != "" {
 		args = append(args, "-e", fmt.Sprintf("FILE_REGEX=%s", tc.FileRegex))
@@ -759,17 +760,16 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		args = append(args, "-e", "KEEP_CLUSTER_ALIVE=true")
 	}
 
-	// Add image and namespace argument
-	args = append(args, *dockerImage)
-	args = append(args, fmt.Sprintf("--argocd-namespace=%s", argocdNamespace))
-
 	if tc.ArgocdLoginOptions != "" {
-		args = append(args, fmt.Sprintf("--argocd-login-options=%s", tc.ArgocdLoginOptions))
+		args = append(args, "-e", fmt.Sprintf("ARGOCD_LOGIN_OPTIONS=%s", tc.ArgocdLoginOptions))
 	}
 
 	if tc.ArgocdAuthToken != "" {
-		args = append(args, fmt.Sprintf("--argocd-auth-token=%s", tc.ArgocdAuthToken))
+		args = append(args, "-e", fmt.Sprintf("ARGOCD_AUTH_TOKEN=%s", tc.ArgocdAuthToken))
 	}
+
+	// Add image (no additional args needed - all config is via env vars)
+	args = append(args, *dockerImage)
 
 	cmd := exec.Command("docker", args...)
 

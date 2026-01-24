@@ -163,7 +163,6 @@ func (a *APIOperations) Login() error {
 		a.connection.authToken = sessionResponse.Token
 
 		log.Debug().Msgf("Login successful on attempt %d", attempt)
-		log.Info().Msg("🔑 Successfully obtained ArgoCD token via API")
 		return nil
 	}
 

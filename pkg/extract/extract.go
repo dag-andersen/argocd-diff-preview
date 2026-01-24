@@ -33,9 +33,9 @@ func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
 // const worker count
 const maxWorkers = 40
 
-// RenderApplicaitonsFromBothBranches extracts resources from both base and target branches
+// RenderApplicationsFromBothBranches extracts resources from both base and target branches
 // by applying their manifests to the cluster and capturing the resulting resources
-func RenderApplicaitonsFromBothBranches(
+func RenderApplicationsFromBothBranches(
 	argocd *argocdPkg.ArgoCDInstallation,
 	timeout uint64,
 	baseApps []argoapplication.ArgoResource,

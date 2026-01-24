@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -12,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/klog/v2"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
@@ -501,6 +503,10 @@ func (o *RawOptions) parseClusterType() (cluster.Provider, error) {
 
 // configureLogging sets up the logger based on the config
 func configureLogging(cfg *Config) {
+	// Suppress klog warnings from client-go (e.g., "unrecognized format" warnings).
+	// Without this, installing the Argo CD Helm chart will print "Warning: unrecognized format "int64"".
+	klog.SetOutput(io.Discard)
+
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true}
 	if cfg.Debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
