@@ -198,6 +198,7 @@ func run(cfg *Config) error {
 		cfg.ArgocdChartRepoPassword,
 		cfg.ArgocdLoginOptions,
 		cfg.UseArgoCDApi,
+		cfg.ArgocdAuthToken,
 	)
 
 	// Ensure cleanup is performed when we exit (e.g., stopping port forwards)
@@ -303,7 +304,7 @@ func run(cfg *Config) error {
 
 	// Extract resources from the cluster based on each branch, passing the manifests directly
 	deleteAfterProcessing := !cfg.CreateCluster
-	baseManifests, targetManifests, extractDuration, err := extract.RenderApplicaitonsFromBothBranches(
+	baseManifests, targetManifests, extractDuration, err := extract.RenderApplicationsFromBothBranches(
 		argocd,
 		cfg.Timeout,
 		baseApps.SelectedApps,

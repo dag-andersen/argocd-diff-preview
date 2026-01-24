@@ -18,6 +18,7 @@ type CLIOperations struct {
 	k8sClient    *utils.K8sClient
 	namespace    string
 	loginOptions string
+	authToken    string // When set, used as ARGOCD_AUTH_TOKEN env var for CLI commands
 }
 
 // runArgocdCommand executes an argocd CLI command with port forwarding and a 60-second timeout
@@ -27,6 +28,12 @@ func (c *CLIOperations) runArgocdCommand(args ...string) (string, error) {
 
 	cmd := exec.CommandContext(ctx, "argocd", args...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", c.namespace))
+
+	// If an auth token is set, pass it as ARGOCD_AUTH_TOKEN environment variable
+	if c.authToken != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("ARGOCD_AUTH_TOKEN=%s", c.authToken))
+	}
+
 	output, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
@@ -42,8 +49,21 @@ func (c *CLIOperations) runArgocdCommand(args ...string) (string, error) {
 	return string(output), nil
 }
 
-// Login performs login to ArgoCD using the CLI
+// Login performs login to ArgoCD using the CLI.
+// If a token was provided during construction, this method will skip the normal authentication
+// and use the provided token instead (passed as ARGOCD_AUTH_TOKEN env var to CLI commands).
 func (c *CLIOperations) Login() error {
+	// If a token is already set, skip the login process
+	if c.authToken != "" {
+		log.Info().Msg("🔑 Using provided auth token for Argo CD CLI authentication")
+		log.Debug().Msg("Verifying token by listing applications...")
+		if _, errList := c.runArgocdCommand("app", "list"); errList != nil {
+			log.Error().Err(errList).Msg("❌ Failed to list applications with provided token (verification step).")
+			return fmt.Errorf("token verification failed (unable to list applications): %w", errList)
+		}
+		return nil
+	}
+
 	log.Info().Msgf("🦑 Logging in to Argo CD through CLI...")
 
 	// Get initial admin password

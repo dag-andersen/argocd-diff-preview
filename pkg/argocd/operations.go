@@ -17,7 +17,9 @@ const (
 // There are two implementations: CLIOperations and APIOperations.
 // The implementation is chosen at construction time based on the useAPI flag.
 type Operations interface {
-	// Login authenticates with ArgoCD and caches credentials for future calls
+	// Login authenticates with ArgoCD and caches credentials for future calls.
+	// If a token was provided during construction, this method will skip authentication
+	// and use the provided token instead.
 	Login() error
 
 	// AppsetGenerate generates applications from an ApplicationSet file
@@ -58,7 +60,9 @@ type apiConnection struct {
 // NewOperations creates the appropriate Operations implementation based on the useAPI flag.
 // If useAPI is true, returns an APIOperations instance.
 // If useAPI is false, returns a CLIOperations instance.
-func NewOperations(useAPI bool, k8sClient *utils.K8sClient, namespace string, loginOptions string) Operations {
+// The authToken parameter is optional - if provided, it will be used instead of
+// authenticating with the ArgoCD server during Login().
+func NewOperations(useAPI bool, k8sClient *utils.K8sClient, namespace string, loginOptions string, authToken string) Operations {
 	if useAPI {
 		return &APIOperations{
 			k8sClient: k8sClient,
@@ -66,6 +70,7 @@ func NewOperations(useAPI bool, k8sClient *utils.K8sClient, namespace string, lo
 			connection: &apiConnection{
 				portForwardLocalPort: localPort,
 				apiServerURL:         fmt.Sprintf("http://localhost:%d", localPort),
+				authToken:            authToken,
 			},
 		}
 	}
@@ -73,5 +78,6 @@ func NewOperations(useAPI bool, k8sClient *utils.K8sClient, namespace string, lo
 		k8sClient:    k8sClient,
 		namespace:    namespace,
 		loginOptions: loginOptions,
+		authToken:    authToken,
 	}
 }
