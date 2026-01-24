@@ -1,8 +1,5 @@
 # Lockdown Mode (Namespace-Scoped Argo CD)
 
-!!! warning "Beta Feature"
-    This feature is currently in beta and only available in the [experimental release](https://github.com/dag-andersen/argocd-diff-preview/releases/tag/v0.1.20-experimental-lock-down-v3). Please report any issues on [GitHub](https://github.com/dag-andersen/argocd-diff-preview/issues/250).
-
 By default, Argo CD is installed with cluster-wide permissions, meaning it can read and manage resources across all namespaces. However, some organizations require a more restricted setup where Argo CD only has permissions within a single namespace. This is often referred to as "namespace-scoped" or "lockdown mode".
 
 This page explains how to use `argocd-diff-preview` with a namespace-scoped Argo CD installation.
@@ -72,7 +69,7 @@ helm install argo-cd argo/argo-cd \
   -f values.yaml
 ```
 
-## Running argocd-diff-preview in Lockdown Mode
+## Running `argocd-diff-preview` in Lockdown Mode
 
 To use lockdown mode, add the `--use-argocd-api="true"` flag:
 
@@ -86,7 +83,7 @@ docker run \
   -v $(pwd)/target-branch:/target-branch \
   -e TARGET_BRANCH=my-feature-branch \
   -e REPO=my-org/my-repo \
-  dagandersen/argocd-diff-preview:v0.1.21-experimental-lock-down-v7 \
+  dagandersen/argocd-diff-preview:v0.1.22 \
   --argocd-namespace=argocd-diff-preview \
   --create-cluster=false \
   --use-argocd-api="true"
@@ -100,4 +97,3 @@ docker run \
 ## Related Issues
 
 - [#250 - Limit ArgoCD to a single namespace](https://github.com/dag-andersen/argocd-diff-preview/issues/250)
-- [#164 - Connect to existing cluster](https://github.com/dag-andersen/argocd-diff-preview/issues/164)

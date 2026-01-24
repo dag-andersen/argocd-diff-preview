@@ -29,6 +29,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--ignore-invalid-watch-pattern`    | `IGNORE_INVALID_WATCH_PATTERN`    | `false` | Ignore invalid watch-pattern Regex on Applications                                                                               |
 | `--keep-cluster-alive`              | `KEEP_CLUSTER_ALIVE`              | `false` | Keep cluster alive after the tool finishes                                                                                       |
 | `--kind-internal`                   | `KIND_INTERNAL`                   | `false` | Use the kind cluster's internal address in the kubeconfig (allows connecting to the cluster when running the CLI in a container) |
+| `--use-argocd-api`                  | `USE_ARGOCD_API`                  | `false` | Use Argo CD API instead of CLI (useful for namespace-scoped Argo CD installations)                                               |
 | `--version`, `-v`                   | -                                 | -       | Prints version information                                                                                                       |
 
 ## Options
@@ -41,6 +42,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--argocd-chart-repo-username <username>` | `ARGOCD_CHART_REPO_USERNAME` | -                                      | Argo CD Helm Chart Private repository username                                      |
 | `--argocd-chart-repo-password <password>` | `ARGOCD_CHART_REPO_PASSWORD` | -                                      | Argo CD Helm Chart Private repository password                                      |
 | `--argocd-login-options <options>`        | `ARGOCD_LOGIN_OPTIONS`       | -                                      | Additional options to pass to `argocd login` command                                |
+| `--argocd-auth-token <token>`             | `ARGOCD_AUTH_TOKEN`          | -                                      | Argo CD authentication token (skips default admin login)                            |
 | `--argocd-namespace <namespace>`          | `ARGOCD_NAMESPACE`           | `argocd`                               | Namespace to use for Argo CD                                                        |
 | `--base-branch <branch>`, `-b`            | `BASE_BRANCH`                | `main`                                 | Base branch name                                                                    |
 | `--cluster <tool>`                        | `CLUSTER`                    | `auto`                                 | Local cluster tool. Options: `kind`, `minikube`, `k3d`, `auto`                      |
