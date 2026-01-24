@@ -142,7 +142,7 @@ You can do this by mounting a `/secrets` folder:
           -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
           -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
           -e REPO=${{ github.repository }} \
-          dagandersen/argocd-diff-preview:v0.1.21
+          dagandersen/argocd-diff-preview:v0.1.22
     ```
 
 All resources in the `/secrets` folder are applied to the cluster. The relevant secrets are typically included in the `/secrets` folder:

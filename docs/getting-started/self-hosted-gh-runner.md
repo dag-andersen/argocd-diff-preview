@@ -112,7 +112,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.21
+            dagandersen/argocd-diff-preview:v0.1.22
 
       - name: Post diff as comment
         run: |
@@ -174,6 +174,6 @@ Add the `--kind-options` flag to your workflow to use the custom configuration:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.21 \
+            dagandersen/argocd-diff-preview:v0.1.22 \
             --kind-options '--config /base-branch/hack/kind.yaml'
 ```
