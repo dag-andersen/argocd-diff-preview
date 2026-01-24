@@ -18,7 +18,6 @@ This will skip cluster creation and connect to Argo CD via port-forwarding in th
 
 ## Requirements
 
-- The default `admin` user must not be disabled in Argo CD.
 - The `default` Argo CD project must exist.
 - The required secrets for authentication have already been added to the cluster.
 

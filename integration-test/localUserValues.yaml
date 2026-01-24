@@ -1,0 +1,12 @@
+# Helm values for ArgoCD with a local user configured for integration testing
+# This is used by the auth token integration test to verify token-based authentication
+
+configs:
+  cm:
+    # Create a local user named 'testuser' with apiKey capability
+    # apiKey - allows generating authentication tokens for API access
+    accounts.testuser: apiKey
+  rbac:
+    # Grant admin permissions to the testuser
+    policy.csv: |
+      g, testuser, role:admin
