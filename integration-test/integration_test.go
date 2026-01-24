@@ -483,11 +483,24 @@ func cloneBranch(branch, targetDir string) error {
 
 	repoURL := fmt.Sprintf("https://github.com/%s/%s.git", defaultGitHubOrg, defaultGitOpsRepo)
 
-	// Clone with depth=1
-	cmd := exec.Command("git", "clone", repoURL, "--depth=1", "--branch", branch, "repo")
-	cmd.Dir = targetDir
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git clone failed: %w\nOutput: %s", err, output)
+	// Clone with depth=1, with retries for transient network errors
+	maxAttempts := 3
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		cmd := exec.Command("git", "clone", repoURL, "--depth=1", "--branch", branch, "repo")
+		cmd.Dir = targetDir
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			break // Success
+		}
+		lastErr = fmt.Errorf("git clone failed: %w\nOutput: %s", err, output)
+		if attempt < maxAttempts {
+			// Clean up failed clone attempt before retrying
+			_ = os.RemoveAll(filepath.Join(targetDir, "repo"))
+			time.Sleep(time.Duration(attempt) * 2 * time.Second) // Exponential backoff: 2s, 4s
+			continue
+		}
+		return lastErr
 	}
 
 	// Copy contents up and clean up
