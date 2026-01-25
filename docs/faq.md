@@ -4,7 +4,7 @@
 
 ### Does the tool work with `ApplicationSets`?
 
-**Short answer:** : Yes.
+**Short answer:** Yes.
 
 **Longer Answer:** Yes, but _how well it works_ depends on the complexity of your generators.
 
@@ -50,6 +50,12 @@ Yes. More info [here](./getting-started/custom-argo-cd-installation.md#argo-cd-c
 **Longer answer:** In theory, yes, but not all providers have been tested. If you are using a different Git provider and encounter issues, please open an issue in the repository. Additionally, if you have successfully used the tool with a different provider, consider contributing to the documentation so others can benefit from a working example ❤️
 
 Relevant issue: [#94](https://github.com/dag-andersen/argocd-diff-preview/issues/94)
+
+---
+
+### Why not compare the PR branch to the live cluster state?
+
+Comparing to live cluster state introduces non-determinism and ambiguity. The cluster state can change between runs, making the output unreliable and hard to trust during code review. Read more about this in the [Design Philosophy](./design-philosophy.md).
 
 ---
 
