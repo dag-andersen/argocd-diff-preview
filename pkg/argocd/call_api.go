@@ -647,8 +647,8 @@ func (a *APIOperations) portForwardToArgoCD() error {
 	// Set up port forward to argocd-server service
 	// Forward local port to pod port 8080 (the actual port the server listens on)
 	// Note: The service exposes 443, but the pod itself listens on 8080
-	// Discover the service by label "app.kubernetes.io/component=server"
-	labelSelector := "app.kubernetes.io/component=server"
+	// Discover the service by labels that work regardless of Helm release name
+	labelSelector := "app.kubernetes.io/part-of=argocd,app.kubernetes.io/component=server"
 	serviceName, err := a.k8sClient.GetServiceNameByLabel(a.namespace, labelSelector)
 	if err != nil {
 		connection.portForwardMutex.Unlock()
