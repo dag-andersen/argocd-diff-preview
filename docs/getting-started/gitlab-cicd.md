@@ -36,7 +36,7 @@ diff:
         -e REPO=${CI_MERGE_REQUEST_PROJECT_PATH} \
         dagandersen/argocd-diff-preview:v0.1.22
     - |
-      DIFF_BODY=$(jq -Rs '.' < $(pwd)/output/diff.md)
+      jq --null-input --rawfile msg $(pwd)/output/diff.md '{body: $msg}' > pr_comment.json
       NOTE_ID=$(curl --silent --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" | \
           jq '.[] | select(.body | test("Argo CD Diff Preview")) | .id')
@@ -52,7 +52,7 @@ diff:
       curl --silent --request POST --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
           --header "Content-Type: application/json" \
           --url "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/merge_requests/${CI_MERGE_REQUEST_IID}/notes" \
-          --data "{\"body\": $DIFF_BODY}" > /dev/null
+          --data @pr_comment.json > /dev/null
 
       echo "Comment added!"
   rules:
