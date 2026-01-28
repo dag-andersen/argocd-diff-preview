@@ -15,6 +15,12 @@ const noAppsFoundTemplate = `
 %message%
 `
 
+// Limits for list truncation
+const (
+	maxSelectorsToShow    = 20
+	maxChangedFilesToShow = 30
+)
+
 // WriteNoAppsFoundMessage writes a message to the output folder when no applications are found
 func WriteNoAppsFoundMessage(
 	title string,
@@ -48,32 +54,47 @@ func generateNoAppsFoundMarkdown(title, message string) string {
 
 // getNoAppsFoundMessage generates an appropriate message based on selectors and changed files
 func getNoAppsFoundMessage(selectors []app_selector.Selector, changedFiles []string) string {
-	selectorString := func(s []app_selector.Selector) string {
-		var strs []string
-		for _, selector := range s {
-			strs = append(strs, selector.String())
-		}
-		return strings.Join(strs, ",")
-	}
-
 	switch {
 	case len(selectors) > 0 && len(changedFiles) > 0:
 		return fmt.Sprintf(
 			"Found no changed Applications that matched `%s` and watched these files: `%s`",
-			selectorString(selectors),
-			strings.Join(changedFiles, "`, `"),
+			formatSelectors(selectors), formatChangedFiles(changedFiles),
 		)
 	case len(selectors) > 0:
-		return fmt.Sprintf(
-			"Found no changed Applications that matched `%s`",
-			selectorString(selectors),
-		)
+		return fmt.Sprintf("Found no changed Applications that matched `%s`", formatSelectors(selectors))
 	case len(changedFiles) > 0:
-		return fmt.Sprintf(
-			"Found no changed Applications that watched these files: `%s`",
-			strings.Join(changedFiles, "`, `"),
-		)
+		return fmt.Sprintf("Found no changed Applications that watched these files: `%s`", formatChangedFiles(changedFiles))
 	default:
 		return "Found no Applications"
 	}
+}
+
+// formatSelectors formats selectors with truncation at maxSelectorsToShow
+func formatSelectors(selectors []app_selector.Selector) string {
+	if len(selectors) == 0 {
+		return ""
+	}
+	limit := min(len(selectors), maxSelectorsToShow)
+	strs := make([]string, limit)
+	for i := range limit {
+		strs[i] = selectors[i].String()
+	}
+	result := strings.Join(strs, ", ")
+	if len(selectors) > maxSelectorsToShow {
+		result += fmt.Sprintf(" [%d more omitted]", len(selectors)-maxSelectorsToShow)
+	}
+	return result
+}
+
+// formatChangedFiles formats changed files with truncation at maxChangedFilesToShow
+func formatChangedFiles(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	limit := min(len(files), maxChangedFilesToShow)
+	result := strings.Join(files[:limit], "`, `")
+	if len(files) > maxChangedFilesToShow {
+		result += fmt.Sprintf("` [%d more omitted]", len(files)-maxChangedFilesToShow)
+	}
+	return result
 }
