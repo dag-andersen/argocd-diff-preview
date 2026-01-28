@@ -59,13 +59,15 @@ func (e *ExtractedApp) FlattenToString(ignoreResourceRules []resource_filter.Ign
 }
 
 func (e *ExtractedApp) sortManifests() {
-	// Sort by API version, then by kind, then by name, with CRDs always at the end
+	// Sort by API version, then by kind, then by namespace, then by name, with CRDs always at the end
 
 	sort.SliceStable(e.Manifests, func(i, j int) bool {
 		apiI := e.Manifests[i].GetAPIVersion()
 		apiJ := e.Manifests[j].GetAPIVersion()
 		kindI := e.Manifests[i].GetKind()
 		kindJ := e.Manifests[j].GetKind()
+		nsI := e.Manifests[i].GetNamespace()
+		nsJ := e.Manifests[j].GetNamespace()
 		nameI := e.Manifests[i].GetName()
 		nameJ := e.Manifests[j].GetName()
 
@@ -78,12 +80,15 @@ func (e *ExtractedApp) sortManifests() {
 			return !isCRD_I
 		}
 
-		// Sort by apiVersion first, then by kind, then by name
+		// Sort by apiVersion first, then by kind, then by namespace, then by name
 		if apiI != apiJ {
 			return apiI < apiJ
 		}
 		if kindI != kindJ {
 			return kindI < kindJ
+		}
+		if nsI != nsJ {
+			return nsI < nsJ
 		}
 		return nameI < nameJ
 	})
