@@ -8,6 +8,7 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 use_argocd_api ?= false
+debug ?= false
 
 GO_TEST_FLAGS ?=
 
@@ -44,7 +45,8 @@ run-with-go: go-build pull-repository
 		--files-changed="$(files_changed)" \
 		--line-count="$(line_count)" \
 		--redirect-target-revisions="HEAD" \
-		--use-argocd-api="$(use_argocd_api)"
+		--use-argocd-api="$(use_argocd_api)" \
+		--debug="$(debug)"
 
 run-with-docker: pull-repository docker-build
 	docker rm argocd-diff-preview || true
@@ -72,7 +74,8 @@ run-with-docker: pull-repository docker-build
 		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		image \
 		--argocd-namespace="$(argocd_namespace)" \
-		--use-argocd-api="$(use_argocd_api)"
+		--use-argocd-api="$(use_argocd_api)" \
+		--debug="$(debug)"
 
 mkdocs:
 	python3 -m venv venv \

@@ -381,12 +381,14 @@ func (a *ArgoCDInstallation) RefreshApp(appName string) error {
 // EnsureArgoCdIsReady waits for ArgoCD deployments to be ready
 func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
 	timeout := 300 * time.Second
-	// Wait for deployment to be ready
-	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-server", int(timeout.Seconds())); err != nil {
+	// Wait for argocd-server deployment to be ready
+	// Use component label to support nameOverride configurations
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "app.kubernetes.io/component=server,app.kubernetes.io/part-of=argocd", int(timeout.Seconds())); err != nil {
 		return fmt.Errorf("failed to wait for argocd-server to be ready: %w", err)
 	}
 
-	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "argocd-repo-server", int(timeout.Seconds())); err != nil {
+	// Wait for argocd-repo-server deployment to be ready
+	if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "app.kubernetes.io/component=repo-server,app.kubernetes.io/part-of=argocd", int(timeout.Seconds())); err != nil {
 		return fmt.Errorf("failed to wait for argocd-repo-server to be ready: %w", err)
 	}
 
