@@ -23,9 +23,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/homedir"
 	"sigs.k8s.io/yaml"
 
@@ -623,9 +623,9 @@ func (c *K8sClient) GetListOfNamespacedScopedResources() (map[schema.GroupKind]b
 }
 
 // WaitForDeploymentReady waits for a deployment to be available
-// Looks for deployments with label app.kubernetes.io/name={name}
-func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSeconds int) error {
-	log.Debug().Msgf("Waiting for deployment with label app.kubernetes.io/name=%s in namespace %s to be ready", name, namespace)
+// Uses the provided label selector to find the deployment (e.g., "app.kubernetes.io/component=server")
+func (c *K8sClient) WaitForDeploymentReady(namespace, labelSelector string, timeoutSeconds int) error {
+	log.Debug().Msgf("Waiting for deployment with labels '%s' in namespace %s to be ready", labelSelector, namespace)
 
 	// Define the Deployment resource
 	deploymentRes := schema.GroupVersionResource{
@@ -638,15 +638,12 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
 	defer cancel()
 
-	// Create label selector
-	labelSelector := fmt.Sprintf("app.kubernetes.io/name=%s", name)
-
 	// Poll until ready or timeout
 	pollInterval := 1 * time.Second
 	for {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for deployment with label app.kubernetes.io/name=%s to be ready", name)
+			return fmt.Errorf("timeout waiting for deployment with labels '%s' to be ready", labelSelector)
 		default:
 			// List deployments with the label selector
 			deploymentList, err := c.clientSet.Resource(deploymentRes).Namespace(namespace).List(ctx, metav1.ListOptions{
@@ -654,11 +651,11 @@ func (c *K8sClient) WaitForDeploymentReady(namespace, name string, timeoutSecond
 			})
 			if err != nil {
 				if strings.Contains(err.Error(), "not found") {
-					log.Debug().Msgf("Deployment %s not found, waiting...", name)
+					log.Debug().Msgf("Deployment with labels '%s' not found, waiting...", labelSelector)
 					time.Sleep(pollInterval)
 					continue
 				}
-				return fmt.Errorf("failed to list deployments with label %s: %w", labelSelector, err)
+				return fmt.Errorf("failed to list deployments with labels '%s': %w", labelSelector, err)
 			}
 
 			// Check if any deployments were found
