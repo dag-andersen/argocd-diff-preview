@@ -68,6 +68,31 @@ if err != nil {
 }
 ```
 
+### Commit Messages and PR Titles
+
+Use the format: `<Prefix> | <message>`
+
+Prefixes:
+- `Feat` - New features or enhancements
+- `Fix` - Bug fixes
+- `Docs` - Documentation changes
+- `Test` - Test additions or changes
+- `Chore` - Maintenance, refactoring, dependencies
+
+```
+# Examples
+Feat | Add support for ApplicationSets
+Fix | Resolve namespace sorting in diff output
+Docs | Update lockdown mode configuration guide
+Test | Add integration tests for multi-app scenarios
+Chore | Update ArgoCD dependency to v3.0
+```
+
+**Do NOT add issue numbers in parentheses to commit messages or PR titles.** The `(#123)` format is what GitHub automatically adds when merging/squashing PRs (and it refers to the PR number, not the issue).
+```
+
+GitHub will automatically link the issue and close it when the PR is merged.
+
 ## Project Structure
 
 ```
