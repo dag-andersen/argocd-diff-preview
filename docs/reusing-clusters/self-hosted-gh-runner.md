@@ -210,7 +210,7 @@ jobs:
 
       - name: Install argocd-diff-preview
         run: |
-          curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.22/argocd-diff-preview-Linux-x86_64.tar.gz
+          curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.23/argocd-diff-preview-Linux-x86_64.tar.gz
           tar -xvf argocd-diff-preview-Linux-x86_64.tar.gz
           sudo mv argocd-diff-preview /usr/local/bin
           argocd-diff-preview --version
@@ -254,7 +254,7 @@ If you prefer to use the Docker image (requires Docker installed on runner pods)
             -v $(pwd)/target-branch:/target-branch \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.22 \
+            dagandersen/argocd-diff-preview:v0.1.23 \
             --argocd-namespace=argocd-diff-preview \
             --create-cluster=false
 ```

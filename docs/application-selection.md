@@ -179,7 +179,7 @@ jobs:
             -v $(pwd)/main:/base-branch \
             -v $(pwd)/pull-request:/target-branch \
             -v $(pwd)/output:/output \
-            dagandersen/argocd-diff-preview:v0.1.22 \
+            dagandersen/argocd-diff-preview:v0.1.23 \
             --target-branch=refs/pull/${{ github.event.number }}/merge \
             --repo=${{ github.repository }} \
             --auto-detect-files-changed=true \
@@ -236,7 +236,7 @@ jobs:
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
             -e FILES_CHANGED="${{ steps.changed-files.outputs.all_changed_files }}" \
-            dagandersen/argocd-diff-preview:v0.1.22
+            dagandersen/argocd-diff-preview:v0.1.23
 ```
 
 ---

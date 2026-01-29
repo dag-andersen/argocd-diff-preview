@@ -71,7 +71,7 @@ Check out [How it works](https://dag-andersen.github.io/argocd-diff-preview/how-
 >    -v $(pwd)/target-branch:/target-branch \
 >    -e TARGET_BRANCH=helm-example-3 \
 >    -e REPO=dag-andersen/argocd-diff-preview \
->    dagandersen/argocd-diff-preview:v0.1.22
+>    dagandersen/argocd-diff-preview:v0.1.23
 > ```
 > 
 > and the output would be something like this:
@@ -132,7 +132,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.1.22
+            dagandersen/argocd-diff-preview:v0.1.23
 
       - name: Post diff as comment
         run: |
