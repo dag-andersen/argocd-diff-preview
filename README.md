@@ -186,6 +186,10 @@ Rendering manifests for all applications in your repository on every pull reques
   <img src="https://contrib.rocks/image?repo=dag-andersen/argocd-diff-preview" />
 </a>
 
+## Start History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=dag-andersen/argocd-diff-preview&type=date&legend=top-left)](https://www.star-history.com/#dag-andersen/argocd-diff-preview&type=date&legend=top-left)
+
 ## Contributing
 
 We welcome contributions to ArgoCD Diff Preview! Whether it's bug fixes, feature additions, or documentation improvements.
