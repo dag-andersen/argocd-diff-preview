@@ -215,6 +215,8 @@ spec:
     spec:
       project: default
       sources:
+        - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+          path: docs
         - chart: ingress-nginx
           repoURL: "https://kubernetes.github.io/ingress-nginx"
           targetRevision: 4.10.0

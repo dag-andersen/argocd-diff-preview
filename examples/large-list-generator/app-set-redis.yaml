@@ -315,6 +315,8 @@ spec:
     spec:
       project: default
       sources:
+        - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+          path: docs
         - chart: redis
           repoURL: "https://charts.bitnami.com/bitnami"
           targetRevision: 19.6.4

@@ -314,23 +314,25 @@ spec:
       name: "{{ .name }}"
     spec:
       project: default
-      source:
-        repoURL: https://github.com/dag-andersen/argocd-diff-preview
-        path: examples/kustomize/my-service/base
-        kustomize:
-          namePrefix: "{{ .name }}-"
-          commonLabels:
-            app-instance: "{{ .name }}"
-          patches:
-            - target:
-                kind: Deployment
-              patch: |-
-                - op: replace
-                  path: /spec/replicas
-                  value: {{ .replicas }}
-                - op: replace
-                  path: /spec/template/spec/containers/0/ports/0/containerPort
-                  value: {{ .port }}
+      sources:
+        - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+          path: docs
+        - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+          path: examples/kustomize/my-service/base
+          kustomize:
+            namePrefix: "{{ .name }}-"
+            commonLabels:
+              app-instance: "{{ .name }}"
+            patches:
+              - target:
+                  kind: Deployment
+                patch: |-
+                  - op: replace
+                    path: /spec/replicas
+                    value: {{ .replicas }}
+                  - op: replace
+                    path: /spec/template/spec/containers/0/ports/0/containerPort
+                    value: {{ .port }}
       destination:
         name: in-cluster
         namespace: "{{ .name }}"

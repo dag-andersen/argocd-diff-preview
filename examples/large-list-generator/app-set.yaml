@@ -314,17 +314,19 @@ spec:
       name: "{{ .name }}"
     spec:
       project: default
-      source:
-        repoURL: https://github.com/dag-andersen/argocd-diff-preview
-        path: examples/helm/charts/myApp
-        helm:
-          valuesObject:
-            replicaCount: "{{ .replicas }}"
-            fullnameOverride: "{{ .name }}"
-            service:
-              port: "{{ .port }}"
-            podLabels:
-              app-name: "{{ .name }}"
+      sources:
+        - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+          path: docs
+        - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+          path: examples/helm/charts/myApp
+          helm:
+            valuesObject:
+              replicaCount: "{{ .replicas }}"
+              fullnameOverride: "{{ .name }}"
+              service:
+                port: "{{ .port }}"
+              podLabels:
+                app-name: "{{ .name }}"
       destination:
         name: in-cluster
         namespace: "{{ .name }}"
