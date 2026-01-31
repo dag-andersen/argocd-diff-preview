@@ -69,9 +69,10 @@ func (d *Diff) commentHeader() string {
 
 func (d *Diff) buildMarkdownSection() MarkdownSection {
 	return MarkdownSection{
-		title:   fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()),
-		comment: d.commentHeader(),
-		content: d.changeInfo.content,
+		appName:  d.prettyName(),
+		filePath: d.prettyPath(),
+		comment:  d.commentHeader(),
+		content:  d.changeInfo.content,
 	}
 }
 

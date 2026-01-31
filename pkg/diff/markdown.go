@@ -8,13 +8,14 @@ import (
 )
 
 type MarkdownSection struct {
-	title   string
-	comment string
-	content string
+	appName  string
+	filePath string
+	comment  string
+	content  string
 }
 
-func markdownSectionHeader(title string) string {
-	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", title)
+func markdownSectionHeader(appName, filePath string) string {
+	return fmt.Sprintf("### %s\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n", appName, filePath)
 }
 
 func markdownSectionFooter() string {
@@ -22,7 +23,7 @@ func markdownSectionFooter() string {
 }
 
 func (m *MarkdownSection) Size() int {
-	return len(markdownSectionHeader(m.title)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
+	return len(markdownSectionHeader(m.appName, m.filePath)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
 }
 
 var (
@@ -32,7 +33,7 @@ var (
 
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
-	header := markdownSectionHeader(m.title)
+	header := markdownSectionHeader(m.appName, m.filePath)
 	footer := markdownSectionFooter()
 	content := strings.TrimRight(m.content, "\n")
 
