@@ -1,0 +1,333 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: large-list-generator
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - name: app-001
+            replicas: "1"
+            port: "8001"
+          - name: app-002
+            replicas: "2"
+            port: "8002"
+          - name: app-003
+            replicas: "3"
+            port: "8003"
+          - name: app-004
+            replicas: "1"
+            port: "8004"
+          - name: app-005
+            replicas: "2"
+            port: "8005"
+          - name: app-006
+            replicas: "3"
+            port: "8006"
+          - name: app-007
+            replicas: "1"
+            port: "8007"
+          - name: app-008
+            replicas: "2"
+            port: "8008"
+          - name: app-009
+            replicas: "3"
+            port: "8009"
+          - name: app-010
+            replicas: "1"
+            port: "8010"
+          - name: app-011
+            replicas: "2"
+            port: "8011"
+          - name: app-012
+            replicas: "3"
+            port: "8012"
+          - name: app-013
+            replicas: "1"
+            port: "8013"
+          - name: app-014
+            replicas: "2"
+            port: "8014"
+          - name: app-015
+            replicas: "3"
+            port: "8015"
+          - name: app-016
+            replicas: "1"
+            port: "8016"
+          - name: app-017
+            replicas: "2"
+            port: "8017"
+          - name: app-018
+            replicas: "3"
+            port: "8018"
+          - name: app-019
+            replicas: "1"
+            port: "8019"
+          - name: app-020
+            replicas: "2"
+            port: "8020"
+          - name: app-021
+            replicas: "3"
+            port: "8021"
+          - name: app-022
+            replicas: "1"
+            port: "8022"
+          - name: app-023
+            replicas: "2"
+            port: "8023"
+          - name: app-024
+            replicas: "3"
+            port: "8024"
+          - name: app-025
+            replicas: "1"
+            port: "8025"
+          - name: app-026
+            replicas: "2"
+            port: "8026"
+          - name: app-027
+            replicas: "3"
+            port: "8027"
+          - name: app-028
+            replicas: "1"
+            port: "8028"
+          - name: app-029
+            replicas: "2"
+            port: "8029"
+          - name: app-030
+            replicas: "3"
+            port: "8030"
+          - name: app-031
+            replicas: "1"
+            port: "8031"
+          - name: app-032
+            replicas: "2"
+            port: "8032"
+          - name: app-033
+            replicas: "3"
+            port: "8033"
+          - name: app-034
+            replicas: "1"
+            port: "8034"
+          - name: app-035
+            replicas: "2"
+            port: "8035"
+          - name: app-036
+            replicas: "3"
+            port: "8036"
+          - name: app-037
+            replicas: "1"
+            port: "8037"
+          - name: app-038
+            replicas: "2"
+            port: "8038"
+          - name: app-039
+            replicas: "3"
+            port: "8039"
+          - name: app-040
+            replicas: "1"
+            port: "8040"
+          - name: app-041
+            replicas: "2"
+            port: "8041"
+          - name: app-042
+            replicas: "3"
+            port: "8042"
+          - name: app-043
+            replicas: "1"
+            port: "8043"
+          - name: app-044
+            replicas: "2"
+            port: "8044"
+          - name: app-045
+            replicas: "3"
+            port: "8045"
+          - name: app-046
+            replicas: "1"
+            port: "8046"
+          - name: app-047
+            replicas: "2"
+            port: "8047"
+          - name: app-048
+            replicas: "3"
+            port: "8048"
+          - name: app-049
+            replicas: "1"
+            port: "8049"
+          - name: app-050
+            replicas: "2"
+            port: "8050"
+          - name: app-051
+            replicas: "3"
+            port: "8051"
+          - name: app-052
+            replicas: "1"
+            port: "8052"
+          - name: app-053
+            replicas: "2"
+            port: "8053"
+          - name: app-054
+            replicas: "3"
+            port: "8054"
+          - name: app-055
+            replicas: "1"
+            port: "8055"
+          - name: app-056
+            replicas: "2"
+            port: "8056"
+          - name: app-057
+            replicas: "3"
+            port: "8057"
+          - name: app-058
+            replicas: "1"
+            port: "8058"
+          - name: app-059
+            replicas: "2"
+            port: "8059"
+          - name: app-060
+            replicas: "3"
+            port: "8060"
+          - name: app-061
+            replicas: "1"
+            port: "8061"
+          - name: app-062
+            replicas: "2"
+            port: "8062"
+          - name: app-063
+            replicas: "3"
+            port: "8063"
+          - name: app-064
+            replicas: "1"
+            port: "8064"
+          - name: app-065
+            replicas: "2"
+            port: "8065"
+          - name: app-066
+            replicas: "3"
+            port: "8066"
+          - name: app-067
+            replicas: "1"
+            port: "8067"
+          - name: app-068
+            replicas: "2"
+            port: "8068"
+          - name: app-069
+            replicas: "3"
+            port: "8069"
+          - name: app-070
+            replicas: "1"
+            port: "8070"
+          - name: app-071
+            replicas: "2"
+            port: "8071"
+          - name: app-072
+            replicas: "3"
+            port: "8072"
+          - name: app-073
+            replicas: "1"
+            port: "8073"
+          - name: app-074
+            replicas: "2"
+            port: "8074"
+          - name: app-075
+            replicas: "3"
+            port: "8075"
+          - name: app-076
+            replicas: "1"
+            port: "8076"
+          - name: app-077
+            replicas: "2"
+            port: "8077"
+          - name: app-078
+            replicas: "3"
+            port: "8078"
+          - name: app-079
+            replicas: "1"
+            port: "8079"
+          - name: app-080
+            replicas: "2"
+            port: "8080"
+          - name: app-081
+            replicas: "3"
+            port: "8081"
+          - name: app-082
+            replicas: "1"
+            port: "8082"
+          - name: app-083
+            replicas: "2"
+            port: "8083"
+          - name: app-084
+            replicas: "3"
+            port: "8084"
+          - name: app-085
+            replicas: "1"
+            port: "8085"
+          - name: app-086
+            replicas: "2"
+            port: "8086"
+          - name: app-087
+            replicas: "3"
+            port: "8087"
+          - name: app-088
+            replicas: "1"
+            port: "8088"
+          - name: app-089
+            replicas: "2"
+            port: "8089"
+          - name: app-090
+            replicas: "3"
+            port: "8090"
+          - name: app-091
+            replicas: "1"
+            port: "8091"
+          - name: app-092
+            replicas: "2"
+            port: "8092"
+          - name: app-093
+            replicas: "3"
+            port: "8093"
+          - name: app-094
+            replicas: "1"
+            port: "8094"
+          - name: app-095
+            replicas: "2"
+            port: "8095"
+          - name: app-096
+            replicas: "3"
+            port: "8096"
+          - name: app-097
+            replicas: "1"
+            port: "8097"
+          - name: app-098
+            replicas: "2"
+            port: "8098"
+          - name: app-099
+            replicas: "3"
+            port: "8099"
+          - name: app-100
+            replicas: "1"
+            port: "8100"
+  template:
+    metadata:
+      name: "{{ .name }}"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview
+        path: examples/helm/charts/myApp
+        helm:
+          valuesObject:
+            replicaCount: "{{ .replicas }}"
+            fullnameOverride: "{{ .name }}"
+            service:
+              port: "{{ .port }}"
+            podLabels:
+              app-name: "{{ .name }}"
+      destination:
+        name: in-cluster
+        namespace: "{{ .name }}"
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,340 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: large-list-generator-redis
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - name: redis-001
+            replicaCount: "1"
+            password: "secret-001"
+          - name: redis-002
+            replicaCount: "2"
+            password: "secret-002"
+          - name: redis-003
+            replicaCount: "3"
+            password: "secret-003"
+          - name: redis-004
+            replicaCount: "1"
+            password: "secret-004"
+          - name: redis-005
+            replicaCount: "2"
+            password: "secret-005"
+          - name: redis-006
+            replicaCount: "3"
+            password: "secret-006"
+          - name: redis-007
+            replicaCount: "1"
+            password: "secret-007"
+          - name: redis-008
+            replicaCount: "2"
+            password: "secret-008"
+          - name: redis-009
+            replicaCount: "3"
+            password: "secret-009"
+          - name: redis-010
+            replicaCount: "1"
+            password: "secret-010"
+          - name: redis-011
+            replicaCount: "2"
+            password: "secret-011"
+          - name: redis-012
+            replicaCount: "3"
+            password: "secret-012"
+          - name: redis-013
+            replicaCount: "1"
+            password: "secret-013"
+          - name: redis-014
+            replicaCount: "2"
+            password: "secret-014"
+          - name: redis-015
+            replicaCount: "3"
+            password: "secret-015"
+          - name: redis-016
+            replicaCount: "1"
+            password: "secret-016"
+          - name: redis-017
+            replicaCount: "2"
+            password: "secret-017"
+          - name: redis-018
+            replicaCount: "3"
+            password: "secret-018"
+          - name: redis-019
+            replicaCount: "1"
+            password: "secret-019"
+          - name: redis-020
+            replicaCount: "2"
+            password: "secret-020"
+          - name: redis-021
+            replicaCount: "3"
+            password: "secret-021"
+          - name: redis-022
+            replicaCount: "1"
+            password: "secret-022"
+          - name: redis-023
+            replicaCount: "2"
+            password: "secret-023"
+          - name: redis-024
+            replicaCount: "3"
+            password: "secret-024"
+          - name: redis-025
+            replicaCount: "1"
+            password: "secret-025"
+          - name: redis-026
+            replicaCount: "2"
+            password: "secret-026"
+          - name: redis-027
+            replicaCount: "3"
+            password: "secret-027"
+          - name: redis-028
+            replicaCount: "1"
+            password: "secret-028"
+          - name: redis-029
+            replicaCount: "2"
+            password: "secret-029"
+          - name: redis-030
+            replicaCount: "3"
+            password: "secret-030"
+          - name: redis-031
+            replicaCount: "1"
+            password: "secret-031"
+          - name: redis-032
+            replicaCount: "2"
+            password: "secret-032"
+          - name: redis-033
+            replicaCount: "3"
+            password: "secret-033"
+          - name: redis-034
+            replicaCount: "1"
+            password: "secret-034"
+          - name: redis-035
+            replicaCount: "2"
+            password: "secret-035"
+          - name: redis-036
+            replicaCount: "3"
+            password: "secret-036"
+          - name: redis-037
+            replicaCount: "1"
+            password: "secret-037"
+          - name: redis-038
+            replicaCount: "2"
+            password: "secret-038"
+          - name: redis-039
+            replicaCount: "3"
+            password: "secret-039"
+          - name: redis-040
+            replicaCount: "1"
+            password: "secret-040"
+          - name: redis-041
+            replicaCount: "2"
+            password: "secret-041"
+          - name: redis-042
+            replicaCount: "3"
+            password: "secret-042"
+          - name: redis-043
+            replicaCount: "1"
+            password: "secret-043"
+          - name: redis-044
+            replicaCount: "2"
+            password: "secret-044"
+          - name: redis-045
+            replicaCount: "3"
+            password: "secret-045"
+          - name: redis-046
+            replicaCount: "1"
+            password: "secret-046"
+          - name: redis-047
+            replicaCount: "2"
+            password: "secret-047"
+          - name: redis-048
+            replicaCount: "3"
+            password: "secret-048"
+          - name: redis-049
+            replicaCount: "1"
+            password: "secret-049"
+          - name: redis-050
+            replicaCount: "2"
+            password: "secret-050"
+          - name: redis-051
+            replicaCount: "3"
+            password: "secret-051"
+          - name: redis-052
+            replicaCount: "1"
+            password: "secret-052"
+          - name: redis-053
+            replicaCount: "2"
+            password: "secret-053"
+          - name: redis-054
+            replicaCount: "3"
+            password: "secret-054"
+          - name: redis-055
+            replicaCount: "1"
+            password: "secret-055"
+          - name: redis-056
+            replicaCount: "2"
+            password: "secret-056"
+          - name: redis-057
+            replicaCount: "3"
+            password: "secret-057"
+          - name: redis-058
+            replicaCount: "1"
+            password: "secret-058"
+          - name: redis-059
+            replicaCount: "2"
+            password: "secret-059"
+          - name: redis-060
+            replicaCount: "3"
+            password: "secret-060"
+          - name: redis-061
+            replicaCount: "1"
+            password: "secret-061"
+          - name: redis-062
+            replicaCount: "2"
+            password: "secret-062"
+          - name: redis-063
+            replicaCount: "3"
+            password: "secret-063"
+          - name: redis-064
+            replicaCount: "1"
+            password: "secret-064"
+          - name: redis-065
+            replicaCount: "2"
+            password: "secret-065"
+          - name: redis-066
+            replicaCount: "3"
+            password: "secret-066"
+          - name: redis-067
+            replicaCount: "1"
+            password: "secret-067"
+          - name: redis-068
+            replicaCount: "2"
+            password: "secret-068"
+          - name: redis-069
+            replicaCount: "3"
+            password: "secret-069"
+          - name: redis-070
+            replicaCount: "1"
+            password: "secret-070"
+          - name: redis-071
+            replicaCount: "2"
+            password: "secret-071"
+          - name: redis-072
+            replicaCount: "3"
+            password: "secret-072"
+          - name: redis-073
+            replicaCount: "1"
+            password: "secret-073"
+          - name: redis-074
+            replicaCount: "2"
+            password: "secret-074"
+          - name: redis-075
+            replicaCount: "3"
+            password: "secret-075"
+          - name: redis-076
+            replicaCount: "1"
+            password: "secret-076"
+          - name: redis-077
+            replicaCount: "2"
+            password: "secret-077"
+          - name: redis-078
+            replicaCount: "3"
+            password: "secret-078"
+          - name: redis-079
+            replicaCount: "1"
+            password: "secret-079"
+          - name: redis-080
+            replicaCount: "2"
+            password: "secret-080"
+          - name: redis-081
+            replicaCount: "3"
+            password: "secret-081"
+          - name: redis-082
+            replicaCount: "1"
+            password: "secret-082"
+          - name: redis-083
+            replicaCount: "2"
+            password: "secret-083"
+          - name: redis-084
+            replicaCount: "3"
+            password: "secret-084"
+          - name: redis-085
+            replicaCount: "1"
+            password: "secret-085"
+          - name: redis-086
+            replicaCount: "2"
+            password: "secret-086"
+          - name: redis-087
+            replicaCount: "3"
+            password: "secret-087"
+          - name: redis-088
+            replicaCount: "1"
+            password: "secret-088"
+          - name: redis-089
+            replicaCount: "2"
+            password: "secret-089"
+          - name: redis-090
+            replicaCount: "3"
+            password: "secret-090"
+          - name: redis-091
+            replicaCount: "1"
+            password: "secret-091"
+          - name: redis-092
+            replicaCount: "2"
+            password: "secret-092"
+          - name: redis-093
+            replicaCount: "3"
+            password: "secret-093"
+          - name: redis-094
+            replicaCount: "1"
+            password: "secret-094"
+          - name: redis-095
+            replicaCount: "2"
+            password: "secret-095"
+          - name: redis-096
+            replicaCount: "3"
+            password: "secret-096"
+          - name: redis-097
+            replicaCount: "1"
+            password: "secret-097"
+          - name: redis-098
+            replicaCount: "2"
+            password: "secret-098"
+          - name: redis-099
+            replicaCount: "3"
+            password: "secret-099"
+          - name: redis-100
+            replicaCount: "1"
+            password: "secret-100"
+  template:
+    metadata:
+      name: "{{ .name }}"
+    spec:
+      project: default
+      sources:
+        - chart: redis
+          repoURL: "https://charts.bitnami.com/bitnami"
+          targetRevision: 19.6.4
+          helm:
+            valuesObject:
+              fullnameOverride: "{{ .name }}"
+              architecture: standalone
+              auth:
+                enabled: true
+                password: "{{ .password }}"
+              replica:
+                replicaCount: "{{ .replicaCount }}"
+              master:
+                persistence:
+                  enabled: false
+              commonLabels:
+                app-instance: "{{ .name }}"
+      destination:
+        name: in-cluster
+        namespace: "{{ .name }}"
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true

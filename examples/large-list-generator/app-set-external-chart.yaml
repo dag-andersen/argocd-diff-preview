@@ -1,0 +1,230 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: large-list-generator-external-chart
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - name: nginx-001
+            ingressClass: "ingress-001"
+          - name: nginx-002
+            ingressClass: "ingress-002"
+          - name: nginx-003
+            ingressClass: "ingress-003"
+          - name: nginx-004
+            ingressClass: "ingress-004"
+          - name: nginx-005
+            ingressClass: "ingress-005"
+          - name: nginx-006
+            ingressClass: "ingress-006"
+          - name: nginx-007
+            ingressClass: "ingress-007"
+          - name: nginx-008
+            ingressClass: "ingress-008"
+          - name: nginx-009
+            ingressClass: "ingress-009"
+          - name: nginx-010
+            ingressClass: "ingress-010"
+          - name: nginx-011
+            ingressClass: "ingress-011"
+          - name: nginx-012
+            ingressClass: "ingress-012"
+          - name: nginx-013
+            ingressClass: "ingress-013"
+          - name: nginx-014
+            ingressClass: "ingress-014"
+          - name: nginx-015
+            ingressClass: "ingress-015"
+          - name: nginx-016
+            ingressClass: "ingress-016"
+          - name: nginx-017
+            ingressClass: "ingress-017"
+          - name: nginx-018
+            ingressClass: "ingress-018"
+          - name: nginx-019
+            ingressClass: "ingress-019"
+          - name: nginx-020
+            ingressClass: "ingress-020"
+          - name: nginx-021
+            ingressClass: "ingress-021"
+          - name: nginx-022
+            ingressClass: "ingress-022"
+          - name: nginx-023
+            ingressClass: "ingress-023"
+          - name: nginx-024
+            ingressClass: "ingress-024"
+          - name: nginx-025
+            ingressClass: "ingress-025"
+          - name: nginx-026
+            ingressClass: "ingress-026"
+          - name: nginx-027
+            ingressClass: "ingress-027"
+          - name: nginx-028
+            ingressClass: "ingress-028"
+          - name: nginx-029
+            ingressClass: "ingress-029"
+          - name: nginx-030
+            ingressClass: "ingress-030"
+          - name: nginx-031
+            ingressClass: "ingress-031"
+          - name: nginx-032
+            ingressClass: "ingress-032"
+          - name: nginx-033
+            ingressClass: "ingress-033"
+          - name: nginx-034
+            ingressClass: "ingress-034"
+          - name: nginx-035
+            ingressClass: "ingress-035"
+          - name: nginx-036
+            ingressClass: "ingress-036"
+          - name: nginx-037
+            ingressClass: "ingress-037"
+          - name: nginx-038
+            ingressClass: "ingress-038"
+          - name: nginx-039
+            ingressClass: "ingress-039"
+          - name: nginx-040
+            ingressClass: "ingress-040"
+          - name: nginx-041
+            ingressClass: "ingress-041"
+          - name: nginx-042
+            ingressClass: "ingress-042"
+          - name: nginx-043
+            ingressClass: "ingress-043"
+          - name: nginx-044
+            ingressClass: "ingress-044"
+          - name: nginx-045
+            ingressClass: "ingress-045"
+          - name: nginx-046
+            ingressClass: "ingress-046"
+          - name: nginx-047
+            ingressClass: "ingress-047"
+          - name: nginx-048
+            ingressClass: "ingress-048"
+          - name: nginx-049
+            ingressClass: "ingress-049"
+          - name: nginx-050
+            ingressClass: "ingress-050"
+          - name: nginx-051
+            ingressClass: "ingress-051"
+          - name: nginx-052
+            ingressClass: "ingress-052"
+          - name: nginx-053
+            ingressClass: "ingress-053"
+          - name: nginx-054
+            ingressClass: "ingress-054"
+          - name: nginx-055
+            ingressClass: "ingress-055"
+          - name: nginx-056
+            ingressClass: "ingress-056"
+          - name: nginx-057
+            ingressClass: "ingress-057"
+          - name: nginx-058
+            ingressClass: "ingress-058"
+          - name: nginx-059
+            ingressClass: "ingress-059"
+          - name: nginx-060
+            ingressClass: "ingress-060"
+          - name: nginx-061
+            ingressClass: "ingress-061"
+          - name: nginx-062
+            ingressClass: "ingress-062"
+          - name: nginx-063
+            ingressClass: "ingress-063"
+          - name: nginx-064
+            ingressClass: "ingress-064"
+          - name: nginx-065
+            ingressClass: "ingress-065"
+          - name: nginx-066
+            ingressClass: "ingress-066"
+          - name: nginx-067
+            ingressClass: "ingress-067"
+          - name: nginx-068
+            ingressClass: "ingress-068"
+          - name: nginx-069
+            ingressClass: "ingress-069"
+          - name: nginx-070
+            ingressClass: "ingress-070"
+          - name: nginx-071
+            ingressClass: "ingress-071"
+          - name: nginx-072
+            ingressClass: "ingress-072"
+          - name: nginx-073
+            ingressClass: "ingress-073"
+          - name: nginx-074
+            ingressClass: "ingress-074"
+          - name: nginx-075
+            ingressClass: "ingress-075"
+          - name: nginx-076
+            ingressClass: "ingress-076"
+          - name: nginx-077
+            ingressClass: "ingress-077"
+          - name: nginx-078
+            ingressClass: "ingress-078"
+          - name: nginx-079
+            ingressClass: "ingress-079"
+          - name: nginx-080
+            ingressClass: "ingress-080"
+          - name: nginx-081
+            ingressClass: "ingress-081"
+          - name: nginx-082
+            ingressClass: "ingress-082"
+          - name: nginx-083
+            ingressClass: "ingress-083"
+          - name: nginx-084
+            ingressClass: "ingress-084"
+          - name: nginx-085
+            ingressClass: "ingress-085"
+          - name: nginx-086
+            ingressClass: "ingress-086"
+          - name: nginx-087
+            ingressClass: "ingress-087"
+          - name: nginx-088
+            ingressClass: "ingress-088"
+          - name: nginx-089
+            ingressClass: "ingress-089"
+          - name: nginx-090
+            ingressClass: "ingress-090"
+          - name: nginx-091
+            ingressClass: "ingress-091"
+          - name: nginx-092
+            ingressClass: "ingress-092"
+          - name: nginx-093
+            ingressClass: "ingress-093"
+          - name: nginx-094
+            ingressClass: "ingress-094"
+          - name: nginx-095
+            ingressClass: "ingress-095"
+          - name: nginx-096
+            ingressClass: "ingress-096"
+          - name: nginx-097
+            ingressClass: "ingress-097"
+          - name: nginx-098
+            ingressClass: "ingress-098"
+          - name: nginx-099
+            ingressClass: "ingress-099"
+          - name: nginx-100
+            ingressClass: "ingress-100"
+  template:
+    metadata:
+      name: "{{ .name }}"
+    spec:
+      project: default
+      sources:
+        - chart: ingress-nginx
+          repoURL: "https://kubernetes.github.io/ingress-nginx"
+          targetRevision: 4.10.0
+          helm:
+            valuesObject:
+              controller:
+                ingressClass: "{{ .ingressClass }}"
+      destination:
+        name: in-cluster
+        namespace: "{{ .name }}"
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
