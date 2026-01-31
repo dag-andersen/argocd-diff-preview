@@ -133,11 +133,12 @@ func TestDiff_commentHeader(t *testing.T) {
 
 func TestDiff_buildMarkdownSection(t *testing.T) {
 	tests := []struct {
-		name            string
-		diff            Diff
-		expectedTitle   string
-		expectedComment string
-		expectedContent string
+		name             string
+		diff             Diff
+		expectedAppName  string
+		expectedFilePath string
+		expectedComment  string
+		expectedContent  string
 	}{
 		{
 			name: "Insert",
@@ -147,9 +148,10 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Insert,
 				changeInfo:    changeInfo{content: "+ line 1\n+ line 2"},
 			},
-			expectedTitle:   "new-app (/path/new)",
-			expectedComment: "@@ Application added: new-app (/path/new) @@\n",
-			expectedContent: "+ line 1\n+ line 2",
+			expectedAppName:  "new-app",
+			expectedFilePath: "/path/new",
+			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
+			expectedContent:  "+ line 1\n+ line 2",
 		},
 		{
 			name: "Modify with name change",
@@ -161,9 +163,10 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Modify,
 				changeInfo:    changeInfo{content: "- line 1\n+ line 1 mod"},
 			},
-			expectedTitle:   "app-v1 -> app-v2 (/path/app)",
-			expectedComment: "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
-			expectedContent: "- line 1\n+ line 1 mod",
+			expectedAppName:  "app-v1 -> app-v2",
+			expectedFilePath: "/path/app",
+			expectedComment:  "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
+			expectedContent:  "- line 1\n+ line 1 mod",
 		},
 		{
 			name: "Delete",
@@ -173,9 +176,10 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Delete,
 				changeInfo:    changeInfo{content: "- line 1\n- line 2"},
 			},
-			expectedTitle:   "old-app (/path/old)",
-			expectedComment: "@@ Application deleted: old-app (/path/old) @@\n",
-			expectedContent: "- line 1\n- line 2",
+			expectedAppName:  "old-app",
+			expectedFilePath: "/path/old",
+			expectedComment:  "@@ Application deleted: old-app (/path/old) @@\n",
+			expectedContent:  "- line 1\n- line 2",
 		},
 	}
 
@@ -183,8 +187,11 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.diff.buildMarkdownSection()
 
-			if got.title != tt.expectedTitle {
-				t.Errorf("buildMarkdownSection().title = %q, want %q", got.title, tt.expectedTitle)
+			if got.appName != tt.expectedAppName {
+				t.Errorf("buildMarkdownSection().appName = %q, want %q", got.appName, tt.expectedAppName)
+			}
+			if got.filePath != tt.expectedFilePath {
+				t.Errorf("buildMarkdownSection().filePath = %q, want %q", got.filePath, tt.expectedFilePath)
 			}
 			if got.comment != tt.expectedComment {
 				t.Errorf("buildMarkdownSection().comment = %q, want %q", got.comment, tt.expectedComment)
@@ -198,8 +205,8 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if truncated {
 				t.Errorf("buildMarkdownSection().build() should not be truncated with large max size")
 			}
-			expectedBuiltSection := fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
-				tt.expectedTitle, tt.expectedComment, tt.expectedContent)
+			expectedBuiltSection := fmt.Sprintf("### %s\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+				tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
 
 			if builtSection != expectedBuiltSection {
 				t.Errorf("buildMarkdownSection().build() got =\n%q\nwant =\n%q", builtSection, expectedBuiltSection)
