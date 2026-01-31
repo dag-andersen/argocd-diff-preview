@@ -34,31 +34,33 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 
 ## Options
 
-| Option                                    | Environment Variable         | Default                                | Description                                                                         |
-| ----------------------------------------- | ---------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
-| `--argocd-chart-version <version>`        | `ARGOCD_CHART_VERSION`       | `latest`                               | Argo CD Helm Chart version                                                          |
-| `--argocd-chart-name <name>`              | `ARGOCD_CHART_NAME`          | `argo`                                 | Argo CD Helm Chart name                                                             |
-| `--argocd-chart-url <url>`                | `ARGOCD_CHART_URL`           | `https://argoproj.github.io/argo-helm` | Argo CD Helm Chart URL                                                              |
-| `--argocd-chart-repo-username <username>` | `ARGOCD_CHART_REPO_USERNAME` | -                                      | Argo CD Helm Chart Private repository username                                      |
-| `--argocd-chart-repo-password <password>` | `ARGOCD_CHART_REPO_PASSWORD` | -                                      | Argo CD Helm Chart Private repository password                                      |
-| `--argocd-login-options <options>`        | `ARGOCD_LOGIN_OPTIONS`       | -                                      | Additional options to pass to `argocd login` command                                |
-| `--argocd-auth-token <token>`             | `ARGOCD_AUTH_TOKEN`          | -                                      | Argo CD authentication token (skips default admin login)                            |
-| `--argocd-namespace <namespace>`          | `ARGOCD_NAMESPACE`           | `argocd`                               | Namespace to use for Argo CD                                                        |
-| `--base-branch <branch>`, `-b`            | `BASE_BRANCH`                | `main`                                 | Base branch name                                                                    |
-| `--cluster <tool>`                        | `CLUSTER`                    | `auto`                                 | Local cluster tool. Options: `kind`, `minikube`, `k3d`, `auto`                      |
-| `--cluster-name <name>`                   | `CLUSTER_NAME`               | `argocd-diff-preview`                  | Cluster name (only for kind & k3d)                                                  |
-| `--diff-ignore <pattern>`, `-i`           | `DIFF_IGNORE`                | -                                      | Ignore lines in diff. Example: `v[1,9]+.[1,9]+.[1,9]+` for ignoring version changes |
-| `--file-regex <regex>`, `-r`              | `FILE_REGEX`                 | -                                      | Regex to filter files. Example: `/apps_.*\.yaml`                                    |
-| `--files-changed <files>`                 | `FILES_CHANGED`              | -                                      | List of files changed between branches (comma, space or newline separated)          |
-| `--ignore-resources <rules>`              | `IGNORE_RESOURCES`           | -                                      | Ignore resources in diff. Format: `group:kind:name` (comma-separated, `*` wildcard) |
-| `--k3d-options <options>`                 | `K3D_OPTIONS`                | -                                      | k3d options (only for k3d)                                                          |
-| `--kind-options <options>`                | `KIND_OPTIONS`               | -                                      | kind options (only for kind)                                                        |
-| `--line-count <count>`, `-c`              | `LINE_COUNT`                 | `7`                                    | Generate diffs with \<n\> lines of context                                          |
-| `--log-format <format>`                   | `LOG_FORMAT`                 | `human`                                | Log format. Options: `human`, `json`                                                |
-| `--max-diff-length <length>`              | `MAX_DIFF_LENGTH`            | `65536`                                | Max diff message character count (only limits the generated Markdown file)          |
-| `--output-folder <folder>`, `-o`          | `OUTPUT_FOLDER`              | `./output`                             | Output folder where the diff will be saved                                          |
-| `--redirect-target-revisions <revs>`      | `REDIRECT_TARGET_REVISIONS`  | -                                      | List of target revisions to redirect                                                |
-| `--secrets-folder <folder>`, `-s`         | `SECRETS_FOLDER`             | `./secrets`                            | Secrets folder where the secrets are read from                                      |
-| `--selector <selector>`, `-l`             | `SELECTOR`                   | -                                      | Label selector to filter on (e.g., `key1=value1,key2=value2`)                       |
-| `--timeout <seconds>`                     | `TIMEOUT`                    | `180`                                  | Set timeout in seconds                                                              |
-| `--title <title>`                         | `TITLE`                      | `Argo CD Diff Preview`                 | Custom title for the markdown output                                                |
+| Option                                    | Environment Variable         | Default                                | Description                                                                                 |
+| ----------------------------------------- | ---------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `--argocd-chart-version <version>`        | `ARGOCD_CHART_VERSION`       | `latest`                               | Argo CD Helm Chart version                                                                  |
+| `--argocd-chart-name <name>`              | `ARGOCD_CHART_NAME`          | `argo`                                 | Argo CD Helm Chart name                                                                     |
+| `--argocd-chart-url <url>`                | `ARGOCD_CHART_URL`           | `https://argoproj.github.io/argo-helm` | Argo CD Helm Chart URL                                                                      |
+| `--argocd-chart-repo-username <username>` | `ARGOCD_CHART_REPO_USERNAME` | -                                      | Argo CD Helm Chart Private repository username                                              |
+| `--argocd-chart-repo-password <password>` | `ARGOCD_CHART_REPO_PASSWORD` | -                                      | Argo CD Helm Chart Private repository password                                              |
+| `--argocd-login-options <options>`        | `ARGOCD_LOGIN_OPTIONS`       | -                                      | Additional options to pass to `argocd login` command                                        |
+| `--argocd-auth-token <token>`             | `ARGOCD_AUTH_TOKEN`          | -                                      | Argo CD authentication token (skips default admin login)                                    |
+| `--argocd-namespace <namespace>`          | `ARGOCD_NAMESPACE`           | `argocd`                               | Namespace to use for Argo CD                                                                |
+| `--argocd-ui-url <url>`                   | `ARGOCD_UI_URL`              | -                                      | Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com) |
+|                                           |
+| `--base-branch <branch>`, `-b`            | `BASE_BRANCH`                | `main`                                 | Base branch name                                                                            |
+| `--cluster <tool>`                        | `CLUSTER`                    | `auto`                                 | Local cluster tool. Options: `kind`, `minikube`, `k3d`, `auto`                              |
+| `--cluster-name <name>`                   | `CLUSTER_NAME`               | `argocd-diff-preview`                  | Cluster name (only for kind & k3d)                                                          |
+| `--diff-ignore <pattern>`, `-i`           | `DIFF_IGNORE`                | -                                      | Ignore lines in diff. Example: `v[1,9]+.[1,9]+.[1,9]+` for ignoring version changes         |
+| `--file-regex <regex>`, `-r`              | `FILE_REGEX`                 | -                                      | Regex to filter files. Example: `/apps_.*\.yaml`                                            |
+| `--files-changed <files>`                 | `FILES_CHANGED`              | -                                      | List of files changed between branches (comma, space or newline separated)                  |
+| `--ignore-resources <rules>`              | `IGNORE_RESOURCES`           | -                                      | Ignore resources in diff. Format: `group:kind:name` (comma-separated, `*` wildcard)         |
+| `--k3d-options <options>`                 | `K3D_OPTIONS`                | -                                      | k3d options (only for k3d)                                                                  |
+| `--kind-options <options>`                | `KIND_OPTIONS`               | -                                      | kind options (only for kind)                                                                |
+| `--line-count <count>`, `-c`              | `LINE_COUNT`                 | `7`                                    | Generate diffs with \<n\> lines of context                                                  |
+| `--log-format <format>`                   | `LOG_FORMAT`                 | `human`                                | Log format. Options: `human`, `json`                                                        |
+| `--max-diff-length <length>`              | `MAX_DIFF_LENGTH`            | `65536`                                | Max diff message character count (only limits the generated Markdown file)                  |
+| `--output-folder <folder>`, `-o`          | `OUTPUT_FOLDER`              | `./output`                             | Output folder where the diff will be saved                                                  |
+| `--redirect-target-revisions <revs>`      | `REDIRECT_TARGET_REVISIONS`  | -                                      | List of target revisions to redirect                                                        |
+| `--secrets-folder <folder>`, `-s`         | `SECRETS_FOLDER`             | `./secrets`                            | Secrets folder where the secrets are read from                                              |
+| `--selector <selector>`, `-l`             | `SELECTOR`                   | -                                      | Label selector to filter on (e.g., `key1=value1,key2=value2`)                               |
+| `--timeout <seconds>`                     | `TIMEOUT`                    | `180`                                  | Set timeout in seconds                                                                      |
+| `--title <title>`                         | `TITLE`                      | `Argo CD Diff Preview`                 | Custom title for the markdown output                                                        |
