@@ -65,6 +65,7 @@ var (
 	DefaultArgocdLoginOptions         = ""
 	DefaultDisableClientThrottling    = false
 	DefaultArgocdAuthToken            = ""
+	DefaultArgocdUIURL                = ""
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -108,6 +109,7 @@ type RawOptions struct {
 	HideDeletedAppDiff         bool   `mapstructure:"hide-deleted-app-diff"`
 	IgnoreResourceRules        string `mapstructure:"ignore-resources"`
 	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
+	ArgocdUIURL                string `mapstructure:"argocd-ui-url"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -146,6 +148,7 @@ type Config struct {
 	HideDeletedAppDiff         bool
 	DisableClientThrottling    bool
 	UseArgoCDApi               bool
+	ArgocdUIURL                string
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -289,6 +292,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
+	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "ArgoCD URL to generate application links in diff output (e.g., https://argocd.example.com)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -370,6 +374,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
 		DisableClientThrottling:    o.DisableClientThrottling,
 		UseArgoCDApi:               o.UseArgoCDApi,
+		ArgocdUIURL:                o.ArgocdUIURL,
 	}
 
 	var err error
@@ -630,6 +635,9 @@ func (o *Config) LogConfig() {
 	}
 	if o.ArgocdLoginOptions != DefaultArgocdLoginOptions {
 		log.Info().Msgf("✨ - argocd-login-options: %s", o.ArgocdLoginOptions)
+	}
+	if o.ArgocdUIURL != DefaultArgocdUIURL {
+		log.Info().Msgf("✨ - argocd-ui-url: %s", o.ArgocdUIURL)
 	}
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)

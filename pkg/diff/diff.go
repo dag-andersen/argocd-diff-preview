@@ -2,6 +2,7 @@ package diff
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 )
@@ -67,10 +68,30 @@ func (d *Diff) commentHeader() string {
 	}
 }
 
-func (d *Diff) buildMarkdownSection() MarkdownSection {
+func (d *Diff) buildAppURL(argocdUIURL string) string {
+	if argocdUIURL == "" {
+		return ""
+	}
+
+	appName := d.newName
+	if appName == "" {
+		appName = d.oldName
+	}
+
+	if appName == "" {
+		return ""
+	}
+
+	baseURL := strings.TrimRight(argocdUIURL, "/")
+
+	return fmt.Sprintf("%s/applications/%s", baseURL, appName)
+}
+
+func (d *Diff) buildMarkdownSection(argocdUIURL string) MarkdownSection {
 	return MarkdownSection{
 		appName:  d.prettyName(),
 		filePath: d.prettyPath(),
+		appURL:   d.buildAppURL(argocdUIURL),
 		comment:  d.commentHeader(),
 		content:  d.changeInfo.content,
 	}
