@@ -292,7 +292,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
-	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "ArgoCD URL to generate application links in diff output (e.g., https://argocd.example.com)")
+	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
