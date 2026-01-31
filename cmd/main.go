@@ -375,6 +375,7 @@ func run(cfg *Config) error {
 		cfg.HideDeletedAppDiff,
 		statsInfo,
 		selectionInfo,
+		cfg.ArgocdUIURL,
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err

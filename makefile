@@ -9,6 +9,7 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 use_argocd_api ?= false
 debug ?= false
+argocd_ui_url ?= ""
 
 GO_TEST_FLAGS ?=
 
@@ -46,6 +47,7 @@ run-with-go: go-build pull-repository
 		--line-count="$(line_count)" \
 		--redirect-target-revisions="HEAD" \
 		--use-argocd-api="$(use_argocd_api)" \
+		--argocd-ui-url="${argocd_ui_url}" \
 		--debug="$(debug)"
 
 run-with-docker: pull-repository docker-build
@@ -114,7 +116,7 @@ update-integration-tests: go-build
 update-integration-tests-docker: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -update ./...
 
-# Run before release	
+# Run before release
 check-release: run-lint run-unit-tests
 	$(MAKE) run-integration-tests-go
 	$(MAKE) run-integration-tests-docker-with-api
