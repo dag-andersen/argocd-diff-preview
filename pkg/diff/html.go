@@ -78,16 +78,18 @@ pre {
 `
 
 type HTMLSection struct {
-	header        string
+	appName       string
+	filePath      string
+	appURL        string
 	commentHeader string
 	content       string
 }
 
 const htmlSection = `
+<h3>%appName%</h3>
+<p>File: %filePath%</p>
 <details>
-<summary>
-%header%
-</summary>
+<summary>Details (Click me)</summary>
 <div class="diff_container">
 <table>
 	%rows%
@@ -100,7 +102,19 @@ const htmlLine = `
 	<tr class="%s"><td><pre>%s</pre></td></tr>`
 
 func (h *HTMLSection) printHTMLSection() string {
-	s := strings.ReplaceAll(htmlSection, "%header%", html.EscapeString(h.header))
+	s := htmlSection
+
+	// Add app name with optional link
+	var appNameHTML string
+	if h.appURL != "" {
+		appNameHTML = fmt.Sprintf(`%s (<a href="%s">link</a>)`,
+			html.EscapeString(h.appName),
+			html.EscapeString(h.appURL))
+	} else {
+		appNameHTML = html.EscapeString(h.appName)
+	}
+	s = strings.ReplaceAll(s, "%appName%", appNameHTML)
+	s = strings.ReplaceAll(s, "%filePath%", html.EscapeString(h.filePath))
 
 	var rows strings.Builder
 	// Pre-allocate capacity based on content length to avoid reallocations

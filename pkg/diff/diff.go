@@ -97,9 +97,11 @@ func (d *Diff) buildMarkdownSection(argocdUIURL string) MarkdownSection {
 	}
 }
 
-func (d *Diff) buildHTMLSection() HTMLSection {
+func (d *Diff) buildHTMLSection(argocdUIURL string) HTMLSection {
 	return HTMLSection{
-		header:        fmt.Sprintf("%s (%s)", d.prettyName(), d.prettyPath()),
+		appName:       d.prettyName(),
+		filePath:      d.prettyPath(),
+		appURL:        d.buildAppURL(argocdUIURL),
 		commentHeader: d.commentHeader(),
 		content:       d.changeInfo.content,
 	}

@@ -378,7 +378,7 @@ func generateGitDiff(
 
 		// Get source path for this file, or use empty string if not found
 		markdownFileSections = append(markdownFileSections, diff.buildMarkdownSection(argocdUIURL))
-		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection())
+		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection(argocdUIURL))
 	}
 
 	return summary, markdownFileSections, htmlFileSections, nil
