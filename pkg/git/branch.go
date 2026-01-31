@@ -17,6 +17,8 @@ const (
 	Base BranchType = "base"
 	// Target represents the target branch for comparison
 	Target BranchType = "target"
+	// Live represents live state from a remote ArgoCD instance
+	Live BranchType = "live"
 )
 
 func (b BranchType) ShortName() string {

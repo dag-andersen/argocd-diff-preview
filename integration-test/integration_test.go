@@ -2,9 +2,16 @@ package integration_test
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"math/rand"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +20,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"sigs.k8s.io/yaml"
 )
 
 // Flags for test configuration
@@ -62,6 +71,12 @@ type TestCase struct {
 	UseArgocdApi               string // "true" = force enable, "false" = force disable, "" = use global flag
 	DisableClusterRoles        string // Mount createClusterRoles.yaml (sets createClusterRoles: false)
 	ExpectFailure              bool   // If true, the test is expected to fail
+	CompareLive                string
+	LiveArgocdInsecure         string
+	LiveAppFile                string
+	LiveAppName                string
+	LiveArgocdURL              string
+	LiveArgocdToken            string
 }
 
 // testCases defines all integration test cases matching the Makefile
@@ -279,6 +294,18 @@ var testCases = []TestCase{
 		FilesChanged:    "examples/helm/applications/nginx.yaml",
 		ExpectFailure:   true,
 	},
+	{
+		Name:               "branch-1/target-live",
+		TargetBranch:       "integration-test/branch-1/target",
+		BaseBranch:         "integration-test/branch-1/base",
+		Suffix:             "-live",
+		FileRegex:          "examples/helm/applications/my-app.yaml",
+		CreateCluster:      "true", // Live test needs its own cluster to avoid secret name conflicts
+		CompareLive:        "true",
+		LiveArgocdInsecure: "true",
+		LiveAppFile:        "examples/helm/applications/my-app.yaml",
+		LiveAppName:        "my-app",
+	},
 }
 
 // timePattern matches timing information in output that varies between runs
@@ -346,8 +373,9 @@ func TestIntegration(t *testing.T) {
 
 	// Run each test case
 	for i, tc := range shuffledCases {
-		// Create cluster if: first test, every 8th test, no cluster exists, or previous test requires it
-		createCluster := testsSinceClusterCreation == 0 || testsSinceClusterCreation >= 8 || !kindClusterExists() || forceNextClusterCreation
+		// Create cluster if: first test, every 8th test, no cluster exists, previous test requires it, or live comparison test
+		// Live tests need a fresh cluster because they use manifest-based ArgoCD install (different secrets)
+		createCluster := testsSinceClusterCreation == 0 || testsSinceClusterCreation >= 8 || !kindClusterExists() || forceNextClusterCreation || tc.CompareLive == "true"
 		if createCluster {
 			testsSinceClusterCreation = 0
 		}
@@ -429,6 +457,17 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 	}
 	if err := cloneBranch(tc.TargetBranch, targetBranchDir); err != nil {
 		t.Fatalf("Failed to clone target branch: %v", err)
+	}
+
+	if tc.CompareLive == "true" {
+		liveURL, liveToken, liveCleanup := setupLiveServer(t, baseBranchDir, tc)
+		tc.LiveArgocdURL = liveURL
+		tc.LiveArgocdToken = liveToken
+		t.Cleanup(func() {
+			if err := liveCleanup(); err != nil {
+				t.Logf("Warning: failed to clean up live Argo CD: %v", err)
+			}
+		})
 	}
 
 	// Run the tool
@@ -636,6 +675,12 @@ func runWithGoBinary(tc TestCase, createCluster bool) error {
 
 	cmd := exec.Command(absBinaryPath, args...)
 	cmd.Dir = repoRoot // Run from repo root so it finds argocd-config/
+	if tc.CompareLive == "true" {
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("LIVE_ARGOCD_URL=%s", tc.LiveArgocdURL),
+			fmt.Sprintf("LIVE_ARGOCD_TOKEN=%s", tc.LiveArgocdToken),
+		)
+	}
 
 	// Try to get TTY for real-time output (Go test captures stdout/stderr)
 	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
@@ -729,6 +774,14 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	args = append(args, "-e", fmt.Sprintf("TITLE=%s", getTitle(tc)))
 	args = append(args, "-e", fmt.Sprintf("ARGOCD_NAMESPACE=%s", argocdNamespace))
 	args = append(args, "-e", "DISABLE_CLIENT_THROTTLING=true")
+	if tc.CompareLive == "true" {
+		args = append(args, "-e", "COMPARE_LIVE=true")
+		args = append(args, "-e", fmt.Sprintf("LIVE_ARGOCD_URL=%s", tc.LiveArgocdURL))
+		args = append(args, "-e", fmt.Sprintf("LIVE_ARGOCD_TOKEN=%s", tc.LiveArgocdToken))
+		if tc.LiveArgocdInsecure == "true" {
+			args = append(args, "-e", "LIVE_ARGOCD_INSECURE=true")
+		}
+	}
 
 	if tc.FileRegex != "" {
 		args = append(args, "-e", fmt.Sprintf("FILE_REGEX=%s", tc.FileRegex))
@@ -864,12 +917,285 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	if tc.ArgocdLoginOptions != "" {
 		args = append(args, "--argocd-login-options", tc.ArgocdLoginOptions)
 	}
+	if tc.CompareLive == "true" {
+		args = append(args, "--compare-live")
+		args = append(args, "--live-argocd-url", tc.LiveArgocdURL)
+		args = append(args, "--live-argocd-token", tc.LiveArgocdToken)
+		if tc.LiveArgocdInsecure == "true" {
+			args = append(args, "--live-argocd-insecure")
+		}
+	}
 
 	if tc.ArgocdAuthToken != "" {
 		args = append(args, "--argocd-auth-token", tc.ArgocdAuthToken)
 	}
 
 	return args
+}
+
+func setupLiveServer(t *testing.T, baseBranchDir string, tc TestCase) (string, string, func() error) {
+	// Allow using external ArgoCD via environment variables
+	if liveURL, liveToken, ok := readLiveArgoEnv(t); ok {
+		if tc.LiveAppName == "" {
+			t.Fatalf("LiveAppName must be set when using LIVE_ARGOCD_URL/LIVE_ARGOCD_TOKEN")
+		}
+		return liveURL, liveToken, func() error { return nil }
+	}
+
+	// Default: spin up a real Kind cluster with ArgoCD
+	return setupLiveKindCluster(t, baseBranchDir, tc)
+}
+
+func readLiveArgoEnv(t *testing.T) (string, string, bool) {
+	liveURL := strings.TrimSpace(os.Getenv("LIVE_ARGOCD_URL"))
+	liveToken := strings.TrimSpace(os.Getenv("LIVE_ARGOCD_TOKEN"))
+	if liveURL == "" && liveToken == "" {
+		return "", "", false
+	}
+	if liveURL == "" || liveToken == "" {
+		t.Fatalf("LIVE_ARGOCD_URL and LIVE_ARGOCD_TOKEN must both be set")
+	}
+	return liveURL, liveToken, true
+}
+
+func setupLiveKindCluster(t *testing.T, baseBranchDir string, tc TestCase) (string, string, func() error) {
+	if tc.LiveAppFile == "" {
+		t.Fatalf("LiveAppFile must be set for live comparison tests")
+	}
+
+	liveClusterName := "argocd-live"
+	liveContext := fmt.Sprintf("kind-%s", liveClusterName)
+	cleanup := func() error {
+		_ = exec.Command("pkill", "-f", "port-forward svc/argocd-server").Run()
+		cmd := exec.Command("kind", "delete", "cluster", "--name", liveClusterName)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
+	_ = exec.Command("kind", "delete", "cluster", "--name", liveClusterName).Run()
+	cmd := exec.Command("kind", "create", "cluster", "--name", liveClusterName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to create live kind cluster: %v", err)
+	}
+
+	if err := kubectlApply(liveContext, "argocd", "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml"); err != nil {
+		t.Fatalf("Failed to install Argo CD in live cluster: %v", err)
+	}
+
+	waitCmd := exec.Command("kubectl", "--context", liveContext, "-n", "argocd", "wait", "--for=condition=available", "--timeout=240s", "deployment/argocd-server")
+	waitCmd.Stdout = os.Stdout
+	waitCmd.Stderr = os.Stderr
+	if err := waitCmd.Run(); err != nil {
+		t.Fatalf("Failed to wait for Argo CD in live cluster: %v", err)
+	}
+
+	livePort := pickFreePort(t)
+	portForwardCmd := exec.Command("kubectl", "--context", liveContext, "-n", "argocd", "port-forward", "svc/argocd-server", fmt.Sprintf("%d:443", livePort))
+	portForwardCmd.Stdout = os.Stdout
+	portForwardCmd.Stderr = os.Stderr
+	if err := portForwardCmd.Start(); err != nil {
+		t.Fatalf("Failed to start port-forward: %v", err)
+	}
+
+	liveURL := fmt.Sprintf("https://localhost:%d", livePort)
+	waitForPort(t, livePort)
+
+	adminPassword, err := getArgoCDAdminPassword(liveContext)
+	if err != nil {
+		t.Fatalf("Failed to get Argo CD admin password: %v", err)
+	}
+
+	liveToken, err := loginArgoCD(liveURL, adminPassword)
+	if err != nil {
+		t.Fatalf("Failed to login to Argo CD: %v", err)
+	}
+
+	appManifest, appName, err := buildLiveAppManifest(baseBranchDir, tc.LiveAppFile, tc.BaseBranch)
+	if err != nil {
+		t.Fatalf("Failed to build live app manifest: %v", err)
+	}
+
+	applyCmd := exec.Command("kubectl", "--context", liveContext, "apply", "-f", "-")
+	applyCmd.Stdin = strings.NewReader(appManifest)
+	applyCmd.Stdout = os.Stdout
+	applyCmd.Stderr = os.Stderr
+	if err := applyCmd.Run(); err != nil {
+		t.Fatalf("Failed to apply live app manifest: %v", err)
+	}
+
+	if err := waitForLiveManifests(liveURL, liveToken, appName); err != nil {
+		t.Fatalf("Failed to wait for live app manifests: %v", err)
+	}
+
+	return liveURL, liveToken, cleanup
+}
+
+func kubectlApply(contextName, namespace, manifestURL string) error {
+	// Ignore error if namespace already exists
+	_ = exec.Command("kubectl", "--context", contextName, "create", "namespace", namespace).Run()
+	cmd := exec.Command("kubectl", "--context", contextName, "apply", "-n", namespace, "-f", manifestURL)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func pickFreePort(t *testing.T) int {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to allocate port: %v", err)
+	}
+	defer func() { _ = listener.Close() }()
+	return listener.Addr().(*net.TCPAddr).Port
+}
+
+func waitForPort(t *testing.T, port int) {
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 500*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("Timed out waiting for port %d", port)
+}
+
+func getArgoCDAdminPassword(contextName string) (string, error) {
+	cmd := exec.Command("kubectl", "--context", contextName, "-n", "argocd", "get", "secret", "argocd-initial-admin-secret", "-o", "jsonpath={.data.password}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("kubectl get secret failed: %w\nOutput: %s", err, output)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(output)))
+	if err != nil {
+		return "", fmt.Errorf("failed to decode admin password: %w", err)
+	}
+	return string(decoded), nil
+}
+
+func loginArgoCD(liveURL, password string) (string, error) {
+	payload := map[string]string{
+		"username": "admin",
+		"password": password,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // local test cluster
+		},
+	}
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, fmt.Sprintf("%s/api/v1/session", liveURL), bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		errBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("login failed: %s", string(errBody))
+	}
+
+	var response struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", err
+	}
+	if response.Token == "" {
+		return "", fmt.Errorf("empty token returned")
+	}
+	return response.Token, nil
+}
+
+func buildLiveAppManifest(baseBranchDir, appFilePath, baseBranch string) (string, string, error) {
+	content, err := os.ReadFile(filepath.Join(baseBranchDir, appFilePath))
+	if err != nil {
+		return "", "", err
+	}
+
+	var obj map[string]any
+	if err := yaml.Unmarshal(content, &obj); err != nil {
+		return "", "", err
+	}
+
+	metadata, _ := obj["metadata"].(map[string]any)
+	name, _ := metadata["name"].(string)
+	if name == "" {
+		return "", "", fmt.Errorf("application name not found in %s", appFilePath)
+	}
+
+	spec, _ := obj["spec"].(map[string]any)
+	if source, ok := spec["source"].(map[string]any); ok {
+		source["targetRevision"] = baseBranch
+		spec["source"] = source
+	}
+	if sources, ok := spec["sources"].([]any); ok {
+		for i, s := range sources {
+			if source, ok := s.(map[string]any); ok {
+				source["targetRevision"] = baseBranch
+				sources[i] = source
+			}
+		}
+		spec["sources"] = sources
+	}
+	obj["spec"] = spec
+
+	manifest, err := yaml.Marshal(obj)
+	if err != nil {
+		return "", "", err
+	}
+	return string(manifest), name, nil
+}
+
+func waitForLiveManifests(liveURL, token, appName string) error {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // local test cluster
+		},
+	}
+
+	deadline := time.Now().Add(5 * time.Minute)
+	var lastError string
+	for time.Now().Before(deadline) {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("%s/api/v1/applications/%s/manifests", liveURL, appName), nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			_ = resp.Body.Close()
+			return nil
+		}
+		if resp != nil {
+			body, _ := io.ReadAll(resp.Body)
+			lastError = fmt.Sprintf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+			_ = resp.Body.Close()
+		} else if err != nil {
+			lastError = err.Error()
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if lastError != "" {
+		return fmt.Errorf("timed out waiting for live manifests: %s", lastError)
+	}
+	return fmt.Errorf("timed out waiting for live manifests")
 }
 
 // getLineCount returns the line count for a test case

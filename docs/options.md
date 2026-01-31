@@ -19,6 +19,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 
 | Flag                                | Environment Variable              | Default | Description                                                                                                                      |
 | ----------------------------------- | --------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `--compare-live`                    | `COMPARE_LIVE`                    | `false` | Compare target branch against live state from a remote Argo CD instance                                                          |
 | `--create-cluster`                  | `CREATE_CLUSTER`                  | `true`  | Create a new cluster if it doesn't exist                                                                                         |
 | `--disable-client-throttling`       | `DISABLE_CLIENT_THROTTLING`       | `false` | Disable client-side throttling (rely on API Priority and Fairness instead)                                                       |
 | `--auto-detect-files-changed`       | `AUTO_DETECT_FILES_CHANGED`       | `false` | Auto detect files changed between branches                                                                                       |
@@ -30,6 +31,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--keep-cluster-alive`              | `KEEP_CLUSTER_ALIVE`              | `false` | Keep cluster alive after the tool finishes                                                                                       |
 | `--kind-internal`                   | `KIND_INTERNAL`                   | `false` | Use the kind cluster's internal address in the kubeconfig (allows connecting to the cluster when running the CLI in a container) |
 | `--use-argocd-api`                  | `USE_ARGOCD_API`                  | `false` | Use Argo CD API instead of CLI (useful for namespace-scoped Argo CD installations)                                               |
+| `--live-argocd-insecure`            | `LIVE_ARGOCD_INSECURE`            | `false` | Skip TLS certificate verification for remote Argo CD (useful for self-signed certificates)                                       |
 | `--version`, `-v`                   | -                                 | -       | Prints version information                                                                                                       |
 
 ## Options
@@ -54,6 +56,8 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--k3d-options <options>`                 | `K3D_OPTIONS`                | -                                      | k3d options (only for k3d)                                                          |
 | `--kind-options <options>`                | `KIND_OPTIONS`               | -                                      | kind options (only for kind)                                                        |
 | `--line-count <count>`, `-c`              | `LINE_COUNT`                 | `7`                                    | Generate diffs with \<n\> lines of context                                          |
+| `--live-argocd-token <token>`             | `LIVE_ARGOCD_TOKEN`          | -                                      | API token for authenticating with the remote Argo CD instance (required for live)   |
+| `--live-argocd-url <url>`                 | `LIVE_ARGOCD_URL`            | -                                      | URL of the remote Argo CD instance (required for live)                              |
 | `--log-format <format>`                   | `LOG_FORMAT`                 | `human`                                | Log format. Options: `human`, `json`                                                |
 | `--max-diff-length <length>`              | `MAX_DIFF_LENGTH`            | `65536`                                | Max diff message character count (only limits the generated Markdown file)          |
 | `--output-folder <folder>`, `-o`          | `OUTPUT_FOLDER`              | `./output`                             | Output folder where the diff will be saved                                          |
@@ -62,3 +66,14 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--selector <selector>`, `-l`             | `SELECTOR`                   | -                                      | Label selector to filter on (e.g., `key1=value1,key2=value2`)                       |
 | `--timeout <seconds>`                     | `TIMEOUT`                    | `180`                                  | Set timeout in seconds                                                              |
 | `--title <title>`                         | `TITLE`                      | `Argo CD Diff Preview`                 | Custom title for the markdown output                                                |
+
+## Live comparison example
+
+```bash
+argocd-diff-preview \
+  --compare-live \
+  --live-argocd-url https://argocd.example.com \
+  --live-argocd-token "$ARGOCD_READ_TOKEN" \
+  --target-branch feature \
+  --repo my-org/my-repo
+```

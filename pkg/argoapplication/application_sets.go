@@ -14,6 +14,43 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// ConvertAppSetsToAppsInBranch converts ApplicationSets to Applications for a single branch
+func ConvertAppSetsToAppsInBranch(
+	argocd *argocd.ArgoCDInstallation,
+	apps *ArgoSelection,
+	branch *git.Branch,
+	repo string,
+	tempFolder string,
+	redirectRevisions []string,
+	debug bool,
+	appSelectionOptions ApplicationSelectionOptions,
+) (*ArgoSelection, time.Duration, error) {
+	startTime := time.Now()
+
+	log.Info().Str("branch", branch.Name).Msg("🤖 Converting ApplicationSets to Applications")
+
+	branchTempFolder := fmt.Sprintf("%s/%s", tempFolder, branch.Type())
+	resultApps, err := processAppSets(
+		argocd,
+		apps,
+		branch,
+		branchTempFolder,
+		debug,
+		appSelectionOptions,
+		repo,
+		redirectRevisions,
+	)
+
+	if err != nil {
+		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
+		return nil, time.Since(startTime), err
+	}
+
+	log.Debug().Msgf("🤖 Converted ApplicationSets to Applications in %s", time.Since(startTime).Round(time.Second))
+
+	return resultApps, time.Since(startTime), nil
+}
+
 func ConvertAppSetsToAppsInBothBranches(
 	argocd *argocd.ArgoCDInstallation,
 	baseApps *ArgoSelection,

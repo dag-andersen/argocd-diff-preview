@@ -68,6 +68,17 @@ func (a *ArgoResource) WriteToFolder(folder string) (string, error) {
 	return randomFileName, nil
 }
 
+// GetApplicationsForBranch gets applications for a single branch (public wrapper)
+func GetApplicationsForBranch(
+	argocdNamespace string,
+	branch *git.Branch,
+	appSelectionOptions ApplicationSelectionOptions,
+	repo string,
+	redirectRevisions []string,
+) (*ArgoSelection, error) {
+	return getApplications(argocdNamespace, branch, appSelectionOptions, repo, redirectRevisions)
+}
+
 // GetApplicationsForBranches gets applications for both base and target branches
 func GetApplicationsForBranches(
 	argocdNamespace string,

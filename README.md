@@ -155,6 +155,21 @@ Instead of spinning up an ephemeral cluster for each diff preview, you can conne
 
 Rendering manifests for all applications in your repository on every pull request can be time-consuming, especially in large monorepos. By default, `argocd-diff-preview` renders all applications it finds, but you can significantly speed up the process by limiting which applications are rendered. Refer to the [Application Selection](https://dag-andersen.github.io/argocd-diff-preview/application-selection/) section in the docs to learn how to do this.
 
+### Compare against live Argo CD
+
+If you want to compare the pull request output against the live state of a remote Argo CD instance, enable live comparison mode:
+
+```bash
+argocd-diff-preview \
+  --compare-live \
+  --live-argocd-url https://argocd.example.com \
+  --live-argocd-token "$ARGOCD_READ_TOKEN" \
+  --target-branch feature \
+  --repo my-org/my-repo
+```
+
+If the Argo CD server uses a self-signed certificate, add `--live-argocd-insecure` to skip TLS verification.
+
 ## Full Documentation
 
 [Link to docs](https://dag-andersen.github.io/argocd-diff-preview/)
