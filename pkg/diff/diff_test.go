@@ -135,21 +135,40 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 	tests := []struct {
 		name             string
 		diff             Diff
+		argocdUIURL      string
 		expectedAppName  string
 		expectedFilePath string
+		expectedAppURL   string
 		expectedComment  string
 		expectedContent  string
 	}{
 		{
-			name: "Insert",
+			name: "Insert without URL",
 			diff: Diff{
 				newName:       "new-app",
 				newSourcePath: "/path/new",
 				action:        merkletrie.Insert,
 				changeInfo:    changeInfo{content: "+ line 1\n+ line 2"},
 			},
+			argocdUIURL:      "",
 			expectedAppName:  "new-app",
 			expectedFilePath: "/path/new",
+			expectedAppURL:   "",
+			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
+			expectedContent:  "+ line 1\n+ line 2",
+		},
+		{
+			name: "Insert with URL",
+			diff: Diff{
+				newName:       "new-app",
+				newSourcePath: "/path/new",
+				action:        merkletrie.Insert,
+				changeInfo:    changeInfo{content: "+ line 1\n+ line 2"},
+			},
+			argocdUIURL:      "https://argocd.example.com",
+			expectedAppName:  "new-app",
+			expectedFilePath: "/path/new",
+			expectedAppURL:   "https://argocd.example.com/applications/new-app",
 			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
 			expectedContent:  "+ line 1\n+ line 2",
 		},
@@ -163,8 +182,10 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Modify,
 				changeInfo:    changeInfo{content: "- line 1\n+ line 1 mod"},
 			},
+			argocdUIURL:      "https://argocd.example.com",
 			expectedAppName:  "app-v1 -> app-v2",
 			expectedFilePath: "/path/app",
+			expectedAppURL:   "https://argocd.example.com/applications/app-v2",
 			expectedComment:  "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
 			expectedContent:  "- line 1\n+ line 1 mod",
 		},
@@ -176,8 +197,10 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Delete,
 				changeInfo:    changeInfo{content: "- line 1\n- line 2"},
 			},
+			argocdUIURL:      "https://argocd.example.com",
 			expectedAppName:  "old-app",
 			expectedFilePath: "/path/old",
+			expectedAppURL:   "https://argocd.example.com/applications/old-app",
 			expectedComment:  "@@ Application deleted: old-app (/path/old) @@\n",
 			expectedContent:  "- line 1\n- line 2",
 		},
@@ -185,13 +208,16 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.diff.buildMarkdownSection()
+			got := tt.diff.buildMarkdownSection(tt.argocdUIURL)
 
 			if got.appName != tt.expectedAppName {
 				t.Errorf("buildMarkdownSection().appName = %q, want %q", got.appName, tt.expectedAppName)
 			}
 			if got.filePath != tt.expectedFilePath {
 				t.Errorf("buildMarkdownSection().filePath = %q, want %q", got.filePath, tt.expectedFilePath)
+			}
+			if got.appURL != tt.expectedAppURL {
+				t.Errorf("buildMarkdownSection().appURL = %q, want %q", got.appURL, tt.expectedAppURL)
 			}
 			if got.comment != tt.expectedComment {
 				t.Errorf("buildMarkdownSection().comment = %q, want %q", got.comment, tt.expectedComment)
@@ -205,8 +231,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if truncated {
 				t.Errorf("buildMarkdownSection().build() should not be truncated with large max size")
 			}
-			expectedBuiltSection := fmt.Sprintf("### %s\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
-				tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
+			var expectedBuiltSection string
+			if tt.expectedAppURL != "" {
+				expectedBuiltSection = fmt.Sprintf("### %s ([link](%s))\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
+			} else {
+				expectedBuiltSection = fmt.Sprintf("### %s\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
+			}
 
 			if builtSection != expectedBuiltSection {
 				t.Errorf("buildMarkdownSection().build() got =\n%q\nwant =\n%q", builtSection, expectedBuiltSection)
@@ -276,7 +308,7 @@ spec:
 
 	// Run the diff generation
 	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, false, baseApps, targetApps,
+		basePath, targetPath, nil, 3, false, baseApps, targetApps, "",
 	)
 
 	if err != nil {
@@ -399,7 +431,7 @@ spec:
 
 	// Run the diff generation
 	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, false, baseApps, targetApps,
+		basePath, targetPath, nil, 3, false, baseApps, targetApps, "",
 	)
 
 	if err != nil {
