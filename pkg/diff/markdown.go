@@ -16,13 +16,13 @@ type MarkdownSection struct {
 }
 
 func markdownSectionHeader(appName, filePath, appURL string) string {
-	var header string
+	var summary string
 	if appURL != "" {
-		header = fmt.Sprintf("### %s ([link](%s))\n\n", appName, appURL)
+		summary = fmt.Sprintf("%s [<a href=\"%s\">link</a>] (%s)", appName, appURL, filePath)
 	} else {
-		header = fmt.Sprintf("### %s\n\n", appName)
+		summary = fmt.Sprintf("%s (%s)", appName, filePath)
 	}
-	return header + fmt.Sprintf("File: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n", filePath)
+	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", summary)
 }
 
 func markdownSectionFooter() string {

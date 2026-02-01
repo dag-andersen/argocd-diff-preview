@@ -20,21 +20,21 @@ func TestMarkdownSectionHeader(t *testing.T) {
 			appName:  "Test App",
 			filePath: "path/to/app",
 			appURL:   "",
-			expected: "### Test App\n\nFile: path/to/app\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n",
+			expected: "<details>\n<summary>Test App (path/to/app)</summary>\n<br>\n\n```diff\n",
 		},
 		{
 			name:     "App with ArgoCD URL",
 			appName:  "app-v2",
 			filePath: "path/to/app",
 			appURL:   "https://argocd.example.com/applications/app-v2",
-			expected: "### app-v2 ([link](https://argocd.example.com/applications/app-v2))\n\nFile: path/to/app\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n",
+			expected: "<details>\n<summary>app-v2 [<a href=\"https://argocd.example.com/applications/app-v2\">link</a>] (path/to/app)</summary>\n<br>\n\n```diff\n",
 		},
 		{
 			name:     "Empty app name without URL",
 			appName:  "",
 			filePath: "path/to/app",
 			appURL:   "",
-			expected: "### \n\nFile: path/to/app\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n",
+			expected: "<details>\n<summary> (path/to/app)</summary>\n<br>\n\n```diff\n",
 		},
 	}
 
@@ -66,7 +66,7 @@ func TestMarkdownSection_Build(t *testing.T) {
 				content:  "+ line 1\n+ line 2",
 			},
 			maxSize:           1000,
-			expectedContent:   "### Test App\n\nFile: path/to/app.yaml\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>Test App (path/to/app.yaml)</summary>\n<br>\n\n```diff\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
 			expectedTruncated: false,
 		},
 		{
@@ -104,7 +104,7 @@ func TestMarkdownSection_Build(t *testing.T) {
 				content:  "+ line 1\n+ line 2\n\n\n",
 			},
 			maxSize:           1000,
-			expectedContent:   "### App\n\nFile: path.yaml\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n@@ Test @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>App (path.yaml)</summary>\n<br>\n\n```diff\n@@ Test @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
 			expectedTruncated: false,
 		},
 	}
@@ -169,11 +169,8 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			expectedContains: []string{
 				"## Test Diff",
 				"Added: 1\nModified: 1",
-				"### App 1",
-				"### App 2",
-				"File: path/to/app1.yaml",
-				"File: path/to/app2.yaml",
-				"<summary>Details (Click me)</summary>",
+				"<summary>App 1 (path/to/app1.yaml)</summary>",
+				"<summary>App 2 (path/to/app2.yaml)</summary>",
 				"@@ Application added: App 1 @@",
 				"@@ Application modified: App 2 @@",
 				"+ new content",
@@ -333,8 +330,8 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 		if truncated {
 			t.Errorf("Empty content should not be truncated")
 		}
-		if !strings.Contains(content, "### App") {
-			t.Errorf("Should contain the section header")
+		if !strings.Contains(content, "<summary>App (path.yaml)</summary>") {
+			t.Errorf("Should contain the section summary")
 		}
 	})
 

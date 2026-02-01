@@ -233,10 +233,10 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			}
 			var expectedBuiltSection string
 			if tt.expectedAppURL != "" {
-				expectedBuiltSection = fmt.Sprintf("### %s ([link](%s))\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
 					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
 			} else {
-				expectedBuiltSection = fmt.Sprintf("### %s\n\nFile: %s\n\n<details>\n<summary>Details (Click me)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
 					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
 			}
 
