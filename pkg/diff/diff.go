@@ -73,9 +73,9 @@ func (d *Diff) buildAppURL(argocdUIURL string) string {
 		return ""
 	}
 
-	appName := d.newName
+	appName := d.oldName
 	if appName == "" {
-		appName = d.oldName
+		appName = d.newName
 	}
 
 	if appName == "" {
