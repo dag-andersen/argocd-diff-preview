@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/argoproj/argo-cd/v3/common"
@@ -102,7 +103,7 @@ func getResourcesFromApps(
 
 	// Setup progress tracking
 	totalApps := len(apps)
-	renderedApps := 0
+	var renderedApps atomic.Int32
 	progressDone := make(chan bool)
 
 	// remainingTime returns the seconds left until timeout
@@ -118,7 +119,7 @@ func getResourcesFromApps(
 		for {
 			select {
 			case <-ticker.C:
-				log.Info().Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTime())
+				log.Info().Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps.Load(), totalApps, remainingTime())
 			case <-progressDone:
 				return
 			}
@@ -148,6 +149,9 @@ func getResourcesFromApps(
 				app ExtractedApp
 				err error
 			}{app: result, err: err}
+			if err == nil {
+				renderedApps.Add(1)
+			}
 
 			// Release semaphore
 			<-sem
@@ -186,7 +190,6 @@ func getResourcesFromApps(
 		default:
 			return nil, nil, fmt.Errorf("unknown branch type: '%s'", result.app.Branch)
 		}
-		renderedApps++
 	}
 
 	// Signal progress reporting to stop
@@ -196,7 +199,7 @@ func getResourcesFromApps(
 		return nil, nil, firstError
 	}
 
-	log.Info().Msgf("🎉 Rendered all %d applications", renderedApps)
+	log.Info().Msgf("🎉 Rendered all %d applications", renderedApps.Load())
 
 	// Wait for all goroutines to complete (including deletions)
 	log.Info().Msg("🧼 Waiting for all application deletions to complete...")
