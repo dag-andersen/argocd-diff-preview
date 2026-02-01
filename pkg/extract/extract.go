@@ -100,18 +100,56 @@ func getResourcesFromApps(
 	// Use WaitGroup to wait for all goroutines to complete (including deletions)
 	var wg sync.WaitGroup
 
+	// Setup progress tracking
+	totalApps := len(apps)
+	renderedApps := 0
+	progressDone := make(chan bool)
+
+	// remainingTime returns the seconds left until timeout
+	remainingTime := func() int {
+		return max(0, int(timeout)-int(time.Since(startTime).Seconds()))
+	}
+
+	// Start progress reporting goroutine before launching extraction workers
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				log.Info().Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTime())
+			case <-progressDone:
+				return
+			}
+		}
+	}()
+
 	for _, app := range apps {
 		sem <- struct{}{} // Acquire semaphore
 		wg.Add(1)         // Add to wait group
 		go func(app argoapplication.ArgoResource) {
 			defer wg.Done() // Signal completion when goroutine ends
-			result, k8sName, err := getResourcesFromApp(argocd, app, timeout, prefix, namespacedScopedResources)
+			timeRemaining := remainingTime()
+
+			// If timeout is reached, return an empty extracted app and an error
+			if timeRemaining <= 0 {
+				results <- struct {
+					app ExtractedApp
+					err error
+				}{app: ExtractedApp{}, err: fmt.Errorf("timeout reached before starting to render application: %s", app.GetLongName())}
+				<-sem
+				return
+			}
+
+			// Get resources from application
+			result, k8sName, err := getResourcesFromApp(argocd, app, timeRemaining, prefix, namespacedScopedResources)
 			results <- struct {
 				app ExtractedApp
 				err error
 			}{app: result, err: err}
 
-			// release semaphore
+			// Release semaphore
 			<-sem
 
 			if deleteAfterProcessing {
@@ -131,34 +169,13 @@ func getResourcesFromApps(
 	extractedTargetApps := make([]ExtractedApp, 0, len(apps))
 	var firstError error
 
-	// Setup progress tracking
-	totalApps := len(apps)
-	renderedApps := 0
-	progressDone := make(chan bool)
-
-	// Start progress reporting goroutine
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				remainingTimeSeconds := max(0, int(timeout)-int(time.Since(startTime).Seconds()))
-				log.Info().Msgf("🤖 Rendered %d out of %d applications (timeout in %d seconds)", renderedApps, totalApps, remainingTimeSeconds)
-			case <-progressDone:
-				return
-			}
-		}
-	}()
-
 	for range len(apps) {
 		result := <-results
 		if result.err != nil {
 			if firstError == nil {
 				firstError = result.err
 			}
-			log.Error().Err(result.err).Msg("Failed to extract app:")
+			log.Error().Err(result.err).Msg("❌ Failed to extract application:")
 			continue
 		}
 		switch result.app.Branch {
@@ -197,7 +214,7 @@ func getResourcesFromApps(
 func getResourcesFromApp(
 	argocd *argocdPkg.ArgoCDInstallation,
 	app argoapplication.ArgoResource,
-	timeout uint64,
+	timeout int,
 	prefix string,
 	namespacedScopedResources map[schema.GroupKind]bool,
 ) (ExtractedApp, string, error) {
