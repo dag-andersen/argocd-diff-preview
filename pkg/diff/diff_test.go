@@ -185,7 +185,7 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			argocdUIURL:      "https://argocd.example.com",
 			expectedAppName:  "app-v1 -> app-v2",
 			expectedFilePath: "/path/app",
-			expectedAppURL:   "https://argocd.example.com/applications/app-v2",
+			expectedAppURL:   "https://argocd.example.com/applications/app-v1",
 			expectedComment:  "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
 			expectedContent:  "- line 1\n+ line 1 mod",
 		},
