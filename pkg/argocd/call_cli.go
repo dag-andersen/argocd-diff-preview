@@ -27,7 +27,11 @@ func (c *CLIOperations) runArgocdCommand(args ...string) (string, error) {
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "argocd", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=--port-forward --port-forward-namespace=%s", c.namespace))
+
+	// Build ARGOCD_OPTS by appending our required options to any existing user-defined options
+	existingOpts := os.Getenv("ARGOCD_OPTS")
+	argocdOpts := strings.TrimSpace(fmt.Sprintf("%s --port-forward --port-forward-namespace=%s", existingOpts, c.namespace))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("ARGOCD_OPTS=%s", argocdOpts))
 
 	// If an auth token is set, pass it as ARGOCD_AUTH_TOKEN environment variable
 	if c.authToken != "" {
