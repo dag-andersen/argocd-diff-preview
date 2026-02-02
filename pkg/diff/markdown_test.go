@@ -10,29 +10,37 @@ import (
 func TestMarkdownSectionHeader(t *testing.T) {
 	tests := []struct {
 		name     string
-		title    string
+		appName  string
+		filePath string
+		appURL   string
 		expected string
 	}{
 		{
-			name:     "Simple title",
-			title:    "Test App",
-			expected: "<details>\n<summary>Test App</summary>\n<br>\n\n```diff\n",
+			name:     "Simple app and file without URL",
+			appName:  "Test App",
+			filePath: "path/to/app",
+			appURL:   "",
+			expected: "<details>\n<summary>Test App (path/to/app)</summary>\n<br>\n\n```diff\n",
 		},
 		{
-			name:     "Title with special characters",
-			title:    "app-v2 (path/to/app)",
-			expected: "<details>\n<summary>app-v2 (path/to/app)</summary>\n<br>\n\n```diff\n",
+			name:     "App with ArgoCD URL",
+			appName:  "app-v2",
+			filePath: "path/to/app",
+			appURL:   "https://argocd.example.com/applications/app-v2",
+			expected: "<details>\n<summary>app-v2 [<a href=\"https://argocd.example.com/applications/app-v2\">link</a>] (path/to/app)</summary>\n<br>\n\n```diff\n",
 		},
 		{
-			name:     "Empty title",
-			title:    "",
-			expected: "<details>\n<summary></summary>\n<br>\n\n```diff\n",
+			name:     "Empty app name without URL",
+			appName:  "",
+			filePath: "path/to/app",
+			appURL:   "",
+			expected: "<details>\n<summary> (path/to/app)</summary>\n<br>\n\n```diff\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := markdownSectionHeader(tt.title)
+			got := markdownSectionHeader(tt.appName, tt.filePath, tt.appURL)
 			if got != tt.expected {
 				t.Errorf("markdownSectionHeader() = %q, want %q", got, tt.expected)
 			}
@@ -51,20 +59,24 @@ func TestMarkdownSection_Build(t *testing.T) {
 		{
 			name: "Full content fits",
 			section: MarkdownSection{
-				title:   "Test App",
-				comment: "@@ Application added: Test App @@\n",
-				content: "+ line 1\n+ line 2",
+				appName:  "Test App",
+				filePath: "path/to/app.yaml",
+				appURL:   "",
+				comment:  "@@ Application added: Test App @@\n",
+				content:  "+ line 1\n+ line 2",
 			},
 			maxSize:           1000,
-			expectedContent:   "<details>\n<summary>Test App</summary>\n<br>\n\n```diff\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>Test App (path/to/app.yaml)</summary>\n<br>\n\n```diff\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
 			expectedTruncated: false,
 		},
 		{
 			name: "Content needs truncation",
 			section: MarkdownSection{
-				title:   "App",
-				comment: "@@ Test @@\n",
-				content: strings.Repeat("Very long line that will be truncated\n", 10),
+				appName:  "App",
+				filePath: "path.yaml",
+				appURL:   "",
+				comment:  "@@ Test @@\n",
+				content:  strings.Repeat("Very long line that will be truncated\n", 10),
 			},
 			maxSize:           200, // Small max size to force truncation
 			expectedTruncated: true,
@@ -72,9 +84,11 @@ func TestMarkdownSection_Build(t *testing.T) {
 		{
 			name: "Content too large, returns empty",
 			section: MarkdownSection{
-				title:   "Very Long Title That Takes Up Most Space",
-				comment: "@@ Very long comment that takes up space @@\n",
-				content: "Some content",
+				appName:  "Very Long Title That Takes Up Most Space",
+				filePath: "path/to/app.yaml",
+				appURL:   "",
+				comment:  "@@ Very long comment that takes up space @@\n",
+				content:  "Some content",
 			},
 			maxSize:           50, // Very small max size
 			expectedContent:   "",
@@ -83,12 +97,14 @@ func TestMarkdownSection_Build(t *testing.T) {
 		{
 			name: "Content with trailing newlines",
 			section: MarkdownSection{
-				title:   "App",
-				comment: "@@ Test @@\n",
-				content: "+ line 1\n+ line 2\n\n\n",
+				appName:  "App",
+				filePath: "path.yaml",
+				appURL:   "",
+				comment:  "@@ Test @@\n",
+				content:  "+ line 1\n+ line 2\n\n\n",
 			},
 			maxSize:           1000,
-			expectedContent:   "<details>\n<summary>App</summary>\n<br>\n\n```diff\n@@ Test @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>App (path.yaml)</summary>\n<br>\n\n```diff\n@@ Test @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
 			expectedTruncated: false,
 		},
 	}
@@ -129,14 +145,18 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 				summary: "Added: 1\nModified: 1",
 				sections: []MarkdownSection{
 					{
-						title:   "App 1",
-						comment: "@@ Application added: App 1 @@\n",
-						content: "+ new content",
+						appName:  "App 1",
+						filePath: "path/to/app1.yaml",
+						appURL:   "",
+						comment:  "@@ Application added: App 1 @@\n",
+						content:  "+ new content",
 					},
 					{
-						title:   "App 2",
-						comment: "@@ Application modified: App 2 @@\n",
-						content: "- old content\n+ new content",
+						appName:  "App 2",
+						filePath: "path/to/app2.yaml",
+						appURL:   "",
+						comment:  "@@ Application modified: App 2 @@\n",
+						content:  "- old content\n+ new content",
 					},
 				},
 				statsInfo: StatsInfo{
@@ -149,8 +169,8 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			expectedContains: []string{
 				"## Test Diff",
 				"Added: 1\nModified: 1",
-				"<summary>App 1</summary>",
-				"<summary>App 2</summary>",
+				"<summary>App 1 (path/to/app1.yaml)</summary>",
+				"<summary>App 2 (path/to/app2.yaml)</summary>",
 				"@@ Application added: App 1 @@",
 				"@@ Application modified: App 2 @@",
 				"+ new content",
@@ -191,9 +211,11 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 				summary: "Large changes",
 				sections: []MarkdownSection{
 					{
-						title:   "Large App",
-						comment: "@@ Application modified: Large App @@\n",
-						content: strings.Repeat("Very long diff content that will cause truncation\n", 100),
+						appName:  "Large App",
+						filePath: "path/to/large.yaml",
+						appURL:   "",
+						comment:  "@@ Application modified: Large App @@\n",
+						content:  strings.Repeat("Very long diff content that will cause truncation\n", 100),
 					},
 				},
 				statsInfo: StatsInfo{
@@ -247,9 +269,11 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 			summary: "Test summary",
 			sections: []MarkdownSection{
 				{
-					title:   "App",
-					comment: "@@ Test @@\n",
-					content: "content",
+					appName:  "App",
+					filePath: "path.yaml",
+					appURL:   "",
+					comment:  "@@ Test @@\n",
+					content:  "content",
 				},
 			},
 			statsInfo: StatsInfo{ApplicationCount: 1},
@@ -270,9 +294,11 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 			summary: "Test summary",
 			sections: []MarkdownSection{
 				{
-					title:   "App",
-					comment: "@@ Test @@\n",
-					content: "content",
+					appName:  "App",
+					filePath: "path.yaml",
+					appURL:   "",
+					comment:  "@@ Test @@\n",
+					content:  "content",
 				},
 			},
 			statsInfo: StatsInfo{ApplicationCount: 1},
@@ -288,30 +314,34 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 }
 
 func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
-	header := markdownSectionHeader("App")
+	header := markdownSectionHeader("App", "path.yaml", "")
 	footer := markdownSectionFooter()
 	headerFooterLen := len(header) + len(footer)
 
 	t.Run("Empty content", func(t *testing.T) {
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: "",
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  "",
 		}
 		content, truncated := section.build(1000)
 		if truncated {
 			t.Errorf("Empty content should not be truncated")
 		}
-		if !strings.Contains(content, "<summary>App</summary>") {
-			t.Errorf("Should contain the section header")
+		if !strings.Contains(content, "<summary>App (path.yaml)</summary>") {
+			t.Errorf("Should contain the section summary")
 		}
 	})
 
 	t.Run("Content is only trailing newlines", func(t *testing.T) {
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: "actual content\n\n\n",
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  "actual content\n\n\n",
 		}
 		content, truncated := section.build(1000)
 		if truncated {
@@ -328,9 +358,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 
 	t.Run("spaceForContent is exactly 0", func(t *testing.T) {
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: "x",
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  "x",
 		}
 		// maxSize = headerFooterLen + 0 = exactly enough for header/footer, no content
 		content, truncated := section.build(headerFooterLen)
@@ -345,9 +377,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 	t.Run("Content length equals spaceForContent exactly", func(t *testing.T) {
 		// The condition is len(content) < spaceForContent, so equal should trigger truncation path
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: strings.Repeat("x", 200),
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  strings.Repeat("x", 200),
 		}
 		maxSize := headerFooterLen + 200
 		content, truncated := section.build(maxSize)
@@ -365,9 +399,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 		// spaceBeforeDiffTooLongWarning = spaceForContent - len(diffTooLongWarning)
 		// So spaceForContent needs to be > minSizeForSectionContent + len(diffTooLongWarning)
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: strings.Repeat("x", 500),
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  strings.Repeat("x", 500),
 		}
 		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + 1 + warning length (just above threshold)
 		spaceForContent := minSizeForSectionContent + 1 + len(diffTooLongWarning)
@@ -386,9 +422,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 
 	t.Run("Just below minSizeForSectionContent threshold", func(t *testing.T) {
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: strings.Repeat("x", 500),
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  strings.Repeat("x", 500),
 		}
 		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + warning length (at threshold, not above)
 		spaceForContent := minSizeForSectionContent + len(diffTooLongWarning)
@@ -404,9 +442,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 
 	t.Run("Truncation preserves valid content without trailing whitespace", func(t *testing.T) {
 		section := MarkdownSection{
-			title:   "App",
-			comment: "",
-			content: "line1\nline2   \t\nline3",
+			appName:  "App",
+			filePath: "path.yaml",
+			appURL:   "",
+			comment:  "",
+			content:  "line1\nline2   \t\nline3",
 		}
 		// Force truncation that cuts off at whitespace area
 		maxSize := headerFooterLen + 150
@@ -422,9 +462,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 
 func TestMarkdownSection_Build_TruncationBehavior(t *testing.T) {
 	section := MarkdownSection{
-		title:   "Test App",
-		comment: "@@ Application modified: Test App @@\n",
-		content: strings.Repeat("Line of content that will be truncated\n", 50),
+		appName:  "Test App",
+		filePath: "path/to/app.yaml",
+		appURL:   "",
+		comment:  "@@ Application modified: Test App @@\n",
+		content:  strings.Repeat("Line of content that will be truncated\n", 50),
 	}
 
 	// Test various max sizes
@@ -465,9 +507,11 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 		summary: "Custom Summary\nWith Multiple Lines",
 		sections: []MarkdownSection{
 			{
-				title:   "Test Section",
-				comment: "@@ Test @@\n",
-				content: "Test content",
+				appName:  "Test Section",
+				filePath: "path/to/section.yaml",
+				appURL:   "",
+				comment:  "@@ Test @@\n",
+				content:  "Test content",
 			},
 		},
 		statsInfo: StatsInfo{
@@ -515,9 +559,11 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 			summary: "Summary",
 			sections: []MarkdownSection{
 				{
-					title:   "App",
-					comment: "@@ Test @@\n",
-					content: "content",
+					appName:  "App",
+					filePath: "path.yaml",
+					appURL:   "",
+					comment:  "@@ Test @@\n",
+					content:  "content",
 				},
 			},
 			selectionInfo: SelectionInfo{
@@ -541,9 +587,11 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 			summary: "Summary",
 			sections: []MarkdownSection{
 				{
-					title:   "App",
-					comment: "@@ Test @@\n",
-					content: "content",
+					appName:  "App",
+					filePath: "path.yaml",
+					appURL:   "",
+					comment:  "@@ Test @@\n",
+					content:  "content",
 				},
 			},
 			selectionInfo: SelectionInfo{
@@ -574,9 +622,11 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 			summary: "Summary",
 			sections: []MarkdownSection{
 				{
-					title:   "App",
-					comment: "@@ Test @@\n",
-					content: "content",
+					appName:  "App",
+					filePath: "path.yaml",
+					appURL:   "",
+					comment:  "@@ Test @@\n",
+					content:  "content",
 				},
 			},
 			selectionInfo: SelectionInfo{

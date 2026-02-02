@@ -40,6 +40,7 @@ func GenerateDiff(
 	hideDeletedAppDiff bool,
 	statsInfo StatsInfo,
 	selectionInfo SelectionInfo,
+	argocdUIURL string,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -58,7 +59,7 @@ func GenerateDiff(
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps)
+	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps, argocdUIURL)
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -121,6 +122,7 @@ func generateGitDiff(
 	hideDeletedAppDiff bool,
 	baseApps []AppInfo,
 	targetApps []AppInfo,
+	argocdUIURL string,
 ) (string, []MarkdownSection, []HTMLSection, error) {
 
 	// Write base manifests to disk
@@ -375,8 +377,8 @@ func generateGitDiff(
 		}
 
 		// Get source path for this file, or use empty string if not found
-		markdownFileSections = append(markdownFileSections, diff.buildMarkdownSection())
-		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection())
+		markdownFileSections = append(markdownFileSections, diff.buildMarkdownSection(argocdUIURL))
+		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection(argocdUIURL))
 	}
 
 	return summary, markdownFileSections, htmlFileSections, nil

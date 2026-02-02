@@ -8,13 +8,21 @@ import (
 )
 
 type MarkdownSection struct {
-	title   string
-	comment string
-	content string
+	appName  string
+	filePath string
+	appURL   string
+	comment  string
+	content  string
 }
 
-func markdownSectionHeader(title string) string {
-	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", title)
+func markdownSectionHeader(appName, filePath, appURL string) string {
+	var summary string
+	if appURL != "" {
+		summary = fmt.Sprintf("%s [<a href=\"%s\">link</a>] (%s)", appName, appURL, filePath)
+	} else {
+		summary = fmt.Sprintf("%s (%s)", appName, filePath)
+	}
+	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", summary)
 }
 
 func markdownSectionFooter() string {
@@ -22,7 +30,7 @@ func markdownSectionFooter() string {
 }
 
 func (m *MarkdownSection) Size() int {
-	return len(markdownSectionHeader(m.title)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
+	return len(markdownSectionHeader(m.appName, m.filePath, m.appURL)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
 }
 
 var (
@@ -32,7 +40,7 @@ var (
 
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
-	header := markdownSectionHeader(m.title)
+	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
 	footer := markdownSectionFooter()
 	content := strings.TrimRight(m.content, "\n")
 

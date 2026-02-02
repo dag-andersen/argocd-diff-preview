@@ -78,7 +78,9 @@ pre {
 `
 
 type HTMLSection struct {
-	header        string
+	appName       string
+	filePath      string
+	appURL        string
 	commentHeader string
 	content       string
 }
@@ -86,7 +88,7 @@ type HTMLSection struct {
 const htmlSection = `
 <details>
 <summary>
-%header%
+%summary%
 </summary>
 <div class="diff_container">
 <table>
@@ -100,7 +102,21 @@ const htmlLine = `
 	<tr class="%s"><td><pre>%s</pre></td></tr>`
 
 func (h *HTMLSection) printHTMLSection() string {
-	s := strings.ReplaceAll(htmlSection, "%header%", html.EscapeString(h.header))
+	s := htmlSection
+
+	// Build summary with optional link
+	var summary string
+	if h.appURL != "" {
+		summary = fmt.Sprintf(`%s [<a href="%s">link</a>] (%s)`,
+			html.EscapeString(h.appName),
+			html.EscapeString(h.appURL),
+			html.EscapeString(h.filePath))
+	} else {
+		summary = fmt.Sprintf(`%s (%s)`,
+			html.EscapeString(h.appName),
+			html.EscapeString(h.filePath))
+	}
+	s = strings.ReplaceAll(s, "%summary%", summary)
 
 	var rows strings.Builder
 	// Pre-allocate capacity based on content length to avoid reallocations

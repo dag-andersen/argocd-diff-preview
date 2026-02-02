@@ -21,7 +21,7 @@ func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
 		},
 	}
 
-	summary, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil)
+	summary, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil, "")
 	if err != nil {
 		t.Fatalf("generateGitDiff failed: %v", err)
 	}
@@ -99,7 +99,7 @@ spec:
 		hideDeletedAppDiff := false
 
 		summary, markdownSections, htmlSections, err := generateGitDiff(
-			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps,
+			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "",
 		)
 
 		if err != nil {
@@ -144,7 +144,7 @@ spec:
 	t.Run("hideDeletedAppDiff=true hides diff content for deleted apps", func(t *testing.T) {
 		hideDeletedAppDiff := true
 		summary, markdownSections, htmlSections, err := generateGitDiff(
-			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps,
+			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "",
 		)
 
 		if err != nil {
