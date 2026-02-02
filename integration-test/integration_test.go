@@ -785,6 +785,10 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		args = append(args, "-e", fmt.Sprintf("ARGOCD_AUTH_TOKEN=%s", tc.ArgocdAuthToken))
 	}
 
+	if tc.ArgocdUIURL != "" {
+		args = append(args, "-e", fmt.Sprintf("ARGOCD_UI_URL=%s", tc.ArgocdUIURL))
+	}
+
 	// Add image (no additional args needed - all config is via env vars)
 	args = append(args, *dockerImage)
 
