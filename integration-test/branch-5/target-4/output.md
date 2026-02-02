@@ -9,7 +9,7 @@ Modified (1):
 ```
 
 <details>
-<summary>my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
+<summary>my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">link</a>] (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
 ```diff
