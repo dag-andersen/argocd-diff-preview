@@ -87,7 +87,9 @@ type HTMLSection struct {
 
 const htmlSection = `
 <details>
-<summary>%summary%</summary>
+<summary>
+%summary%
+</summary>
 <div class="diff_container">
 <table>
 	%rows%
