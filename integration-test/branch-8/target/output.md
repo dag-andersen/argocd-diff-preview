@@ -12,7 +12,7 @@ Modified (1):
 ```
 
 <details>
-<summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
+<summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
 ```diff
@@ -34,7 +34,7 @@ Modified (1):
 </details>
 
 <details>
-<summary>folder3 (examples/git-generator/app/app-set.yaml)</summary>
+<summary>folder3 [<a href="https://argocd.example.com/applications/folder3">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
 ```diff

@@ -61,6 +61,7 @@ type TestCase struct {
 	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
 	UseArgocdApi               string // "true" = force enable, "false" = force disable, "" = use global flag
 	DisableClusterRoles        string // Mount createClusterRoles.yaml (sets createClusterRoles: false)
+	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
@@ -89,6 +90,7 @@ var testCases = []TestCase{
 		Suffix:             "-3",
 		HideDeletedAppDiff: "true",
 		ArgocdLoginOptions: "--insecure",
+		ArgocdUIURL:        "https://argocd.example.com",
 	},
 	{
 		Name:         "branch-2/target",
@@ -133,6 +135,7 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-5/base",
 		Suffix:       "-4",
 		Selector:     "team=my-team",
+		ArgocdUIURL:  "https://argocd.example.com",
 	},
 	{
 		Name:         "branch-5/target-5",
@@ -190,6 +193,7 @@ var testCases = []TestCase{
 		TargetBranch: "integration-test/branch-8/target",
 		BaseBranch:   "integration-test/branch-8/base",
 		FilesChanged: "examples/git-generator/resources/folder2/deployment.yaml,examples/git-generator/resources/folder3/deployment.yaml",
+		ArgocdUIURL:  "https://argocd.example.com",
 	},
 	{
 		Name:          "branch-9/target-1",
@@ -867,6 +871,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	if tc.ArgocdAuthToken != "" {
 		args = append(args, "--argocd-auth-token", tc.ArgocdAuthToken)
+	}
+
+	if tc.ArgocdUIURL != "" {
+		args = append(args, "--argocd-ui-url", tc.ArgocdUIURL)
 	}
 
 	return args

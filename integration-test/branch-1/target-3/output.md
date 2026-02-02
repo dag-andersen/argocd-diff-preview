@@ -12,7 +12,7 @@ Modified (1):
 ```
 
 <details>
-<summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
+<summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
 ```diff
@@ -23,7 +23,7 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
 </details>
 
 <details>
-<summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
+<summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
 ```diff
