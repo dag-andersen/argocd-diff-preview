@@ -24,6 +24,7 @@ const (
 	ErrorCommitSHA            ErrorKind = "to a commit SHA"
 	ErrorFetchChart           ErrorKind = "error fetching chart: failed to fetch chart: failed to get command args to log"
 	ErrorClusterVersionFailed ErrorKind = "ComparisonError: Failed to load target state: failed to get cluster version for cluster"
+	ErrorClusterScopeRBAC     ErrorKind = "forbidden: User \"system:serviceaccount:"
 )
 
 var errorMessages = []string{
@@ -42,10 +43,12 @@ var errorMessages = []string{
 	string(ErrorCommitSHA),
 	string(ErrorFetchChart),
 	string(ErrorClusterVersionFailed),
+	string(ErrorClusterScopeRBAC),
 }
 
 var helpMessages = map[ErrorKind]string{
 	ErrorClusterVersionFailed: "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--use-argocd-api=true' is not set",
+	ErrorClusterScopeRBAC:     "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--use-argocd-api=true' is not set",
 }
 
 // GetHelpMessage returns a helpful message for a given error if one exists
