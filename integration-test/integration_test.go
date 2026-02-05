@@ -345,17 +345,36 @@ func TestIntegration(t *testing.T) {
 	// Track how many tests since last cluster creation
 	testsSinceClusterCreation := 0
 
-	// Track if the previous test modified the cluster in a way that requires recreation
-	forceNextClusterCreation := false
-
 	// Run each test case
 	for i, tc := range shuffledCases {
-		// Create cluster if: first test, every 8th test, no cluster exists, or previous test requires it
-		createCluster := testsSinceClusterCreation == 0 || testsSinceClusterCreation >= 8 || !kindClusterExists() || forceNextClusterCreation
+		// Determine if this test needs cluster roles disabled:
+		// - DisableClusterRoles explicitly set, OR
+		// - UseArgocdApi explicitly set to true, OR
+		// - Global useArgocdApi flag is set AND test doesn't explicitly disable it
+		testNeedsRolesDisabled := tc.DisableClusterRoles == "true" || tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi)
+
+		// Check current cluster state
+		clusterExists := kindClusterExists()
+
+		// Check for RBAC mismatch (only relevant if cluster exists)
+		if clusterExists {
+			clusterHasRoles := clusterHasArgocdClusterRoles()
+			// Mismatch if: test wants roles disabled but cluster has them, OR
+			//              test wants roles enabled but cluster doesn't have them
+			rbacMismatch := testNeedsRolesDisabled == clusterHasRoles
+
+			if rbacMismatch {
+				printToTTY("🔄 Deleting cluster due to RBAC configuration mismatch...\n")
+				_ = deleteKindCluster()
+				clusterExists = false
+			}
+		}
+
+		// Create cluster if: every 8th test, no cluster exists, or test explicitly requires it
+		createCluster := testsSinceClusterCreation >= 8 || !clusterExists || tc.CreateCluster == "true"
 		if createCluster {
 			testsSinceClusterCreation = 0
 		}
-		forceNextClusterCreation = false // Reset for this iteration
 
 		// Print separator to TTY for visibility between test runs
 		runMode := "go"
@@ -368,12 +387,6 @@ func TestIntegration(t *testing.T) {
 		})
 
 		testsSinceClusterCreation++
-
-		// If this test modified the cluster configuration (e.g., disabled cluster roles),
-		// force the next test to create a fresh cluster to avoid polluting other tests.
-		if tc.DisableClusterRoles == "true" {
-			forceNextClusterCreation = true
-		}
 
 		// Stop on first failure (fail fast)
 		if t.Failed() {
@@ -392,6 +405,19 @@ func kindClusterExists() bool {
 	}
 	// Check if our cluster name is in the list
 	return slices.Contains(strings.Split(strings.TrimSpace(string(output)), "\n"), "argocd-diff-preview")
+}
+
+// clusterHasArgocdClusterRoles checks if the cluster has ArgoCD cluster roles installed.
+// This is used to detect if the current cluster was installed with createClusterRoles enabled.
+func clusterHasArgocdClusterRoles() bool {
+	cmd := exec.Command("kubectl", "get", "clusterroles",
+		"-l", "app.kubernetes.io/part-of=argocd",
+		"--no-headers")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return len(strings.TrimSpace(string(output))) > 0
 }
 
 // printToTTY prints directly to TTY for real-time visibility (bypasses Go test output capture)
@@ -608,9 +634,10 @@ func runWithGoBinary(tc TestCase, createCluster bool) error {
 		return fmt.Errorf("failed to get repo root: %w", err)
 	}
 
-	// If DisableClusterRoles is set, temporarily replace argocd-config/values.yaml
-	// with the createClusterRoles.yaml file (which sets createClusterRoles: false)
-	if tc.DisableClusterRoles == "true" {
+	// If DisableClusterRoles is set OR we're using the API mode, temporarily replace
+	// argocd-config/values.yaml with the createClusterRoles.yaml file (which sets
+	// createClusterRoles: false). This tests the API mode in a more restrictive environment.
+	if tc.DisableClusterRoles == "true" || tc.UseArgocdApi == "true" || *useArgocdApi {
 		valuesPath := filepath.Join(repoRoot, "argocd-config", "values.yaml")
 		createClusterRolesPath := filepath.Join(repoRoot, "integration-test", "createClusterRoles.yaml")
 
@@ -713,7 +740,8 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	}
 
 	// Mount argocd-config: when use_argocd_api is true or DisableClusterRoles is set,
-	// mount the special createClusterRoles.yaml file
+	// mount the special createClusterRoles.yaml file (which sets createClusterRoles: false).
+	// This tests the API mode in a more restrictive environment without cluster-wide permissions.
 	if tc.UseArgocdApi == "true" || *useArgocdApi || tc.DisableClusterRoles == "true" {
 		args = append(args, "-v", fmt.Sprintf("%s/integration-test/createClusterRoles.yaml:/argocd-config/values.yaml", repoRoot))
 	}
