@@ -1,3 +1,5 @@
+-include devcontainer.make
+
 gitops_repo ?= argocd-diff-preview
 github_org ?= dag-andersen
 base_branch := main
