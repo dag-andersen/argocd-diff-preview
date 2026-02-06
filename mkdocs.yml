@@ -41,6 +41,7 @@ nav:
 - Output formats: output.md
 - All Options: options.md
 - Troubleshooting: troubleshooting.md
+- Roadmap: roadmap.md
 - FAQ: faq.md
 
 markdown_extensions:
