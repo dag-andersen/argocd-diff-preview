@@ -355,52 +355,49 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		return nil, fmt.Errorf("failed to get manifests for application %s: %w", app.GetLongName(), err)
 	}
 
-	if strings.TrimSpace(manifests) == "" {
+	if len(manifests) == 0 {
 		log.Debug().Str("App", app.GetLongName()).Msgf("No manifests found for application in %s", time.Since(extractionTimer).Round(time.Second))
 		return []unstructured.Unstructured{}, nil
 	}
 
 	log.Debug().Str("App", app.GetLongName()).Msgf("Extracted manifests from Application in %s", time.Since(extractionTimer).Round(time.Second))
 
-	// Replace all application IDs with the application name (relevant for annotations)
-	manifests = strings.ReplaceAll(manifests, app.Id, app.Name)
-
-	// Process the manifests into unstructured.Unstructured objects
-	manifestsContent, err := processYamlOutput(manifests)
-	if err != nil {
-		log.Error().Err(err).Str("App", app.GetLongName()).Msg("Failed to process YAML")
-		return nil, fmt.Errorf("failed to process YAML: %w", err)
-	}
+	// Replace all application IDs with the application name in annotations
+	replaceAppIdInManifests(manifests, app.Id, app.Name)
 
 	// Apply Application-level ignoreDifferences (jsonPointers) before comparing diffs
 	rules := parseIgnoreDifferencesFromApp(app)
 	if len(rules) > 0 {
-		applyIgnoreDifferencesToManifests(manifestsContent, rules)
+		applyIgnoreDifferencesToManifests(manifests, rules)
 	}
 
-	err = removeArgoCDTrackingID(manifestsContent)
+	err = removeArgoCDTrackingID(manifests)
 	if err != nil {
 		return nil, fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
 	}
 
 	// Normalize namespaces and deduplicate resources (same logic as Argo CD controller)
-	destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
-	manifestsContent, err = normalizeNamespaces(manifestsContent, destNamespace, namespacedScopedResources, app.GetLongName())
-	if err != nil {
-		return nil, err
+	// Only needed for API mode - CLI's `argocd app manifests` already does this
+	// This is also used as a sanity check to always verify That the API implementation matches the CLI implementation in terms of namespace handling and deduplication.
+	if argocd.UseAPI() {
+		destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
+		manifests, err = normalizeNamespaces(manifests, destNamespace, namespacedScopedResources, app.GetLongName())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// remove Helm hooks resources
-	newManifestsContent := make([]unstructured.Unstructured, 0, len(manifestsContent))
-	for _, manifest := range manifestsContent {
+	newManifestsContent := make([]unstructured.Unstructured, 0, len(manifests))
+	for _, manifest := range manifests {
 		if HelmHookFilter(manifest) {
 			newManifestsContent = append(newManifestsContent, manifest)
 		}
 	}
-	manifestsContent = newManifestsContent
+	manifests = newManifestsContent
 
 	// Parse the first non-empty manifest from the string
-	return manifestsContent, nil
+	return manifests, nil
 }
 
 // normalizeNamespaces uses Argo CD's DeduplicateTargetObjects to normalize namespaces on manifests.

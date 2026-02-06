@@ -11,6 +11,8 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // CLIOperations implements the Operations interface using the ArgoCD CLI.
@@ -124,23 +126,60 @@ func (c *CLIOperations) AppsetGenerate(appSetPath string) (string, error) {
 }
 
 // GetManifests returns the manifests for an application using the CLI
-func (c *CLIOperations) GetManifests(appName string) (string, bool, error) {
+func (c *CLIOperations) GetManifests(appName string) ([]unstructured.Unstructured, bool, error) {
 	out, err := c.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
 		if exists, err := c.k8sClient.CheckIfResourceExists(ApplicationGVR, c.namespace, appName); !exists && err != nil {
 			log.Warn().Msgf("App '%s' does not exist", appName)
-			return "", false, fmt.Errorf("app '%s' does not exist: %w", appName, err)
+			return nil, false, fmt.Errorf("app '%s' does not exist: %w", appName, err)
 		}
 
-		return "", true, fmt.Errorf("failed to get manifests for app: %w", err)
+		return nil, true, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
 	if strings.TrimSpace(out) == "" {
 		log.Debug().Msgf("No manifests found with `argocd app manifests '%s'`", appName)
-		return "", true, nil
+		return []unstructured.Unstructured{}, true, nil
 	}
 
-	return out, true, nil
+	// Parse YAML output into unstructured objects
+	manifests, err := parseYAMLManifests(out)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to parse manifests: %w", err)
+	}
+
+	return manifests, true, nil
+}
+
+// parseYAMLManifests parses a multi-document YAML string into unstructured objects
+func parseYAMLManifests(yamlStr string) ([]unstructured.Unstructured, error) {
+	documents := utils.SplitYAMLDocuments(yamlStr)
+	manifests := make([]unstructured.Unstructured, 0, len(documents))
+
+	for _, doc := range documents {
+		var obj map[string]any
+		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML document: %w", err)
+		}
+
+		// Skip empty objects
+		if len(obj) == 0 {
+			continue
+		}
+
+		// Validate required fields
+		apiVersion, _, _ := unstructured.NestedString(obj, "apiVersion")
+		kind, _, _ := unstructured.NestedString(obj, "kind")
+		name, _, _ := unstructured.NestedString(obj, "metadata", "name")
+		if apiVersion == "" || kind == "" || name == "" {
+			log.Debug().Msgf("Skipping manifest with missing apiVersion, kind, or name")
+			continue
+		}
+
+		manifests = append(manifests, unstructured.Unstructured{Object: obj})
+	}
+
+	return manifests, nil
 }
 
 // AddSourceNamespaceToDefaultAppProject adds "*" to the sourceNamespaces of the default AppProject

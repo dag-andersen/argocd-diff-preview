@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -27,7 +28,7 @@ type Operations interface {
 
 	// GetManifests returns the manifests for an application.
 	// Returns: (manifests, appExists, error)
-	GetManifests(appName string) (string, bool, error)
+	GetManifests(appName string) ([]unstructured.Unstructured, bool, error)
 
 	// CheckVersionCompatibility checks if the client/library version is compatible
 	// with the ArgoCD server version

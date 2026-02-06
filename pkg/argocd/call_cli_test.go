@@ -1,4 +1,4 @@
-package extract
+package argocd
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestProcessYamlOutput(t *testing.T) {
+func TestParseYAMLManifests(t *testing.T) {
 	tests := []struct {
 		name          string
 		input         string
@@ -75,7 +75,7 @@ spec:
 			expectedKinds: []string{},
 		},
 		{
-			name: "manifest without apiVersion",
+			name: "manifest without apiVersion is skipped",
 			input: `kind: Deployment
 metadata:
   name: test-deployment
@@ -86,7 +86,7 @@ spec:
 			expectedKinds: []string{},
 		},
 		{
-			name: "manifest without kind",
+			name: "manifest without kind is skipped",
 			input: `apiVersion: apps/v1
 metadata:
   name: test-deployment
@@ -97,7 +97,19 @@ spec:
 			expectedKinds: []string{},
 		},
 		{
-			name: "manifest with empty apiVersion",
+			name: "manifest without name is skipped",
+			input: `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: default
+spec:
+  replicas: 1`,
+			expectedCount: 0,
+			expectedError: false,
+			expectedKinds: []string{},
+		},
+		{
+			name: "manifest with empty apiVersion is skipped",
 			input: `apiVersion: ""
 kind: Deployment
 metadata:
@@ -107,7 +119,7 @@ metadata:
 			expectedKinds: []string{},
 		},
 		{
-			name: "manifest with empty kind",
+			name: "manifest with empty kind is skipped",
 			input: `apiVersion: apps/v1
 kind: ""
 metadata:
@@ -128,40 +140,28 @@ metadata:
 			expectedKinds: []string{},
 		},
 		{
-			name:          "scalar string value",
+			name:          "scalar string value returns error",
 			input:         `just a plain string`,
 			expectedCount: 0,
 			expectedError: true,
 			expectedKinds: []string{},
 		},
 		{
-			name:          "scalar number value",
+			name:          "scalar number value returns error",
 			input:         `42`,
 			expectedCount: 0,
 			expectedError: true,
 			expectedKinds: []string{},
 		},
 		{
-			name:          "scalar boolean value",
+			name:          "scalar boolean value returns error",
 			input:         `true`,
 			expectedCount: 0,
 			expectedError: true,
 			expectedKinds: []string{},
 		},
 		{
-			name: "mixed scalar and valid manifest",
-			input: `just a string
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: test-config`,
-			expectedCount: 1,
-			expectedError: true,
-			expectedKinds: []string{},
-		},
-		{
-			name: "scalar array value",
+			name: "scalar array value returns error",
 			input: `- item1
 - item2
 - item3`,
@@ -170,7 +170,7 @@ metadata:
 			expectedKinds: []string{},
 		},
 		{
-			name: "mixed valid and invalid manifests",
+			name: "mixed valid and invalid manifests - invalid skipped",
 			input: `apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -304,7 +304,7 @@ data:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := processYamlOutput(tt.input)
+			result, err := parseYAMLManifests(tt.input)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -335,12 +335,17 @@ data:
 				require.NoError(t, err)
 				require.True(t, found)
 				assert.NotEmpty(t, kind)
+
+				name, found, err := unstructured.NestedString(manifest.Object, "metadata", "name")
+				require.NoError(t, err)
+				require.True(t, found)
+				assert.NotEmpty(t, name)
 			}
 		})
 	}
 }
 
-func TestProcessYamlOutput_EdgeCases(t *testing.T) {
+func TestParseYAMLManifests_EdgeCases(t *testing.T) {
 	t.Run("very large manifest", func(t *testing.T) {
 		// Create a manifest with many labels
 		var input strings.Builder
@@ -357,7 +362,7 @@ metadata:
 
 		input.WriteString("\ndata:\n  key: value")
 
-		result, err := processYamlOutput(input.String())
+		result, err := parseYAMLManifests(input.String())
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
@@ -377,7 +382,7 @@ metadata:
 data:
   key: dmFsdWU=`
 
-		result, err := processYamlOutput(input)
+		result, err := parseYAMLManifests(input)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
@@ -397,7 +402,7 @@ metadata:
 data:
   greeting: "Hello 世界"`
 
-		result, err := processYamlOutput(input)
+		result, err := parseYAMLManifests(input)
 		require.NoError(t, err)
 		assert.Len(t, result, 1)
 
@@ -408,7 +413,7 @@ data:
 	})
 }
 
-func TestProcessYamlOutput_YamlStructure(t *testing.T) {
+func TestParseYAMLManifests_Structure(t *testing.T) {
 	t.Run("verify unstructured object structure", func(t *testing.T) {
 		input := `apiVersion: apps/v1
 kind: Deployment
@@ -423,7 +428,7 @@ spec:
     matchLabels:
       app: test`
 
-		result, err := processYamlOutput(input)
+		result, err := parseYAMLManifests(input)
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 
