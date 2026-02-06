@@ -10,6 +10,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -369,7 +370,7 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 }
 
 // GetManifests returns the manifests for an application
-func (a *ArgoCDInstallation) GetManifests(appName string) (string, bool, error) {
+func (a *ArgoCDInstallation) GetManifests(appName string) ([]unstructured.Unstructured, bool, error) {
 	return a.operations.GetManifests(appName)
 }
 
