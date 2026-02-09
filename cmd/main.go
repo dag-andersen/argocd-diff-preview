@@ -307,6 +307,7 @@ func run(cfg *Config) error {
 	baseManifests, targetManifests, extractDuration, err := extract.RenderApplicationsFromBothBranches(
 		argocd,
 		cfg.Timeout,
+		cfg.Concurrency,
 		baseApps.SelectedApps,
 		targetApps.SelectedApps,
 		uniqueID,
