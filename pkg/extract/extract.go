@@ -248,13 +248,16 @@ func getResourcesFromApp(
 
 	triedRefreshing := false
 
+	// Keep track of the last seen error to provide more context in case of timeout.
+	var lastSeenError error
+
 	loopCount := -1 // -1 means we haven't started the loop yet
 	for {
 		loopCount++
 
 		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s'", app.GetLongName())
+			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s': last seen error: %v", app.GetLongName(), lastSeenError)
 		}
 
 		reconciled, isMarkedForRefresh, argoErrMessage, internalError, err := argoapplication.GetApplicationStatus(argocd, app)
@@ -316,6 +319,9 @@ func getResourcesFromApp(
 			return extractedApp, k8sName, nil
 		}
 
+		// update last seen error
+		lastSeenError = err
+
 		log.Debug().Str("loop", strconv.Itoa(loopCount)).Err(err).Str("App", app.GetLongName()).Msg("Failed to get manifests from application")
 
 		// Check if the error is a known error
@@ -335,7 +341,7 @@ func getResourcesFromApp(
 
 		// Check if we've exceeded timeout
 		if time.Since(startTime).Seconds() > float64(timeout) {
-			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s'", app.GetLongName())
+			return ExtractedApp{}, k8sName, fmt.Errorf("timed out waiting for application '%s': last seen error: %v", app.GetLongName(), lastSeenError)
 		}
 
 		// Sleep before next iteration
@@ -384,10 +390,14 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	}
 
 	// Normalize namespaces and deduplicate resources (same logic as Argo CD controller)
-	destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
-	manifestsContent, err = normalizeNamespaces(manifestsContent, destNamespace, namespacedScopedResources, app.GetLongName())
-	if err != nil {
-		return nil, err
+	// Only needed for API mode - CLI's `argocd app manifests` already does this
+	// This ensures the API implementation matches the CLI implementation in terms of namespace handling and deduplication.
+	if argocd.UseAPI() {
+		destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
+		manifestsContent, err = normalizeNamespaces(manifestsContent, destNamespace, namespacedScopedResources, app.GetLongName())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// remove Helm hooks resources
