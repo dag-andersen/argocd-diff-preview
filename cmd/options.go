@@ -66,6 +66,7 @@ var (
 	DefaultDisableClientThrottling    = false
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
+	DefaultConcurrency                = uint(40)
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -110,6 +111,7 @@ type RawOptions struct {
 	IgnoreResourceRules        string `mapstructure:"ignore-resources"`
 	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
 	ArgocdUIURL                string `mapstructure:"argocd-ui-url"`
+	Concurrency                uint   `mapstructure:"concurrency"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -149,6 +151,7 @@ type Config struct {
 	DisableClientThrottling    bool
 	UseArgoCDApi               bool
 	ArgocdUIURL                string
+	Concurrency                uint
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -240,6 +243,7 @@ func Parse() *Config {
 	viper.SetDefault("hide-deleted-app-diff", DefaultHideDeletedAppDiff)
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
+	viper.SetDefault("concurrency", DefaultConcurrency)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -281,6 +285,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("k3d-options", DefaultK3dOptions, "k3d options (only for k3d)")
 	rootCmd.Flags().Bool("keep-cluster-alive", DefaultKeepClusterAlive, "Keep cluster alive after the tool finishes")
 	rootCmd.Flags().Bool("disable-client-throttling", DefaultDisableClientThrottling, "Disable client-side throttling (rely on API Priority and Fairness instead)")
+	rootCmd.Flags().Uint("concurrency", DefaultConcurrency, "Max concurrent application processing (0 = unlimited, not recommended)")
 
 	// Other options
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
@@ -375,6 +380,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		DisableClientThrottling:    o.DisableClientThrottling,
 		UseArgoCDApi:               o.UseArgoCDApi,
 		ArgocdUIURL:                o.ArgocdUIURL,
+		Concurrency:                o.Concurrency,
 	}
 
 	var err error
@@ -386,6 +392,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	if cfg.MaxDiffLength <= 0 {
 		cfg.MaxDiffLength = DefaultMaxDiffLength
 	}
+	// Note: Concurrency 0 means unlimited, so we don't apply a default for zero
 
 	// Parse file regex
 	cfg.FileRegex, err = o.parseFileRegex()
@@ -654,5 +661,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.DisableClientThrottling {
 		log.Info().Msgf("✨ - disable-client-throttling: %t (relying on API Priority and Fairness)", o.DisableClientThrottling)
+	}
+	if o.Concurrency != DefaultConcurrency {
+		log.Info().Msgf("✨ - concurrency: %d", o.Concurrency)
 	}
 }

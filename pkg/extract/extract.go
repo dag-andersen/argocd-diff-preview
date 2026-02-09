@@ -31,14 +31,12 @@ func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
 	return p.namespacedByGk[gk], nil
 }
 
-// const worker count
-const maxWorkers = 40
-
 // RenderApplicationsFromBothBranches extracts resources from both base and target branches
 // by applying their manifests to the cluster and capturing the resulting resources
 func RenderApplicationsFromBothBranches(
 	argocd *argocdPkg.ArgoCDInstallation,
 	timeout uint64,
+	maxConcurrency uint,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
 	prefix string,
@@ -60,7 +58,7 @@ func RenderApplicationsFromBothBranches(
 	apps := append(baseApps, targetApps...)
 
 	log.Debug().Msg("Applied manifest for both branches")
-	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, prefix, deleteAfterProcessing)
+	extractedBaseApps, extractedTargetApps, err := getResourcesFromApps(argocd, apps, timeout, maxConcurrency, prefix, deleteAfterProcessing)
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get resources: %w", err)
 	}
@@ -74,6 +72,7 @@ func getResourcesFromApps(
 	argocd *argocdPkg.ArgoCDInstallation,
 	apps []argoapplication.ArgoResource,
 	timeout uint64,
+	maxConcurrency uint,
 	prefix string,
 	deleteAfterProcessing bool,
 ) ([]ExtractedApp, []ExtractedApp, error) {
@@ -96,7 +95,12 @@ func getResourcesFromApps(
 	}, len(apps))
 
 	// Create a semaphore channel to limit concurrent workers
-	sem := make(chan struct{}, maxWorkers)
+	// If maxConcurrency is 0, use len(apps) to effectively have no limit
+	semSize := int(maxConcurrency)
+	if semSize == 0 {
+		semSize = len(apps)
+	}
+	sem := make(chan struct{}, semSize)
 
 	// Use WaitGroup to wait for all goroutines to complete (including deletions)
 	var wg sync.WaitGroup
