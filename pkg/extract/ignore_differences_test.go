@@ -1303,13 +1303,13 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 
 				firstPort, ok := ports[0].(map[string]any)
 				require.True(t, ok)
-				assert.Equal(t, 80, firstPort["port"])
+				assert.Equal(t, int64(80), firstPort["port"])
 				_, exists := firstPort["nodePort"]
 				assert.False(t, exists)
 
 				secondPort, ok := ports[1].(map[string]any)
 				require.True(t, ok)
-				assert.Equal(t, 443, secondPort["port"])
+				assert.Equal(t, int64(443), secondPort["port"])
 				_, exists = secondPort["nodePort"]
 				assert.False(t, exists)
 			},

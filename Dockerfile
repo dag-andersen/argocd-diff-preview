@@ -15,7 +15,7 @@ RUN go mod download
 
 # Install kind and Argo CD (these are stable and should be cached)
 RUN apt-get update && apt-get install -y curl
-RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-${TARGETARCH} && \
+RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-${TARGETARCH} && \
     chmod +x ./kind
 RUN curl -sSL -o argocd-linux-${TARGETARCH} https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-${TARGETARCH} && \
     install -m 555 argocd-linux-${TARGETARCH} /usr/local/bin/argocd && \
