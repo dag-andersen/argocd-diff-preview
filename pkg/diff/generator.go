@@ -271,7 +271,10 @@ func generateGitDiff(
 				}
 
 				resourceIndex := BuildResourceIndex(content)
-				changeInfo = formatNewFileDiff(content, diffContextLines, diffIgnore, resourceIndex)
+				changeInfo, err = formatNewFileDiff(content, diffContextLines, diffIgnore, resourceIndex)
+				if err != nil {
+					return "", nil, nil, fmt.Errorf("failed to format new file diff: %w", err)
+				}
 			}
 
 		case merkletrie.Delete:
@@ -292,7 +295,10 @@ func generateGitDiff(
 				}
 
 				resourceIndex := BuildResourceIndex(content)
-				changeInfo = formatDeletedFileDiff(content, diffContextLines, diffIgnore, resourceIndex)
+				changeInfo, err = formatDeletedFileDiff(content, diffContextLines, diffIgnore, resourceIndex)
+				if err != nil {
+					return "", nil, nil, fmt.Errorf("failed to format deleted file diff: %w", err)
+				}
 			}
 
 		case merkletrie.Modify:
@@ -325,7 +331,10 @@ func generateGitDiff(
 
 			// Use the new content's resource index for displaying resource headers
 			resourceIndex := BuildResourceIndex(newContent)
-			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore, resourceIndex)
+			changeInfo, err = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore, resourceIndex)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to format modified file diff: %w", err)
+			}
 		}
 
 		toName := ""

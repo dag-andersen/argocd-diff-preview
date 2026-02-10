@@ -24,14 +24,26 @@ var ignorePatterns = []string{
 	"caBundle: ",
 }
 
-// shouldIgnoreLine checks if a line should be ignored based on regex pattern
-func shouldIgnoreLine(line, pattern string) bool {
-	matched, err := regexp.MatchString(pattern, line)
-	if err != nil {
-		// If regex fails, fall back to simple string matching
-		return strings.Contains(line, pattern)
+// compileIgnorePattern compiles a regex pattern string into a *regexp.Regexp.
+// Returns (nil, nil) if the pattern is empty (no pattern provided).
+// Returns (nil, error) if the pattern is invalid.
+func compileIgnorePattern(pattern *string) (*regexp.Regexp, error) {
+	if pattern == nil || *pattern == "" {
+		return nil, nil
 	}
-	return matched
+	compiled, err := regexp.Compile(*pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ignore pattern regex %q: %w", *pattern, err)
+	}
+	return compiled, nil
+}
+
+// shouldIgnoreLine checks if a line should be ignored based on a pre-compiled regex pattern
+func shouldIgnoreLine(line string, pattern *regexp.Regexp) bool {
+	if pattern == nil {
+		return false
+	}
+	return pattern.MatchString(line)
 }
 
 // ResourceBlock represents a single resource's diff content without any formatting
@@ -58,11 +70,17 @@ type processedLine struct {
 // formatDiff formats diffmatchpatch.Diff into unified diff format
 // resourceIndex is optional and used to insert resource headers at chunk boundaries
 // Output: each ResourceBlock contains a header (e.g., "Deployment/my-app (default)") and raw diff content
-func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
+func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) (changeInfo, error) {
 	// Process the diffs and format them in unified diff format
 	// We'll keep track of context lines to include only the specified number
 	// Also track the original line number in the new content for resource lookup
 	var processedLines []processedLine
+
+	// Pre-compile the ignore pattern regex once for efficiency
+	compiledIgnorePattern, err := compileIgnorePattern(ignorePattern)
+	if err != nil {
+		return changeInfo{}, err
+	}
 
 	// Track line number in the "new" content (DiffEqual and DiffInsert contribute to this)
 	newLineNum := 0
@@ -79,9 +97,9 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		for _, line := range lines {
 			// Determine if this line should be shown or filtered out
 			show := true
-			if isChange && ignorePattern != nil && *ignorePattern != "" {
+			if isChange && compiledIgnorePattern != nil {
 				// Only apply regex filter to changed lines
-				show = !shouldIgnoreLine(line, *ignorePattern)
+				show = !shouldIgnoreLine(line, compiledIgnorePattern)
 			}
 
 			// Ignore specific hardcoded lines.
@@ -121,7 +139,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 
 	// No changes to show, so return empty changeInfo
 	if len(changedLines) == 0 {
-		return changeInfo{blocks: nil, addedLines: 0, deletedLines: 0}
+		return changeInfo{blocks: nil, addedLines: 0, deletedLines: 0}, nil
 	}
 
 	// Now create chunks of lines to include based on context
@@ -256,25 +274,25 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	// Flush the last block
 	flushBlock()
 
-	return changeInfo{blocks: blocks, addedLines: addedLines, deletedLines: deletedLines}
+	return changeInfo{blocks: blocks, addedLines: addedLines, deletedLines: deletedLines}, nil
 }
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
-func formatNewFileDiff(content string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
+func formatNewFileDiff(content string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) (changeInfo, error) {
 	// For new files, we diff from empty string to the content
 	diffs := diff.Do("", content)
 	return formatDiff(diffs, contextLines, ignorePattern, resourceIndex)
 }
 
 // formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
-func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
+func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) (changeInfo, error) {
 	// For deleted files, we diff from the content to empty string
 	diffs := diff.Do(content, "")
 	return formatDiff(diffs, contextLines, ignorePattern, resourceIndex)
 }
 
 // formatModifiedFileDiff formats a diff for a modified file using the go-git/utils/diff package
-func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
+func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) (changeInfo, error) {
 	diffs := diff.Do(oldContent, newContent)
 	return formatDiff(diffs, contextLines, ignorePattern, resourceIndex)
 }
