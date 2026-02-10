@@ -140,7 +140,7 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 		expectedFilePath string
 		expectedAppURL   string
 		expectedComment  string
-		expectedContent  string
+		expectedBlocks   []ResourceBlock
 	}{
 		{
 			name: "Insert without URL",
@@ -148,14 +148,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				newName:       "new-app",
 				newSourcePath: "/path/new",
 				action:        merkletrie.Insert,
-				changeInfo:    changeInfo{content: "+ line 1\n+ line 2"},
+				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}}},
 			},
 			argocdUIURL:      "",
 			expectedAppName:  "new-app",
 			expectedFilePath: "/path/new",
 			expectedAppURL:   "",
 			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
-			expectedContent:  "+ line 1\n+ line 2",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
 		},
 		{
 			name: "Insert with URL",
@@ -163,14 +163,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				newName:       "new-app",
 				newSourcePath: "/path/new",
 				action:        merkletrie.Insert,
-				changeInfo:    changeInfo{content: "+ line 1\n+ line 2"},
+				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}}},
 			},
 			argocdUIURL:      "https://argocd.example.com",
 			expectedAppName:  "new-app",
 			expectedFilePath: "/path/new",
 			expectedAppURL:   "https://argocd.example.com/applications/new-app",
 			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
-			expectedContent:  "+ line 1\n+ line 2",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
 		},
 		{
 			name: "Modify with name change",
@@ -180,14 +180,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				newSourcePath: "/path/app",
 				oldSourcePath: "/path/app",
 				action:        merkletrie.Modify,
-				changeInfo:    changeInfo{content: "- line 1\n+ line 1 mod"},
+				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}}},
 			},
 			argocdUIURL:      "https://argocd.example.com",
 			expectedAppName:  "app-v1 -> app-v2",
 			expectedFilePath: "/path/app",
 			expectedAppURL:   "https://argocd.example.com/applications/app-v1",
 			expectedComment:  "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
-			expectedContent:  "- line 1\n+ line 1 mod",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}},
 		},
 		{
 			name: "Delete",
@@ -195,14 +195,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				oldName:       "old-app",
 				oldSourcePath: "/path/old",
 				action:        merkletrie.Delete,
-				changeInfo:    changeInfo{content: "- line 1\n- line 2"},
+				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}}},
 			},
 			argocdUIURL:      "https://argocd.example.com",
 			expectedAppName:  "old-app",
 			expectedFilePath: "/path/old",
 			expectedAppURL:   "https://argocd.example.com/applications/old-app",
 			expectedComment:  "@@ Application deleted: old-app (/path/old) @@\n",
-			expectedContent:  "- line 1\n- line 2",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}},
 		},
 	}
 
@@ -222,8 +222,18 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if got.comment != tt.expectedComment {
 				t.Errorf("buildMarkdownSection().comment = %q, want %q", got.comment, tt.expectedComment)
 			}
-			if got.content != tt.expectedContent {
-				t.Errorf("buildMarkdownSection().content = %q, want %q", got.content, tt.expectedContent)
+			// Compare blocks
+			if len(got.blocks) != len(tt.expectedBlocks) {
+				t.Errorf("buildMarkdownSection().blocks length = %d, want %d", len(got.blocks), len(tt.expectedBlocks))
+			} else {
+				for i, block := range got.blocks {
+					if block.Header != tt.expectedBlocks[i].Header {
+						t.Errorf("blocks[%d].Header = %q, want %q", i, block.Header, tt.expectedBlocks[i].Header)
+					}
+					if block.Content != tt.expectedBlocks[i].Content {
+						t.Errorf("blocks[%d].Content = %q, want %q", i, block.Content, tt.expectedBlocks[i].Content)
+					}
+				}
 			}
 
 			// Test that the build method works correctly
@@ -231,15 +241,16 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if truncated {
 				t.Errorf("buildMarkdownSection().build() should not be truncated with large max size")
 			}
-			// Note: The markdown wrapper no longer includes code blocks - the content already includes them
-			// when a resourceIndex is provided. For these tests without resourceIndex, content is plain diff format.
+			// For blocks with empty header, formatBlocksToMarkdown just wraps content in code blocks
+			formattedContent := formatBlocksToMarkdown(tt.expectedBlocks)
+			formattedContent = strings.TrimRight(formattedContent, "\n")
 			var expectedBuiltSection string
 			if tt.expectedAppURL != "" {
 				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
-					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
+					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, formattedContent)
 			} else {
 				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
-					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
+					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, formattedContent)
 			}
 
 			if builtSection != expectedBuiltSection {

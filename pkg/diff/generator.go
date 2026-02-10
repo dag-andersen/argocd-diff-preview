@@ -279,7 +279,7 @@ func generateGitDiff(
 			// Skip generating diff content for deleted apps when hideDeletedAppDiff is enabled
 			// The header will still be shown, but not the full diff content
 			if hideDeletedAppDiff {
-				changeInfo.content = deletedAppDiffHiddenMessage
+				changeInfo.blocks = []ResourceBlock{{Header: "", Content: deletedAppDiffHiddenMessage}}
 			} else if from != nil {
 				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
@@ -347,7 +347,7 @@ func generateGitDiff(
 		}
 
 		// If the diff didn't change and the names are the same, skip it
-		if diff.changeInfo.content == "" && diff.oldName == diff.newName && diff.oldSourcePath == diff.newSourcePath {
+		if len(diff.changeInfo.blocks) == 0 && diff.oldName == diff.newName && diff.oldSourcePath == diff.newSourcePath {
 			continue
 		}
 
@@ -376,7 +376,7 @@ func generateGitDiff(
 	for _, diff := range changedFiles {
 
 		// skips empty diffs
-		if diff.changeInfo.content == "" {
+		if len(diff.changeInfo.blocks) == 0 {
 			continue
 		}
 

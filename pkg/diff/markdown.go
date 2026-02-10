@@ -12,7 +12,7 @@ type MarkdownSection struct {
 	filePath string
 	appURL   string
 	comment  string
-	content  string
+	blocks   []ResourceBlock // Structured blocks with raw content
 }
 
 func markdownSectionHeader(appName, filePath, appURL string) string {
@@ -30,8 +30,29 @@ func markdownSectionFooter() string {
 	return "\n</details>\n\n"
 }
 
+// formatBlocksToMarkdown converts ResourceBlocks to formatted markdown string
+// Each block gets a #### header (if present) and ```diff code fences around content
+func formatBlocksToMarkdown(blocks []ResourceBlock) string {
+	var result strings.Builder
+	for _, block := range blocks {
+		if block.Header != "" {
+			result.WriteString("#### " + block.Header + "\n")
+		}
+		if block.Content != "" {
+			result.WriteString("```diff\n")
+			result.WriteString(block.Content)
+			if !strings.HasSuffix(block.Content, "\n") {
+				result.WriteString("\n")
+			}
+			result.WriteString("```\n")
+		}
+	}
+	return result.String()
+}
+
 func (m *MarkdownSection) Size() int {
-	return len(markdownSectionHeader(m.appName, m.filePath, m.appURL)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
+	content := formatBlocksToMarkdown(m.blocks)
+	return len(markdownSectionHeader(m.appName, m.filePath, m.appURL)) + len(m.comment) + len(content) + len(markdownSectionFooter())
 }
 
 var (
@@ -43,7 +64,7 @@ var (
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
 	footer := markdownSectionFooter()
-	content := strings.TrimRight(m.content, "\n")
+	content := strings.TrimRight(formatBlocksToMarkdown(m.blocks), "\n")
 
 	spaceForContent := maxSize - len(header) - len(footer) - len(m.comment)
 

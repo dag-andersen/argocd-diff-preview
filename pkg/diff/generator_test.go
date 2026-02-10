@@ -34,11 +34,14 @@ func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
 	if len(htmlSections) != 1 {
 		t.Fatalf("expected 1 html section, got %d", len(htmlSections))
 	}
-	if markdownSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("markdown content = %q, want %q", markdownSections[0].content, deletedAppDiffHiddenMessage)
+	// Check that blocks contain the hidden message
+	mdContent := formatBlocksToMarkdown(markdownSections[0].blocks)
+	if !strings.Contains(mdContent, deletedAppDiffHiddenMessage) {
+		t.Fatalf("markdown blocks should contain %q, got %q", deletedAppDiffHiddenMessage, mdContent)
 	}
-	if htmlSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("html content = %q, want %q", htmlSections[0].content, deletedAppDiffHiddenMessage)
+	// For HTML, we need to check the blocks directly
+	if len(htmlSections[0].blocks) != 1 || htmlSections[0].blocks[0].Content != deletedAppDiffHiddenMessage {
+		t.Fatalf("html blocks should contain %q", deletedAppDiffHiddenMessage)
 	}
 }
 

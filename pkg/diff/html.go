@@ -82,7 +82,7 @@ type HTMLSection struct {
 	filePath      string
 	appURL        string
 	commentHeader string
-	content       string
+	blocks        []ResourceBlock // Structured blocks with raw content
 }
 
 const htmlSection = `
@@ -119,40 +119,48 @@ func (h *HTMLSection) printHTMLSection() string {
 	s = strings.ReplaceAll(s, "%summary%", summary)
 
 	var rows strings.Builder
-	// Pre-allocate capacity based on content length to avoid reallocations
-	// Each line gets ~50 chars of HTML wrapper + up to ~40 chars for HTML escaping expansion
-	estimatedLines := strings.Count(h.content, "\n") + 1
-	htmlOverhead := estimatedLines * 90
-	rows.Grow(len(h.content) + len(h.commentHeader) + htmlOverhead)
+	// Pre-allocate capacity based on blocks
+	totalContentLen := 0
+	totalLines := 0
+	for _, block := range h.blocks {
+		totalContentLen += len(block.Content) + len(block.Header)
+		totalLines += strings.Count(block.Content, "\n") + 1
+	}
+	htmlOverhead := totalLines * 90
+	rows.Grow(totalContentLen + len(h.commentHeader) + htmlOverhead)
 
 	// Add comment header
 	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
 
-	// Process content lines
-	for line := range strings.Lines(h.content) {
-		line = strings.TrimRight(line, " \t\r\n")
-		if len(line) == 0 {
-			continue // Skip empty lines
+	// Process each resource block
+	for _, block := range h.blocks {
+		// Add resource header as a comment line (with #### prefix for consistency with markdown)
+		if block.Header != "" {
+			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString("#### "+block.Header))
 		}
-		// Skip markdown code block markers (```diff and ```)
-		if strings.HasPrefix(line, "```") {
-			continue
-		}
-		// Handle YAML document separator as a comment line
-		if line == "---" {
-			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
-			continue
-		}
-		switch line[0] {
-		case '@', '#':
-			// @ for skipped lines, # for markdown headers (resource headers)
-			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
-		case '-':
-			fmt.Fprintf(&rows, htmlLine, "removed_line", html.EscapeString(line))
-		case '+':
-			fmt.Fprintf(&rows, htmlLine, "added_line", html.EscapeString(line))
-		default:
-			fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
+
+		// Process content lines
+		for line := range strings.Lines(block.Content) {
+			line = strings.TrimRight(line, " \t\r\n")
+			if len(line) == 0 {
+				continue // Skip empty lines
+			}
+			// Handle YAML document separator as a comment line
+			if line == "---" {
+				fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
+				continue
+			}
+			switch line[0] {
+			case '@':
+				// @ for skipped lines
+				fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
+			case '-':
+				fmt.Fprintf(&rows, htmlLine, "removed_line", html.EscapeString(line))
+			case '+':
+				fmt.Fprintf(&rows, htmlLine, "added_line", html.EscapeString(line))
+			default:
+				fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
+			}
 		}
 	}
 	s = strings.ReplaceAll(s, "%rows%", rows.String())

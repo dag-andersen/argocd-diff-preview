@@ -93,7 +93,7 @@ func (d *Diff) buildMarkdownSection(argocdUIURL string) MarkdownSection {
 		filePath: d.prettyPath(),
 		appURL:   d.buildAppURL(argocdUIURL),
 		comment:  d.commentHeader(),
-		content:  d.changeInfo.content,
+		blocks:   d.changeInfo.blocks,
 	}
 }
 
@@ -103,6 +103,6 @@ func (d *Diff) buildHTMLSection(argocdUIURL string) HTMLSection {
 		filePath:      d.prettyPath(),
 		appURL:        d.buildAppURL(argocdUIURL),
 		commentHeader: d.commentHeader(),
-		content:       d.changeInfo.content,
+		blocks:        d.changeInfo.blocks,
 	}
 }

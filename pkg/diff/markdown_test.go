@@ -63,10 +63,10 @@ func TestMarkdownSection_Build(t *testing.T) {
 				filePath: "path/to/app.yaml",
 				appURL:   "",
 				comment:  "@@ Application added: Test App @@\n",
-				content:  "+ line 1\n+ line 2",
+				blocks:   []ResourceBlock{{Content: "+ line 1\n+ line 2"}},
 			},
 			maxSize:           1000,
-			expectedContent:   "<details>\n<summary>Test App (path/to/app.yaml)</summary>\n<br>\n\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>Test App (path/to/app.yaml)</summary>\n<br>\n\n@@ Application added: Test App @@\n```diff\n+ line 1\n+ line 2\n```\n</details>\n\n",
 			expectedTruncated: false,
 		},
 		{
@@ -76,7 +76,7 @@ func TestMarkdownSection_Build(t *testing.T) {
 				filePath: "path.yaml",
 				appURL:   "",
 				comment:  "@@ Test @@\n",
-				content:  strings.Repeat("Very long line that will be truncated\n", 10),
+				blocks:   []ResourceBlock{{Content: strings.Repeat("Very long line that will be truncated\n", 10)}},
 			},
 			maxSize:           200, // Small max size to force truncation
 			expectedTruncated: true,
@@ -88,7 +88,7 @@ func TestMarkdownSection_Build(t *testing.T) {
 				filePath: "path/to/app.yaml",
 				appURL:   "",
 				comment:  "@@ Very long comment that takes up space @@\n",
-				content:  "Some content",
+				blocks:   []ResourceBlock{{Content: "Some content"}},
 			},
 			maxSize:           50, // Very small max size
 			expectedContent:   "",
@@ -101,10 +101,10 @@ func TestMarkdownSection_Build(t *testing.T) {
 				filePath: "path.yaml",
 				appURL:   "",
 				comment:  "@@ Test @@\n",
-				content:  "+ line 1\n+ line 2\n\n\n",
+				blocks:   []ResourceBlock{{Content: "+ line 1\n+ line 2\n\n\n"}},
 			},
 			maxSize:           1000,
-			expectedContent:   "<details>\n<summary>App (path.yaml)</summary>\n<br>\n\n@@ Test @@\n+ line 1\n+ line 2\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>App (path.yaml)</summary>\n<br>\n\n@@ Test @@\n```diff\n+ line 1\n+ line 2\n\n\n```\n</details>\n\n",
 			expectedTruncated: false,
 		},
 	}
@@ -149,14 +149,14 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 						filePath: "path/to/app1.yaml",
 						appURL:   "",
 						comment:  "@@ Application added: App 1 @@\n",
-						content:  "+ new content",
+						blocks:   []ResourceBlock{{Content: "+ new content"}},
 					},
 					{
 						appName:  "App 2",
 						filePath: "path/to/app2.yaml",
 						appURL:   "",
 						comment:  "@@ Application modified: App 2 @@\n",
-						content:  "- old content\n+ new content",
+						blocks:   []ResourceBlock{{Content: "- old content\n+ new content"}},
 					},
 				},
 				statsInfo: StatsInfo{
@@ -215,7 +215,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 						filePath: "path/to/large.yaml",
 						appURL:   "",
 						comment:  "@@ Application modified: Large App @@\n",
-						content:  strings.Repeat("Very long diff content that will cause truncation\n", 100),
+						blocks:   []ResourceBlock{{Content: strings.Repeat("Very long diff content that will cause truncation\n", 100)}},
 					},
 				},
 				statsInfo: StatsInfo{
@@ -273,7 +273,7 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 					filePath: "path.yaml",
 					appURL:   "",
 					comment:  "@@ Test @@\n",
-					content:  "content",
+					blocks:   []ResourceBlock{{Content: "content"}},
 				},
 			},
 			statsInfo: StatsInfo{ApplicationCount: 1},
@@ -298,7 +298,7 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 					filePath: "path.yaml",
 					appURL:   "",
 					comment:  "@@ Test @@\n",
-					content:  "content",
+					blocks:   []ResourceBlock{{Content: "content"}},
 				},
 			},
 			statsInfo: StatsInfo{ApplicationCount: 1},
@@ -324,7 +324,7 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  "",
+			blocks:   []ResourceBlock{{Content: strings.Repeat("x", 500)}},
 		}
 		content, truncated := section.build(1000)
 		if truncated {
@@ -341,18 +341,19 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  "actual content\n\n\n",
+			blocks:   []ResourceBlock{{Content: "actual content\n\n\n"}},
 		}
 		content, truncated := section.build(1000)
 		if truncated {
 			t.Errorf("Content with trailing newlines should not be truncated")
 		}
-		// Trailing newlines should be trimmed
-		if strings.Contains(content, "actual content\n\n\n") {
-			t.Errorf("Trailing newlines should be trimmed from content")
-		}
+		// Content is preserved inside code fences
 		if !strings.Contains(content, "actual content") {
 			t.Errorf("Should preserve the actual content")
+		}
+		// Should have code fences
+		if !strings.Contains(content, "```diff") {
+			t.Errorf("Should have code fence markers")
 		}
 	})
 
@@ -362,7 +363,7 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  "x",
+			blocks:   []ResourceBlock{{Content: "x"}},
 		}
 		// maxSize = headerFooterLen + 0 = exactly enough for header/footer, no content
 		content, truncated := section.build(headerFooterLen)
@@ -381,7 +382,7 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  strings.Repeat("x", 200),
+			blocks:   []ResourceBlock{{Content: strings.Repeat("x", 200)}},
 		}
 		maxSize := headerFooterLen + 200
 		content, truncated := section.build(maxSize)
@@ -403,7 +404,7 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  strings.Repeat("x", 500),
+			blocks:   []ResourceBlock{{Content: strings.Repeat("x", 500)}},
 		}
 		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + 1 + warning length (just above threshold)
 		spaceForContent := minSizeForSectionContent + 1 + len(diffTooLongWarning)
@@ -426,7 +427,7 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  strings.Repeat("x", 500),
+			blocks:   []ResourceBlock{{Content: strings.Repeat("x", 500)}},
 		}
 		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + warning length (at threshold, not above)
 		spaceForContent := minSizeForSectionContent + len(diffTooLongWarning)
@@ -446,7 +447,7 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			filePath: "path.yaml",
 			appURL:   "",
 			comment:  "",
-			content:  "line1\nline2   \t\nline3",
+			blocks:   []ResourceBlock{{Content: "line1\nline2   \t\nline3"}},
 		}
 		// Force truncation that cuts off at whitespace area
 		maxSize := headerFooterLen + 150
@@ -461,12 +462,13 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 }
 
 func TestMarkdownSection_Build_TruncationBehavior(t *testing.T) {
+	sectionContent := strings.Repeat("Line of content that will be truncated\n", 50)
 	section := MarkdownSection{
 		appName:  "Test App",
 		filePath: "path/to/app.yaml",
 		appURL:   "",
 		comment:  "@@ Application modified: Test App @@\n",
-		content:  strings.Repeat("Line of content that will be truncated\n", 50),
+		blocks:   []ResourceBlock{{Content: sectionContent}},
 	}
 
 	// Test various max sizes
@@ -493,7 +495,7 @@ func TestMarkdownSection_Build_TruncationBehavior(t *testing.T) {
 				if !strings.Contains(content, section.comment) {
 					t.Errorf("Non-truncated content should contain comment")
 				}
-				if !strings.Contains(content, strings.TrimRight(section.content, "\n")) {
+				if !strings.Contains(content, strings.TrimRight(sectionContent, "\n")) {
 					t.Errorf("Non-truncated content should contain original content")
 				}
 			}
@@ -511,7 +513,7 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 				filePath: "path/to/section.yaml",
 				appURL:   "",
 				comment:  "@@ Test @@\n",
-				content:  "Test content",
+				blocks:   []ResourceBlock{{Content: "Test content"}},
 			},
 		},
 		statsInfo: StatsInfo{
@@ -563,7 +565,7 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 					filePath: "path.yaml",
 					appURL:   "",
 					comment:  "@@ Test @@\n",
-					content:  "content",
+					blocks:   []ResourceBlock{{Content: "content"}},
 				},
 			},
 			selectionInfo: SelectionInfo{
@@ -591,7 +593,7 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 					filePath: "path.yaml",
 					appURL:   "",
 					comment:  "@@ Test @@\n",
-					content:  "content",
+					blocks:   []ResourceBlock{{Content: "content"}},
 				},
 			},
 			selectionInfo: SelectionInfo{
@@ -626,7 +628,7 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 					filePath: "path.yaml",
 					appURL:   "",
 					comment:  "@@ Test @@\n",
-					content:  "content",
+					blocks:   []ResourceBlock{{Content: "content"}},
 				},
 			},
 			selectionInfo: SelectionInfo{

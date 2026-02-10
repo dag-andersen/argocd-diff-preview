@@ -34,8 +34,14 @@ func shouldIgnoreLine(line, pattern string) bool {
 	return matched
 }
 
+// ResourceBlock represents a single resource's diff content without any formatting
+type ResourceBlock struct {
+	Header  string // e.g., "Deployment/my-deploy (default)" - NO formatting like #### or code fences
+	Content string // Raw diff lines for this resource - NO code fences, just +/- prefixed lines
+}
+
 type changeInfo struct {
-	content      string
+	blocks       []ResourceBlock // List of resource blocks with raw content
 	addedLines   int
 	deletedLines int
 }
@@ -51,10 +57,8 @@ type processedLine struct {
 
 // formatDiff formats diffmatchpatch.Diff into unified diff format
 // resourceIndex is optional and used to insert resource headers at chunk boundaries
-// Output format: each resource section has its header outside the code block, with the diff content inside
+// Output: each ResourceBlock contains a header (e.g., "Deployment/my-app (default)") and raw diff content
 func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
-	var buffer bytes.Buffer
-
 	// Process the diffs and format them in unified diff format
 	// We'll keep track of context lines to include only the specified number
 	// Also track the original line number in the new content for resource lookup
@@ -115,9 +119,9 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		}
 	}
 
-	// No changes to show, so return empty string
+	// No changes to show, so return empty changeInfo
 	if len(changedLines) == 0 {
-		return changeInfo{content: "", addedLines: 0, deletedLines: 0}
+		return changeInfo{blocks: nil, addedLines: 0, deletedLines: 0}
 	}
 
 	// Now create chunks of lines to include based on context
@@ -244,56 +248,57 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	addedLines := 0
 	deletedLines := 0
 
-	// Write the filtered lines
-	// When resourceIndex is provided, wrap each resource's diff content in code blocks
-	// When resourceIndex is nil, output plain diff format (no code blocks)
-	inCodeBlock := false
-	useCodeBlocks := resourceIndex != nil
+	// Build ResourceBlocks from filteredLines
+	// Each resource header starts a new block, and content is raw diff lines
+	var blocks []ResourceBlock
+	var currentBlock *ResourceBlock
+	var contentBuffer bytes.Buffer
+
+	// Helper to flush current block
+	flushBlock := func() {
+		if currentBlock != nil && contentBuffer.Len() > 0 {
+			currentBlock.Content = strings.TrimRight(contentBuffer.String(), "\n")
+			blocks = append(blocks, *currentBlock)
+		} else if currentBlock == nil && contentBuffer.Len() > 0 {
+			// Content before any resource header goes into a block with empty header
+			blocks = append(blocks, ResourceBlock{
+				Header:  "",
+				Content: strings.TrimRight(contentBuffer.String(), "\n"),
+			})
+		}
+		contentBuffer.Reset()
+	}
 
 	for _, line := range filteredLines {
 		switch line.lType {
 		case lineTypeResourceHeader:
-			// Close any open code block before resource header
-			if inCodeBlock {
-				buffer.WriteString("```\n")
-				inCodeBlock = false
-			}
-			buffer.WriteString(line.text + "\n")
+			// Flush any previous block and start a new one
+			flushBlock()
+			currentBlock = &ResourceBlock{Header: line.text}
 		case lineTypeYAMLSeparator:
-			// Close any open code block before YAML separator
-			if inCodeBlock {
-				buffer.WriteString("```\n")
-				inCodeBlock = false
-			}
-			buffer.WriteString("---\n")
+			// YAML separator goes into content as-is
+			contentBuffer.WriteString("---\n")
 		case lineTypeSeparator:
-			// Skipped lines separator stays inside code block (or just as-is if no code blocks)
-			buffer.WriteString(line.text + "\n")
+			// Skipped lines separator goes into content
+			contentBuffer.WriteString(line.text + "\n")
 		case lineTypeDiff:
-			// Open code block if using code blocks and not already open
-			if useCodeBlocks && !inCodeBlock {
-				buffer.WriteString("```diff\n")
-				inCodeBlock = true
-			}
 			switch line.operation {
 			case diffmatchpatch.DiffInsert:
 				addedLines++
-				buffer.WriteString("+" + line.text + "\n")
+				contentBuffer.WriteString("+" + line.text + "\n")
 			case diffmatchpatch.DiffDelete:
 				deletedLines++
-				buffer.WriteString("-" + line.text + "\n")
+				contentBuffer.WriteString("-" + line.text + "\n")
 			default:
-				buffer.WriteString(" " + line.text + "\n")
+				contentBuffer.WriteString(" " + line.text + "\n")
 			}
 		}
 	}
 
-	// Close any remaining open code block
-	if inCodeBlock {
-		buffer.WriteString("```\n")
-	}
+	// Flush the last block
+	flushBlock()
 
-	return changeInfo{content: buffer.String(), addedLines: addedLines, deletedLines: deletedLines}
+	return changeInfo{blocks: blocks, addedLines: addedLines, deletedLines: deletedLines}
 }
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
