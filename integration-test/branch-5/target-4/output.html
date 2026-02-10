@@ -36,6 +36,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -58,11 +68,18 @@ Modified (1):
 <summary>
 my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">link</a>] (examples/helm/applications/label-selectors/my-app-labels.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/experiment (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/experiment (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -97,7 +114,13 @@ my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">l
 	<tr class="normal_line"><td><pre>       securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      serviceAccountName: super-app-name</pre></td></tr>
 	<tr class="added_line"><td><pre>+      serviceAccountName: experiment</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Service/experiment (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service/experiment (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Service</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -120,7 +143,13 @@ my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">l
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: my-app-labels</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   type: ClusterIP</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### ServiceAccount/experiment (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount/experiment (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> automountServiceAccountToken: true</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: ServiceAccount</pre></td></tr>
@@ -136,6 +165,7 @@ my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">l
 	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

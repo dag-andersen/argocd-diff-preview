@@ -36,6 +36,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -58,11 +68,18 @@ Deleted (1):
 <summary>
 folder2 (examples/git-generator/app/app-set.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-two</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/deploy-from-folder-two</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -84,6 +101,7 @@ folder2 (examples/git-generator/app/app-set.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

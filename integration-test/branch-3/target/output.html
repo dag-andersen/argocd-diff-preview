@@ -36,6 +36,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -58,11 +68,18 @@ Modified (1):
 <summary>
 my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/staging-myapp (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/staging-myapp (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -85,6 +102,7 @@ my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 	<tr class="normal_line"><td><pre>       - image: dag-andersen/myapp:latest</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

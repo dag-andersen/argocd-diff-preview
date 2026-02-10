@@ -53,6 +53,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -90,16 +100,23 @@ const htmlSection = `
 <summary>
 %summary%
 </summary>
+%content%
+</details>
+`
+
+const htmlDiffBlock = `
 <div class="diff_container">
 <table>
-	%rows%
+%rows%
 </table>
 </div>
-</details>
 `
 
 const htmlLine = `
 	<tr class="%s"><td><pre>%s</pre></td></tr>`
+
+const htmlResourceHeader = `
+<h4 class="resource_header">%s</h4>`
 
 func (h *HTMLSection) printHTMLSection() string {
 	s := htmlSection
@@ -118,28 +135,21 @@ func (h *HTMLSection) printHTMLSection() string {
 	}
 	s = strings.ReplaceAll(s, "%summary%", summary)
 
-	var rows strings.Builder
-	// Pre-allocate capacity based on blocks
-	totalContentLen := 0
-	totalLines := 0
-	for _, block := range h.blocks {
-		totalContentLen += len(block.Content) + len(block.Header)
-		totalLines += strings.Count(block.Content, "\n") + 1
-	}
-	htmlOverhead := totalLines * 90
-	rows.Grow(totalContentLen + len(h.commentHeader) + htmlOverhead)
+	var content strings.Builder
 
-	// Add comment header
-	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
+	// Add comment header in its own diff block
+	commentRows := fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
+	content.WriteString(strings.ReplaceAll(htmlDiffBlock, "%rows%", commentRows))
 
-	// Process each resource block
+	// Process each resource block - each gets its own header and diff_container
 	for _, block := range h.blocks {
-		// Add resource header as a comment line (with #### prefix for consistency with markdown)
+		// Add resource header as an h4 element outside the diff block
 		if block.Header != "" {
-			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString("#### "+block.Header))
+			content.WriteString(fmt.Sprintf(htmlResourceHeader, html.EscapeString(block.Header)))
 		}
 
-		// Process content lines
+		// Build the rows for this block's content
+		var rows strings.Builder
 		for line := range strings.Lines(block.Content) {
 			line = strings.TrimRight(line, " \t\r\n")
 			if len(line) == 0 {
@@ -162,8 +172,14 @@ func (h *HTMLSection) printHTMLSection() string {
 				fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
 			}
 		}
+
+		// Only add the diff block if there's content
+		if rows.Len() > 0 {
+			content.WriteString(strings.ReplaceAll(htmlDiffBlock, "%rows%", rows.String()))
+		}
 	}
-	s = strings.ReplaceAll(s, "%rows%", rows.String())
+
+	s = strings.ReplaceAll(s, "%content%", content.String())
 
 	return s
 }

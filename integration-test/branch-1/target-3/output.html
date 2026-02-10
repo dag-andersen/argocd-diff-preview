@@ -36,6 +36,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -61,24 +71,39 @@ Modified (1):
 <summary>
 folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@</pre></td></tr>
+</table>
+</div>
+
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre>Diff content omitted because &#39;--hide-deleted-app-diff&#39; is enabled.</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/nginx-ingress-ingress-nginx-controller (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre>         - name: POD_NAME</pre></td></tr>
 	<tr class="normal_line"><td><pre>           valueFrom:</pre></td></tr>
 	<tr class="normal_line"><td><pre>             fieldRef:</pre></td></tr>
@@ -103,6 +128,7 @@ nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">l
 	<tr class="normal_line"><td><pre>             path: /healthz</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

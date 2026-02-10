@@ -36,6 +36,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -66,11 +76,18 @@ Deleted (9):
 <summary>
 app1 (examples/duplicate-names/app/app-set-1.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: app1 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/deploy-from-folder-one</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -92,17 +109,25 @@ app1 (examples/duplicate-names/app/app-set-1.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app1 (examples/duplicate-names/app/app-set-2.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: app1 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/deploy-from-folder-one</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -124,17 +149,25 @@ app1 (examples/duplicate-names/app/app-set-2.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app2 (examples/duplicate-names/app/app-set-1.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: app2 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/deploy-from-folder-one</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -156,17 +189,25 @@ app2 (examples/duplicate-names/app/app-set-1.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app2 (examples/duplicate-names/app/app-set-2.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: app2 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/deploy-from-folder-one</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -188,17 +229,25 @@ app2 (examples/duplicate-names/app/app-set-2.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 custom-target-revision-example (examples/custom-target-revision/app/app.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: custom-target-revision-example (examples/custom-target-revision/app/app.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/my-deployment (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/my-deployment (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -215,17 +264,25 @@ custom-target-revision-example (examples/custom-target-revision/app/app.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app-set-dev (examples/basic-appset/my-app-set.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: my-app-set-dev (examples/basic-appset/my-app-set.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/super-app-name (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -307,17 +364,25 @@ my-app-set-dev (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app-set-prod (examples/basic-appset/my-app-set.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/super-app-name (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -399,17 +464,25 @@ my-app-set-prod (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app-set-staging (examples/basic-appset/my-app-set.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### Deployment/super-app-name (default)</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment/super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -491,17 +564,25 @@ my-app-set-staging (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 nginx-ingress (examples/external-chart/nginx.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: admissionregistration.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ValidatingWebhookConfiguration</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -974,6 +1055,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

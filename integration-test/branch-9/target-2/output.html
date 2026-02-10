@@ -36,6 +36,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -58,11 +68,18 @@ Deleted (1):
 <summary>
 nginx-ingress (examples/external-chart/nginx.yaml)
 </summary>
+
 <div class="diff_container">
 <table>
-	
+
 	<tr class="comment_line"><td><pre>@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>#### ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: admissionregistration.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ValidatingWebhookConfiguration</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -535,6 +552,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

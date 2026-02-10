@@ -39,6 +39,11 @@ cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -ru
 make update-integration-tests    # Update with Go binary
 make update-integration-tests-docker  # Update with Docker
 
+# NOTE FOR AI AGENTS: Integration tests produce a LOT of output (cluster creation, 
+# ArgoCD deployment, etc). Always pipe to `tail -50` or similar to avoid output overflow:
+make update-integration-tests 2>&1 | tail -50
+make run-integration-tests-go 2>&1 | tail -100
+
 # Pre-release check (lint + unit + integration)
 make check-release
 ```
