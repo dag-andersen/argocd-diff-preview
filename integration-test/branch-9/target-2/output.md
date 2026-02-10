@@ -14,13 +14,12 @@ Deleted (1):
 
 ```diff
 @@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@
+@@ Resource: ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission @@
 -apiVersion: admissionregistration.k8s.io/v1
 -kind: ValidatingWebhookConfiguration
 -metadata:
 -  labels:
--    app.kubernetes.io/component: admission-webhook
--    app.kubernetes.io/instance: nginx-ingress
--    app.kubernetes.io/m
+-    app.kubernetes.io/component: admi
 🚨 Diff is too long
 ```
 

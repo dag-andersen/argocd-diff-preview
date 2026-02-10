@@ -14,6 +14,7 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app (examples/helm/applications/my-app.yaml) @@
+@@ Resource: Deployment/new-app-name (default) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -53,6 +54,7 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
  ---
+@@ Resource: Service/new-app-name (default) @@
  apiVersion: v1
  kind: Service
  metadata:
@@ -76,6 +78,7 @@ Modified (1):
      app.kubernetes.io/name: myApp
    type: ClusterIP
  ---
+@@ Resource: ServiceAccount/new-app-name (default) @@
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount

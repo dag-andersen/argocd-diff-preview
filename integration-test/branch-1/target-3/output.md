@@ -28,6 +28,7 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
 
 ```diff
 @@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+@@ Resource: Deployment/nginx-ingress-ingress-nginx-controller (default) @@
          - name: POD_NAME
            valueFrom:
              fieldRef:

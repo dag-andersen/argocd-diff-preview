@@ -22,6 +22,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: app1 (examples/duplicate-names/app/app-set-1.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -51,6 +52,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: app1 (examples/duplicate-names/app/app-set-2.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -80,6 +82,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: app2 (examples/duplicate-names/app/app-set-1.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -109,6 +112,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: app2 (examples/duplicate-names/app/app-set-2.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -138,6 +142,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: custom-target-revision-example (examples/custom-target-revision/app/app.yaml) @@
+@@ Resource: Deployment/my-deployment (default) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -162,6 +167,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: my-app-set-dev (examples/basic-appset/my-app-set.yaml) @@
+@@ Resource: Deployment/super-app-name (default) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -253,6 +259,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml) @@
+@@ Resource: Deployment/super-app-name (default) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -344,6 +351,7 @@ Deleted (9):
 
 ```diff
 @@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@
+@@ Resource: Deployment/super-app-name (default) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -409,22 +417,8 @@ Deleted (9):
 -    protocol: TCP
 -    targetPort: http
 -  selector:
--    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/name: myApp
--  type: ClusterIP
-----
--apiVersion: v1
--automountServiceAccountToken: true
--kind: ServiceAccount
--metadata:
--  labels:
--    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/managed-by: Helm
--    app.kubernetes.io/name: myApp
--    app.kubernetes.io/version: 1.16.0
--    helm.sh/chart: myApp-0.1.0
--  name: super-app-name
--  namespace: default
+-    app.kubernetes.io/instance:
+🚨 Diff is too long
 ```
 
 </details>

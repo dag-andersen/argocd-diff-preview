@@ -14,6 +14,7 @@ Added (1):
 
 ```diff
 @@ Application added: label-selectors-example (examples/label-selectors/app.yaml) @@
+@@ Resource: Deployment/super-app-name (some-namespace) @@
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
@@ -61,6 +62,7 @@ Added (1):
 +      securityContext: {}
 +      serviceAccountName: super-app-name
 +---
+@@ Resource: Service/super-app-name (some-namespace) @@
 +apiVersion: v1
 +kind: Service
 +metadata:
@@ -83,6 +85,7 @@ Added (1):
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
 +---
+@@ Resource: ServiceAccount/super-app-name (some-namespace) @@
 +apiVersion: v1
 +automountServiceAccountToken: true
 +kind: ServiceAccount

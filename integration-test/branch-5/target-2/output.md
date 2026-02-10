@@ -14,6 +14,7 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml) @@
+@@ Resource: Deployment/experiment (default) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -49,6 +50,7 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
  ---
+@@ Resource: Service/experiment (default) @@
  apiVersion: v1
  kind: Service
  metadata:
@@ -72,6 +74,7 @@ Modified (1):
      app.kubernetes.io/name: myApp
    type: ClusterIP
  ---
+@@ Resource: ServiceAccount/experiment (default) @@
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount

@@ -20,6 +20,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
        app: myapp
    template:
      metadata:
@@ -42,6 +43,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
        app: myapp
    template:
      metadata:
@@ -64,6 +66,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
        app: myapp
    template:
      metadata:
@@ -86,6 +89,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-one @@
        app: myapp
    template:
      metadata:
@@ -108,6 +112,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml) @@
+@@ Resource: Deployment/super-app-name (default) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -149,6 +154,7 @@ Modified (7):
        securityContext: {}
        serviceAccountName: super-app-name
  ---
+@@ Resource: Service/super-app-name (default) @@
  apiVersion: v1
  kind: Service
  metadata:
@@ -173,6 +179,7 @@ Modified (7):
      app.kubernetes.io/name: myApp
    type: ClusterIP
  ---
+@@ Resource: ServiceAccount/super-app-name (default) @@
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -196,6 +203,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
+@@ Resource: Deployment/staging-myapp (default) @@
      spec:
        containers:
        - image: dag-andersen/myapp:latest
@@ -209,6 +217,7 @@ Modified (7):
 -            memory: 128Mi
 +            memory: 64Mi
  ---
+@@ Resource: Service/staging-myapp (default) @@
  apiVersion: v1
  kind: Service
  metadata:
@@ -228,6 +237,7 @@ Modified (7):
 
 ```diff
 @@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml) @@
+@@ Resource: Deployment/nginx-ingress-ingress-nginx-controller (default) @@
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0
          helm.sh/chart: ingress-nginx-4.10.0

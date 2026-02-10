@@ -62,6 +62,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Deployment/argocd-helm-chart-applicationset-controller (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - name: ARGOCD_APPLICATIONSET_CONTROLLER_LOGFORMAT</pre></td></tr>
 	<tr class="normal_line"><td><pre>           valueFrom:</pre></td></tr>
 	<tr class="normal_line"><td><pre>             configMapKeyRef:</pre></td></tr>
@@ -214,6 +215,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+          optional: true</pre></td></tr>
 	<tr class="added_line"><td><pre>+        name: argocd-cmd-params-cm</pre></td></tr>
 	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Deployment/argocd-helm-chart-dex-server (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -316,6 +318,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>         secret:</pre></td></tr>
 	<tr class="normal_line"><td><pre>           items:</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 52 lines (447 -&gt; 498) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Deployment/argocd-helm-chart-notifications-controller (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>               labelSelector:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                 matchLabels:</pre></td></tr>
 	<tr class="normal_line"><td><pre>                   app.kubernetes.io/name: argocd-notifications-controller</pre></td></tr>
@@ -406,6 +409,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>           items:</pre></td></tr>
 	<tr class="normal_line"><td><pre>           - key: tls.crt</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 55 lines (588 -&gt; 642) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Deployment/argocd-helm-chart-redis (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - &#34;&#34;</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - --appendonly</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - &#34;no&#34;</pre></td></tr>
@@ -448,6 +452,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>       - configMap:</pre></td></tr>
 	<tr class="normal_line"><td><pre>           defaultMode: 493</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 67 lines (684 -&gt; 750) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Deployment/argocd-helm-chart-repo-server (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - name: ARGOCD_REPO_SERVER_LOGFORMAT</pre></td></tr>
 	<tr class="normal_line"><td><pre>           valueFrom:</pre></td></tr>
 	<tr class="normal_line"><td><pre>             configMapKeyRef:</pre></td></tr>
@@ -644,6 +649,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>         name: var-files</pre></td></tr>
 	<tr class="normal_line"><td><pre>       - emptyDir: {}</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 198 lines (1084 -&gt; 1281) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Deployment/argocd-helm-chart-server (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>             configMapKeyRef:</pre></td></tr>
 	<tr class="normal_line"><td><pre>               key: server.connection.status.cache.expiration</pre></td></tr>
 	<tr class="normal_line"><td><pre>               name: argocd-cmd-params-cm</pre></td></tr>
@@ -785,6 +791,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>           name: argocd-ssh-known-hosts-cm</pre></td></tr>
 	<tr class="normal_line"><td><pre>         name: ssh-known-hosts</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 145 lines (1548 -&gt; 1692) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: StatefulSet/argocd-helm-chart-application-controller (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>             configMapKeyRef:</pre></td></tr>
 	<tr class="normal_line"><td><pre>               key: controller.log.format</pre></td></tr>
 	<tr class="normal_line"><td><pre>               name: argocd-cmd-params-cm</pre></td></tr>
@@ -984,6 +991,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>             path: ca.crt</pre></td></tr>
 	<tr class="normal_line"><td><pre>           optional: true</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 99 lines (1979 -&gt; 2077) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: ClusterRole/argocd-helm-chart-server @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>   name: argocd-helm-chart-server</pre></td></tr>
 	<tr class="normal_line"><td><pre> rules:</pre></td></tr>
 	<tr class="normal_line"><td><pre> - apiGroups:</pre></td></tr>
@@ -1006,6 +1014,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>   - &#34;&#34;</pre></td></tr>
 	<tr class="normal_line"><td><pre>   resources:</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 115 lines (2099 -&gt; 2213) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Role/argocd-helm-chart-application-controller (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>   - secrets</pre></td></tr>
 	<tr class="normal_line"><td><pre>   - configmaps</pre></td></tr>
 	<tr class="normal_line"><td><pre>   verbs:</pre></td></tr>
@@ -1028,6 +1037,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>   - delete</pre></td></tr>
 	<tr class="normal_line"><td><pre> - apiGroups:</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 96 lines (2235 -&gt; 2330) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Role/argocd-helm-chart-applicationset-controller (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>   verbs:</pre></td></tr>
 	<tr class="normal_line"><td><pre>   - get</pre></td></tr>
 	<tr class="normal_line"><td><pre>   - list</pre></td></tr>
@@ -1053,6 +1063,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="added_line"><td><pre>+  - create</pre></td></tr>
 	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: Role/argocd-helm-chart-dex-server (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Role</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -1063,6 +1074,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: argocd-dex-server</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: argocd</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 275 lines (2365 -&gt; 2639) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: RoleBinding/argocd-helm-chart-server (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>   name: argocd-helm-chart-server</pre></td></tr>
 	<tr class="normal_line"><td><pre> subjects:</pre></td></tr>
 	<tr class="normal_line"><td><pre> - kind: ServiceAccount</pre></td></tr>
@@ -1071,6 +1083,7 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre> ---</pre></td></tr>
 	<tr class="normal_line"><td><pre> Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]</pre></td></tr>
 	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Resource: ConfigMap/argocd-cmd-params-cm (argocd) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> data:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  application.namespaces: &#34;&#34;</pre></td></tr>

@@ -14,6 +14,7 @@ Modified (1):
 
 ```diff
 @@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
+@@ Resource: Deployment/staging-myapp (default) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:

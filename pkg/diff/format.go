@@ -40,18 +40,27 @@ type changeInfo struct {
 	deletedLines int
 }
 
+// processedLine represents a line in the diff with metadata for processing
+type processedLine struct {
+	operation   diffmatchpatch.Operation
+	text        string
+	isChange    bool
+	show        bool
+	origLineNum int // line number in the new content, for resource lookup
+}
+
 // formatDiff formats diffmatchpatch.Diff into unified diff format
-func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string) changeInfo {
+// resourceIndex is optional and used to insert resource headers at chunk boundaries
+func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
 	var buffer bytes.Buffer
 
 	// Process the diffs and format them in unified diff format
 	// We'll keep track of context lines to include only the specified number
-	var processedLines []struct {
-		operation diffmatchpatch.Operation
-		text      string
-		isChange  bool
-		show      bool
-	}
+	// Also track the original line number in the new content for resource lookup
+	var processedLines []processedLine
+
+	// Track line number in the "new" content (DiffEqual and DiffInsert contribute to this)
+	newLineNum := 0
 
 	for _, d := range diffs {
 		lines := strings.Split(d.Text, "\n")
@@ -80,12 +89,20 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				}
 			}
 
-			processedLines = append(processedLines, struct {
-				operation diffmatchpatch.Operation
-				text      string
-				isChange  bool
-				show      bool
-			}{d.Type, line, isChange, show})
+			// For DiffEqual and DiffInsert, this line exists in the new content
+			// For DiffDelete, it only exists in the old content
+			lineNum := newLineNum
+			if d.Type != diffmatchpatch.DiffDelete {
+				newLineNum++
+			}
+
+			processedLines = append(processedLines, processedLine{
+				operation:   d.Type,
+				text:        line,
+				isChange:    isChange,
+				show:        show,
+				origLineNum: lineNum,
+			})
 		}
 	}
 
@@ -103,10 +120,11 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	}
 
 	// Now create chunks of lines to include based on context
-	var chunks []struct {
+	type chunk struct {
 		start int
 		end   int
 	}
+	var chunks []chunk
 
 	// Start with the first changed line and its context
 	chunkStart := max(0, changedLines[0]-int(contextLines))
@@ -120,10 +138,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
 		} else {
 			// Otherwise, finish this chunk and start a new one
-			chunks = append(chunks, struct {
-				start int
-				end   int
-			}{chunkStart, chunkEnd})
+			chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
 
 			chunkStart = max(0, currentLine-int(contextLines))
 			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
@@ -131,37 +146,82 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	}
 
 	// Add the last chunk
-	chunks = append(chunks, struct {
-		start int
-		end   int
-	}{chunkStart, chunkEnd})
+	chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
 
 	// Now build the output with separators between chunks
-	var filteredLines []struct {
+	// Also track the last resource header we emitted to avoid duplicates
+	type outputLine struct {
 		operation diffmatchpatch.Operation
 		text      string
 	}
+	var filteredLines []outputLine
 
-	for i, chunk := range chunks {
+	lastResourceHeader := ""
+
+	for i, c := range chunks {
+		// Insert resource header at the start of each chunk if resource changed
+		if resourceIndex != nil && len(processedLines) > 0 {
+			// Use the line number of the first line in the chunk
+			firstLineNum := processedLines[c.start].origLineNum
+			resource := resourceIndex.GetResourceForLine(firstLineNum)
+			if resource != nil {
+				header := resource.FormatHeader()
+				if header != "" && header != lastResourceHeader {
+					filteredLines = append(filteredLines, outputLine{
+						operation: diffmatchpatch.DiffEqual,
+						text:      header,
+					})
+					lastResourceHeader = header
+				}
+			}
+		}
+
 		// Add all lines in this chunk
-		for j := chunk.start; j <= chunk.end; j++ {
-			filteredLines = append(filteredLines, struct {
-				operation diffmatchpatch.Operation
-				text      string
-			}{processedLines[j].operation, processedLines[j].text})
+		for j := c.start; j <= c.end; j++ {
+			// Check if we're crossing a resource boundary within the chunk
+			// Insert resource header when we see "---" and the next resource is different
+			if resourceIndex != nil && strings.TrimSpace(processedLines[j].text) == "---" {
+				// Add the --- line first
+				filteredLines = append(filteredLines, outputLine{
+					operation: processedLines[j].operation,
+					text:      processedLines[j].text,
+				})
+
+				// Look up the resource for the next line (if there is one)
+				if j+1 <= c.end {
+					nextLineNum := processedLines[j+1].origLineNum
+					resource := resourceIndex.GetResourceForLine(nextLineNum)
+					if resource != nil {
+						header := resource.FormatHeader()
+						if header != "" && header != lastResourceHeader {
+							filteredLines = append(filteredLines, outputLine{
+								operation: diffmatchpatch.DiffEqual,
+								text:      header,
+							})
+							lastResourceHeader = header
+						}
+					}
+				}
+				continue
+			}
+
+			filteredLines = append(filteredLines, outputLine{
+				operation: processedLines[j].operation,
+				text:      processedLines[j].text,
+			})
 		}
 
 		// Add separator if there's a next chunk and it's far enough away
 		if i < len(chunks)-1 {
 			nextChunk := chunks[i+1]
-			skippedLines := nextChunk.start - chunk.end - 1
+			skippedLines := nextChunk.start - c.end - 1
 
 			if skippedLines > 0 {
-				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, chunk.end+1, nextChunk.start-1)
-				filteredLines = append(filteredLines, struct {
-					operation diffmatchpatch.Operation
-					text      string
-				}{diffmatchpatch.DiffEqual, separator})
+				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, c.end+1, nextChunk.start-1)
+				filteredLines = append(filteredLines, outputLine{
+					operation: diffmatchpatch.DiffEqual,
+					text:      separator,
+				})
 			}
 		}
 	}
@@ -171,7 +231,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 
 	// Write the filtered lines
 	for _, line := range filteredLines {
-		if strings.HasPrefix(line.text, "@@ skipped") {
+		if strings.HasPrefix(line.text, "@@ skipped") || strings.HasPrefix(line.text, "@@ Resource:") {
 			buffer.WriteString(line.text + "\n")
 		} else {
 			switch line.operation {
@@ -191,21 +251,21 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 }
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package
-func formatNewFileDiff(content string, contextLines uint, ignorePattern *string) changeInfo {
+func formatNewFileDiff(content string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
 	// For new files, we diff from empty string to the content
 	diffs := diff.Do("", content)
-	return formatDiff(diffs, contextLines, ignorePattern)
+	return formatDiff(diffs, contextLines, ignorePattern, resourceIndex)
 }
 
 // formatDeletedFileDiff formats a diff for a deleted file using the go-git/utils/diff package
-func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string) changeInfo {
+func formatDeletedFileDiff(content string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
 	// For deleted files, we diff from the content to empty string
 	diffs := diff.Do(content, "")
-	return formatDiff(diffs, contextLines, ignorePattern)
+	return formatDiff(diffs, contextLines, ignorePattern, resourceIndex)
 }
 
 // formatModifiedFileDiff formats a diff for a modified file using the go-git/utils/diff package
-func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string) changeInfo {
+func formatModifiedFileDiff(oldContent, newContent string, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
 	diffs := diff.Do(oldContent, newContent)
-	return formatDiff(diffs, contextLines, ignorePattern)
+	return formatDiff(diffs, contextLines, ignorePattern, resourceIndex)
 }

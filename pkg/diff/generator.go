@@ -270,7 +270,8 @@ func generateGitDiff(
 					return "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
 				}
 
-				changeInfo = formatNewFileDiff(content, diffContextLines, diffIgnore)
+				resourceIndex := BuildResourceIndex(content)
+				changeInfo = formatNewFileDiff(content, diffContextLines, diffIgnore, resourceIndex)
 			}
 
 		case merkletrie.Delete:
@@ -290,7 +291,8 @@ func generateGitDiff(
 					return "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
 				}
 
-				changeInfo = formatDeletedFileDiff(content, diffContextLines, diffIgnore)
+				resourceIndex := BuildResourceIndex(content)
+				changeInfo = formatDeletedFileDiff(content, diffContextLines, diffIgnore, resourceIndex)
 			}
 
 		case merkletrie.Modify:
@@ -321,7 +323,9 @@ func generateGitDiff(
 				}
 			}
 
-			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
+			// Use the new content's resource index for displaying resource headers
+			resourceIndex := BuildResourceIndex(newContent)
+			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore, resourceIndex)
 		}
 
 		toName := ""

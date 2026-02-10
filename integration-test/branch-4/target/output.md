@@ -14,6 +14,7 @@ Added (1):
 
 ```diff
 @@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-three @@
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:

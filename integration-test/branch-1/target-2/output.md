@@ -14,6 +14,7 @@ Deleted (1):
 
 ```diff
 @@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-two @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:

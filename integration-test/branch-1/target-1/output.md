@@ -17,6 +17,7 @@ Modified (1):
 
 ```diff
 @@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
+@@ Resource: Deployment/deploy-from-folder-two @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -46,6 +47,7 @@ Modified (1):
 
 ```diff
 @@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+@@ Resource: Deployment/nginx-ingress-ingress-nginx-controller (default) @@
                fieldPath: metadata.namespace
          - name: LD_PRELOAD
            value: /usr/local/lib/libmimalloc.so

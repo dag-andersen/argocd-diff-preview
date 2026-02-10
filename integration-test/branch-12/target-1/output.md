@@ -14,6 +14,7 @@ Modified (1):
 
 ```diff
 @@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@
+@@ Resource: Deployment/argocd-helm-chart-applicationset-controller (argocd) @@
              configMapKeyRef:
                key: applicationsetcontroller.log.format
                name: argocd-cmd-params-cm
@@ -162,6 +163,7 @@ Modified (1):
 +          optional: true
 +        name: argocd-cmd-params-cm
  ---
+@@ Resource: Deployment/argocd-helm-chart-dex-server (argocd) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -264,6 +266,7 @@ Modified (1):
          secret:
            items:
 @@ skipped 52 lines (447 -> 498) @@
+@@ Resource: Deployment/argocd-helm-chart-notifications-controller (argocd) @@
                labelSelector:
                  matchLabels:
                    app.kubernetes.io/name: argocd-notifications-controller
@@ -354,6 +357,7 @@ Modified (1):
            items:
            - key: tls.crt
 @@ skipped 55 lines (588 -> 642) @@
+@@ Resource: Deployment/argocd-helm-chart-redis (argocd) @@
          - ""
          - --appendonly
          - "no"
@@ -396,6 +400,7 @@ Modified (1):
        - configMap:
            defaultMode: 493
 @@ skipped 67 lines (684 -> 750) @@
+@@ Resource: Deployment/argocd-helm-chart-repo-server (argocd) @@
          - name: ARGOCD_REPO_SERVER_LOGFORMAT
            valueFrom:
              configMapKeyRef:
@@ -590,6 +595,7 @@ Modified (1):
          name: var-files
        - emptyDir: {}
 @@ skipped 198 lines (1084 -> 1281) @@
+@@ Resource: Deployment/argocd-helm-chart-server (argocd) @@
              configMapKeyRef:
                key: server.connection.status.cache.expiration
                name: argocd-cmd-params-cm
@@ -731,6 +737,7 @@ Modified (1):
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
 @@ skipped 145 lines (1548 -> 1692) @@
+@@ Resource: StatefulSet/argocd-helm-chart-application-controller (argocd) @@
              configMapKeyRef:
                key: controller.log.format
                name: argocd-cmd-params-cm
@@ -930,6 +937,7 @@ Modified (1):
              path: ca.crt
            optional: true
 @@ skipped 99 lines (1979 -> 2077) @@
+@@ Resource: ClusterRole/argocd-helm-chart-server @@
    name: argocd-helm-chart-server
  rules:
  - apiGroups:
@@ -952,6 +960,7 @@ Modified (1):
    - ""
    resources:
 @@ skipped 115 lines (2099 -> 2213) @@
+@@ Resource: Role/argocd-helm-chart-application-controller (argocd) @@
    - secrets
    - configmaps
    verbs:
@@ -974,6 +983,7 @@ Modified (1):
    - delete
  - apiGroups:
 @@ skipped 96 lines (2235 -> 2330) @@
+@@ Resource: Role/argocd-helm-chart-applicationset-controller (argocd) @@
    verbs:
    - get
    - list
@@ -999,6 +1009,7 @@ Modified (1):
 -  - watch
 +  - create
  ---
+@@ Resource: Role/argocd-helm-chart-dex-server (argocd) @@
  apiVersion: rbac.authorization.k8s.io/v1
  kind: Role
  metadata:
@@ -1009,12 +1020,14 @@ Modified (1):
      app.kubernetes.io/name: argocd-dex-server
      app.kubernetes.io/part-of: argocd
 @@ skipped 275 lines (2365 -> 2639) @@
+@@ Resource: RoleBinding/argocd-helm-chart-server (argocd) @@
    name: argocd-helm-chart-server
  subjects:
  - kind: ServiceAccount
    name: argocd-server
    namespace: argocd
  ---
+@@ Resource: ConfigMap/argocd-cm (argocd) @@
  apiVersion: v1
  data:
    admin.enabled: "true"
@@ -1134,6 +1147,7 @@ Modified (1):
    name: argocd-cm
    namespace: argocd
  ---
+@@ Resource: ConfigMap/argocd-cmd-params-cm (argocd) @@
  apiVersion: v1
  data:
 -  application.namespaces: ""
@@ -1186,6 +1200,7 @@ Modified (1):
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
 @@ skipped 524 lines (2816 -> 3339) @@
+@@ Resource: CustomResourceDefinition/applications.argoproj.io @@
                        maxDuration:
                          description: MaxDuration is the maximum amount of time allowed
                            for the backoff strategy
@@ -1617,23 +1632,7 @@ Modified (1):
                            type: array
                          forceCommonAnnotations:
                            description: ForceCommonAnnotations specifies whether to
-                             force applying common annotations to resources for Kustomize
-                             apps
-                           type: boolean
-                         forceCommonLabels:
-                           description: ForceCommonLabels specifies whether to force
-                             applying common labels to resources for Kustomize apps
-                           type: boolean
-+                        ignoreMissingComponents:
-+                          description: IgnoreMissingComponents prevents kustomize
-+                            from failing when components do not exist locally by not
-+                            appending them to kustomization file
-+                          type: boolean
-                         images:
-                           description: Images is a list of Kustomize image override
-                             specifications
-                           items:
-                             description: KustomizeImage represents a Kustomi
+                             force applying
 🚨 Diff is too long
 ```
 
