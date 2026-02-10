@@ -8,11 +8,11 @@ import (
 )
 
 type MarkdownSection struct {
-	appName  string
-	filePath string
-	appURL   string
-	comment  string
-	blocks   []ResourceBlock // Structured blocks with raw content
+	appName      string
+	filePath     string
+	appURL       string
+	actionHeader string
+	blocks       []ResourceBlock // Structured blocks with raw content
 }
 
 func markdownSectionHeader(appName, filePath, appURL string) string {
@@ -50,9 +50,18 @@ func formatBlocksToMarkdown(blocks []ResourceBlock) string {
 	return result.String()
 }
 
+// formatActionHeaderMarkdown wraps the plain text action header with bold markdown
+func formatActionHeaderMarkdown(actionHeader string) string {
+	if actionHeader == "" {
+		return ""
+	}
+	return fmt.Sprintf("**%s**\n", actionHeader)
+}
+
 func (m *MarkdownSection) Size() int {
 	content := formatBlocksToMarkdown(m.blocks)
-	return len(markdownSectionHeader(m.appName, m.filePath, m.appURL)) + len(m.comment) + len(content) + len(markdownSectionFooter())
+	formattedActionHeader := formatActionHeaderMarkdown(m.actionHeader)
+	return len(markdownSectionHeader(m.appName, m.filePath, m.appURL)) + len(formattedActionHeader) + len(content) + len(markdownSectionFooter())
 }
 
 var (
@@ -65,8 +74,9 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
 	footer := markdownSectionFooter()
 	content := strings.TrimRight(formatBlocksToMarkdown(m.blocks), "\n")
+	formattedActionHeader := formatActionHeaderMarkdown(m.actionHeader)
 
-	spaceForContent := maxSize - len(header) - len(footer) - len(m.comment)
+	spaceForContent := maxSize - len(header) - len(footer) - len(formattedActionHeader)
 
 	if spaceForContent < 0 {
 		log.Debug().Msgf("Markdown - Skipping section, because diff section does not fit in space: %d < 0", spaceForContent)
@@ -76,7 +86,7 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	// if there is enough space for the content, return the full section
 	if len(content) < spaceForContent {
 		log.Debug().Msgf("Markdown - Diff section fits in space: %d < %d", spaceForContent, len(content))
-		return header + m.comment + content + footer, false
+		return header + formattedActionHeader + content + footer, false
 	}
 
 	log.Debug().Msgf("Markdown - diff section does not fit in space: %d < %d", spaceForContent, len(content))
@@ -87,7 +97,7 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 		truncatedContent := content[:spaceBeforeDiffTooLongWarning]
 		truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
 		log.Debug().Msgf("Markdown - returning truncated content with warning")
-		return header + m.comment + truncatedContent + diffTooLongWarning + footer, true
+		return header + formattedActionHeader + truncatedContent + diffTooLongWarning + footer, true
 	}
 
 	log.Debug().Msgf("Markdown - available space is below threashhold %d, returning empty string", minSizeForSectionContent)

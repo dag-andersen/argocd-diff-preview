@@ -12,7 +12,7 @@ Added (1):
 <summary>ignore-annotation-example (examples/ignore-annotation/app.yaml)</summary>
 <br>
 
-@@ Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml) @@
+**Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml)**
 #### Deployment/super-app-name (default)
 ```diff
 +apiVersion: apps/v1

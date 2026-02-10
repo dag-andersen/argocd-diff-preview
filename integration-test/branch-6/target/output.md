@@ -18,7 +18,7 @@ Modified (7):
 <summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-@@ Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml) @@
+**Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
        app: myapp
@@ -40,7 +40,7 @@ Modified (7):
 <summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-@@ Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml) @@
+**Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
        app: myapp
@@ -62,7 +62,7 @@ Modified (7):
 <summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-@@ Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml) @@
+**Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
        app: myapp
@@ -84,7 +84,7 @@ Modified (7):
 <summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-@@ Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml) @@
+**Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
        app: myapp
@@ -106,7 +106,7 @@ Modified (7):
 <summary>my-app -> my-super-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
-@@ Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml) @@
+**Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml)**
 #### Deployment/super-app-name (default)
 ```diff
  apiVersion: apps/v1
@@ -198,7 +198,7 @@ Modified (7):
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
-@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
+**Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml)**
 #### Deployment/staging-myapp (default)
 ```diff
      spec:
@@ -232,7 +232,7 @@ Modified (7):
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
 <br>
 
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml) @@
+**Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)**
 #### Deployment/nginx-ingress-ingress-nginx-controller (default)
 ```diff
          app.kubernetes.io/part-of: ingress-nginx

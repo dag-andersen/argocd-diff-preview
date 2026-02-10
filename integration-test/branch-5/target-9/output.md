@@ -13,7 +13,7 @@ Modified (2):
 <summary>my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
-@@ Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml) @@
+**Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)**
 #### Deployment/experiment (default)
 ```diff
  apiVersion: apps/v1
@@ -98,7 +98,7 @@ Modified (2):
 <summary>my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
-@@ Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml) @@
+**Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)**
 #### Deployment/experiment (default)
 ```diff
  apiVersion: apps/v1

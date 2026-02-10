@@ -12,7 +12,7 @@ Deleted (1):
 <summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
 <br>
 
-@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@
+**Application deleted: nginx-ingress (examples/external-chart/nginx.yaml)**
 #### ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission
 ```diff
 -apiVersion: admissionregistration.k8s.io/v1

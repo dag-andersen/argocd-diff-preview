@@ -12,7 +12,7 @@ Modified (1):
 <summary>my-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
-@@ Application modified: my-app (examples/helm/applications/my-app.yaml) @@
+**Application modified: my-app (examples/helm/applications/my-app.yaml)**
 #### Deployment/new-app-name (default)
 ```diff
  apiVersion: apps/v1

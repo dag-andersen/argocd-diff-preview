@@ -94,7 +94,7 @@ func TestDiff_prettyPath(t *testing.T) {
 	}
 }
 
-func TestDiff_commentHeader(t *testing.T) {
+func TestDiff_actionHeader(t *testing.T) {
 	tests := []struct {
 		name     string
 		diff     Diff
@@ -103,17 +103,17 @@ func TestDiff_commentHeader(t *testing.T) {
 		{
 			name:     "Insert",
 			diff:     Diff{newName: "app", newSourcePath: "/path", action: merkletrie.Insert},
-			expected: "@@ Application added: app (/path) @@\n",
+			expected: "Application added: app (/path)",
 		},
 		{
 			name:     "Delete",
 			diff:     Diff{oldName: "app", oldSourcePath: "/path", action: merkletrie.Delete},
-			expected: "@@ Application deleted: app (/path) @@\n",
+			expected: "Application deleted: app (/path)",
 		},
 		{
 			name:     "Modify",
 			diff:     Diff{newName: "app", newSourcePath: "/path", action: merkletrie.Modify},
-			expected: "@@ Application modified: app (/path) @@\n",
+			expected: "Application modified: app (/path)",
 		},
 		{
 			name:     "Unknown action",
@@ -124,8 +124,8 @@ func TestDiff_commentHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.diff.commentHeader(); got != tt.expected {
-				t.Errorf("commentHeader() = %q, want %q", got, tt.expected)
+			if got := tt.diff.actionHeader(); got != tt.expected {
+				t.Errorf("actionHeader() = %q, want %q", got, tt.expected)
 			}
 		})
 	}
@@ -133,14 +133,14 @@ func TestDiff_commentHeader(t *testing.T) {
 
 func TestDiff_buildMarkdownSection(t *testing.T) {
 	tests := []struct {
-		name             string
-		diff             Diff
-		argocdUIURL      string
-		expectedAppName  string
-		expectedFilePath string
-		expectedAppURL   string
-		expectedComment  string
-		expectedBlocks   []ResourceBlock
+		name                 string
+		diff                 Diff
+		argocdUIURL          string
+		expectedAppName      string
+		expectedFilePath     string
+		expectedAppURL       string
+		expectedActionHeader string
+		expectedBlocks       []ResourceBlock
 	}{
 		{
 			name: "Insert without URL",
@@ -150,12 +150,12 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Insert,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}}},
 			},
-			argocdUIURL:      "",
-			expectedAppName:  "new-app",
-			expectedFilePath: "/path/new",
-			expectedAppURL:   "",
-			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
-			expectedBlocks:   []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
+			argocdUIURL:          "",
+			expectedAppName:      "new-app",
+			expectedFilePath:     "/path/new",
+			expectedAppURL:       "",
+			expectedActionHeader: "Application added: new-app (/path/new)",
+			expectedBlocks:       []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
 		},
 		{
 			name: "Insert with URL",
@@ -165,12 +165,12 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Insert,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}}},
 			},
-			argocdUIURL:      "https://argocd.example.com",
-			expectedAppName:  "new-app",
-			expectedFilePath: "/path/new",
-			expectedAppURL:   "https://argocd.example.com/applications/new-app",
-			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
-			expectedBlocks:   []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
+			argocdUIURL:          "https://argocd.example.com",
+			expectedAppName:      "new-app",
+			expectedFilePath:     "/path/new",
+			expectedAppURL:       "https://argocd.example.com/applications/new-app",
+			expectedActionHeader: "Application added: new-app (/path/new)",
+			expectedBlocks:       []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
 		},
 		{
 			name: "Modify with name change",
@@ -182,12 +182,12 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Modify,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}}},
 			},
-			argocdUIURL:      "https://argocd.example.com",
-			expectedAppName:  "app-v1 -> app-v2",
-			expectedFilePath: "/path/app",
-			expectedAppURL:   "https://argocd.example.com/applications/app-v1",
-			expectedComment:  "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
-			expectedBlocks:   []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}},
+			argocdUIURL:          "https://argocd.example.com",
+			expectedAppName:      "app-v1 -> app-v2",
+			expectedFilePath:     "/path/app",
+			expectedAppURL:       "https://argocd.example.com/applications/app-v1",
+			expectedActionHeader: "Application modified: app-v1 -> app-v2 (/path/app)",
+			expectedBlocks:       []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}},
 		},
 		{
 			name: "Delete",
@@ -197,12 +197,12 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Delete,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}}},
 			},
-			argocdUIURL:      "https://argocd.example.com",
-			expectedAppName:  "old-app",
-			expectedFilePath: "/path/old",
-			expectedAppURL:   "https://argocd.example.com/applications/old-app",
-			expectedComment:  "@@ Application deleted: old-app (/path/old) @@\n",
-			expectedBlocks:   []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}},
+			argocdUIURL:          "https://argocd.example.com",
+			expectedAppName:      "old-app",
+			expectedFilePath:     "/path/old",
+			expectedAppURL:       "https://argocd.example.com/applications/old-app",
+			expectedActionHeader: "Application deleted: old-app (/path/old)",
+			expectedBlocks:       []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}},
 		},
 	}
 
@@ -219,8 +219,8 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if got.appURL != tt.expectedAppURL {
 				t.Errorf("buildMarkdownSection().appURL = %q, want %q", got.appURL, tt.expectedAppURL)
 			}
-			if got.comment != tt.expectedComment {
-				t.Errorf("buildMarkdownSection().comment = %q, want %q", got.comment, tt.expectedComment)
+			if got.actionHeader != tt.expectedActionHeader {
+				t.Errorf("buildMarkdownSection().actionHeader = %q, want %q", got.actionHeader, tt.expectedActionHeader)
 			}
 			// Compare blocks
 			if len(got.blocks) != len(tt.expectedBlocks) {
@@ -244,13 +244,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			// For blocks with empty header, formatBlocksToMarkdown just wraps content in code blocks
 			formattedContent := formatBlocksToMarkdown(tt.expectedBlocks)
 			formattedContent = strings.TrimRight(formattedContent, "\n")
+			formattedActionHeader := formatActionHeaderMarkdown(tt.expectedActionHeader)
 			var expectedBuiltSection string
 			if tt.expectedAppURL != "" {
 				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
-					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, formattedContent)
+					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, formattedActionHeader, formattedContent)
 			} else {
 				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
-					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, formattedContent)
+					tt.expectedAppName, tt.expectedFilePath, formattedActionHeader, formattedContent)
 			}
 
 			if builtSection != expectedBuiltSection {

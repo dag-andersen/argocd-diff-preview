@@ -15,7 +15,7 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-@@ Application modified: folder2 (examples/git-generator/app/app-set.yaml) @@
+**Application modified: folder2 (examples/git-generator/app/app-set.yaml)**
 #### Deployment/deploy-from-folder-two
 ```diff
        app: myapp
@@ -37,7 +37,7 @@ Modified (1):
 <summary>folder3 [<a href="https://argocd.example.com/applications/folder3">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-@@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
+**Application added: folder3 (examples/git-generator/app/app-set.yaml)**
 #### Deployment/deploy-from-folder-three
 ```diff
 +apiVersion: apps/v1

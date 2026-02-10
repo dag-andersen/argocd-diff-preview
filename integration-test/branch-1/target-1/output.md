@@ -15,7 +15,7 @@ Modified (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
+**Application deleted: folder2 (examples/git-generator/app/app-set.yaml)**
 #### Deployment/deploy-from-folder-two
 ```diff
 -apiVersion: apps/v1
@@ -44,7 +44,7 @@ Modified (1):
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+**Application modified: nginx-ingress (examples/helm/applications/nginx.yaml)**
 #### Deployment/nginx-ingress-ingress-nginx-controller (default)
 ```diff
                fieldPath: metadata.namespace

@@ -13,7 +13,7 @@ Modified (2):
 <summary>valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml)</summary>
 <br>
 
-@@ Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml) @@
+**Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml)**
 #### Deployment/super-duper-app-name (default)
 ```diff
  apiVersion: apps/v1
@@ -98,7 +98,7 @@ Modified (2):
 <summary>watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
-@@ Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml) @@
+**Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml)**
 #### Deployment/super-duper-app-name (default)
 ```diff
  apiVersion: apps/v1

@@ -12,7 +12,7 @@ Modified (1):
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
-@@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@
+**Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml)**
 #### Deployment/argocd-helm-chart-applicationset-controller (argocd)
 ```diff
              configMapKeyRef:
@@ -1656,7 +1656,7 @@ Modified (1):
                            type: array
                          forceCommonAnnotations:
                            description: ForceCommonAnnotations specifies whether to
-                             force applying common annotations to
+                             force applying common annotations to r
 🚨 Diff is too long
 </details>
 

@@ -88,11 +88,11 @@ pre {
 `
 
 type HTMLSection struct {
-	appName       string
-	filePath      string
-	appURL        string
-	commentHeader string
-	blocks        []ResourceBlock // Structured blocks with raw content
+	appName      string
+	filePath     string
+	appURL       string
+	actionHeader string
+	blocks       []ResourceBlock // Structured blocks with raw content
 }
 
 const htmlSection = `
@@ -118,6 +118,14 @@ const htmlLine = `
 const htmlResourceHeader = `
 <h4 class="resource_header">%s</h4>`
 
+// formatActionHeaderHTML wraps the plain text action header with strong tags and escapes it
+func formatActionHeaderHTML(actionHeader string) string {
+	if actionHeader == "" {
+		return ""
+	}
+	return fmt.Sprintf("<strong>%s</strong>", html.EscapeString(actionHeader))
+}
+
 func (h *HTMLSection) printHTMLSection() string {
 	s := htmlSection
 
@@ -137,9 +145,10 @@ func (h *HTMLSection) printHTMLSection() string {
 
 	var content strings.Builder
 
-	// Add comment header in its own diff block
-	commentRows := fmt.Sprintf(htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
-	content.WriteString(strings.ReplaceAll(htmlDiffBlock, "%rows%", commentRows))
+	// Add action header in its own diff block
+	formattedActionHeader := formatActionHeaderHTML(h.actionHeader)
+	actionRows := fmt.Sprintf(htmlLine, "comment_line", formattedActionHeader)
+	content.WriteString(strings.ReplaceAll(htmlDiffBlock, "%rows%", actionRows))
 
 	// Process each resource block - each gets its own header and diff_container
 	for _, block := range h.blocks {

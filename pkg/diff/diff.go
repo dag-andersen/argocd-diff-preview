@@ -55,14 +55,14 @@ func (d *Diff) prettyPath() string {
 	}
 }
 
-func (d *Diff) commentHeader() string {
+func (d *Diff) actionHeader() string {
 	switch d.action {
 	case merkletrie.Insert:
-		return fmt.Sprintf("@@ Application added: %s (%s) @@\n", d.prettyName(), d.prettyPath())
+		return fmt.Sprintf("Application added: %s (%s)", d.prettyName(), d.prettyPath())
 	case merkletrie.Delete:
-		return fmt.Sprintf("@@ Application deleted: %s (%s) @@\n", d.prettyName(), d.prettyPath())
+		return fmt.Sprintf("Application deleted: %s (%s)", d.prettyName(), d.prettyPath())
 	case merkletrie.Modify:
-		return fmt.Sprintf("@@ Application modified: %s (%s) @@\n", d.prettyName(), d.prettyPath())
+		return fmt.Sprintf("Application modified: %s (%s)", d.prettyName(), d.prettyPath())
 	default:
 		return ""
 	}
@@ -89,20 +89,20 @@ func (d *Diff) buildAppURL(argocdUIURL string) string {
 
 func (d *Diff) buildMarkdownSection(argocdUIURL string) MarkdownSection {
 	return MarkdownSection{
-		appName:  d.prettyName(),
-		filePath: d.prettyPath(),
-		appURL:   d.buildAppURL(argocdUIURL),
-		comment:  d.commentHeader(),
-		blocks:   d.changeInfo.blocks,
+		appName:      d.prettyName(),
+		filePath:     d.prettyPath(),
+		appURL:       d.buildAppURL(argocdUIURL),
+		actionHeader: d.actionHeader(),
+		blocks:       d.changeInfo.blocks,
 	}
 }
 
 func (d *Diff) buildHTMLSection(argocdUIURL string) HTMLSection {
 	return HTMLSection{
-		appName:       d.prettyName(),
-		filePath:      d.prettyPath(),
-		appURL:        d.buildAppURL(argocdUIURL),
-		commentHeader: d.commentHeader(),
-		blocks:        d.changeInfo.blocks,
+		appName:      d.prettyName(),
+		filePath:     d.prettyPath(),
+		appURL:       d.buildAppURL(argocdUIURL),
+		actionHeader: d.actionHeader(),
+		blocks:       d.changeInfo.blocks,
 	}
 }
