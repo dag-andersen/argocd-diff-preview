@@ -51,7 +51,6 @@ Modified (2):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
 ```
----
 #### Service/super-duper-app-name (default)
 ```diff
  apiVersion: v1
@@ -77,7 +76,6 @@ Modified (2):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
----
 #### ServiceAccount/super-duper-app-name (default)
 ```diff
  apiVersion: v1
@@ -138,7 +136,6 @@ Modified (2):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
 ```
----
 #### Service/super-duper-app-name (default)
 ```diff
  apiVersion: v1
@@ -164,7 +161,6 @@ Modified (2):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
----
 #### ServiceAccount/super-duper-app-name (default)
 ```diff
  apiVersion: v1

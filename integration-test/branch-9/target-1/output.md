@@ -209,9 +209,6 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-```
----
-```diff
 -apiVersion: v1
 -kind: Service
 -metadata:
@@ -233,9 +230,6 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
-```
----
-```diff
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount
@@ -304,9 +298,6 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-```
----
-```diff
 -apiVersion: v1
 -kind: Service
 -metadata:
@@ -328,9 +319,6 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
-```
----
-```diff
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount
@@ -399,9 +387,6 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-```
----
-```diff
 -apiVersion: v1
 -kind: Service
 -metadata:
@@ -421,7 +406,10 @@ Deleted (9):
 -    targetPort: http
 -  selector:
 -    app.kubernetes.io/instance: my-app-set-staging
--    app.kubernetes.io/na
+-    app.kubernetes.io/name: myApp
+-  type: ClusterIP
+-apiVersion: v1
+-automountServiceAccountToken: true
 🚨 Diff is too long
 </details>
 

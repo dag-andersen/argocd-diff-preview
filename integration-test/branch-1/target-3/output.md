@@ -16,7 +16,9 @@ Modified (1):
 <br>
 
 @@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
+```diff
 Diff content omitted because '--hide-deleted-app-diff' is enabled.
+```
 </details>
 
 <details>

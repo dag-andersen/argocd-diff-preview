@@ -62,7 +62,6 @@ Added (1):
 +      securityContext: {}
 +      serviceAccountName: super-app-name
 ```
----
 #### Service/super-app-name (some-namespace)
 ```diff
 +apiVersion: v1
@@ -87,7 +86,6 @@ Added (1):
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
 ```
----
 #### ServiceAccount/super-app-name (some-namespace)
 ```diff
 +apiVersion: v1

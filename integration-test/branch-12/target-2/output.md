@@ -167,7 +167,6 @@ Modified (1):
 +          optional: true
 +        name: argocd-cmd-params-cm
 ```
----
 #### Deployment/argocd-helm-chart-dex-server (argocd)
 ```diff
  apiVersion: apps/v1
@@ -1033,7 +1032,6 @@ Modified (1):
 -  - watch
 +  - create
 ```
----
 #### Role/argocd-helm-chart-dex-server (argocd)
 ```diff
  apiVersion: rbac.authorization.k8s.io/v1
@@ -1055,11 +1053,7 @@ Modified (1):
    name: argocd-server
    namespace: argocd
 ```
----
-```diff
- Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]
-```
----
+#### Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]
 #### ConfigMap/argocd-cmd-params-cm (argocd)
 ```diff
  apiVersion: v1

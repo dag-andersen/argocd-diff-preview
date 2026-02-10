@@ -210,7 +210,6 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+          name: argocd-cmd-params-cm</pre></td></tr>
 	<tr class="added_line"><td><pre>+          optional: true</pre></td></tr>
 	<tr class="added_line"><td><pre>+        name: argocd-cmd-params-cm</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### Deployment/argocd-helm-chart-dex-server (argocd)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
@@ -1056,7 +1055,6 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>   - update</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="added_line"><td><pre>+  - create</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### Role/argocd-helm-chart-dex-server (argocd)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Role</pre></td></tr>
@@ -1074,7 +1072,6 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre> - kind: ServiceAccount</pre></td></tr>
 	<tr class="normal_line"><td><pre>   name: argocd-server</pre></td></tr>
 	<tr class="normal_line"><td><pre>   namespace: argocd</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### ConfigMap/argocd-cm (argocd)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> data:</pre></td></tr>
@@ -1194,7 +1191,6 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="added_line"><td><pre>+    helm.sh/chart: argo-cd-9.1.4</pre></td></tr>
 	<tr class="normal_line"><td><pre>   name: argocd-cm</pre></td></tr>
 	<tr class="normal_line"><td><pre>   namespace: argocd</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### ConfigMap/argocd-cmd-params-cm (argocd)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> data:</pre></td></tr>
@@ -9672,7 +9668,6 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>     storage: true</pre></td></tr>
 	<tr class="normal_line"><td><pre>     subresources:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       status: {}</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 78 lines (27007 -&gt; 27084) @@</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### CustomResourceDefinition/appprojects.argoproj.io</pre></td></tr>
 	<tr class="normal_line"><td><pre>                       type: string</pre></td></tr>

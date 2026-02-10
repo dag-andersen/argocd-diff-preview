@@ -153,106 +153,14 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	// Add the last chunk
 	chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
 
-	// outputLine now includes a lineType to distinguish between diff content,
-	// resource headers, and separators
-	type lineType int
-	const (
-		lineTypeDiff lineType = iota
-		lineTypeResourceHeader
-		lineTypeSeparator
-		lineTypeYAMLSeparator // the "---" line
-	)
-
-	type outputLine struct {
-		operation diffmatchpatch.Operation
-		text      string
-		lType     lineType
-	}
-	var filteredLines []outputLine
-
-	lastResourceHeader := ""
-
-	for i, c := range chunks {
-		// Insert resource header at the start of each chunk if resource changed
-		if resourceIndex != nil && len(processedLines) > 0 {
-			// Use the line number of the first line in the chunk
-			firstLineNum := processedLines[c.start].origLineNum
-			resource := resourceIndex.GetResourceForLine(firstLineNum)
-			if resource != nil {
-				header := resource.FormatHeader()
-				if header != "" && header != lastResourceHeader {
-					filteredLines = append(filteredLines, outputLine{
-						operation: diffmatchpatch.DiffEqual,
-						text:      header,
-						lType:     lineTypeResourceHeader,
-					})
-					lastResourceHeader = header
-				}
-			}
-		}
-
-		// Add all lines in this chunk
-		for j := c.start; j <= c.end; j++ {
-			// Check if we're crossing a resource boundary within the chunk
-			// Insert resource header when we see "---" and the next resource is different
-			if resourceIndex != nil && strings.TrimSpace(processedLines[j].text) == "---" {
-				// Add the --- line as a YAML separator
-				filteredLines = append(filteredLines, outputLine{
-					operation: processedLines[j].operation,
-					text:      processedLines[j].text,
-					lType:     lineTypeYAMLSeparator,
-				})
-
-				// Look up the resource for the next line (if there is one)
-				if j+1 <= c.end {
-					nextLineNum := processedLines[j+1].origLineNum
-					resource := resourceIndex.GetResourceForLine(nextLineNum)
-					if resource != nil {
-						header := resource.FormatHeader()
-						if header != "" && header != lastResourceHeader {
-							filteredLines = append(filteredLines, outputLine{
-								operation: diffmatchpatch.DiffEqual,
-								text:      header,
-								lType:     lineTypeResourceHeader,
-							})
-							lastResourceHeader = header
-						}
-					}
-				}
-				continue
-			}
-
-			filteredLines = append(filteredLines, outputLine{
-				operation: processedLines[j].operation,
-				text:      processedLines[j].text,
-				lType:     lineTypeDiff,
-			})
-		}
-
-		// Add separator if there's a next chunk and it's far enough away
-		if i < len(chunks)-1 {
-			nextChunk := chunks[i+1]
-			skippedLines := nextChunk.start - c.end - 1
-
-			if skippedLines > 0 {
-				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, c.end+1, nextChunk.start-1)
-				filteredLines = append(filteredLines, outputLine{
-					operation: diffmatchpatch.DiffEqual,
-					text:      separator,
-					lType:     lineTypeSeparator,
-				})
-			}
-		}
-	}
-
-	addedLines := 0
-	deletedLines := 0
-
-	// Build ResourceBlocks from filteredLines
+	// Build ResourceBlocks directly from chunks
 	// Each resource header starts a new block, and content is raw diff lines
 	var blocks []ResourceBlock
 	var currentBlock *ResourceBlock
 	var contentBuffer bytes.Buffer
+	addedLines := 0
+	deletedLines := 0
+	lastResourceHeader := ""
 
 	// Helper to flush current block
 	flushBlock := func() {
@@ -269,28 +177,78 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		contentBuffer.Reset()
 	}
 
-	for _, line := range filteredLines {
-		switch line.lType {
-		case lineTypeResourceHeader:
-			// Flush any previous block and start a new one
+	// Helper to write a diff line to the content buffer
+	writeDiffLine := func(line processedLine) {
+		switch line.operation {
+		case diffmatchpatch.DiffInsert:
+			addedLines++
+			contentBuffer.WriteString("+" + line.text + "\n")
+		case diffmatchpatch.DiffDelete:
+			deletedLines++
+			contentBuffer.WriteString("-" + line.text + "\n")
+		default:
+			contentBuffer.WriteString(" " + line.text + "\n")
+		}
+	}
+
+	// Helper to start a new resource block if the header changed
+	maybeStartNewBlock := func(header string) {
+		if header != "" && header != lastResourceHeader {
 			flushBlock()
-			currentBlock = &ResourceBlock{Header: line.text}
-		case lineTypeYAMLSeparator:
-			// YAML separator goes into content as-is
-			contentBuffer.WriteString("---\n")
-		case lineTypeSeparator:
-			// Skipped lines separator goes into content
-			contentBuffer.WriteString(line.text + "\n")
-		case lineTypeDiff:
-			switch line.operation {
-			case diffmatchpatch.DiffInsert:
-				addedLines++
-				contentBuffer.WriteString("+" + line.text + "\n")
-			case diffmatchpatch.DiffDelete:
-				deletedLines++
-				contentBuffer.WriteString("-" + line.text + "\n")
-			default:
-				contentBuffer.WriteString(" " + line.text + "\n")
+			currentBlock = &ResourceBlock{Header: header}
+			lastResourceHeader = header
+		}
+	}
+
+	for i, c := range chunks {
+		// Insert resource header at the start of each chunk if resource changed
+		if resourceIndex != nil && len(processedLines) > 0 {
+			// Use the line number of the first line in the chunk
+			firstLineNum := processedLines[c.start].origLineNum
+			if resource := resourceIndex.GetResourceForLine(firstLineNum); resource != nil {
+				maybeStartNewBlock(resource.FormatHeader())
+			}
+		}
+
+		// Add all lines in this chunk
+		for j := c.start; j <= c.end; j++ {
+			line := processedLines[j]
+
+			// Check if we're crossing a resource boundary within the chunk
+			// When we see "---", check if the next resource is different and start a new block
+			// Skip the "---" line itself since we now split by resource into separate blocks
+			if resourceIndex != nil && strings.TrimSpace(line.text) == "---" {
+				// Look up the resource for the next line (if there is one)
+				if j+1 <= c.end {
+					nextLineNum := processedLines[j+1].origLineNum
+					if resource := resourceIndex.GetResourceForLine(nextLineNum); resource != nil {
+						maybeStartNewBlock(resource.FormatHeader())
+					}
+				}
+				continue
+			}
+
+			// Handle "Skipped Resource:" lines - convert them to a header-only block
+			// These are generated when resources match ignore rules
+			if strings.HasPrefix(strings.TrimSpace(line.text), "Skipped Resource:") {
+				// Flush current block and create a new one with just this as header
+				flushBlock()
+				skippedHeader := strings.TrimSpace(line.text)
+				blocks = append(blocks, ResourceBlock{Header: skippedHeader, Content: ""})
+				lastResourceHeader = skippedHeader
+				currentBlock = nil
+				continue
+			}
+
+			writeDiffLine(line)
+		}
+
+		// Add separator if there's a next chunk and it's far enough away
+		if i < len(chunks)-1 {
+			nextChunk := chunks[i+1]
+			if skippedLines := nextChunk.start - c.end - 1; skippedLines > 0 {
+				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, c.end+1, nextChunk.start-1)
+				contentBuffer.WriteString(separator + "\n")
 			}
 		}
 	}

@@ -109,7 +109,6 @@ label-selectors-example (examples/label-selectors/app.yaml)
 	<tr class="added_line"><td><pre>+        securityContext: {}</pre></td></tr>
 	<tr class="added_line"><td><pre>+      securityContext: {}</pre></td></tr>
 	<tr class="added_line"><td><pre>+      serviceAccountName: super-app-name</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### Service/super-app-name (some-namespace)</pre></td></tr>
 	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
 	<tr class="added_line"><td><pre>+kind: Service</pre></td></tr>
@@ -132,7 +131,6 @@ label-selectors-example (examples/label-selectors/app.yaml)
 	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: label-selectors-example</pre></td></tr>
 	<tr class="added_line"><td><pre>+    app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="added_line"><td><pre>+  type: ClusterIP</pre></td></tr>
-	<tr class="comment_line"><td><pre>---</pre></td></tr>
 	<tr class="comment_line"><td><pre>#### ServiceAccount/super-app-name (some-namespace)</pre></td></tr>
 	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
 	<tr class="added_line"><td><pre>+automountServiceAccountToken: true</pre></td></tr>

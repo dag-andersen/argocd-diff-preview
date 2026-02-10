@@ -26,7 +26,7 @@ func TestResourceInfo_FormatHeader(t *testing.T) {
 				Kind: "Deployment",
 				Name: "my-deploy",
 			},
-			expected: "#### Deployment/my-deploy",
+			expected: "Deployment/my-deploy",
 		},
 		{
 			name: "kind, name, and namespace",
@@ -35,14 +35,14 @@ func TestResourceInfo_FormatHeader(t *testing.T) {
 				Name:      "my-deploy",
 				Namespace: "default",
 			},
-			expected: "#### Deployment/my-deploy (default)",
+			expected: "Deployment/my-deploy (default)",
 		},
 		{
 			name: "kind only",
 			info: &ResourceInfo{
 				Kind: "Namespace",
 			},
-			expected: "#### Namespace",
+			expected: "Namespace",
 		},
 		{
 			name: "kind and namespace, no name",
@@ -50,14 +50,14 @@ func TestResourceInfo_FormatHeader(t *testing.T) {
 				Kind:      "ConfigMap",
 				Namespace: "kube-system",
 			},
-			expected: "#### ConfigMap (kube-system)",
+			expected: "ConfigMap (kube-system)",
 		},
 		{
 			name: "name only",
 			info: &ResourceInfo{
 				Name: "orphan-resource",
 			},
-			expected: "#### orphan-resource",
+			expected: "orphan-resource",
 		},
 		{
 			name: "cluster-scoped resource (no namespace)",
@@ -65,7 +65,7 @@ func TestResourceInfo_FormatHeader(t *testing.T) {
 				Kind: "ClusterRole",
 				Name: "admin-role",
 			},
-			expected: "#### ClusterRole/admin-role",
+			expected: "ClusterRole/admin-role",
 		},
 	}
 

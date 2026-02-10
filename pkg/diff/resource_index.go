@@ -13,7 +13,8 @@ type ResourceInfo struct {
 }
 
 // FormatHeader returns the formatted header string for a resource
-// e.g., "#### Deployment/my-deploy (default)" or "#### Deployment/my-deploy" if no namespace
+// e.g., "Deployment/my-deploy (default)" or "Deployment/my-deploy" if no namespace
+// Note: Does NOT include markdown formatting like "####" - that's added by the output formatter
 func (r *ResourceInfo) FormatHeader() string {
 	if r == nil {
 		return ""
@@ -39,7 +40,7 @@ func (r *ResourceInfo) FormatHeader() string {
 		result = fmt.Sprintf("%s (%s)", result, r.Namespace)
 	}
 
-	return fmt.Sprintf("#### %s", result)
+	return result
 }
 
 // resourceRange represents the line range for a resource

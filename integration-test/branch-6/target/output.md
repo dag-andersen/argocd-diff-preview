@@ -150,7 +150,6 @@ Modified (7):
        securityContext: {}
        serviceAccountName: super-app-name
 ```
----
 #### Service/super-app-name (default)
 ```diff
  apiVersion: v1
@@ -177,7 +176,6 @@ Modified (7):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
----
 #### ServiceAccount/super-app-name (default)
 ```diff
  apiVersion: v1
@@ -216,7 +214,6 @@ Modified (7):
 -            memory: 128Mi
 +            memory: 64Mi
 ```
----
 #### Service/staging-myapp (default)
 ```diff
  apiVersion: v1

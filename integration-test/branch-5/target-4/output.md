@@ -50,7 +50,6 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
 ```
----
 #### Service/experiment (default)
 ```diff
  apiVersion: v1
@@ -76,7 +75,6 @@ Modified (1):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
----
 #### ServiceAccount/experiment (default)
 ```diff
  apiVersion: v1

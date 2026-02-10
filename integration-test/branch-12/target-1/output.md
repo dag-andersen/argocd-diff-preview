@@ -163,7 +163,6 @@ Modified (1):
 +          optional: true
 +        name: argocd-cmd-params-cm
 ```
----
 #### Deployment/argocd-helm-chart-dex-server (argocd)
 ```diff
  apiVersion: apps/v1
@@ -1027,7 +1026,6 @@ Modified (1):
 -  - watch
 +  - create
 ```
----
 #### Role/argocd-helm-chart-dex-server (argocd)
 ```diff
  apiVersion: rbac.authorization.k8s.io/v1
@@ -1049,7 +1047,6 @@ Modified (1):
    name: argocd-server
    namespace: argocd
 ```
----
 #### ConfigMap/argocd-cm (argocd)
 ```diff
  apiVersion: v1
@@ -1171,7 +1168,6 @@ Modified (1):
    name: argocd-cm
    namespace: argocd
 ```
----
 #### ConfigMap/argocd-cmd-params-cm (argocd)
 ```diff
  apiVersion: v1
@@ -1660,7 +1656,7 @@ Modified (1):
                            type: array
                          forceCommonAnnotations:
                            description: ForceCommonAnnotations specifies whether to
-                             force applying commo
+                             force applying common annotations to
 🚨 Diff is too long
 </details>
 

@@ -54,7 +54,6 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
 ```
----
 #### Service/new-app-name (default)
 ```diff
  apiVersion: v1
@@ -80,7 +79,6 @@ Modified (1):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
----
 #### ServiceAccount/new-app-name (default)
 ```diff
  apiVersion: v1
