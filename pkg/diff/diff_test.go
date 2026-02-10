@@ -231,12 +231,14 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if truncated {
 				t.Errorf("buildMarkdownSection().build() should not be truncated with large max size")
 			}
+			// Note: The markdown wrapper no longer includes code blocks - the content already includes them
+			// when a resourceIndex is provided. For these tests without resourceIndex, content is plain diff format.
 			var expectedBuiltSection string
 			if tt.expectedAppURL != "" {
-				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
 					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
 			} else {
-				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
+				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
 					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
 			}
 

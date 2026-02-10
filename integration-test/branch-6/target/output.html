@@ -68,7 +68,7 @@ app1 (examples/duplicate-names/app/app-set-1.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/deploy-from-folder-one @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -93,7 +93,7 @@ app1 (examples/duplicate-names/app/app-set-2.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/deploy-from-folder-one @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -118,7 +118,7 @@ app2 (examples/duplicate-names/app/app-set-1.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/deploy-from-folder-one @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -143,7 +143,7 @@ app2 (examples/duplicate-names/app/app-set-2.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/deploy-from-folder-one @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/deploy-from-folder-one</pre></td></tr>
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -168,7 +168,7 @@ my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/super-app-name (default) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/super-app-name (default)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -209,8 +209,8 @@ my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 	<tr class="normal_line"><td><pre>         securityContext: {}</pre></td></tr>
 	<tr class="normal_line"><td><pre>       securityContext: {}</pre></td></tr>
 	<tr class="normal_line"><td><pre>       serviceAccountName: super-app-name</pre></td></tr>
-	<tr class="normal_line"><td><pre> ---</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Service/super-app-name (default) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>---</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Service/super-app-name (default)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Service</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -234,8 +234,8 @@ my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: my-super-app</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   type: ClusterIP</pre></td></tr>
-	<tr class="normal_line"><td><pre> ---</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: ServiceAccount/super-app-name (default) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>---</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### ServiceAccount/super-app-name (default)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> automountServiceAccountToken: true</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: ServiceAccount</pre></td></tr>
@@ -261,7 +261,7 @@ my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/staging-myapp (default) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/staging-myapp (default)</pre></td></tr>
 	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       containers:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       - image: dag-andersen/myapp:latest</pre></td></tr>
@@ -274,8 +274,8 @@ my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 	<tr class="normal_line"><td><pre>           requests:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-            memory: 128Mi</pre></td></tr>
 	<tr class="added_line"><td><pre>+            memory: 64Mi</pre></td></tr>
-	<tr class="normal_line"><td><pre> ---</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Service/staging-myapp (default) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>---</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Service/staging-myapp (default)</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Service</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -297,7 +297,7 @@ nginx-ingress (examples/helm/applications/nginx.yaml -&gt; examples/helm/applica
 <table>
 	
 	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -&gt; examples/helm/applications/nginx-new-path.yaml) @@</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ Resource: Deployment/nginx-ingress-ingress-nginx-controller (default) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>#### Deployment/nginx-ingress-ingress-nginx-controller (default)</pre></td></tr>
 	<tr class="normal_line"><td><pre>         app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
 	<tr class="normal_line"><td><pre>         app.kubernetes.io/version: 1.10.0</pre></td></tr>
 	<tr class="normal_line"><td><pre>         helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>

@@ -20,21 +20,21 @@ func TestMarkdownSectionHeader(t *testing.T) {
 			appName:  "Test App",
 			filePath: "path/to/app",
 			appURL:   "",
-			expected: "<details>\n<summary>Test App (path/to/app)</summary>\n<br>\n\n```diff\n",
+			expected: "<details>\n<summary>Test App (path/to/app)</summary>\n<br>\n\n",
 		},
 		{
 			name:     "App with ArgoCD URL",
 			appName:  "app-v2",
 			filePath: "path/to/app",
 			appURL:   "https://argocd.example.com/applications/app-v2",
-			expected: "<details>\n<summary>app-v2 [<a href=\"https://argocd.example.com/applications/app-v2\">link</a>] (path/to/app)</summary>\n<br>\n\n```diff\n",
+			expected: "<details>\n<summary>app-v2 [<a href=\"https://argocd.example.com/applications/app-v2\">link</a>] (path/to/app)</summary>\n<br>\n\n",
 		},
 		{
 			name:     "Empty app name without URL",
 			appName:  "",
 			filePath: "path/to/app",
 			appURL:   "",
-			expected: "<details>\n<summary> (path/to/app)</summary>\n<br>\n\n```diff\n",
+			expected: "<details>\n<summary> (path/to/app)</summary>\n<br>\n\n",
 		},
 	}
 
@@ -66,7 +66,7 @@ func TestMarkdownSection_Build(t *testing.T) {
 				content:  "+ line 1\n+ line 2",
 			},
 			maxSize:           1000,
-			expectedContent:   "<details>\n<summary>Test App (path/to/app.yaml)</summary>\n<br>\n\n```diff\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>Test App (path/to/app.yaml)</summary>\n<br>\n\n@@ Application added: Test App @@\n+ line 1\n+ line 2\n</details>\n\n",
 			expectedTruncated: false,
 		},
 		{
@@ -104,7 +104,7 @@ func TestMarkdownSection_Build(t *testing.T) {
 				content:  "+ line 1\n+ line 2\n\n\n",
 			},
 			maxSize:           1000,
-			expectedContent:   "<details>\n<summary>App (path.yaml)</summary>\n<br>\n\n```diff\n@@ Test @@\n+ line 1\n+ line 2\n```\n\n</details>\n\n",
+			expectedContent:   "<details>\n<summary>App (path.yaml)</summary>\n<br>\n\n@@ Test @@\n+ line 1\n+ line 2\n</details>\n\n",
 			expectedTruncated: false,
 		},
 	}

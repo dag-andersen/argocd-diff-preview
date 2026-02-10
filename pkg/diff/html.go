@@ -134,8 +134,18 @@ func (h *HTMLSection) printHTMLSection() string {
 		if len(line) == 0 {
 			continue // Skip empty lines
 		}
+		// Skip markdown code block markers (```diff and ```)
+		if strings.HasPrefix(line, "```") {
+			continue
+		}
+		// Handle YAML document separator as a comment line
+		if line == "---" {
+			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
+			continue
+		}
 		switch line[0] {
-		case '@':
+		case '@', '#':
+			// @ for skipped lines, # for markdown headers (resource headers)
 			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
 		case '-':
 			fmt.Fprintf(&rows, htmlLine, "removed_line", html.EscapeString(line))

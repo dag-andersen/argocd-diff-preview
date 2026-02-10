@@ -15,9 +15,9 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-```diff
 @@ Application modified: folder2 (examples/git-generator/app/app-set.yaml) @@
-@@ Resource: Deployment/deploy-from-folder-two @@
+#### Deployment/deploy-from-folder-two
+```diff
        app: myapp
    template:
      metadata:
@@ -31,16 +31,15 @@ Modified (1):
 -        - containerPort: 80
 +        - containerPort: 8080
 ```
-
 </details>
 
 <details>
 <summary>folder3 [<a href="https://argocd.example.com/applications/folder3">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-```diff
 @@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
-@@ Resource: Deployment/deploy-from-folder-three @@
+#### Deployment/deploy-from-folder-three
+```diff
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
@@ -61,7 +60,6 @@ Modified (1):
 +        ports:
 +        - containerPort: 80
 ```
-
 </details>
 
 _Stats_:

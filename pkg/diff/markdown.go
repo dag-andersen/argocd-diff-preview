@@ -22,11 +22,12 @@ func markdownSectionHeader(appName, filePath, appURL string) string {
 	} else {
 		summary = fmt.Sprintf("%s (%s)", appName, filePath)
 	}
-	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", summary)
+	// Note: No code block here - the content already contains code blocks around each resource
+	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n", summary)
 }
 
 func markdownSectionFooter() string {
-	return "\n```\n\n</details>\n\n"
+	return "\n</details>\n\n"
 }
 
 func (m *MarkdownSection) Size() int {

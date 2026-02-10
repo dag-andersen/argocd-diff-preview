@@ -15,20 +15,17 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-```diff
 @@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 Diff content omitted because '--hide-deleted-app-diff' is enabled.
-```
-
 </details>
 
 <details>
 <summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
-```diff
 @@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
-@@ Resource: Deployment/nginx-ingress-ingress-nginx-controller (default) @@
+#### Deployment/nginx-ingress-ingress-nginx-controller (default)
+```diff
          - name: POD_NAME
            valueFrom:
              fieldRef:
@@ -52,7 +49,6 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
            httpGet:
              path: /healthz
 ```
-
 </details>
 
 _Stats_:

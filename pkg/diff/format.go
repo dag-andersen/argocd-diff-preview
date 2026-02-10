@@ -51,6 +51,7 @@ type processedLine struct {
 
 // formatDiff formats diffmatchpatch.Diff into unified diff format
 // resourceIndex is optional and used to insert resource headers at chunk boundaries
+// Output format: each resource section has its header outside the code block, with the diff content inside
 func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) changeInfo {
 	var buffer bytes.Buffer
 
@@ -148,11 +149,20 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	// Add the last chunk
 	chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
 
-	// Now build the output with separators between chunks
-	// Also track the last resource header we emitted to avoid duplicates
+	// outputLine now includes a lineType to distinguish between diff content,
+	// resource headers, and separators
+	type lineType int
+	const (
+		lineTypeDiff lineType = iota
+		lineTypeResourceHeader
+		lineTypeSeparator
+		lineTypeYAMLSeparator // the "---" line
+	)
+
 	type outputLine struct {
 		operation diffmatchpatch.Operation
 		text      string
+		lType     lineType
 	}
 	var filteredLines []outputLine
 
@@ -170,6 +180,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 					filteredLines = append(filteredLines, outputLine{
 						operation: diffmatchpatch.DiffEqual,
 						text:      header,
+						lType:     lineTypeResourceHeader,
 					})
 					lastResourceHeader = header
 				}
@@ -181,10 +192,11 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			// Check if we're crossing a resource boundary within the chunk
 			// Insert resource header when we see "---" and the next resource is different
 			if resourceIndex != nil && strings.TrimSpace(processedLines[j].text) == "---" {
-				// Add the --- line first
+				// Add the --- line as a YAML separator
 				filteredLines = append(filteredLines, outputLine{
 					operation: processedLines[j].operation,
 					text:      processedLines[j].text,
+					lType:     lineTypeYAMLSeparator,
 				})
 
 				// Look up the resource for the next line (if there is one)
@@ -197,6 +209,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 							filteredLines = append(filteredLines, outputLine{
 								operation: diffmatchpatch.DiffEqual,
 								text:      header,
+								lType:     lineTypeResourceHeader,
 							})
 							lastResourceHeader = header
 						}
@@ -208,6 +221,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			filteredLines = append(filteredLines, outputLine{
 				operation: processedLines[j].operation,
 				text:      processedLines[j].text,
+				lType:     lineTypeDiff,
 			})
 		}
 
@@ -221,6 +235,7 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				filteredLines = append(filteredLines, outputLine{
 					operation: diffmatchpatch.DiffEqual,
 					text:      separator,
+					lType:     lineTypeSeparator,
 				})
 			}
 		}
@@ -230,10 +245,36 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	deletedLines := 0
 
 	// Write the filtered lines
+	// When resourceIndex is provided, wrap each resource's diff content in code blocks
+	// When resourceIndex is nil, output plain diff format (no code blocks)
+	inCodeBlock := false
+	useCodeBlocks := resourceIndex != nil
+
 	for _, line := range filteredLines {
-		if strings.HasPrefix(line.text, "@@ skipped") || strings.HasPrefix(line.text, "@@ Resource:") {
+		switch line.lType {
+		case lineTypeResourceHeader:
+			// Close any open code block before resource header
+			if inCodeBlock {
+				buffer.WriteString("```\n")
+				inCodeBlock = false
+			}
 			buffer.WriteString(line.text + "\n")
-		} else {
+		case lineTypeYAMLSeparator:
+			// Close any open code block before YAML separator
+			if inCodeBlock {
+				buffer.WriteString("```\n")
+				inCodeBlock = false
+			}
+			buffer.WriteString("---\n")
+		case lineTypeSeparator:
+			// Skipped lines separator stays inside code block (or just as-is if no code blocks)
+			buffer.WriteString(line.text + "\n")
+		case lineTypeDiff:
+			// Open code block if using code blocks and not already open
+			if useCodeBlocks && !inCodeBlock {
+				buffer.WriteString("```diff\n")
+				inCodeBlock = true
+			}
 			switch line.operation {
 			case diffmatchpatch.DiffInsert:
 				addedLines++
@@ -245,6 +286,11 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				buffer.WriteString(" " + line.text + "\n")
 			}
 		}
+	}
+
+	// Close any remaining open code block
+	if inCodeBlock {
+		buffer.WriteString("```\n")
 	}
 
 	return changeInfo{content: buffer.String(), addedLines: addedLines, deletedLines: deletedLines}

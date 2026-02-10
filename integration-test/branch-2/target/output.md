@@ -12,9 +12,9 @@ Modified (1):
 <summary>my-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
-```diff
 @@ Application modified: my-app (examples/helm/applications/my-app.yaml) @@
-@@ Resource: Deployment/new-app-name (default) @@
+#### Deployment/new-app-name (default)
+```diff
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -53,8 +53,10 @@ Modified (1):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
- ---
-@@ Resource: Service/new-app-name (default) @@
+```
+---
+#### Service/new-app-name (default)
+```diff
  apiVersion: v1
  kind: Service
  metadata:
@@ -77,8 +79,10 @@ Modified (1):
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/name: myApp
    type: ClusterIP
- ---
-@@ Resource: ServiceAccount/new-app-name (default) @@
+```
+---
+#### ServiceAccount/new-app-name (default)
+```diff
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -93,7 +97,6 @@ Modified (1):
 +  name: new-app-name
    namespace: default
 ```
-
 </details>
 
 _Stats_:
