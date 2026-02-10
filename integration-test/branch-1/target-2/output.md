@@ -12,7 +12,6 @@ Deleted (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-**Application deleted: folder2 (examples/git-generator/app/app-set.yaml)**
 #### Deployment/deploy-from-folder-two
 ```diff
 -apiVersion: apps/v1

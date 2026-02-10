@@ -15,7 +15,6 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-**Application deleted: folder2 (examples/git-generator/app/app-set.yaml)**
 ```diff
 Diff content omitted because '--hide-deleted-app-diff' is enabled.
 ```
@@ -25,7 +24,6 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
 <summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
-**Application modified: nginx-ingress (examples/helm/applications/nginx.yaml)**
 #### Deployment/nginx-ingress-ingress-nginx-controller (default)
 ```diff
          - name: POD_NAME

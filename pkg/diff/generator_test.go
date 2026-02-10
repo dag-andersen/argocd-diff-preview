@@ -130,11 +130,9 @@ spec:
 		for _, section := range markdownSections {
 			sectionContent, _ := section.build(10000)
 			if strings.Contains(sectionContent, "app-to-delete") {
-				if strings.Contains(sectionContent, "Application deleted") {
-					// Should have actual diff content (minus lines showing the deleted content)
-					if strings.Contains(sectionContent, "- apiVersion:") || strings.Contains(sectionContent, "-apiVersion:") {
-						foundDeletedWithContent = true
-					}
+				// Should have actual diff content (minus lines showing the deleted content)
+				if strings.Contains(sectionContent, "- apiVersion:") || strings.Contains(sectionContent, "-apiVersion:") {
+					foundDeletedWithContent = true
 				}
 			}
 		}
@@ -174,10 +172,6 @@ spec:
 		for _, section := range markdownSections {
 			sectionContent, _ := section.build(10000)
 			if strings.Contains(sectionContent, "app-to-delete") {
-				// Should have the deletion header
-				if !strings.Contains(sectionContent, "Application deleted") {
-					t.Error("Deleted app should have deletion header")
-				}
 				// Should have the hidden message
 				if !strings.Contains(sectionContent, deletedAppDiffHiddenMessage) {
 					t.Errorf("With hideDeletedAppDiff=true, deleted app should show hidden message, got: %s", sectionContent)

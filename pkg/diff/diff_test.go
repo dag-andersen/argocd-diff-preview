@@ -94,53 +94,15 @@ func TestDiff_prettyPath(t *testing.T) {
 	}
 }
 
-func TestDiff_actionHeader(t *testing.T) {
-	tests := []struct {
-		name     string
-		diff     Diff
-		expected string
-	}{
-		{
-			name:     "Insert",
-			diff:     Diff{newName: "app", newSourcePath: "/path", action: merkletrie.Insert},
-			expected: "Application added: app (/path)",
-		},
-		{
-			name:     "Delete",
-			diff:     Diff{oldName: "app", oldSourcePath: "/path", action: merkletrie.Delete},
-			expected: "Application deleted: app (/path)",
-		},
-		{
-			name:     "Modify",
-			diff:     Diff{newName: "app", newSourcePath: "/path", action: merkletrie.Modify},
-			expected: "Application modified: app (/path)",
-		},
-		{
-			name:     "Unknown action",
-			diff:     Diff{newName: "app", newSourcePath: "/path", action: 99}, // Assuming 99 is not a valid action
-			expected: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.diff.actionHeader(); got != tt.expected {
-				t.Errorf("actionHeader() = %q, want %q", got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestDiff_buildMarkdownSection(t *testing.T) {
 	tests := []struct {
-		name                 string
-		diff                 Diff
-		argocdUIURL          string
-		expectedAppName      string
-		expectedFilePath     string
-		expectedAppURL       string
-		expectedActionHeader string
-		expectedBlocks       []ResourceBlock
+		name             string
+		diff             Diff
+		argocdUIURL      string
+		expectedAppName  string
+		expectedFilePath string
+		expectedAppURL   string
+		expectedBlocks   []ResourceBlock
 	}{
 		{
 			name: "Insert without URL",
@@ -150,12 +112,11 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Insert,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}}},
 			},
-			argocdUIURL:          "",
-			expectedAppName:      "new-app",
-			expectedFilePath:     "/path/new",
-			expectedAppURL:       "",
-			expectedActionHeader: "Application added: new-app (/path/new)",
-			expectedBlocks:       []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
+			argocdUIURL:      "",
+			expectedAppName:  "new-app",
+			expectedFilePath: "/path/new",
+			expectedAppURL:   "",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
 		},
 		{
 			name: "Insert with URL",
@@ -165,12 +126,11 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Insert,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}}},
 			},
-			argocdUIURL:          "https://argocd.example.com",
-			expectedAppName:      "new-app",
-			expectedFilePath:     "/path/new",
-			expectedAppURL:       "https://argocd.example.com/applications/new-app",
-			expectedActionHeader: "Application added: new-app (/path/new)",
-			expectedBlocks:       []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
+			argocdUIURL:      "https://argocd.example.com",
+			expectedAppName:  "new-app",
+			expectedFilePath: "/path/new",
+			expectedAppURL:   "https://argocd.example.com/applications/new-app",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "+ line 1\n+ line 2"}},
 		},
 		{
 			name: "Modify with name change",
@@ -182,12 +142,11 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Modify,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}}},
 			},
-			argocdUIURL:          "https://argocd.example.com",
-			expectedAppName:      "app-v1 -> app-v2",
-			expectedFilePath:     "/path/app",
-			expectedAppURL:       "https://argocd.example.com/applications/app-v1",
-			expectedActionHeader: "Application modified: app-v1 -> app-v2 (/path/app)",
-			expectedBlocks:       []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}},
+			argocdUIURL:      "https://argocd.example.com",
+			expectedAppName:  "app-v1 -> app-v2",
+			expectedFilePath: "/path/app",
+			expectedAppURL:   "https://argocd.example.com/applications/app-v1",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "- line 1\n+ line 1 mod"}},
 		},
 		{
 			name: "Delete",
@@ -197,12 +156,11 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 				action:        merkletrie.Delete,
 				changeInfo:    changeInfo{blocks: []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}}},
 			},
-			argocdUIURL:          "https://argocd.example.com",
-			expectedAppName:      "old-app",
-			expectedFilePath:     "/path/old",
-			expectedAppURL:       "https://argocd.example.com/applications/old-app",
-			expectedActionHeader: "Application deleted: old-app (/path/old)",
-			expectedBlocks:       []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}},
+			argocdUIURL:      "https://argocd.example.com",
+			expectedAppName:  "old-app",
+			expectedFilePath: "/path/old",
+			expectedAppURL:   "https://argocd.example.com/applications/old-app",
+			expectedBlocks:   []ResourceBlock{{Header: "", Content: "- line 1\n- line 2"}},
 		},
 	}
 
@@ -218,9 +176,6 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			}
 			if got.appURL != tt.expectedAppURL {
 				t.Errorf("buildMarkdownSection().appURL = %q, want %q", got.appURL, tt.expectedAppURL)
-			}
-			if got.actionHeader != tt.expectedActionHeader {
-				t.Errorf("buildMarkdownSection().actionHeader = %q, want %q", got.actionHeader, tt.expectedActionHeader)
 			}
 			// Compare blocks
 			if len(got.blocks) != len(tt.expectedBlocks) {
@@ -244,14 +199,13 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			// For blocks with empty header, formatBlocksToMarkdown just wraps content in code blocks
 			formattedContent := formatBlocksToMarkdown(tt.expectedBlocks)
 			formattedContent = strings.TrimRight(formattedContent, "\n")
-			formattedActionHeader := formatActionHeaderMarkdown(tt.expectedActionHeader)
 			var expectedBuiltSection string
 			if tt.expectedAppURL != "" {
-				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
-					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, formattedActionHeader, formattedContent)
+				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n%s\n</details>\n\n",
+					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, formattedContent)
 			} else {
-				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n%s%s\n</details>\n\n",
-					tt.expectedAppName, tt.expectedFilePath, formattedActionHeader, formattedContent)
+				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n%s\n</details>\n\n",
+					tt.expectedAppName, tt.expectedFilePath, formattedContent)
 			}
 
 			if builtSection != expectedBuiltSection {
@@ -474,10 +428,6 @@ spec:
 		sectionContent, _ := section.build(10000) // Use large max size to get full content
 		if strings.Contains(sectionContent, "app-a") {
 			foundAppA = true
-			// Should show as modification, not delete+add
-			if !strings.Contains(sectionContent, "Application modified") {
-				t.Errorf("App-A should show as modified, got: %s", sectionContent)
-			}
 			// Should show the content change
 			if !strings.Contains(sectionContent, "-  replicas: 1") || !strings.Contains(sectionContent, "+  replicas: 2") {
 				t.Errorf("App-A should show replica change from 1 to 2, got: %s", sectionContent)
@@ -485,10 +435,6 @@ spec:
 		}
 		if strings.Contains(sectionContent, "app-b") {
 			foundAppB = true
-			// Should show as modification, not delete+add
-			if !strings.Contains(sectionContent, "Application modified") {
-				t.Errorf("App-B should show as modified, got: %s", sectionContent)
-			}
 			// Should show the content change
 			if !strings.Contains(sectionContent, "-  replicas: 1") || !strings.Contains(sectionContent, "+  replicas: 2") {
 				t.Errorf("App-B should show replica change from 1 to 2, got: %s", sectionContent)
@@ -507,10 +453,6 @@ spec:
 	// This proves they were matched by identity (Name+SourcePath), not by filename
 	for i, section := range markdownSections {
 		sectionContent, _ := section.build(10000) // Use large max size to get full content
-		// Both should show as modifications
-		if !strings.Contains(sectionContent, "Application modified") {
-			t.Errorf("Section %d should show modification, not deletion/addition, got: %s", i, sectionContent)
-		}
 		// Both should show the same content change
 		if !strings.Contains(sectionContent, "-  replicas: 1") || !strings.Contains(sectionContent, "+  replicas: 2") {
 			t.Errorf("Section %d should show consistent replica change from 1 to 2, got: %s", i, sectionContent)

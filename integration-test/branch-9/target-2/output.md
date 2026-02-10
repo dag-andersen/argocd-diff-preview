@@ -12,7 +12,6 @@ Deleted (1):
 <summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
 <br>
 
-**Application deleted: nginx-ingress (examples/external-chart/nginx.yaml)**
 #### ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission
 ```diff
 -apiVersion: admissionregistration.k8s.io/v1
@@ -20,7 +19,8 @@ Deleted (1):
 -metadata:
 -  labels:
 -    app.kubernetes.io/component: admission-webhook
--
+-    app.kubernetes.io/instance: nginx-ingress
+-    app.kubernetes.io/managed-by
 🚨 Diff is too long
 </details>
 

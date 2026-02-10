@@ -20,7 +20,6 @@ Deleted (9):
 <summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-**Application deleted: app1 (examples/duplicate-names/app/app-set-1.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
@@ -49,7 +48,6 @@ Deleted (9):
 <summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-**Application deleted: app1 (examples/duplicate-names/app/app-set-2.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
@@ -78,7 +76,6 @@ Deleted (9):
 <summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-**Application deleted: app2 (examples/duplicate-names/app/app-set-1.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
@@ -107,7 +104,6 @@ Deleted (9):
 <summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-**Application deleted: app2 (examples/duplicate-names/app/app-set-2.yaml)**
 #### Deployment/deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
@@ -136,7 +132,6 @@ Deleted (9):
 <summary>custom-target-revision-example (examples/custom-target-revision/app/app.yaml)</summary>
 <br>
 
-**Application deleted: custom-target-revision-example (examples/custom-target-revision/app/app.yaml)**
 #### Deployment/my-deployment (default)
 ```diff
 -apiVersion: apps/v1
@@ -160,7 +155,6 @@ Deleted (9):
 <summary>my-app-set-dev (examples/basic-appset/my-app-set.yaml)</summary>
 <br>
 
-**Application deleted: my-app-set-dev (examples/basic-appset/my-app-set.yaml)**
 #### Deployment/super-app-name (default)
 ```diff
 -apiVersion: apps/v1
@@ -249,7 +243,6 @@ Deleted (9):
 <summary>my-app-set-prod (examples/basic-appset/my-app-set.yaml)</summary>
 <br>
 
-**Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml)**
 #### Deployment/super-app-name (default)
 ```diff
 -apiVersion: apps/v1
@@ -338,7 +331,6 @@ Deleted (9):
 <summary>my-app-set-staging (examples/basic-appset/my-app-set.yaml)</summary>
 <br>
 
-**Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml)**
 #### Deployment/super-app-name (default)
 ```diff
 -apiVersion: apps/v1
@@ -410,7 +402,31 @@ Deleted (9):
 -  type: ClusterIP
 -apiVersion: v1
 -automountServiceAccountToken: true
--kind: ServiceA
+-kind: ServiceAccount
+-metadata:
+-  labels:
+-    app.kubernetes.io/instance: my-app-set-staging
+-    app.kubernetes.io/managed-by: Helm
+-    app.kubernetes.io/name: myApp
+-    app.kubernetes.io/version: 1.16.0
+-    helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
+-  namespace: default
+```
+</details>
+
+<details>
+<summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
+<br>
+
+#### ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission
+```diff
+-apiVersion: admissionregistration.k8s.io/v1
+-kind: ValidatingWebhookConfiguration
+-metadata:
+-  labels:
+-    app.kubernetes.io/component: admission-webhook
+-    app.kubernetes.io/instance: nginx
 🚨 Diff is too long
 </details>
 

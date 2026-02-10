@@ -12,7 +12,6 @@ Modified (1):
 <summary>my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
-**Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)**
 #### Deployment/experiment (default)
 ```diff
  apiVersion: apps/v1

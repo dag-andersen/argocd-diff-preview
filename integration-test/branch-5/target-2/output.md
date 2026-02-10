@@ -12,7 +12,6 @@ Modified (1):
 <summary>my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
-**Application modified: my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)**
 #### Deployment/experiment (default)
 ```diff
  apiVersion: apps/v1

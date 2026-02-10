@@ -12,7 +12,6 @@ Modified (1):
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
-**Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml)**
 #### Deployment/argocd-helm-chart-applicationset-controller (argocd)
 ```diff
          - name: ARGOCD_APPLICATIONSET_CONTROLLER_LOGFORMAT

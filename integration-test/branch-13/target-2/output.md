@@ -12,7 +12,6 @@ Added (1):
 <summary>label-selectors-example (examples/label-selectors/app.yaml)</summary>
 <br>
 
-**Application added: label-selectors-example (examples/label-selectors/app.yaml)**
 #### Deployment/super-app-name (some-namespace)
 ```diff
 +apiVersion: apps/v1
