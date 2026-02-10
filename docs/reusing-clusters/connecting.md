@@ -61,7 +61,7 @@ docker run \
   -v $(pwd)/target-branch:/target-branch \
   -e TARGET_BRANCH=helm-example-3 \
   -e REPO=dag-andersen/argocd-diff-preview \
-  dagandersen/argocd-diff-preview:v0.1.24 \
+  dagandersen/argocd-diff-preview:v0.1.25 \
   --argocd-namespace=argocd-diff-preview \
   --create-cluster=false
 ```
