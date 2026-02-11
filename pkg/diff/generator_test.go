@@ -261,9 +261,7 @@ stringData:
 
 // TestGenerateGitDiff_ResourceDeletedWithContentMoved tests diff output when a resource
 // is deleted but some of its content is moved to another resource.
-// Current behavior: The deleted resource's content appears as deletions within the
-// remaining resource's diff block. This is because we only use the new content's
-// resource index, so deleted resources don't get their own headers.
+// We split on all "---" separators, so each resource gets its own block.
 func TestGenerateGitDiff_ResourceDeletedWithContentMoved(t *testing.T) {
 	tempDir := t.TempDir()
 	basePath := filepath.Join(tempDir, "base")
@@ -297,8 +295,7 @@ data:
   keyTwo: "2"
   keyThree: "3"`
 
-	// Current behavior: deleted resource (other-config) appears as deletions
-	// within my-config's block since we only have my-config in target
+	// Current behavior: all resources in one block with only the first resource header
 	expectedOutput := `#### ConfigMap/my-config (default)
 ` + "```diff" + `
  apiVersion: v1
@@ -321,6 +318,153 @@ data:
 
 	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
 	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	actualOutput := strings.TrimSpace(formatBlocksToMarkdown(markdownSections[0].blocks))
+	expectedOutput = strings.TrimSpace(expectedOutput)
+
+	if actualOutput != expectedOutput {
+		t.Errorf("Output mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedOutput, actualOutput)
+	}
+}
+
+// TestGenerateGitDiff_NewFileWithMultipleResources tests that a new file with multiple
+// resources (separated by ---) produces separate resource blocks with proper headers.
+func TestGenerateGitDiff_NewFileWithMultipleResources(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	// New file with 3 resources
+	targetContent := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-app-config
+  namespace: default
+data:
+  key: value`
+
+	// Each resource should get its own block with a header
+	expectedOutput := `#### Deployment/my-app (default)
+` + "```diff" + `
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: my-app
++  namespace: default
++spec:
++  replicas: 1
+` + "```" + `
+#### Service/my-app (default)
+` + "```diff" + `
++apiVersion: v1
++kind: Service
++metadata:
++  name: my-app
++  namespace: default
++spec:
++  type: ClusterIP
+` + "```" + `
+#### ConfigMap/my-app-config (default)
+` + "```diff" + `
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: my-app-config
++  namespace: default
++data:
++  key: value
+` + "```"
+
+	baseApps := []AppInfo{} // No base apps - this is a new file
+	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	actualOutput := strings.TrimSpace(formatBlocksToMarkdown(markdownSections[0].blocks))
+	expectedOutput = strings.TrimSpace(expectedOutput)
+
+	if actualOutput != expectedOutput {
+		t.Errorf("Output mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedOutput, actualOutput)
+	}
+}
+
+// TestGenerateGitDiff_DeletedFileWithMultipleResources tests that a deleted file
+// with multiple resources produces separate blocks with proper headers for each.
+func TestGenerateGitDiff_DeletedFileWithMultipleResources(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	// Deleted file with 2 resources
+	baseContent := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  type: ClusterIP`
+
+	// Current behavior: all resources in one block with only the first resource header
+	expectedOutput := `#### Deployment/my-app (default)
+` + "```diff" + `
+-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  name: my-app
+-  namespace: default
+-spec:
+-  replicas: 1
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  name: my-app
+-  namespace: default
+-spec:
+-  type: ClusterIP
+` + "```"
+
+	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
+	targetApps := []AppInfo{} // App is deleted
 
 	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
 	if err != nil {
