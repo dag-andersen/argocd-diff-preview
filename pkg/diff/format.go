@@ -68,27 +68,47 @@ type processedLine struct {
 	origLineNum int // line number in the new content, for resource lookup
 }
 
+// chunk represents a contiguous range of lines to include in the diff output
+type chunk struct {
+	start int
+	end   int
+}
+
 // formatDiff formats diffmatchpatch.Diff into unified diff format
 // resourceIndex is optional and used to insert resource headers at chunk boundaries
 // Output: each ResourceBlock contains a header (e.g., "Deployment/my-app (default)") and raw diff content
 func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string, resourceIndex *ResourceIndex) (changeInfo, error) {
-	// Process the diffs and format them in unified diff format
-	// We'll keep track of context lines to include only the specified number
-	// Also track the original line number in the new content for resource lookup
-	var processedLines []processedLine
-
-	// Pre-compile the ignore pattern regex once for efficiency
-	compiledIgnorePattern, err := compileIgnorePattern(ignorePattern)
+	// Phase 1: Process diffs into lines with metadata
+	processedLines, err := processDiffLines(diffs, ignorePattern)
 	if err != nil {
 		return changeInfo{}, err
 	}
 
-	// Track line number in the "new" content (DiffEqual and DiffInsert contribute to this)
+	// Phase 2: Find indices of changed lines that should be shown
+	changedLines := findChangedLines(processedLines)
+	if len(changedLines) == 0 {
+		return changeInfo{blocks: nil, addedLines: 0, deletedLines: 0}, nil
+	}
+
+	// Phase 3: Build chunks of lines to include based on context
+	chunks := buildChunks(changedLines, len(processedLines), contextLines)
+
+	// Phase 4: Build resource blocks from chunks
+	return buildResourceBlocks(chunks, processedLines, resourceIndex)
+}
+
+// processDiffLines converts raw diffs into processedLine structs with metadata
+func processDiffLines(diffs []diffmatchpatch.Diff, ignorePattern *string) ([]processedLine, error) {
+	compiledIgnorePattern, err := compileIgnorePattern(ignorePattern)
+	if err != nil {
+		return nil, err
+	}
+
+	var processedLines []processedLine
 	newLineNum := 0
 
 	for _, d := range diffs {
 		lines := strings.Split(d.Text, "\n")
-		// If the last element is empty (due to trailing newline), remove it
 		if len(lines) > 0 && lines[len(lines)-1] == "" {
 			lines = lines[:len(lines)-1]
 		}
@@ -96,25 +116,8 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		isChange := d.Type != diffmatchpatch.DiffEqual
 
 		for _, line := range lines {
-			// Determine if this line should be shown or filtered out
-			show := true
-			if isChange && compiledIgnorePattern != nil {
-				// Only apply regex filter to changed lines
-				show = !shouldIgnoreLine(line, compiledIgnorePattern)
-			}
+			show := shouldShowLine(line, isChange, compiledIgnorePattern)
 
-			// Ignore specific hardcoded lines.
-			if show && isChange {
-				for _, pattern := range ignorePatterns {
-					if strings.HasPrefix(strings.TrimLeft(line, " \t"), pattern) {
-						show = false
-						break
-					}
-				}
-			}
-
-			// For DiffEqual and DiffInsert, this line exists in the new content
-			// For DiffDelete, it only exists in the old content
 			lineNum := newLineNum
 			if d.Type != diffmatchpatch.DiffDelete {
 				newLineNum++
@@ -130,50 +133,63 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		}
 	}
 
-	// First find all changed lines that should be shown
+	return processedLines, nil
+}
+
+// shouldShowLine determines if a line should be shown in the diff output
+func shouldShowLine(line string, isChange bool, compiledIgnorePattern *regexp.Regexp) bool {
+	if !isChange {
+		return true
+	}
+
+	if compiledIgnorePattern != nil && shouldIgnoreLine(line, compiledIgnorePattern) {
+		return false
+	}
+
+	for _, pattern := range ignorePatterns {
+		if strings.HasPrefix(strings.TrimLeft(line, " \t"), pattern) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// findChangedLines returns indices of lines that have visible changes
+func findChangedLines(processedLines []processedLine) []int {
 	var changedLines []int
 	for i, line := range processedLines {
 		if line.isChange && line.show {
 			changedLines = append(changedLines, i)
 		}
 	}
+	return changedLines
+}
 
-	// No changes to show, so return empty changeInfo
-	if len(changedLines) == 0 {
-		return changeInfo{blocks: nil, addedLines: 0, deletedLines: 0}, nil
-	}
-
-	// Now create chunks of lines to include based on context
-	type chunk struct {
-		start int
-		end   int
-	}
+// buildChunks groups changed lines into chunks with surrounding context
+func buildChunks(changedLines []int, totalLines int, contextLines uint) []chunk {
 	var chunks []chunk
 
-	// Start with the first changed line and its context
 	chunkStart := max(0, changedLines[0]-int(contextLines))
-	chunkEnd := min(len(processedLines)-1, changedLines[0]+int(contextLines))
+	chunkEnd := min(totalLines-1, changedLines[0]+int(contextLines))
 
-	// Extend chunk to include other changed lines that are within 2*contextLines
 	for i := 1; i < len(changedLines); i++ {
 		currentLine := changedLines[i]
-		// If this changed line is close to our current chunk, extend the chunk
 		if currentLine-chunkEnd <= 2*int(contextLines) {
-			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
+			chunkEnd = min(totalLines-1, currentLine+int(contextLines))
 		} else {
-			// Otherwise, finish this chunk and start a new one
 			chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
-
 			chunkStart = max(0, currentLine-int(contextLines))
-			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
+			chunkEnd = min(totalLines-1, currentLine+int(contextLines))
 		}
 	}
 
-	// Add the last chunk
 	chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
+	return chunks
+}
 
-	// Build ResourceBlocks directly from chunks
-	// Each resource header starts a new block, and content is raw diff lines
+// buildResourceBlocks converts chunks into ResourceBlocks with headers and diff content
+func buildResourceBlocks(chunks []chunk, processedLines []processedLine, resourceIndex *ResourceIndex) (changeInfo, error) {
 	var blocks []ResourceBlock
 	var currentBlock *ResourceBlock
 	var contentBuffer bytes.Buffer
@@ -181,13 +197,11 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	deletedLines := 0
 	lastResourceHeader := ""
 
-	// Helper to flush current block
 	flushBlock := func() {
 		if currentBlock != nil && contentBuffer.Len() > 0 {
 			currentBlock.Content = strings.TrimRight(contentBuffer.String(), "\n")
 			blocks = append(blocks, *currentBlock)
 		} else if currentBlock == nil && contentBuffer.Len() > 0 {
-			// Content before any resource header goes into a block with empty header
 			blocks = append(blocks, ResourceBlock{
 				Header:  "",
 				Content: strings.TrimRight(contentBuffer.String(), "\n"),
@@ -196,7 +210,6 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		contentBuffer.Reset()
 	}
 
-	// Helper to write a diff line to the content buffer
 	writeDiffLine := func(line processedLine) {
 		switch line.operation {
 		case diffmatchpatch.DiffInsert:
@@ -210,7 +223,6 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		}
 	}
 
-	// Helper to start a new resource block if the header changed
 	maybeStartNewBlock := func(header string) {
 		if header != "" && header != lastResourceHeader {
 			flushBlock()
@@ -220,24 +232,17 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 	}
 
 	for i, c := range chunks {
-		// Insert resource header at the start of each chunk if resource changed
 		if resourceIndex != nil && len(processedLines) > 0 {
-			// Use the line number of the first line in the chunk
 			firstLineNum := processedLines[c.start].origLineNum
 			if resource := resourceIndex.GetResourceForLine(firstLineNum); resource != nil {
 				maybeStartNewBlock(resource.FormatHeader())
 			}
 		}
 
-		// Add all lines in this chunk
 		for j := c.start; j <= c.end; j++ {
 			line := processedLines[j]
 
-			// Check if we're crossing a resource boundary within the chunk
-			// When we see "---", check if the next resource is different and start a new block
-			// Skip the "---" line itself since we now split by resource into separate blocks
 			if resourceIndex != nil && strings.TrimSpace(line.text) == "---" {
-				// Look up the resource for the next line (if there is one)
 				if j+1 <= c.end {
 					nextLineNum := processedLines[j+1].origLineNum
 					if resource := resourceIndex.GetResourceForLine(nextLineNum); resource != nil {
@@ -247,8 +252,6 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				continue
 			}
 
-			// Handle hidden resource lines (e.g., "ConfigMap/name (ns): Hidden")
-			// These are generated when resources match ignore rules
 			if strings.HasSuffix(strings.TrimSpace(line.text), extract.HiddenResourceSuffix) {
 				flushBlock()
 				header := strings.TrimSpace(line.text)
@@ -261,12 +264,9 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 			writeDiffLine(line)
 		}
 
-		// Add separator if there's a next chunk and it's far enough away
-		// But skip if the next chunk is a different resource (separator would be meaningless)
 		if i < len(chunks)-1 {
 			nextChunk := chunks[i+1]
 			if skippedLines := nextChunk.start - c.end - 1; skippedLines > 0 {
-				// Check if next chunk is a different resource
 				sameResource := true
 				if resourceIndex != nil {
 					nextLineNum := processedLines[nextChunk.start].origLineNum
@@ -282,10 +282,44 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		}
 	}
 
-	// Flush the last block
 	flushBlock()
 
+	// Post-process blocks to detect kind changes and update headers
+	for i := range blocks {
+		blocks[i].Header = detectAndUpdateKindChange(blocks[i])
+	}
+
 	return changeInfo{blocks: blocks, addedLines: addedLines, deletedLines: deletedLines}, nil
+}
+
+// detectAndUpdateKindChange scans a block's content for kind changes (-kind: X, +kind: Y)
+// and updates the header to show the transformation (e.g., "ConfigMap → Secret/name (ns)")
+func detectAndUpdateKindChange(block ResourceBlock) string {
+	if block.Header == "" || block.Content == "" {
+		return block.Header
+	}
+
+	var oldKind, newKind string
+	for line := range strings.SplitSeq(block.Content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if kind, found := strings.CutPrefix(trimmed, "-kind:"); found {
+			oldKind = strings.TrimSpace(kind)
+		} else if kind, found := strings.CutPrefix(trimmed, "+kind:"); found {
+			newKind = strings.TrimSpace(kind)
+		}
+	}
+
+	// If both old and new kind are found and different, update the header
+	if oldKind != "" && newKind != "" && oldKind != newKind {
+		// Header format is "Kind/Name (namespace)" or "Kind/Name"
+		// We want to change it to "OldKind → NewKind/Name (namespace)"
+		if idx := strings.Index(block.Header, "/"); idx != -1 {
+			namePart := block.Header[idx:] // "/Name (namespace)" or "/Name"
+			return oldKind + " → " + newKind + namePart
+		}
+	}
+
+	return block.Header
 }
 
 // formatNewFileDiff formats a diff for a new file using the go-git/utils/diff package

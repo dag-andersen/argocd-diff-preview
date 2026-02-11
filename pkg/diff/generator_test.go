@@ -199,3 +199,142 @@ spec:
 		}
 	})
 }
+
+// TestGenerateGitDiff_ResourceKindChange tests diff output when a resource changes kind
+// (e.g., ConfigMap → Secret).
+func TestGenerateGitDiff_ResourceKindChange(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	baseContent := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  key: value`
+
+	targetContent := `apiVersion: v1
+kind: Secret
+metadata:
+  name: my-config
+  namespace: default
+type: Opaque
+stringData:
+  key: value`
+
+	// Expected: header shows the kind transformation
+	expectedOutput := `#### ConfigMap → Secret/my-config (default)
+` + "```diff" + `
+ apiVersion: v1
+-kind: ConfigMap
++kind: Secret
+ metadata:
+   name: my-config
+   namespace: default
+-data:
++type: Opaque
++stringData:
+   key: value
+` + "```"
+
+	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
+	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	actualOutput := strings.TrimSpace(formatBlocksToMarkdown(markdownSections[0].blocks))
+	expectedOutput = strings.TrimSpace(expectedOutput)
+
+	if actualOutput != expectedOutput {
+		t.Errorf("Output mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedOutput, actualOutput)
+	}
+}
+
+// TestGenerateGitDiff_ResourceDeletedWithContentMoved tests diff output when a resource
+// is deleted but some of its content is moved to another resource.
+// Current behavior: The deleted resource's content appears as deletions within the
+// remaining resource's diff block. This is because we only use the new content's
+// resource index, so deleted resources don't get their own headers.
+func TestGenerateGitDiff_ResourceDeletedWithContentMoved(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	baseContent := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  key: value
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: other-config
+  namespace: default
+data:
+  keyOne: "1"
+  keyTwo: "2"
+  keyThree: "3"`
+
+	targetContent := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  keyOne: "1"
+  keyTwo: "2"
+  keyThree: "3"`
+
+	// Current behavior: deleted resource (other-config) appears as deletions
+	// within my-config's block since we only have my-config in target
+	expectedOutput := `#### ConfigMap/my-config (default)
+` + "```diff" + `
+ apiVersion: v1
+ kind: ConfigMap
+ metadata:
+   name: my-config
+   namespace: default
+ data:
+-  key: value
+-apiVersion: v1
+-kind: ConfigMap
+-metadata:
+-  name: other-config
+-  namespace: default
+-data:
+   keyOne: "1"
+   keyTwo: "2"
+   keyThree: "3"
+` + "```"
+
+	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
+	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	actualOutput := strings.TrimSpace(formatBlocksToMarkdown(markdownSections[0].blocks))
+	expectedOutput = strings.TrimSpace(expectedOutput)
+
+	if actualOutput != expectedOutput {
+		t.Errorf("Output mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedOutput, actualOutput)
+	}
+}
