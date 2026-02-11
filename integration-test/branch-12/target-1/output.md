@@ -265,7 +265,6 @@ Modified (1):
        - name: argocd-dex-server-tls
          secret:
            items:
-@@ skipped 52 lines (447 -> 498) @@
 ```
 #### Deployment/argocd-helm-chart-notifications-controller (argocd)
 ```diff
@@ -358,7 +357,6 @@ Modified (1):
          secret:
            items:
            - key: tls.crt
-@@ skipped 55 lines (588 -> 642) @@
 ```
 #### Deployment/argocd-helm-chart-redis (argocd)
 ```diff
@@ -403,7 +401,6 @@ Modified (1):
        volumes:
        - configMap:
            defaultMode: 493
-@@ skipped 67 lines (684 -> 750) @@
 ```
 #### Deployment/argocd-helm-chart-repo-server (argocd)
 ```diff
@@ -600,7 +597,6 @@ Modified (1):
        - emptyDir: {}
          name: var-files
        - emptyDir: {}
-@@ skipped 198 lines (1084 -> 1281) @@
 ```
 #### Deployment/argocd-helm-chart-server (argocd)
 ```diff
@@ -744,7 +740,6 @@ Modified (1):
        - configMap:
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
-@@ skipped 145 lines (1548 -> 1692) @@
 ```
 #### StatefulSet/argocd-helm-chart-application-controller (argocd)
 ```diff
@@ -946,7 +941,6 @@ Modified (1):
            - key: ca.crt
              path: ca.crt
            optional: true
-@@ skipped 99 lines (1979 -> 2077) @@
 ```
 #### ClusterRole/argocd-helm-chart-server
 ```diff
@@ -971,7 +965,6 @@ Modified (1):
  - apiGroups:
    - ""
    resources:
-@@ skipped 115 lines (2099 -> 2213) @@
 ```
 #### Role/argocd-helm-chart-application-controller (argocd)
 ```diff
@@ -996,7 +989,6 @@ Modified (1):
    - patch
    - delete
  - apiGroups:
-@@ skipped 96 lines (2235 -> 2330) @@
 ```
 #### Role/argocd-helm-chart-applicationset-controller (argocd)
 ```diff
@@ -1036,7 +1028,6 @@ Modified (1):
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: argocd-dex-server
      app.kubernetes.io/part-of: argocd
-@@ skipped 275 lines (2365 -> 2639) @@
 ```
 #### RoleBinding/argocd-helm-chart-server (argocd)
 ```diff
@@ -1220,7 +1211,6 @@ Modified (1):
      app.kubernetes.io/part-of: argocd
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
-@@ skipped 524 lines (2816 -> 3339) @@
 ```
 #### CustomResourceDefinition/applications.argoproj.io
 ```diff
@@ -1657,6 +1647,13 @@ Modified (1):
                            description: ForceCommonAnnotations specifies whether to
                              force applying common annotations to resources for Kustomize
                              apps
+                           type: boolean
+                         forceCommonLabels:
+                           description: ForceCommonLabels specifies whether to force
+                             applying common labels to resources for Kustomize apps
+                           type: boolean
++                        ignoreMissingComponents:
++                          description: IgnoreMissingCo
 ```
 🚨 Diff is too long
 </details>

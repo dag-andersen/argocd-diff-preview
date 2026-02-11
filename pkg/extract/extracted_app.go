@@ -13,6 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const (
+	// HiddenResourceSuffix is appended to resource headers when they match ignore rules
+	HiddenResourceSuffix = ": Hidden"
+)
+
 // contains a app name, source path, and extracted manifest
 type ExtractedApp struct {
 	Id         string
@@ -41,9 +46,13 @@ func (e *ExtractedApp) FlattenToString(ignoreResourceRules []resource_filter.Ign
 		// If there are ignore resource rules, check if the manifest should be ignored
 		if len(ignoreResourceRules) > 0 {
 			if resource_filter.MatchesAnyIgnoreRule(&manifest, ignoreResourceRules) {
-				msg := fmt.Sprintf("Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", manifest.GetAPIVersion(), manifest.GetKind(), manifest.GetName())
-				log.Debug().Msg(msg)
-				manifestStrings = append(manifestStrings, msg)
+				kind, name, ns := manifest.GetKind(), manifest.GetName(), manifest.GetNamespace()
+				log.Debug().Msgf("Skipping ignored resource: %s/%s", kind, name)
+				if ns != "" {
+					manifestStrings = append(manifestStrings, fmt.Sprintf("%s/%s (%s)%s\n", kind, name, ns, HiddenResourceSuffix))
+				} else {
+					manifestStrings = append(manifestStrings, fmt.Sprintf("%s/%s%s\n", kind, name, HiddenResourceSuffix))
+				}
 				continue
 			}
 		}

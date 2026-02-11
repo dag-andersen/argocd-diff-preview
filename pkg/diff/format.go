@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/go-git/go-git/v5/utils/diff"
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
@@ -246,14 +247,13 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				continue
 			}
 
-			// Handle "Skipped Resource:" lines - convert them to a header-only block
+			// Handle hidden resource lines (e.g., "ConfigMap/name (ns): Hidden")
 			// These are generated when resources match ignore rules
-			if strings.HasPrefix(strings.TrimSpace(line.text), "Skipped Resource:") {
-				// Flush current block and create a new one with just this as header
+			if strings.HasSuffix(strings.TrimSpace(line.text), extract.HiddenResourceSuffix) {
 				flushBlock()
-				skippedHeader := strings.TrimSpace(line.text)
-				blocks = append(blocks, ResourceBlock{Header: skippedHeader, Content: ""})
-				lastResourceHeader = skippedHeader
+				header := strings.TrimSpace(line.text)
+				blocks = append(blocks, ResourceBlock{Header: header, Content: ""})
+				lastResourceHeader = header
 				currentBlock = nil
 				continue
 			}
@@ -262,11 +262,22 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		}
 
 		// Add separator if there's a next chunk and it's far enough away
+		// But skip if the next chunk is a different resource (separator would be meaningless)
 		if i < len(chunks)-1 {
 			nextChunk := chunks[i+1]
 			if skippedLines := nextChunk.start - c.end - 1; skippedLines > 0 {
-				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, c.end+1, nextChunk.start-1)
-				contentBuffer.WriteString(separator + "\n")
+				// Check if next chunk is a different resource
+				sameResource := true
+				if resourceIndex != nil {
+					nextLineNum := processedLines[nextChunk.start].origLineNum
+					if nextResource := resourceIndex.GetResourceForLine(nextLineNum); nextResource != nil {
+						sameResource = nextResource.FormatHeader() == lastResourceHeader
+					}
+				}
+				if sameResource {
+					separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, c.end+1, nextChunk.start-1)
+					contentBuffer.WriteString(separator + "\n")
+				}
 			}
 		}
 	}
