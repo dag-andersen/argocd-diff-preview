@@ -426,7 +426,8 @@ Deleted (9):
 -metadata:
 -  labels:
 -    app.kubernetes.io/component: admission-webhook
--    app.kubernetes.io/instance: nginx
+-    app.kubernetes.io/instance: n
+```
 🚨 Diff is too long
 </details>
 

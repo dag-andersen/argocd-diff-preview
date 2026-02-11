@@ -381,17 +381,17 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Just enough space for minSizeForSectionContent threshold", func(t *testing.T) {
-		// We need spaceBeforeDiffTooLongWarning > minSizeForSectionContent
-		// spaceBeforeDiffTooLongWarning = spaceForContent - len(diffTooLongWarning)
-		// So spaceForContent needs to be > minSizeForSectionContent + len(diffTooLongWarning)
+		// We need spaceBeforeTruncationSuffix > minSizeForSectionContent
+		// spaceBeforeTruncationSuffix = spaceForContent - len(closingCodeFence) - len(diffTooLongWarning)
+		// So spaceForContent needs to be > minSizeForSectionContent + len(closingCodeFence) + len(diffTooLongWarning)
 		section := MarkdownSection{
 			appName:  "App",
 			filePath: "path.yaml",
 			appURL:   "",
 			blocks:   []ResourceBlock{{Content: strings.Repeat("x", 500)}},
 		}
-		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + 1 + warning length (just above threshold)
-		spaceForContent := minSizeForSectionContent + 1 + len(diffTooLongWarning)
+		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + 1 + fence + warning length (just above threshold)
+		spaceForContent := minSizeForSectionContent + 1 + len(closingCodeFence) + len(diffTooLongWarning)
 		maxSize := headerFooterLen + spaceForContent
 		content, truncated := section.build(maxSize)
 		if !truncated {
@@ -412,8 +412,8 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 			appURL:   "",
 			blocks:   []ResourceBlock{{Content: strings.Repeat("x", 500)}},
 		}
-		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + warning length (at threshold, not above)
-		spaceForContent := minSizeForSectionContent + len(diffTooLongWarning)
+		// Set maxSize so spaceForContent is exactly minSizeForSectionContent + fence + warning length (at threshold, not above)
+		spaceForContent := minSizeForSectionContent + len(closingCodeFence) + len(diffTooLongWarning)
 		maxSize := headerFooterLen + spaceForContent
 		content, truncated := section.build(maxSize)
 		if !truncated {
@@ -528,6 +528,105 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 		if !strings.Contains(got, expected) {
 			t.Errorf("Expected content %q not found in output:\n%s", expected, got)
 		}
+	}
+}
+
+func TestIsInsideCodeFence(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+	}{
+		{
+			name:     "No code fences",
+			content:  "plain text without any fences",
+			expected: false,
+		},
+		{
+			name:     "One open code fence",
+			content:  "```diff\n+line1\n+line2",
+			expected: true,
+		},
+		{
+			name:     "Closed code fence",
+			content:  "```diff\n+line1\n```",
+			expected: false,
+		},
+		{
+			name:     "Two closed code fences",
+			content:  "```diff\n+line1\n```\n```diff\n+line2\n```",
+			expected: false,
+		},
+		{
+			name:     "Two fences, second unclosed",
+			content:  "```diff\n+line1\n```\n```diff\n+line2",
+			expected: true,
+		},
+		{
+			name:     "Empty string",
+			content:  "",
+			expected: false,
+		},
+		{
+			name:     "Just opening fence",
+			content:  "```",
+			expected: true,
+		},
+		{
+			name:     "Opening and closing fence",
+			content:  "```\n```",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isInsideCodeFence(tt.content)
+			if got != tt.expected {
+				t.Errorf("isInsideCodeFence() = %v, want %v for content: %q", got, tt.expected, tt.content)
+			}
+		})
+	}
+}
+
+func TestMarkdownSection_Build_ClosesCodeFenceOnTruncation(t *testing.T) {
+	// Create content that will definitely be truncated and leave us inside a code fence
+	longContent := strings.Repeat("Very long line of content\n", 100)
+
+	section := MarkdownSection{
+		appName:  "App",
+		filePath: "path.yaml",
+		appURL:   "",
+		blocks:   []ResourceBlock{{Header: "Deployment/test", Content: longContent}},
+	}
+
+	// Force truncation - use a size that will cut in the middle of the diff block
+	maxSize := 300
+	content, truncated := section.build(maxSize)
+
+	if !truncated {
+		t.Errorf("Expected content to be truncated")
+	}
+
+	if content == "" {
+		t.Skip("Content was empty, cannot verify code fence closing")
+	}
+
+	// The content should have balanced code fences
+	if isInsideCodeFence(content) {
+		t.Errorf("Truncated content should have closed code fence, but it's still open.\nContent:\n%s", content)
+	}
+
+	// Should contain the truncation warning
+	if !strings.Contains(content, "🚨 Diff is too long") {
+		t.Errorf("Should contain truncation warning")
+	}
+
+	// The closing ``` should appear before the warning
+	beforeWarning, _, _ := strings.Cut(content, "🚨 Diff is too long")
+	lastFenceIdx := strings.LastIndex(beforeWarning, "```")
+	if lastFenceIdx == -1 {
+		t.Errorf("Should have a closing ``` before the warning")
 	}
 }
 

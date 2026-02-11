@@ -56,8 +56,16 @@ func (m *MarkdownSection) Size() int {
 
 var (
 	minSizeForSectionContent = 100
+	closingCodeFence         = "\n```"
 	diffTooLongWarning       = "\n🚨 Diff is too long"
 )
+
+// isInsideCodeFence checks if the content ends inside an unclosed code fence
+// by counting the number of ``` occurrences
+func isInsideCodeFence(content string) bool {
+	count := strings.Count(content, "```")
+	return count%2 == 1 // odd number means unclosed fence
+}
 
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
@@ -80,11 +88,18 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 
 	log.Debug().Msgf("Markdown - diff section does not fit in space: %d < %d", spaceForContent, len(content))
 
-	spaceBeforeDiffTooLongWarning := spaceForContent - len(diffTooLongWarning)
+	// Reserve space for closing code fence (assume we're always inside one) and warning
+	spaceBeforeTruncationSuffix := spaceForContent - len(closingCodeFence) - len(diffTooLongWarning)
 
-	if minSizeForSectionContent < spaceBeforeDiffTooLongWarning {
-		truncatedContent := content[:spaceBeforeDiffTooLongWarning]
+	if minSizeForSectionContent < spaceBeforeTruncationSuffix {
+		truncatedContent := content[:spaceBeforeTruncationSuffix]
 		truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
+
+		// Close code fence if we're inside one
+		if isInsideCodeFence(truncatedContent) {
+			truncatedContent += closingCodeFence
+		}
+
 		log.Debug().Msgf("Markdown - returning truncated content with warning")
 		return header + truncatedContent + diffTooLongWarning + footer, true
 	}

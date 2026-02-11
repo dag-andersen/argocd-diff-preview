@@ -1657,6 +1657,7 @@ Modified (1):
                            description: ForceCommonAnnotations specifies whether to
                              force applying common annotations to resources for Kustomize
                              apps
+```
 🚨 Diff is too long
 </details>
 
