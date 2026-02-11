@@ -40,22 +40,44 @@ type changeInfo struct {
 	deletedLines int
 }
 
+// processedLine represents a line in the diff with metadata for processing
+type processedLine struct {
+	operation diffmatchpatch.Operation
+	text      string
+	isChange  bool
+	show      bool
+}
+
+// chunk represents a contiguous range of lines to include in the diff output
+type chunk struct {
+	start int
+	end   int
+}
+
 // formatDiff formats diffmatchpatch.Diff into unified diff format
 func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string) changeInfo {
-	var buffer bytes.Buffer
+	// Phase 1: Process diffs into lines with metadata
+	processedLines := processDiffLines(diffs, ignorePattern)
 
-	// Process the diffs and format them in unified diff format
-	// We'll keep track of context lines to include only the specified number
-	var processedLines []struct {
-		operation diffmatchpatch.Operation
-		text      string
-		isChange  bool
-		show      bool
+	// Phase 2: Find indices of changed lines that should be shown
+	changedLines := findChangedLines(processedLines)
+	if len(changedLines) == 0 {
+		return changeInfo{content: "", addedLines: 0, deletedLines: 0}
 	}
+
+	// Phase 3: Build chunks of lines to include based on context
+	chunks := buildChunks(changedLines, len(processedLines), contextLines)
+
+	// Phase 4: Build output from chunks
+	return buildOutput(chunks, processedLines)
+}
+
+// processDiffLines converts raw diffs into processedLine structs with metadata
+func processDiffLines(diffs []diffmatchpatch.Diff, ignorePattern *string) []processedLine {
+	var processedLines []processedLine
 
 	for _, d := range diffs {
 		lines := strings.Split(d.Text, "\n")
-		// If the last element is empty (due to trailing newline), remove it
 		if len(lines) > 0 && lines[len(lines)-1] == "" {
 			lines = lines[:len(lines)-1]
 		}
@@ -63,117 +85,83 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 		isChange := d.Type != diffmatchpatch.DiffEqual
 
 		for _, line := range lines {
-			// Determine if this line should be shown or filtered out
-			show := true
-			if isChange && ignorePattern != nil && *ignorePattern != "" {
-				// Only apply regex filter to changed lines
-				show = !shouldIgnoreLine(line, *ignorePattern)
-			}
-
-			// Ignore specific hardcoded lines.
-			if show && isChange {
-				for _, pattern := range ignorePatterns {
-					if strings.HasPrefix(strings.TrimLeft(line, " \t"), pattern) {
-						show = false
-						break
-					}
-				}
-			}
-
-			processedLines = append(processedLines, struct {
-				operation diffmatchpatch.Operation
-				text      string
-				isChange  bool
-				show      bool
-			}{d.Type, line, isChange, show})
+			show := shouldShowLine(line, isChange, ignorePattern)
+			processedLines = append(processedLines, processedLine{
+				operation: d.Type,
+				text:      line,
+				isChange:  isChange,
+				show:      show,
+			})
 		}
 	}
 
-	// First find all changed lines that should be shown
+	return processedLines
+}
+
+// shouldShowLine determines if a line should be shown in the diff output
+func shouldShowLine(line string, isChange bool, ignorePattern *string) bool {
+	if !isChange {
+		return true
+	}
+
+	if ignorePattern != nil && *ignorePattern != "" {
+		if shouldIgnoreLine(line, *ignorePattern) {
+			return false
+		}
+	}
+
+	for _, pattern := range ignorePatterns {
+		if strings.HasPrefix(strings.TrimLeft(line, " \t"), pattern) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// findChangedLines returns indices of lines that have visible changes
+func findChangedLines(processedLines []processedLine) []int {
 	var changedLines []int
 	for i, line := range processedLines {
 		if line.isChange && line.show {
 			changedLines = append(changedLines, i)
 		}
 	}
+	return changedLines
+}
 
-	// No changes to show, so return empty string
-	if len(changedLines) == 0 {
-		return changeInfo{content: "", addedLines: 0, deletedLines: 0}
-	}
+// buildChunks groups changed lines into chunks with surrounding context
+func buildChunks(changedLines []int, totalLines int, contextLines uint) []chunk {
+	var chunks []chunk
 
-	// Now create chunks of lines to include based on context
-	var chunks []struct {
-		start int
-		end   int
-	}
-
-	// Start with the first changed line and its context
 	chunkStart := max(0, changedLines[0]-int(contextLines))
-	chunkEnd := min(len(processedLines)-1, changedLines[0]+int(contextLines))
+	chunkEnd := min(totalLines-1, changedLines[0]+int(contextLines))
 
-	// Extend chunk to include other changed lines that are within 2*contextLines
 	for i := 1; i < len(changedLines); i++ {
 		currentLine := changedLines[i]
-		// If this changed line is close to our current chunk, extend the chunk
 		if currentLine-chunkEnd <= 2*int(contextLines) {
-			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
+			chunkEnd = min(totalLines-1, currentLine+int(contextLines))
 		} else {
-			// Otherwise, finish this chunk and start a new one
-			chunks = append(chunks, struct {
-				start int
-				end   int
-			}{chunkStart, chunkEnd})
-
+			chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
 			chunkStart = max(0, currentLine-int(contextLines))
-			chunkEnd = min(len(processedLines)-1, currentLine+int(contextLines))
+			chunkEnd = min(totalLines-1, currentLine+int(contextLines))
 		}
 	}
 
-	// Add the last chunk
-	chunks = append(chunks, struct {
-		start int
-		end   int
-	}{chunkStart, chunkEnd})
+	chunks = append(chunks, chunk{start: chunkStart, end: chunkEnd})
+	return chunks
+}
 
-	// Now build the output with separators between chunks
-	var filteredLines []struct {
-		operation diffmatchpatch.Operation
-		text      string
-	}
-
-	for i, chunk := range chunks {
-		// Add all lines in this chunk
-		for j := chunk.start; j <= chunk.end; j++ {
-			filteredLines = append(filteredLines, struct {
-				operation diffmatchpatch.Operation
-				text      string
-			}{processedLines[j].operation, processedLines[j].text})
-		}
-
-		// Add separator if there's a next chunk and it's far enough away
-		if i < len(chunks)-1 {
-			nextChunk := chunks[i+1]
-			skippedLines := nextChunk.start - chunk.end - 1
-
-			if skippedLines > 0 {
-				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, chunk.end+1, nextChunk.start-1)
-				filteredLines = append(filteredLines, struct {
-					operation diffmatchpatch.Operation
-					text      string
-				}{diffmatchpatch.DiffEqual, separator})
-			}
-		}
-	}
-
+// buildOutput converts chunks into the final diff output string
+func buildOutput(chunks []chunk, processedLines []processedLine) changeInfo {
+	var buffer bytes.Buffer
 	addedLines := 0
 	deletedLines := 0
 
-	// Write the filtered lines
-	for _, line := range filteredLines {
-		if strings.HasPrefix(line.text, "@@ skipped") {
-			buffer.WriteString(line.text + "\n")
-		} else {
+	for i, c := range chunks {
+		// Add all lines in this chunk
+		for j := c.start; j <= c.end; j++ {
+			line := processedLines[j]
 			switch line.operation {
 			case diffmatchpatch.DiffInsert:
 				addedLines++
@@ -183,6 +171,15 @@ func formatDiff(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *s
 				buffer.WriteString("-" + line.text + "\n")
 			default:
 				buffer.WriteString(" " + line.text + "\n")
+			}
+		}
+
+		// Add separator if there's a next chunk and it's far enough away
+		if i < len(chunks)-1 {
+			nextChunk := chunks[i+1]
+			if skippedLines := nextChunk.start - c.end - 1; skippedLines > 0 {
+				separator := fmt.Sprintf("@@ skipped %d lines (%d -> %d) @@", skippedLines, c.end+1, nextChunk.start-1)
+				buffer.WriteString(separator + "\n")
 			}
 		}
 	}
