@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hydrator-kustomize-demo
+  namespace: argocd
+spec:
+  project: default
+  sourceHydrator:
+    drySource:
+      repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      targetRevision: HEAD
+      path: examples/kustomize/my-service/overlay/production
+    syncSource:
+      targetBranch: hydrated/kustomize-demo
+      path: kustomize-demo
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
