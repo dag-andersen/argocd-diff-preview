@@ -653,3 +653,278 @@ func TestInvalidRegexPatterns(t *testing.T) {
 		})
 	}
 }
+
+// TestShouldIgnoreLine tests the shouldIgnoreLine function directly
+func TestShouldIgnoreLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		pattern  string
+		expected bool
+	}{
+		{
+			name:     "exact string match",
+			line:     "checksum: abc123",
+			pattern:  "checksum:",
+			expected: true,
+		},
+		{
+			name:     "no match",
+			line:     "replicas: 3",
+			pattern:  "checksum:",
+			expected: false,
+		},
+		{
+			name:     "regex pattern match",
+			line:     "version: 1.2.3",
+			pattern:  `version: \d+\.\d+\.\d+`,
+			expected: true,
+		},
+		{
+			name:     "regex pattern no match",
+			line:     "version: latest",
+			pattern:  `version: \d+\.\d+\.\d+`,
+			expected: false,
+		},
+		{
+			name:     "empty line empty pattern",
+			line:     "",
+			pattern:  "",
+			expected: true,
+		},
+		{
+			name:     "line with whitespace",
+			line:     "  helm.sh/chart: mychart-1.0",
+			pattern:  "helm.sh/chart:",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldIgnoreLine(tt.line, tt.pattern)
+			if result != tt.expected {
+				t.Errorf("shouldIgnoreLine(%q, %q) = %v, want %v", tt.line, tt.pattern, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestShouldShowLine tests the shouldShowLine function
+func TestShouldShowLine(t *testing.T) {
+	tests := []struct {
+		name          string
+		line          string
+		isChange      bool
+		ignorePattern *string
+		expected      bool
+	}{
+		{
+			name:          "unchanged line always shown",
+			line:          "replicas: 3",
+			isChange:      false,
+			ignorePattern: nil,
+			expected:      true,
+		},
+		{
+			name:          "changed line shown when no pattern",
+			line:          "replicas: 3",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      true,
+		},
+		{
+			name:          "changed line hidden by pattern",
+			line:          "checksum: abc123",
+			isChange:      true,
+			ignorePattern: stringPtr("checksum:"),
+			expected:      false,
+		},
+		{
+			name:          "hardcoded pattern - app.kubernetes.io/version",
+			line:          "  app.kubernetes.io/version: 1.0.0",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "hardcoded pattern - helm.sh/chart",
+			line:          "    helm.sh/chart: mychart-1.0.0",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "hardcoded pattern - checksum/config",
+			line:          "checksum/config: abc123def456",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "hardcoded pattern - caBundle",
+			line:          "caBundle: LS0tLS1CRUdJTi...",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "empty ignore pattern doesn't hide",
+			line:          "replicas: 3",
+			isChange:      true,
+			ignorePattern: stringPtr(""),
+			expected:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := shouldShowLine(tt.line, tt.isChange, tt.ignorePattern)
+			if result != tt.expected {
+				t.Errorf("shouldShowLine(%q, %v, %v) = %v, want %v",
+					tt.line, tt.isChange, tt.ignorePattern, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestChangeInfoLineCount tests that addedLines and deletedLines are counted correctly
+func TestChangeInfoLineCount(t *testing.T) {
+	tests := []struct {
+		name            string
+		oldContent      string
+		newContent      string
+		expectedAdded   int
+		expectedDeleted int
+	}{
+		{
+			name:            "modification in middle",
+			oldContent:      "line1\nold\nline3",
+			newContent:      "line1\nnew\nline3",
+			expectedAdded:   1,
+			expectedDeleted: 1,
+		},
+		{
+			name:            "multiple line replacement",
+			oldContent:      "a\nb\nc\nd",
+			newContent:      "a\nx\ny\nd",
+			expectedAdded:   2,
+			expectedDeleted: 2,
+		},
+		{
+			name:            "no changes",
+			oldContent:      "same\ncontent",
+			newContent:      "same\ncontent",
+			expectedAdded:   0,
+			expectedDeleted: 0,
+		},
+		{
+			name:            "insert line in middle",
+			oldContent:      "line1\nline3",
+			newContent:      "line1\nline2\nline3",
+			expectedAdded:   1,
+			expectedDeleted: 0,
+		},
+		{
+			name:            "delete line in middle",
+			oldContent:      "line1\nline2\nline3",
+			newContent:      "line1\nline3",
+			expectedAdded:   0,
+			expectedDeleted: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatModifiedFileDiff(tt.oldContent, tt.newContent, 3, nil)
+			if result.addedLines != tt.expectedAdded {
+				t.Errorf("addedLines = %d, want %d", result.addedLines, tt.expectedAdded)
+			}
+			if result.deletedLines != tt.expectedDeleted {
+				t.Errorf("deletedLines = %d, want %d", result.deletedLines, tt.expectedDeleted)
+			}
+		})
+	}
+}
+
+// TestNewFileLineCount tests line counting for new files
+func TestNewFileLineCount(t *testing.T) {
+	content := "line1\nline2\nline3"
+	result := formatNewFileDiff(content, 3, nil)
+
+	if result.addedLines != 3 {
+		t.Errorf("new file addedLines = %d, want 3", result.addedLines)
+	}
+	if result.deletedLines != 0 {
+		t.Errorf("new file deletedLines = %d, want 0", result.deletedLines)
+	}
+}
+
+// TestDeletedFileLineCount tests line counting for deleted files
+func TestDeletedFileLineCount(t *testing.T) {
+	content := "line1\nline2\nline3"
+	result := formatDeletedFileDiff(content, 3, nil)
+
+	if result.addedLines != 0 {
+		t.Errorf("deleted file addedLines = %d, want 0", result.addedLines)
+	}
+	if result.deletedLines != 3 {
+		t.Errorf("deleted file deletedLines = %d, want 3", result.deletedLines)
+	}
+}
+
+// TestBuildChunksEdgeCases tests edge cases in chunk building
+func TestBuildChunksEdgeCases(t *testing.T) {
+	tests := []struct {
+		name           string
+		changedLines   []int
+		totalLines     int
+		contextLines   uint
+		expectedChunks int
+	}{
+		{
+			name:           "single change at start",
+			changedLines:   []int{0},
+			totalLines:     10,
+			contextLines:   2,
+			expectedChunks: 1,
+		},
+		{
+			name:           "single change at end",
+			changedLines:   []int{9},
+			totalLines:     10,
+			contextLines:   2,
+			expectedChunks: 1,
+		},
+		{
+			name:           "two changes close together - single chunk",
+			changedLines:   []int{2, 5},
+			totalLines:     20,
+			contextLines:   2,
+			expectedChunks: 1,
+		},
+		{
+			name:           "two changes far apart - two chunks",
+			changedLines:   []int{2, 15},
+			totalLines:     20,
+			contextLines:   2,
+			expectedChunks: 2,
+		},
+		{
+			name:           "zero context lines",
+			changedLines:   []int{5, 15},
+			totalLines:     20,
+			contextLines:   0,
+			expectedChunks: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chunks := buildChunks(tt.changedLines, tt.totalLines, tt.contextLines)
+			if len(chunks) != tt.expectedChunks {
+				t.Errorf("buildChunks returned %d chunks, want %d", len(chunks), tt.expectedChunks)
+			}
+		})
+	}
+}
