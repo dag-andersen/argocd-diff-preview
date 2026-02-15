@@ -7,6 +7,264 @@ import (
 	"testing"
 )
 
+// TestGenerateGitDiff_NewFileWithMultipleResources tests how a new file with multiple
+// YAML resources (separated by ---) is handled in the diff output.
+// Currently, all resources are shown in a single diff block.
+func TestGenerateGitDiff_NewFileWithMultipleResources(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	// New file with 3 resources separated by ---
+	targetContent := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-app-config
+  namespace: default
+data:
+  key: value`
+
+	baseApps := []AppInfo{} // No base apps - this is a new file
+	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	section := markdownSections[0]
+
+	// Verify section metadata
+	if section.appName != "my-app" {
+		t.Errorf("expected appName 'my-app', got %q", section.appName)
+	}
+	if section.filePath != "/path/app" {
+		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
+	}
+
+	expectedComment := "@@ Application added: my-app (/path/app) @@\n"
+	if section.comment != expectedComment {
+		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	}
+
+	// Current behavior: all resources in one block, each line prefixed with +
+	expectedContent := `+apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: my-app
++  namespace: default
++spec:
++  replicas: 1
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: my-app
++  namespace: default
++spec:
++  type: ClusterIP
++---
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: my-app-config
++  namespace: default
++data:
++  key: value
+`
+
+	if section.content != expectedContent {
+		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	}
+}
+
+// TestGenerateGitDiff_DeletedFileWithMultipleResources tests that a deleted file
+// with multiple YAML resources produces the correct diff output.
+func TestGenerateGitDiff_DeletedFileWithMultipleResources(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	// File with 2 resources that will be deleted
+	baseContent := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  type: ClusterIP`
+
+	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
+	targetApps := []AppInfo{} // App is deleted
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	section := markdownSections[0]
+
+	// Verify section metadata
+	if section.appName != "my-app" {
+		t.Errorf("expected appName 'my-app', got %q", section.appName)
+	}
+	if section.filePath != "/path/app" {
+		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
+	}
+
+	expectedComment := "@@ Application deleted: my-app (/path/app) @@\n"
+	if section.comment != expectedComment {
+		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	}
+
+	// Current behavior: all resources in one block, each line prefixed with -
+	// Note: The YAML separator --- also gets a - prefix, appearing as ----
+	expectedContent := `-apiVersion: apps/v1
+-kind: Deployment
+-metadata:
+-  name: my-app
+-  namespace: default
+-spec:
+-  replicas: 1
+----
+-apiVersion: v1
+-kind: Service
+-metadata:
+-  name: my-app
+-  namespace: default
+-spec:
+-  type: ClusterIP
+`
+
+	if section.content != expectedContent {
+		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	}
+}
+
+// TestGenerateGitDiff_ModifiedFileWithMultipleResources tests modifications to a file
+// containing multiple YAML resources.
+func TestGenerateGitDiff_ModifiedFileWithMultipleResources(t *testing.T) {
+	tempDir := t.TempDir()
+	basePath := filepath.Join(tempDir, "base")
+	targetPath := filepath.Join(tempDir, "target")
+
+	baseContent := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  type: ClusterIP`
+
+	// Only change the replicas in the Deployment
+	targetContent := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  type: ClusterIP`
+
+	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
+	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
+
+	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	if err != nil {
+		t.Fatalf("generateGitDiff failed: %v", err)
+	}
+
+	if len(markdownSections) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	}
+
+	section := markdownSections[0]
+
+	// Verify section metadata
+	if section.appName != "my-app" {
+		t.Errorf("expected appName 'my-app', got %q", section.appName)
+	}
+	if section.filePath != "/path/app" {
+		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
+	}
+
+	expectedComment := "@@ Application modified: my-app (/path/app) @@\n"
+	if section.comment != expectedComment {
+		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	}
+
+	// Current behavior: unified diff showing context lines with space prefix,
+	// removed lines with - prefix, and added lines with + prefix
+	expectedContent := ` apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: my-app
+   namespace: default
+ spec:
+-  replicas: 1
++  replicas: 3
+ ---
+ apiVersion: v1
+ kind: Service
+ metadata:
+   name: my-app
+   namespace: default
+ spec:
+   type: ClusterIP
+`
+
+	if section.content != expectedContent {
+		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	}
+}
+
 func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
 	tempDir := t.TempDir()
 	basePath := filepath.Join(tempDir, "base")
