@@ -72,6 +72,14 @@ func patchApplication(
 		return nil, fmt.Errorf("failed to remove Argo CD finalizers: %w", err)
 	}
 
+	// RedirectSourceHydrator must be called BEFORE RedirectSources so that
+	// the converted spec.source can have its targetRevision redirected
+	err = app.RedirectSourceHydrator(repo, branch.Name, redirectRevisions)
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to redirect source hydrator: %w", err)
+	}
+
 	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
@@ -448,4 +456,43 @@ func (a *ArgoResource) processGenerators(generators []any, repo, branch string, 
 
 func containsIgnoreCase(s, substr string) bool {
 	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
+
+// RedirectSourceHydrator converts sourceHydrator applications to regular applications.
+// It moves spec.sourceHydrator.drySource to spec.source and removes the sourceHydrator field.
+// This allows argocd-diff-preview to render manifests from the dry source directly.
+// See: https://argo-cd.readthedocs.io/en/stable/user-guide/source-hydrator/
+func (a *ArgoResource) RedirectSourceHydrator(repo, branch string, redirectRevisions []string) error {
+	// Only process Applications (ApplicationSets don't support sourceHydrator)
+	if a.Kind != Application || a.Yaml == nil {
+		return nil
+	}
+
+	// Get sourceHydrator
+	sourceHydrator, found, err := unstructured.NestedMap(a.Yaml.Object, "spec", "sourceHydrator")
+	if err != nil || !found {
+		// No sourceHydrator, nothing to do
+		return nil
+	}
+
+	// Get drySource
+	drySource, ok := sourceHydrator["drySource"].(map[string]any)
+	if !ok {
+		log.Debug().Str("patchType", "redirectSourceHydrator").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Found no 'drySource' under sourceHydrator")
+		return nil
+	}
+
+	log.Debug().Str("patchType", "redirectSourceHydrator").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Converting sourceHydrator application to regular application")
+
+	// Move drySource to spec.source
+	if err := unstructured.SetNestedMap(a.Yaml.Object, drySource, "spec", "source"); err != nil {
+		return fmt.Errorf("failed to set spec.source: %w", err)
+	}
+
+	// Remove sourceHydrator
+	unstructured.RemoveNestedField(a.Yaml.Object, "spec", "sourceHydrator")
+
+	log.Debug().Str("patchType", "redirectSourceHydrator").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Converted sourceHydrator.drySource to spec.source")
+
+	return nil
 }
