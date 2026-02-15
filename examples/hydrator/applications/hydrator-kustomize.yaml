@@ -15,7 +15,7 @@ spec:
       path: kustomize-demo
   destination:
     server: https://kubernetes.default.svc
-    namespace: demo-app
+    namespace: demo-test
   syncPolicy:
     automated:
       prune: true
