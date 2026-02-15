@@ -804,3 +804,249 @@ spec:`
 
 	return string(yamlBytes)
 }
+
+func TestRedirectSourceHydrator(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	const (
+		repo   = "https://github.com/org/repo.git"
+		branch = "target"
+	)
+
+	tests := []struct {
+		name              string
+		yaml              string
+		want              string
+		redirectRevisions []string
+		expectErr         error
+	}{
+		{
+			name: "application with sourceHydrator converts to regular application",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  sourceHydrator:
+    drySource:
+      repoURL: https://github.com/org/repo.git
+      targetRevision: HEAD
+      path: examples/kustomize
+    syncSource:
+      targetBranch: hydrated/branch
+      path: output
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: examples/kustomize
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app
+`,
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application with sourceHydrator and hydrateTo converts to regular application",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  sourceHydrator:
+    drySource:
+      repoURL: https://github.com/org/repo.git
+      targetRevision: main
+      path: examples/kustomize
+    syncSource:
+      targetBranch: environments/dev
+      path: output
+    hydrateTo:
+      targetBranch: environments/dev-next
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: main
+    path: examples/kustomize
+`,
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application with sourceHydrator and helm config converts to regular application",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-helm-app
+  namespace: argocd
+spec:
+  sourceHydrator:
+    drySource:
+      repoURL: https://github.com/argoproj/argocd-example-apps
+      path: helm-guestbook
+      targetRevision: HEAD
+      helm:
+        valueFiles:
+          - values-prod.yaml
+        parameters:
+          - name: image.tag
+            value: v1.2.3
+        releaseName: my-release
+    syncSource:
+      targetBranch: environments/prod
+      path: helm-guestbook-hydrated
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-helm-app
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps
+    path: helm-guestbook
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - values-prod.yaml
+      parameters:
+        - name: image.tag
+          value: v1.2.3
+      releaseName: my-release
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+`,
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application without sourceHydrator should do nothing",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: examples/kustomize
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: examples/kustomize
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo-app
+`,
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
+			name: "application with sourceHydrator missing targetRevision",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  sourceHydrator:
+    drySource:
+      repoURL: https://github.com/org/repo.git
+      path: examples/kustomize
+    syncSource:
+      targetBranch: hydrated/branch
+      path: output
+`,
+			want: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  namespace: default
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: examples/kustomize
+`,
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Parse YAML
+			var node map[string]any
+			err := yaml.Unmarshal([]byte(tt.yaml), &node)
+			assert.NoError(t, err)
+
+			// Create ArgoResource
+			app := &ArgoResource{
+				Yaml:     &unstructured.Unstructured{Object: node},
+				Kind:     Application,
+				Id:       "test-app",
+				Name:     "test-app",
+				FileName: "test-app.yaml",
+			}
+
+			// Run redirect source hydrator
+			err = app.RedirectSourceHydrator(repo, branch, tt.redirectRevisions)
+
+			// Check result
+			if tt.expectErr == nil {
+				assert.Nil(t, err)
+				got, err := app.AsString()
+				assert.Nil(t, err)
+
+				// Normalize both expected and actual YAML for comparison
+				expectedNormalized := normalizeYAML(tt.want)
+				gotNormalized := normalizeYAML(got)
+				assert.Equal(t, expectedNormalized, gotNormalized)
+			} else {
+				assert.Equal(t, tt.expectErr.Error(), err.Error())
+			}
+		})
+	}
+}

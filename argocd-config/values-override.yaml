@@ -6,6 +6,12 @@ dex:
   enabled: false
 applicationSet:
   replicas: 0
+# Explicitly disable the source hydrator / commit server
+# We don't want ArgoCD to push hydrated manifests to git
+# Ref: https://argo-cd.readthedocs.io/en/stable/user-guide/source-hydrator/#enabling-the-source-hydrator
+configs:
+  params:
+    hydrator.enabled: "false"
 # Readiness probe settings have been adjusted to start checks immediately (initialDelaySeconds: 0)
 # The failureThreshold is increased to ensure the total time before a pod is marked unhealthy remains similar to the default
 # This default duration is calculated using the original values from values.yaml for (initialDelaySeconds + failureThreshold * periodSeconds)
