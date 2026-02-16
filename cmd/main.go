@@ -188,6 +188,12 @@ func run(cfg *Config) error {
 		}
 	}
 
+	tempFolder := "temp"
+	if err := utils.CreateFolder(tempFolder, true); err != nil {
+		log.Error().Msgf("❌ Failed to clear temp folder: ./%s", tempFolder)
+		return err
+	}
+
 	argocd := argocd.New(
 		k8sClient,
 		cfg.ArgocdNamespace,
@@ -220,12 +226,6 @@ func run(cfg *Config) error {
 			return err
 		}
 		argocdInstallationDuration = duration
-	}
-
-	tempFolder := "temp"
-	if err := utils.CreateFolder(tempFolder, true); err != nil {
-		log.Error().Msgf("❌ Failed to clear temp folder: ./%s", tempFolder)
-		return err
 	}
 
 	// Generate applications from ApplicationSets

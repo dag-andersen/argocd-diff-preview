@@ -2,16 +2,13 @@ package argoapplication
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
-	"sigs.k8s.io/yaml"
 )
 
 func ConvertAppSetsToAppsInBothBranches(
@@ -79,17 +76,11 @@ func processAppSets(
 	redirectRevisions []string,
 ) (*ArgoSelection, error) {
 
-	appSetTempFolder := fmt.Sprintf("%s/app-sets", tempFolder)
-	if err := utils.CreateFolder(appSetTempFolder, true); err != nil {
-		log.Error().Msgf("❌ Failed to create temp folder: %s", appSetTempFolder)
-		return nil, err
-	}
-
 	appSetConversionResult, err := convertAppSetsToApps(
 		argocd,
 		appSets.SelectedApps,
 		branch,
-		appSetTempFolder,
+		tempFolder,
 		debug,
 	)
 	if err != nil {
@@ -127,7 +118,7 @@ func processAppSets(
 
 	// real applications (not application sets)
 	numberOfNewlySkippedApps := len(selection.SkippedApps)
-	selectedAppsBeforeConversion := appSetConversionResult.origialApplicationsCount
+	selectedAppsBeforeConversion := appSetConversionResult.originalApplicationsCount
 	selectedAppsAfterConversion := len(selection.SelectedApps)
 	numberOfNewlySelectedApplicationsCount := selectedAppsAfterConversion - selectedAppsBeforeConversion
 
@@ -182,7 +173,7 @@ func processAppSets(
 }
 
 type AppSetConversionResult struct {
-	origialApplicationsCount   int // real applications (not application sets)
+	originalApplicationsCount  int // real applications (not application sets)
 	generatedApplicationsCount int // real applications (not application sets)
 	appSetsProcessedCount      int
 	argoResource               []ArgoResource
@@ -198,7 +189,7 @@ func convertAppSetsToApps(
 	var appsNew []ArgoResource
 	appSetsProcessedCount := 0
 	generatedApplicationsCounter := 0
-	origialApplicationsCounter := 0
+	originalApplicationsCounter := 0
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
 
@@ -212,63 +203,30 @@ func convertAppSetsToApps(
 		// Skip non-ApplicationSets
 		if appSet.Kind != ApplicationSet {
 			appsNew = append(appsNew, appSet)
-			origialApplicationsCounter++
+			originalApplicationsCounter++
 			continue
 		}
 
 		appSetsProcessedCount++
 
-		randomFileName, err := appSet.WriteToFolder(tempFolder)
-		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("❌ Failed to write ApplicationSet to file")
-			continue
-		}
-
 		// Generate applications using argocd appset generate
 		retryCount := 5
-		output, err := argocd.AppsetGenerateWithRetry(randomFileName, retryCount)
+		generatedApps, err := argocd.AppsetGenerateWithRetry(appSet.Yaml, tempFolder, retryCount)
 		if err != nil {
 			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
 			return nil, err
 		}
 
-		// check if output is empty / null
-		if strings.TrimSpace(output) == "" || strings.TrimSpace(output) == "null" {
+		// check if output is empty
+		if len(generatedApps) == 0 {
 			log.Warn().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("⚠️ ApplicationSet generated empty output")
-			continue
-		}
-
-		// check if output is list of applications
-		isList := strings.HasPrefix(output, "-")
-
-		var yamlData []unstructured.Unstructured
-		if isList {
-			var yamlOutput []unstructured.Unstructured
-			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
-				log.Error().Err(err)
-				continue
-			}
-			yamlData = yamlOutput
-		} else {
-			var yamlOutput unstructured.Unstructured
-			if err := yaml.Unmarshal([]byte(output), &yamlOutput); err != nil {
-				log.Error().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to read output from ApplicationSet")
-				log.Error().Err(err)
-				continue
-			}
-			yamlData = []unstructured.Unstructured{yamlOutput}
-		}
-
-		if len(yamlData) == 0 {
-			log.Error().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ No applications found in ApplicationSet")
 			continue
 		}
 
 		localGeneratedAppsCounter := 0
 
 		// Convert each document to ArgoResource
-		for _, doc := range yamlData {
+		for _, doc := range generatedApps {
 			kind := doc.GetKind()
 			if kind == "" {
 				log.Error().
@@ -307,7 +265,7 @@ func convertAppSetsToApps(
 
 	return &AppSetConversionResult{
 		appSetsProcessedCount:      appSetsProcessedCount,
-		origialApplicationsCount:   origialApplicationsCounter,
+		originalApplicationsCount:  originalApplicationsCounter,
 		generatedApplicationsCount: generatedApplicationsCounter,
 		argoResource:               appsNew,
 	}, nil

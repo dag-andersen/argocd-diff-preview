@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -18,7 +17,6 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 )
 
 // APIOperations implements the Operations interface using the ArgoCD HTTP API.
@@ -323,34 +321,23 @@ func (a *APIOperations) GetManifests(appName string) ([]unstructured.Unstructure
 	return manifests, true, nil
 }
 
-// AppsetGenerate generates applications from an ApplicationSet using the ArgoCD API
-func (a *APIOperations) AppsetGenerate(appSetPath string) (string, error) {
+// AppsetGenerate generates applications from an ApplicationSet using the ArgoCD API.
+// The tempFolder parameter is not used in API mode but is required by the interface.
+func (a *APIOperations) AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error) {
 	// Ensure port forward is active
 	if err := a.portForwardToArgoCD(); err != nil {
-		return "", err
-	}
-
-	// Read the ApplicationSet file
-	appSetBytes, err := os.ReadFile(appSetPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read ApplicationSet file: %w", err)
-	}
-
-	// Parse the ApplicationSet YAML to JSON for the API request
-	var appSetObj map[string]any
-	if err := yaml.Unmarshal(appSetBytes, &appSetObj); err != nil {
-		return "", fmt.Errorf("failed to parse ApplicationSet YAML: %w", err)
+		return nil, err
 	}
 
 	// Wrap the ApplicationSet in the request structure
 	requestBody := map[string]any{
-		"applicationSet": appSetObj,
+		"applicationSet": resource.Object,
 	}
 
 	// Convert to JSON for the API request
 	requestJSON, err := json.Marshal(requestBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request body: %w", err)
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
 	// Make API request to generate applications
@@ -360,7 +347,7 @@ func (a *APIOperations) AppsetGenerate(appSetPath string) (string, error) {
 
 	req, err := http.NewRequest("POST", url, strings.NewReader(string(requestJSON)))
 	if err != nil {
-		return "", fmt.Errorf("failed to create HTTP request: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
 	// Set headers
@@ -379,19 +366,19 @@ func (a *APIOperations) AppsetGenerate(appSetPath string) (string, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to make HTTP request: %w", err)
+		return nil, fmt.Errorf("failed to make HTTP request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {
-		return "", parseAPIError(body, resp.StatusCode)
+		return nil, parseAPIError(body, resp.StatusCode)
 	}
 
 	// Parse JSON response to extract generated applications
@@ -400,43 +387,36 @@ func (a *APIOperations) AppsetGenerate(appSetPath string) (string, error) {
 	}
 
 	if err := json.Unmarshal(body, &generateResponse); err != nil {
-		return "", fmt.Errorf("failed to unmarshal generate response: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal generate response: %w", err)
 	}
 
 	if len(generateResponse.Applications) == 0 {
 		log.Debug().Msg("No applications generated from ApplicationSet")
-		return "", nil
+		return nil, nil
 	}
 
-	// Convert applications to a YAML array format (matching CLI output format)
-	// The CLI outputs applications as a YAML array starting with "- apiVersion: ..."
-	var apps []map[string]any
+	// Convert JSON applications to unstructured objects
+	var apps []unstructured.Unstructured
 	for i, appJSON := range generateResponse.Applications {
-		var app map[string]any
-		if err := json.Unmarshal(appJSON, &app); err != nil {
-			return "", fmt.Errorf("failed to unmarshal application %d: %w", i, err)
+		var appObj map[string]any
+		if err := json.Unmarshal(appJSON, &appObj); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal application %d: %w", i, err)
 		}
 
 		// Backfill apiVersion and kind because the API doesn't return these fields
 		// This matches what the argocd CLI does in cmd/argocd/commands/applicationset.go
-		if _, ok := app["apiVersion"]; !ok {
-			app["apiVersion"] = "argoproj.io/v1alpha1"
+		if _, ok := appObj["apiVersion"]; !ok {
+			appObj["apiVersion"] = "argoproj.io/v1alpha1"
 		}
-		if _, ok := app["kind"]; !ok {
-			app["kind"] = "Application"
+		if _, ok := appObj["kind"]; !ok {
+			appObj["kind"] = "Application"
 		}
 
-		apps = append(apps, app)
+		apps = append(apps, unstructured.Unstructured{Object: appObj})
 	}
 
-	// Convert to YAML array format
-	appsYAML, err := yaml.Marshal(apps)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal applications to YAML: %w", err)
-	}
-
-	log.Debug().Msgf("Successfully generated %d applications from ApplicationSet", len(generateResponse.Applications))
-	return string(appsYAML), nil
+	log.Debug().Msgf("Successfully generated %d applications from ApplicationSet", len(apps))
+	return apps, nil
 }
 
 // AddSourceNamespaceToDefaultAppProject adds "*" to the sourceNamespaces of the default AppProject

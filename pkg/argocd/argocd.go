@@ -344,18 +344,18 @@ func (a *ArgoCDInstallation) OnlyLogin() (time.Duration, error) {
 }
 
 // AppsetGenerate generates applications from an ApplicationSet
-func (a *ArgoCDInstallation) AppsetGenerate(appSetPath string) (string, error) {
-	return a.operations.AppsetGenerate(appSetPath)
+func (a *ArgoCDInstallation) AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error) {
+	return a.operations.AppsetGenerate(resource, tempFolder)
 }
 
 // AppsetGenerateWithRetry runs AppsetGenerate with retry logic
-func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttempts int) (string, error) {
+func (a *ArgoCDInstallation) AppsetGenerateWithRetry(resource *unstructured.Unstructured, tempFolder string, maxAttempts int) ([]unstructured.Unstructured, error) {
 
 	var err error
-	var out string
+	var out []unstructured.Unstructured
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		log.Debug().Msgf("AppsetGenerateWithRetry attempt %d/%d to Argo CD...", attempt, maxAttempts)
-		out, err = a.AppsetGenerate(appSetPath)
+		out, err = a.AppsetGenerate(resource, tempFolder)
 		if err == nil {
 			return out, nil
 		}
@@ -366,7 +366,7 @@ func (a *ArgoCDInstallation) AppsetGenerateWithRetry(appSetPath string, maxAttem
 		}
 	}
 
-	return "", err
+	return nil, err
 }
 
 // GetManifests returns the manifests for an application

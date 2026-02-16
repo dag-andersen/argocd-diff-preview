@@ -115,14 +115,58 @@ func (c *CLIOperations) Login() error {
 	return nil
 }
 
-// AppsetGenerate runs 'argocd appset generate' on a file and returns the output
-func (c *CLIOperations) AppsetGenerate(appSetPath string) (string, error) {
-	out, err := c.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
+// AppsetGenerate runs 'argocd appset generate' on an ApplicationSet resource and returns the generated applications.
+// The tempFolder parameter specifies where to write the temporary ApplicationSet file.
+func (c *CLIOperations) AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error) {
+	// Marshal the resource to YAML
+	yamlBytes, err := yaml.Marshal(resource.Object)
 	if err != nil {
-		return "", fmt.Errorf("failed to run argocd appset generate: %w", err)
+		return nil, fmt.Errorf("failed to marshal ApplicationSet to YAML: %w", err)
 	}
 
-	return out, nil
+	// Ensure the app-sets directory exists
+	appSetsDir := fmt.Sprintf("%s/app-sets", tempFolder)
+	if err := os.MkdirAll(appSetsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create app-sets directory: %w", err)
+	}
+
+	filename := fmt.Sprintf("%s/%s-%s.yaml", appSetsDir, resource.GetName(), utils.UniqueId())
+
+	if err := os.WriteFile(filename, yamlBytes, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	out, err := c.runArgocdCommand("appset", "generate", filename, "-o", "yaml")
+	if err != nil {
+		return nil, fmt.Errorf("failed to run argocd appset generate: %w", err)
+	}
+
+	// Parse the YAML output into unstructured objects
+	return parseAppsetGenerateOutput(out)
+}
+
+// parseAppsetGenerateOutput parses the YAML output from 'argocd appset generate' into unstructured objects
+func parseAppsetGenerateOutput(output string) ([]unstructured.Unstructured, error) {
+	output = strings.TrimSpace(output)
+	if output == "" || output == "null" {
+		return nil, nil
+	}
+
+	// Check if output is a list (starts with "-") or a single object
+	if strings.HasPrefix(output, "-") {
+		var apps []unstructured.Unstructured
+		if err := yaml.Unmarshal([]byte(output), &apps); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML list output: %w", err)
+		}
+		return apps, nil
+	}
+
+	// Single object
+	var app unstructured.Unstructured
+	if err := yaml.Unmarshal([]byte(output), &app); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML output: %w", err)
+	}
+	return []unstructured.Unstructured{app}, nil
 }
 
 // GetManifests returns the manifests for an application using the CLI

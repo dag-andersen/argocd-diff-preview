@@ -23,8 +23,9 @@ type Operations interface {
 	// and use the provided token instead.
 	Login() error
 
-	// AppsetGenerate generates applications from an ApplicationSet file
-	AppsetGenerate(appSetPath string) (string, error)
+	// AppsetGenerate generates applications from an ApplicationSet resource.
+	// The tempFolder parameter specifies where to write temporary files (CLI mode only).
+	AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error)
 
 	// GetManifests returns the manifests for an application.
 	// Returns: (manifests, appExists, error)
