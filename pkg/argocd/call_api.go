@@ -17,7 +17,6 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 )
 
 // APIOperations implements the Operations interface using the ArgoCD HTTP API.
