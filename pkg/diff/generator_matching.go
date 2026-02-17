@@ -7,6 +7,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 )
@@ -29,6 +30,7 @@ func GenerateMatchingDiff(
 	statsInfo StatsInfo,
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) error {
 	maxDiffMessageCharCount := maxCharCount
 	if maxDiffMessageCharCount <= 0 {
@@ -44,7 +46,7 @@ func GenerateMatchingDiff(
 	}
 
 	// Generate diffs using the matching package
-	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex)
+	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules)
 	if err != nil {
 		return fmt.Errorf("failed to generate matching diffs: %w", err)
 	}
@@ -65,7 +67,7 @@ func GenerateMatchingDiff(
 	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
 
 	// Write YAML outputs for base and target branches
-	if err := writeMatchingYAMLOutputs(outputFolder, baseBranch, targetBranch, baseManifests, targetManifests); err != nil {
+	if err := writeMatchingYAMLOutputs(outputFolder, baseBranch, targetBranch, baseManifests, targetManifests, ignoreResourceRules); err != nil {
 		return err
 	}
 
@@ -219,11 +221,12 @@ func writeMatchingYAMLOutputs(
 	outputFolder string,
 	baseBranch, targetBranch *gitt.Branch,
 	baseManifests, targetManifests []extract.ExtractedApp,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) error {
 	// Collect YAML from base manifests
 	var baseYAMLParts []string
 	for _, app := range baseManifests {
-		yaml, err := app.FlattenToString(nil)
+		yaml, err := app.FlattenToString(ignoreResourceRules)
 		if err != nil {
 			return fmt.Errorf("failed to flatten base app %s: %w", app.Name, err)
 		}
@@ -235,7 +238,7 @@ func writeMatchingYAMLOutputs(
 	// Collect YAML from target manifests
 	var targetYAMLParts []string
 	for _, app := range targetManifests {
-		yaml, err := app.FlattenToString(nil)
+		yaml, err := app.FlattenToString(ignoreResourceRules)
 		if err != nil {
 			return fmt.Errorf("failed to flatten target app %s: %w", app.Name, err)
 		}

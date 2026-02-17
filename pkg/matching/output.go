@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/go-git/go-git/v5/utils/diff"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -113,7 +114,14 @@ func GenerateAppDiffs(
 	baseApps, targetApps []extract.ExtractedApp,
 	contextLines uint,
 	ignorePattern *string,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) ([]AppDiff, error) {
+	// Filter out ignored resources before matching so they don't affect similarity scores
+	if len(ignoreResourceRules) > 0 {
+		baseApps = filterIgnoredResources(baseApps, ignoreResourceRules)
+		targetApps = filterIgnoredResources(targetApps, ignoreResourceRules)
+	}
+
 	// Match apps by content similarity
 	pairs := MatchApps(baseApps, targetApps)
 
@@ -469,4 +477,24 @@ func buildOutputWithIgnore(chunks []chunk, processedLines []processedLineWithIgn
 	}
 
 	return DiffResult{Content: buffer.String(), AddedLines: addedLines, DeletedLines: deletedLines}
+}
+
+// filterIgnoredResources returns copies of the apps with ignored resources removed from their manifests.
+// This ensures ignored resources don't affect similarity matching or appear in diffs.
+func filterIgnoredResources(apps []extract.ExtractedApp, rules []resource_filter.IgnoreResourceRule) []extract.ExtractedApp {
+	filtered := make([]extract.ExtractedApp, len(apps))
+	for i, app := range apps {
+		filtered[i] = extract.ExtractedApp{
+			Id:         app.Id,
+			Name:       app.Name,
+			SourcePath: app.SourcePath,
+			Branch:     app.Branch,
+		}
+		for _, manifest := range app.Manifests {
+			if !resource_filter.MatchesAnyIgnoreRule(&manifest, rules) {
+				filtered[i].Manifests = append(filtered[i].Manifests, manifest)
+			}
+		}
+	}
+	return filtered
 }
