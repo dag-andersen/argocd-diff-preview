@@ -5,7 +5,7 @@ Summary:
 Total: 1 files changed
 
 Added (1):
-+ label-selectors-example (+81)
++ label-selectors-example (+79)
 ```
 
 <details>
@@ -60,7 +60,7 @@ Added (1):
 +        securityContext: {}
 +      securityContext: {}
 +      serviceAccountName: super-app-name
-+---
+ ---
 +apiVersion: v1
 +kind: Service
 +metadata:
@@ -82,7 +82,7 @@ Added (1):
 +    app.kubernetes.io/instance: label-selectors-example
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
-+---
+ ---
 +apiVersion: v1
 +automountServiceAccountToken: true
 +kind: ServiceAccount

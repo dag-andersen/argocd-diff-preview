@@ -142,12 +142,6 @@ Modified (7):
          imagePullPolicy: IfNotPresent
          livenessProbe:
            httpGet:
-@@ skipped 10 lines (34 -> 43) @@
-             port: http
-         resources: {}
-         securityContext: {}
-       securityContext: {}
-       serviceAccountName: super-app-name
  ---
  apiVersion: v1
  kind: Service
@@ -208,16 +202,6 @@ Modified (7):
            requests:
 -            memory: 128Mi
 +            memory: 64Mi
- ---
- apiVersion: v1
- kind: Service
- metadata:
-   labels:
-     app: myapp
-   name: staging-myapp
-   namespace: default
- spec:
-   ports:
 ```
 
 </details>
