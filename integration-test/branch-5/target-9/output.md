@@ -71,7 +71,6 @@ Modified (2):
    selector:
      app.kubernetes.io/instance: my-app-labels
      app.kubernetes.io/name: myApp
-   type: ClusterIP
  ---
  apiVersion: v1
  automountServiceAccountToken: true
@@ -152,7 +151,6 @@ Modified (2):
    selector:
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/name: myApp
-   type: ClusterIP
  ---
  apiVersion: v1
  automountServiceAccountToken: true

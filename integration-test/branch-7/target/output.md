@@ -71,7 +71,6 @@ Modified (2):
    selector:
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/name: myApp
-   type: ClusterIP
  ---
  apiVersion: v1
  automountServiceAccountToken: true
@@ -152,7 +151,6 @@ Modified (2):
    selector:
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/name: myApp
-   type: ClusterIP
  ---
  apiVersion: v1
  automountServiceAccountToken: true

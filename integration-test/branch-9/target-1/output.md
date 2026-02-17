@@ -10,10 +10,10 @@ Deleted (9):
 - app2 (-19)
 - app2 (-19)
 - custom-target-revision-example (-14)
-- my-app-set-dev (-81)
-- my-app-set-prod (-81)
-- my-app-set-staging (-81)
-- nginx-ingress (-480)
+- my-app-set-dev (-79)
+- my-app-set-prod (-79)
+- my-app-set-staging (-79)
+- nginx-ingress (-470)
 ```
 
 <details>
@@ -208,7 +208,7 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-----
+ ---
 -apiVersion: v1
 -kind: Service
 -metadata:
@@ -230,7 +230,7 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-dev
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
-----
+ ---
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount
@@ -299,7 +299,7 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-----
+ ---
 -apiVersion: v1
 -kind: Service
 -metadata:
@@ -321,7 +321,7 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-prod
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
-----
+ ---
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount
@@ -390,7 +390,7 @@ Deleted (9):
 -        securityContext: {}
 -      securityContext: {}
 -      serviceAccountName: super-app-name
-----
+ ---
 -apiVersion: v1
 -kind: Service
 -metadata:
@@ -412,7 +412,7 @@ Deleted (9):
 -    app.kubernetes.io/instance: my-app-set-staging
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
-----
+ ---
 -apiVersion: v1
 -automountServiceAccountToken: true
 -kind: ServiceAccount

@@ -5,7 +5,7 @@ Summary:
 Total: 2 files changed
 
 Deleted (1):
-- folder2
+- folder2 (-19)
 
 Modified (1):
 ± nginx-ingress (+1|-1)
