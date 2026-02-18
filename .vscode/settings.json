@@ -1,0 +1,10 @@
+{
+  "files.watcherExclude": {
+    "base-branch/**": true,
+    "target-branch/**": true
+  },
+  "search.exclude": {
+    "base-branch": true,
+    "target-branch": true
+  }
+}
