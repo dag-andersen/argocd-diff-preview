@@ -989,6 +989,8 @@ Modified (1):
 -  - watch
 +  - create
  ---
+ Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]
+ ---
  apiVersion: v1
  data:
 -  application.namespaces: ""
@@ -1040,6 +1042,12 @@ Modified (1):
      app.kubernetes.io/part-of: argocd
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
+ ---
+ Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: applications.argoproj.io]
+ ---
+ Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: applicationsets.argoproj.io]
+ ---
+ Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: appprojects.argoproj.io]
 ```
 
 </details>
