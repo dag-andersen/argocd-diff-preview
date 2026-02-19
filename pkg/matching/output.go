@@ -116,19 +116,13 @@ func GenerateAppDiffs(
 	ignorePattern *string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) ([]AppDiff, error) {
-	// Filter out ignored resources before matching so they don't affect similarity scores
-	if len(ignoreResourceRules) > 0 {
-		baseApps = filterIgnoredResources(baseApps, ignoreResourceRules)
-		targetApps = filterIgnoredResources(targetApps, ignoreResourceRules)
-	}
-
 	// Match apps by content similarity
 	pairs := MatchApps(baseApps, targetApps)
 
 	var diffs []AppDiff
 
 	for _, pair := range pairs {
-		appDiff, err := generateAppDiff(pair, contextLines, ignorePattern)
+		appDiff, err := generateAppDiff(pair, contextLines, ignorePattern, ignoreResourceRules)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate diff for app pair: %w", err)
 		}
@@ -159,7 +153,7 @@ func GenerateAppDiffs(
 }
 
 // generateAppDiff generates the diff for a single app pair
-func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string) (AppDiff, error) {
+func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string, ignoreResourceRules []resource_filter.IgnoreResourceRule) (AppDiff, error) {
 	diff := AppDiff{}
 
 	// Set names and paths
@@ -197,7 +191,7 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string) (AppDi
 	}
 
 	// Build combined diff content from all changed resources
-	content, added, deleted, err := buildCombinedResourceDiff(changedResources, contextLines, ignorePattern)
+	content, added, deleted, err := buildCombinedResourceDiff(changedResources, contextLines, ignorePattern, ignoreResourceRules)
 	if err != nil {
 		return diff, err
 	}
@@ -220,6 +214,7 @@ func buildCombinedResourceDiff(
 	resources []ResourcePair,
 	contextLines uint,
 	ignorePattern *string,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) (string, int, int, error) {
 	var parts []string
 	totalAdded := 0
@@ -254,6 +249,14 @@ func buildCombinedResourceDiff(
 	})
 
 	for _, rp := range sortedResources {
+		// Check if this resource matches any ignore rules.
+		// If so, emit a "Skipped Resource" context line instead of the full diff.
+		if len(ignoreResourceRules) > 0 && resourceMatchesIgnoreRules(&rp, ignoreResourceRules) {
+			ref := getResourceRef(&rp)
+			parts = append(parts, fmt.Sprintf(" Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", ref.apiVersion, ref.kind, ref.name))
+			continue
+		}
+
 		// Generate diff for this resource pair
 		result, err := generateResourceDiff(rp, contextLines, ignorePattern)
 		if err != nil {
@@ -479,22 +482,13 @@ func buildOutputWithIgnore(chunks []chunk, processedLines []processedLineWithIgn
 	return DiffResult{Content: buffer.String(), AddedLines: addedLines, DeletedLines: deletedLines}
 }
 
-// filterIgnoredResources returns copies of the apps with ignored resources removed from their manifests.
-// This ensures ignored resources don't affect similarity matching or appear in diffs.
-func filterIgnoredResources(apps []extract.ExtractedApp, rules []resource_filter.IgnoreResourceRule) []extract.ExtractedApp {
-	filtered := make([]extract.ExtractedApp, len(apps))
-	for i, app := range apps {
-		filtered[i] = extract.ExtractedApp{
-			Id:         app.Id,
-			Name:       app.Name,
-			SourcePath: app.SourcePath,
-			Branch:     app.Branch,
-		}
-		for _, manifest := range app.Manifests {
-			if !resource_filter.MatchesAnyIgnoreRule(&manifest, rules) {
-				filtered[i].Manifests = append(filtered[i].Manifests, manifest)
-			}
-		}
+// resourceMatchesIgnoreRules checks if either side of a ResourcePair matches any ignore rule
+func resourceMatchesIgnoreRules(rp *ResourcePair, rules []resource_filter.IgnoreResourceRule) bool {
+	if rp.Base != nil && resource_filter.MatchesAnyIgnoreRule(rp.Base, rules) {
+		return true
 	}
-	return filtered
+	if rp.Target != nil && resource_filter.MatchesAnyIgnoreRule(rp.Target, rules) {
+		return true
+	}
+	return false
 }

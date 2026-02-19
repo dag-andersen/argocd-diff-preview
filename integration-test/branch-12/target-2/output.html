@@ -1037,6 +1037,8 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="added_line"><td><pre>+  - create</pre></td></tr>
 	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="normal_line"><td><pre> Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]</pre></td></tr>
+	<tr class="normal_line"><td><pre> ---</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> data:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  application.namespaces: &#34;&#34;</pre></td></tr>
@@ -1088,6 +1090,12 @@ argocd-helm-chart (examples/with-crds/applicaiton.yaml)
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/part-of: argocd</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/version: v2.13.1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: argo-cd-7.7.7</pre></td></tr>
+	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="normal_line"><td><pre> Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: applications.argoproj.io]</pre></td></tr>
+	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="normal_line"><td><pre> Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: applicationsets.argoproj.io]</pre></td></tr>
+	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="normal_line"><td><pre> Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: appprojects.argoproj.io]</pre></td></tr>
 </table>
 </div>
 </details>
