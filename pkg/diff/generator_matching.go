@@ -12,8 +12,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const deletedAppDiffHiddenMessageMatching = "Diff content omitted because '--hide-deleted-app-diff' is enabled."
-
 // GenerateMatchingDiff generates a diff using similarity-based matching instead of ID-based matching.
 // This correctly handles cases where apps or resources are renamed.
 func GenerateMatchingDiff(
@@ -55,7 +53,9 @@ func GenerateMatchingDiff(
 	if hideDeletedAppDiff {
 		for i := range appDiffs {
 			if appDiffs[i].Action == matching.ActionDeleted {
-				appDiffs[i].Content = deletedAppDiffHiddenMessageMatching
+				appDiffs[i].Resources = nil
+				appDiffs[i].AddedLines = 0
+				appDiffs[i].DeletedLines = 0
 			}
 		}
 	}
@@ -170,27 +170,30 @@ func buildMatchingSections(diffs []matching.AppDiff, argocdUIURL string) ([]Mark
 	htmlSections := make([]HTMLSection, 0, len(diffs))
 
 	for _, d := range diffs {
-		// Skip empty diffs
-		if d.Content == "" {
-			continue
-		}
-
 		appURL := buildAppURLFromDiff(d, argocdUIURL)
 
+		// Convert matching.ResourceDiff → diff.ResourceSection
+		sections := make([]ResourceSection, len(d.Resources))
+		for i, r := range d.Resources {
+			sections[i] = ResourceSection{
+				Header:    r.Header(),
+				Content:   r.Content,
+				IsSkipped: r.IsSkipped,
+			}
+		}
+
 		markdownSections = append(markdownSections, MarkdownSection{
-			appName:  d.PrettyName(),
-			filePath: d.PrettyPath(),
-			appURL:   appURL,
-			comment:  d.CommentHeader(),
-			content:  d.Content,
+			appName:   d.PrettyName(),
+			filePath:  d.PrettyPath(),
+			appURL:    appURL,
+			resources: sections,
 		})
 
 		htmlSections = append(htmlSections, HTMLSection{
-			appName:       d.PrettyName(),
-			filePath:      d.PrettyPath(),
-			appURL:        appURL,
-			commentHeader: d.CommentHeader(),
-			content:       d.Content,
+			appName:   d.PrettyName(),
+			filePath:  d.PrettyPath(),
+			appURL:    appURL,
+			resources: sections,
 		})
 	}
 

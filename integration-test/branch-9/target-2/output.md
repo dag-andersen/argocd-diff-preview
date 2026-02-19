@@ -12,18 +12,16 @@ Deleted (1):
 <summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
 <br>
 
+#### ValidatingWebhookConfiguration/nginx-ingress-ingress-nginx-admission
 ```diff
-@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@
 -apiVersion: admissionregistration.k8s.io/v1
 -kind: ValidatingWebhookConfiguration
 -metadata:
 -  labels:
 -    app.kubernetes.io/component: admission-webhook
 -    app.kubernetes.io/instance: nginx-ingress
--    app.kubernetes.io/m
+-    app.kubernetes.io/managed-by
 🚨 Diff is too long
-```
-
 </details>
 
 ⚠️⚠️⚠️ Diff exceeds max length of 900 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag

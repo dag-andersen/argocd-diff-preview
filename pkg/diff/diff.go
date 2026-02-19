@@ -88,21 +88,33 @@ func (d *Diff) buildAppURL(argocdUIURL string) string {
 }
 
 func (d *Diff) buildMarkdownSection(argocdUIURL string) MarkdownSection {
+	// Legacy code path: wrap the entire app content as a single resource section
+	// with the comment header embedded in the content.
 	return MarkdownSection{
 		appName:  d.prettyName(),
 		filePath: d.prettyPath(),
 		appURL:   d.buildAppURL(argocdUIURL),
-		comment:  d.commentHeader(),
-		content:  d.changeInfo.content,
+		resources: []ResourceSection{
+			{
+				Header:  d.commentHeader(),
+				Content: d.changeInfo.content,
+			},
+		},
 	}
 }
 
 func (d *Diff) buildHTMLSection(argocdUIURL string) HTMLSection {
+	// Legacy code path: wrap the entire app content as a single resource section
+	// with the comment header embedded in the content.
 	return HTMLSection{
-		appName:       d.prettyName(),
-		filePath:      d.prettyPath(),
-		appURL:        d.buildAppURL(argocdUIURL),
-		commentHeader: d.commentHeader(),
-		content:       d.changeInfo.content,
+		appName:  d.prettyName(),
+		filePath: d.prettyPath(),
+		appURL:   d.buildAppURL(argocdUIURL),
+		resources: []ResourceSection{
+			{
+				Header:  d.commentHeader(),
+				Content: d.changeInfo.content,
+			},
+		},
 	}
 }

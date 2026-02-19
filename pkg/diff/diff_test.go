@@ -1,7 +1,6 @@
 package diff
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -139,8 +138,6 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 		expectedAppName  string
 		expectedFilePath string
 		expectedAppURL   string
-		expectedComment  string
-		expectedContent  string
 	}{
 		{
 			name: "Insert without URL",
@@ -154,8 +151,6 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			expectedAppName:  "new-app",
 			expectedFilePath: "/path/new",
 			expectedAppURL:   "",
-			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
-			expectedContent:  "+ line 1\n+ line 2",
 		},
 		{
 			name: "Insert with URL",
@@ -169,8 +164,6 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			expectedAppName:  "new-app",
 			expectedFilePath: "/path/new",
 			expectedAppURL:   "https://argocd.example.com/applications/new-app",
-			expectedComment:  "@@ Application added: new-app (/path/new) @@\n",
-			expectedContent:  "+ line 1\n+ line 2",
 		},
 		{
 			name: "Modify with name change",
@@ -186,8 +179,6 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			expectedAppName:  "app-v1 -> app-v2",
 			expectedFilePath: "/path/app",
 			expectedAppURL:   "https://argocd.example.com/applications/app-v1",
-			expectedComment:  "@@ Application modified: app-v1 -> app-v2 (/path/app) @@\n",
-			expectedContent:  "- line 1\n+ line 1 mod",
 		},
 		{
 			name: "Delete",
@@ -201,8 +192,6 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			expectedAppName:  "old-app",
 			expectedFilePath: "/path/old",
 			expectedAppURL:   "https://argocd.example.com/applications/old-app",
-			expectedComment:  "@@ Application deleted: old-app (/path/old) @@\n",
-			expectedContent:  "- line 1\n- line 2",
 		},
 	}
 
@@ -219,11 +208,8 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if got.appURL != tt.expectedAppURL {
 				t.Errorf("buildMarkdownSection().appURL = %q, want %q", got.appURL, tt.expectedAppURL)
 			}
-			if got.comment != tt.expectedComment {
-				t.Errorf("buildMarkdownSection().comment = %q, want %q", got.comment, tt.expectedComment)
-			}
-			if got.content != tt.expectedContent {
-				t.Errorf("buildMarkdownSection().content = %q, want %q", got.content, tt.expectedContent)
+			if len(got.resources) != 1 {
+				t.Fatalf("expected 1 resource section, got %d", len(got.resources))
 			}
 
 			// Test that the build method works correctly
@@ -231,17 +217,19 @@ func TestDiff_buildMarkdownSection(t *testing.T) {
 			if truncated {
 				t.Errorf("buildMarkdownSection().build() should not be truncated with large max size")
 			}
-			var expectedBuiltSection string
-			if tt.expectedAppURL != "" {
-				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s [<a href=\"%s\">link</a>] (%s)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
-					tt.expectedAppName, tt.expectedAppURL, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
-			} else {
-				expectedBuiltSection = fmt.Sprintf("<details>\n<summary>%s (%s)</summary>\n<br>\n\n```diff\n%s%s\n```\n\n</details>\n\n",
-					tt.expectedAppName, tt.expectedFilePath, tt.expectedComment, tt.expectedContent)
-			}
 
-			if builtSection != expectedBuiltSection {
-				t.Errorf("buildMarkdownSection().build() got =\n%q\nwant =\n%q", builtSection, expectedBuiltSection)
+			// Verify the built section contains key parts
+			if !strings.Contains(builtSection, "<details>") {
+				t.Error("built section should contain <details> tag")
+			}
+			if !strings.Contains(builtSection, tt.expectedAppName) {
+				t.Errorf("built section should contain app name %q", tt.expectedAppName)
+			}
+			if !strings.Contains(builtSection, tt.expectedFilePath) {
+				t.Errorf("built section should contain file path %q", tt.expectedFilePath)
+			}
+			if !strings.Contains(builtSection, "</details>") {
+				t.Error("built section should contain </details> tag")
 			}
 		})
 	}

@@ -44,12 +44,154 @@ func (p *Pair) ChangedResources() []ResourcePair {
 
 // matchResources finds the best pairing between base and target resources,
 // returning only pairs where the resources differ (or are added/deleted).
+//
+// It uses a three-phase matching strategy:
+//  1. Match by kind+name+namespace (exact identity) — strongest signal
+//  2. Match remaining by name+namespace across kinds — catches kind changes
+//     (e.g. Deployment → StatefulSet with the same name)
+//  3. Match remaining within the same kind by content similarity — fallback
 func matchResources(baseManifests, targetManifests []unstructured.Unstructured) []ResourcePair {
-	// Group by kind for more efficient matching
-	baseByKind := groupByKind(baseManifests)
-	targetByKind := groupByKind(targetManifests)
+	matchedBaseIndices := make(map[int]bool)
+	matchedTargetIndices := make(map[int]bool)
+	var changedPairs []ResourcePair
 
-	// Collect all kinds
+	// Phase 1: Match by kind+name+namespace (exact identity)
+	baseByFullKey := make(map[string][]int) // kind/namespace/name -> indices
+	for i := range baseManifests {
+		key := fullResourceKey(&baseManifests[i])
+		baseByFullKey[key] = append(baseByFullKey[key], i)
+	}
+
+	// Sort keys for deterministic ordering
+	sortedFullKeys := sortedMapKeys(baseByFullKey)
+
+	for _, key := range sortedFullKeys {
+		baseIdxs := baseByFullKey[key]
+		for _, bi := range baseIdxs {
+			if matchedBaseIndices[bi] {
+				continue
+			}
+			// Find a matching target
+			for ti := range targetManifests {
+				if matchedTargetIndices[ti] {
+					continue
+				}
+				if fullResourceKey(&targetManifests[ti]) == key {
+					matchedBaseIndices[bi] = true
+					matchedTargetIndices[ti] = true
+					if !resourcesEqual(&baseManifests[bi], &targetManifests[ti]) {
+						changedPairs = append(changedPairs, ResourcePair{
+							Base:   &baseManifests[bi],
+							Target: &targetManifests[ti],
+						})
+					}
+					break
+				}
+			}
+		}
+	}
+
+	// Phase 2: Match remaining by name+namespace across kinds (for kind changes)
+	var unmatchedBase []int
+	for i := range baseManifests {
+		if !matchedBaseIndices[i] {
+			unmatchedBase = append(unmatchedBase, i)
+		}
+	}
+	var unmatchedTarget []int
+	for i := range targetManifests {
+		if !matchedTargetIndices[i] {
+			unmatchedTarget = append(unmatchedTarget, i)
+		}
+	}
+
+	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
+		baseByKey := make(map[string][]int) // namespace/name -> indices
+		for _, i := range unmatchedBase {
+			key := resourceKey(&baseManifests[i])
+			baseByKey[key] = append(baseByKey[key], i)
+		}
+		targetByKey := make(map[string][]int)
+		for _, i := range unmatchedTarget {
+			key := resourceKey(&targetManifests[i])
+			targetByKey[key] = append(targetByKey[key], i)
+		}
+
+		sortedKeys := sortedMapKeys(baseByKey)
+		for _, key := range sortedKeys {
+			baseIdxs := baseByKey[key]
+			targetIdxs := targetByKey[key]
+
+			matchLen := min(len(baseIdxs), len(targetIdxs))
+			for i := range matchLen {
+				bi := baseIdxs[i]
+				ti := targetIdxs[i]
+				if matchedBaseIndices[bi] || matchedTargetIndices[ti] {
+					continue
+				}
+				matchedBaseIndices[bi] = true
+				matchedTargetIndices[ti] = true
+				if !resourcesEqual(&baseManifests[bi], &targetManifests[ti]) {
+					changedPairs = append(changedPairs, ResourcePair{
+						Base:   &baseManifests[bi],
+						Target: &targetManifests[ti],
+					})
+				}
+			}
+		}
+	}
+
+	// Phase 3: Collect remaining unmatched, group by kind, and match by similarity
+	unmatchedBase = nil
+	for i := range baseManifests {
+		if !matchedBaseIndices[i] {
+			unmatchedBase = append(unmatchedBase, i)
+		}
+	}
+	unmatchedTarget = nil
+	for i := range targetManifests {
+		if !matchedTargetIndices[i] {
+			unmatchedTarget = append(unmatchedTarget, i)
+		}
+	}
+
+	if len(unmatchedBase) > 0 || len(unmatchedTarget) > 0 {
+		kindPairs := matchUnmatchedByKind(baseManifests, targetManifests, unmatchedBase, unmatchedTarget)
+		changedPairs = append(changedPairs, kindPairs...)
+	}
+
+	return changedPairs
+}
+
+// fullResourceKey returns a string key for a resource (kind/namespace/name)
+func fullResourceKey(r *unstructured.Unstructured) string {
+	return r.GetKind() + "/" + r.GetNamespace() + "/" + r.GetName()
+}
+
+// sortedMapKeys returns the sorted keys of a map[string][]int
+func sortedMapKeys(m map[string][]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// matchUnmatchedByKind groups unmatched resources by kind and matches within each kind
+func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstructured, unmatchedBase, unmatchedTarget []int) []ResourcePair {
+	// Group unmatched by kind
+	baseByKind := make(map[string][]int)
+	for _, i := range unmatchedBase {
+		kind := baseManifests[i].GetKind()
+		baseByKind[kind] = append(baseByKind[kind], i)
+	}
+	targetByKind := make(map[string][]int)
+	for _, i := range unmatchedTarget {
+		kind := targetManifests[i].GetKind()
+		targetByKind[kind] = append(targetByKind[kind], i)
+	}
+
 	allKinds := make(map[string]bool)
 	for k := range baseByKind {
 		allKinds[k] = true
@@ -57,8 +199,6 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	for k := range targetByKind {
 		allKinds[k] = true
 	}
-
-	// Sort kinds for deterministic ordering
 	sortedKinds := make([]string, 0, len(allKinds))
 	for k := range allKinds {
 		sortedKinds = append(sortedKinds, k)
@@ -68,10 +208,20 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	var changedPairs []ResourcePair
 
 	for _, kind := range sortedKinds {
-		baseResources := baseByKind[kind]
-		targetResources := targetByKind[kind]
+		baseIdxs := baseByKind[kind]
+		targetIdxs := targetByKind[kind]
 
-		kindPairs := matchResourcesOfSameKind(baseResources, targetResources)
+		// Build slices of the actual resources for matching
+		baseRes := make([]unstructured.Unstructured, len(baseIdxs))
+		for i, idx := range baseIdxs {
+			baseRes[i] = baseManifests[idx]
+		}
+		targetRes := make([]unstructured.Unstructured, len(targetIdxs))
+		for i, idx := range targetIdxs {
+			targetRes[i] = targetManifests[idx]
+		}
+
+		kindPairs := matchResourcesOfSameKind(baseRes, targetRes)
 		changedPairs = append(changedPairs, kindPairs...)
 	}
 

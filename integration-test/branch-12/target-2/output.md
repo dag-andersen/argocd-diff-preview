@@ -12,8 +12,8 @@ Modified (1):
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
+#### Deployment/argocd-helm-chart-applicationset-controller (argocd)
 ```diff
-@@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@
              configMapKeyRef:
                key: applicationsetcontroller.log.format
                name: argocd-cmd-params-cm
@@ -161,7 +161,9 @@ Modified (1):
 +          name: argocd-cmd-params-cm
 +          optional: true
 +        name: argocd-cmd-params-cm
- ---
+```
+#### Deployment/argocd-helm-chart-dex-server (argocd)
+```diff
                  matchLabels:
                    app.kubernetes.io/name: argocd-dex-server
                topologyKey: kubernetes.io/hostname
@@ -253,7 +255,9 @@ Modified (1):
        - name: argocd-dex-server-tls
          secret:
            items:
- ---
+```
+#### Deployment/argocd-helm-chart-notifications-controller (argocd)
+```diff
                labelSelector:
                  matchLabels:
                    app.kubernetes.io/name: argocd-notifications-controller
@@ -343,7 +347,9 @@ Modified (1):
          secret:
            items:
            - key: tls.crt
- ---
+```
+#### Deployment/argocd-helm-chart-redis (argocd)
+```diff
          - ""
          - --appendonly
          - "no"
@@ -385,7 +391,9 @@ Modified (1):
        volumes:
        - configMap:
            defaultMode: 493
- ---
+```
+#### Deployment/argocd-helm-chart-repo-server (argocd)
+```diff
              configMapKeyRef:
                key: reposerver.log.format
                name: argocd-cmd-params-cm
@@ -579,7 +587,9 @@ Modified (1):
        - emptyDir: {}
          name: var-files
        - emptyDir: {}
- ---
+```
+#### Deployment/argocd-helm-chart-server (argocd)
+```diff
              configMapKeyRef:
                key: server.connection.status.cache.expiration
                name: argocd-cmd-params-cm
@@ -720,7 +730,9 @@ Modified (1):
        - configMap:
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
- ---
+```
+#### StatefulSet/argocd-helm-chart-application-controller (argocd)
+```diff
              configMapKeyRef:
                key: controller.log.format
                name: argocd-cmd-params-cm
@@ -919,7 +931,9 @@ Modified (1):
            - key: ca.crt
              path: ca.crt
            optional: true
- ---
+```
+#### ClusterRole/argocd-helm-chart-server
+```diff
    name: argocd-helm-chart-server
  rules:
  - apiGroups:
@@ -941,7 +955,9 @@ Modified (1):
  - apiGroups:
    - ""
    resources:
- ---
+```
+#### Role/argocd-helm-chart-application-controller (argocd)
+```diff
    - secrets
    - configmaps
    verbs:
@@ -963,7 +979,9 @@ Modified (1):
    - patch
    - delete
  - apiGroups:
- ---
+```
+#### Role/argocd-helm-chart-applicationset-controller (argocd)
+```diff
    verbs:
    - get
    - list
@@ -988,9 +1006,13 @@ Modified (1):
    - update
 -  - watch
 +  - create
- ---
- Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]
- ---
+```
+#### ConfigMap/argocd-cm (argocd)
+
+_Skipped_
+
+#### ConfigMap/argocd-cmd-params-cm (argocd)
+```diff
  apiVersion: v1
  data:
 -  application.namespaces: ""
@@ -1042,13 +1064,18 @@ Modified (1):
      app.kubernetes.io/part-of: argocd
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
- ---
- Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: applications.argoproj.io]
- ---
- Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: applicationsets.argoproj.io]
- ---
- Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: appprojects.argoproj.io]
 ```
+#### CustomResourceDefinition/applications.argoproj.io
+
+_Skipped_
+
+#### CustomResourceDefinition/applicationsets.argoproj.io
+
+_Skipped_
+
+#### CustomResourceDefinition/appprojects.argoproj.io
+
+_Skipped_
 
 </details>
 

@@ -15,8 +15,8 @@ Modified (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-two
 ```diff
-@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -37,15 +37,14 @@ Modified (1):
 -        ports:
 -        - containerPort: 80
 ```
-
 </details>
 
 <details>
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
+#### Deployment/nginx-ingress-ingress-nginx-controller (default)
 ```diff
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
                fieldPath: metadata.namespace
          - name: LD_PRELOAD
            value: /usr/local/lib/libmimalloc.so
@@ -55,7 +54,6 @@ Modified (1):
          lifecycle:
            preStop:
 ```
-
 </details>
 
 _Stats_:

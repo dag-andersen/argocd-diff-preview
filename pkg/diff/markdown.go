@@ -8,11 +8,10 @@ import (
 )
 
 type MarkdownSection struct {
-	appName  string
-	filePath string
-	appURL   string
-	comment  string
-	content  string
+	appName   string
+	filePath  string
+	appURL    string
+	resources []ResourceSection
 }
 
 func markdownSectionHeader(appName, filePath, appURL string) string {
@@ -22,15 +21,29 @@ func markdownSectionHeader(appName, filePath, appURL string) string {
 	} else {
 		summary = fmt.Sprintf("%s (%s)", appName, filePath)
 	}
-	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n```diff\n", summary)
+	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n", summary)
 }
 
 func markdownSectionFooter() string {
-	return "\n```\n\n</details>\n\n"
+	return "</details>\n\n"
 }
 
 func (m *MarkdownSection) Size() int {
-	return len(markdownSectionHeader(m.appName, m.filePath, m.appURL)) + len(m.comment) + len(m.content) + len(markdownSectionFooter())
+	size := len(markdownSectionHeader(m.appName, m.filePath, m.appURL))
+	for _, r := range m.resources {
+		if r.IsSkipped {
+			// "#### Header\n\n_Skipped_\n\n"
+			size += len("#### ") + len(r.Header) + len("\n\n_Skipped_\n\n")
+		} else {
+			// "#### Header\n```diff\ncontent\n```\n"
+			size += len("#### ") + len(r.Header) + len("\n```diff\n") + len(r.Content) + len("```\n")
+		}
+	}
+	if len(m.resources) == 0 {
+		size += len("_No resources rendered_\n\n")
+	}
+	size += len(markdownSectionFooter())
+	return size
 }
 
 var (
@@ -42,36 +55,64 @@ var (
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
 	footer := markdownSectionFooter()
-	content := strings.TrimRight(m.content, "\n")
 
-	spaceForContent := maxSize - len(header) - len(footer) - len(m.comment)
+	var body strings.Builder
 
-	if spaceForContent < 0 {
-		log.Debug().Msgf("Markdown - Skipping section, because diff section does not fit in space: %d < 0", spaceForContent)
+	if len(m.resources) == 0 {
+		body.WriteString("_No resources rendered_\n\n")
+	} else {
+		for _, r := range m.resources {
+			if r.IsSkipped {
+				fmt.Fprintf(&body, "#### %s\n\n_Skipped_\n\n", r.Header)
+			} else {
+				content := strings.TrimRight(r.Content, "\n")
+				fmt.Fprintf(&body, "#### %s\n```diff\n%s\n```\n", r.Header, content)
+			}
+		}
+	}
+
+	totalSize := len(header) + body.Len() + len(footer)
+
+	if totalSize <= maxSize {
+		log.Debug().Msgf("Markdown - Diff section fits in space: %d <= %d", totalSize, maxSize)
+		return header + body.String() + footer, false
+	}
+
+	// Truncation: include full resources until budget is exhausted
+	log.Debug().Msgf("Markdown - diff section does not fit in space: %d > %d", totalSize, maxSize)
+
+	spaceForBody := maxSize - len(header) - len(footer) - len(diffTooLongWarning) - 1 // -1 for the "\n" after warning
+
+	if spaceForBody < minSizeForSectionContent {
+		log.Debug().Msgf("Markdown - available space is below threshold %d, returning empty string", minSizeForSectionContent)
 		return "", true
 	}
 
-	// if there is enough space for the content, return the full section
-	if len(content) < spaceForContent {
-		log.Debug().Msgf("Markdown - Diff section fits in space: %d < %d", spaceForContent, len(content))
-		return header + m.comment + content + footer, false
+	var truncatedBody strings.Builder
+	for _, r := range m.resources {
+		var part string
+		if r.IsSkipped {
+			part = fmt.Sprintf("#### %s\n\n_Skipped_\n\n", r.Header)
+		} else {
+			content := strings.TrimRight(r.Content, "\n")
+			part = fmt.Sprintf("#### %s\n```diff\n%s\n```\n", r.Header, content)
+		}
+
+		if truncatedBody.Len()+len(part) > spaceForBody {
+			// Try to fit a partial resource
+			remaining := spaceForBody - truncatedBody.Len()
+			if remaining > minSizeForSectionContent {
+				truncated := part[:remaining]
+				truncated = strings.TrimRight(truncated, " \t\n\r")
+				truncatedBody.WriteString(truncated)
+			}
+			break
+		}
+		truncatedBody.WriteString(part)
 	}
 
-	log.Debug().Msgf("Markdown - diff section does not fit in space: %d < %d", spaceForContent, len(content))
-
-	spaceBeforeDiffTooLongWarning := spaceForContent - len(diffTooLongWarning)
-
-	if minSizeForSectionContent < spaceBeforeDiffTooLongWarning {
-		truncatedContent := content[:spaceBeforeDiffTooLongWarning]
-		truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
-		log.Debug().Msgf("Markdown - returning truncated content with warning")
-		return header + m.comment + truncatedContent + diffTooLongWarning + footer, true
-	}
-
-	log.Debug().Msgf("Markdown - available space is below threashhold %d, returning empty string", minSizeForSectionContent)
-
-	// if there is not enough space for the content, return an empty string
-	return "", true
+	log.Debug().Msgf("Markdown - returning truncated content with warning")
+	return header + truncatedBody.String() + diffTooLongWarning + "\n" + footer, true
 }
 
 type MarkdownOutput struct {

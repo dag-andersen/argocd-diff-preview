@@ -12,11 +12,20 @@ type Pair struct {
 	Target *extract.ExtractedApp // nil if app was deleted in target
 }
 
+// appIdentityKey returns the identity key for an app: "name\x00sourcePath".
+// This uniquely identifies an app in most cases. When multiple apps share the
+// same name but have different source paths, the path disambiguates them.
+func appIdentityKey(app *extract.ExtractedApp) string {
+	return app.Name + "\x00" + app.SourcePath
+}
+
 // MatchApps finds the best pairing between base and target ExtractedApps.
-// It uses content similarity (with an identity bonus for matching Name + SourcePath)
-// to find the best matches. This correctly handles cases where apps are renamed
-// or content is moved between apps, while giving a tiebreaker advantage to apps
-// that share the same identity.
+// It uses a three-phase matching strategy:
+//  1. Match by exact identity (name + source path) — strongest signal.
+//  2. Match remaining by exact name only — catches apps whose source path
+//     changed but name stayed the same. This also ensures deterministic results
+//     for ApplicationSet-generated apps that produce nearly identical resources.
+//  3. Match remaining by content similarity — handles renames, moves, etc.
 //
 // Returns a list of pairs where each pair contains matching base and target apps.
 // If an app only exists in base, Target will be nil (deleted).
@@ -26,31 +35,110 @@ func MatchApps(baseApps, targetApps []extract.ExtractedApp) []Pair {
 		return nil
 	}
 
-	// Build indices for all apps
-	baseIndices := make([]int, len(baseApps))
-	for i := range baseApps {
-		baseIndices[i] = i
-	}
-	targetIndices := make([]int, len(targetApps))
-	for i := range targetApps {
-		targetIndices[i] = i
-	}
-
-	// Match all apps by similarity (with identity bonus baked into the score)
-	similarityPairs := matchAppsBySimilarity(baseApps, targetApps, baseIndices, targetIndices)
-
-	// Build result pairs
 	var pairs []Pair
 	matchedBase := make(map[int]bool)
 	matchedTarget := make(map[int]bool)
 
-	for _, sp := range similarityPairs {
-		pairs = append(pairs, Pair{
-			Base:   &baseApps[sp.baseIdx],
-			Target: &targetApps[sp.targetIdx],
-		})
-		matchedBase[sp.baseIdx] = true
-		matchedTarget[sp.targetIdx] = true
+	// Phase 1: Match by exact identity (name + source path).
+	targetByIdentity := make(map[string][]int)
+	for i := range targetApps {
+		key := appIdentityKey(&targetApps[i])
+		targetByIdentity[key] = append(targetByIdentity[key], i)
+	}
+
+	baseByIdentity := make(map[string][]int)
+	sortedIdentityKeys := make([]string, 0)
+	for i := range baseApps {
+		key := appIdentityKey(&baseApps[i])
+		if _, exists := baseByIdentity[key]; !exists {
+			sortedIdentityKeys = append(sortedIdentityKeys, key)
+		}
+		baseByIdentity[key] = append(baseByIdentity[key], i)
+	}
+	sort.Strings(sortedIdentityKeys)
+
+	for _, key := range sortedIdentityKeys {
+		baseIdxs := baseByIdentity[key]
+		targetIdxs := targetByIdentity[key]
+
+		matchLen := min(len(baseIdxs), len(targetIdxs))
+		for i := range matchLen {
+			bi := baseIdxs[i]
+			ti := targetIdxs[i]
+			pairs = append(pairs, Pair{
+				Base:   &baseApps[bi],
+				Target: &targetApps[ti],
+			})
+			matchedBase[bi] = true
+			matchedTarget[ti] = true
+		}
+	}
+
+	// Phase 2: Match remaining by exact name only.
+	// This catches apps whose source path changed but name stayed the same,
+	// and ensures deterministic results for ApplicationSet apps with nearly
+	// identical resources.
+	targetByName := make(map[string][]int)
+	for i := range targetApps {
+		if !matchedTarget[i] {
+			targetByName[targetApps[i].Name] = append(targetByName[targetApps[i].Name], i)
+		}
+	}
+
+	baseByName := make(map[string][]int)
+	sortedBaseNames := make([]string, 0)
+	for i := range baseApps {
+		if !matchedBase[i] {
+			name := baseApps[i].Name
+			if _, exists := baseByName[name]; !exists {
+				sortedBaseNames = append(sortedBaseNames, name)
+			}
+			baseByName[name] = append(baseByName[name], i)
+		}
+	}
+	sort.Strings(sortedBaseNames)
+
+	for _, name := range sortedBaseNames {
+		baseIdxs := baseByName[name]
+		targetIdxs := targetByName[name]
+
+		matchLen := min(len(baseIdxs), len(targetIdxs))
+		for i := range matchLen {
+			bi := baseIdxs[i]
+			ti := targetIdxs[i]
+			pairs = append(pairs, Pair{
+				Base:   &baseApps[bi],
+				Target: &targetApps[ti],
+			})
+			matchedBase[bi] = true
+			matchedTarget[ti] = true
+		}
+	}
+
+	// Phase 3: Match remaining apps by content similarity.
+	var unmatchedBaseIndices []int
+	for i := range baseApps {
+		if !matchedBase[i] {
+			unmatchedBaseIndices = append(unmatchedBaseIndices, i)
+		}
+	}
+	var unmatchedTargetIndices []int
+	for i := range targetApps {
+		if !matchedTarget[i] {
+			unmatchedTargetIndices = append(unmatchedTargetIndices, i)
+		}
+	}
+
+	if len(unmatchedBaseIndices) > 0 && len(unmatchedTargetIndices) > 0 {
+		similarityPairs := matchAppsBySimilarity(baseApps, targetApps, unmatchedBaseIndices, unmatchedTargetIndices)
+		for _, sp := range similarityPairs {
+			pairs = append(pairs, Pair{
+				Base:   &baseApps[sp.baseIdx],
+				Target: &targetApps[sp.targetIdx],
+			})
+			matchedBase[sp.baseIdx] = true
+			matchedTarget[sp.targetIdx] = true
+		}
 	}
 
 	// Add remaining unmatched as deletions
@@ -87,7 +175,7 @@ func matchAppsBySimilarity(
 	for _, baseIdx := range unmatchedBaseIndices {
 		for _, targetIdx := range unmatchedTargetIndices {
 			score := appSimilarity(&baseApps[baseIdx], &targetApps[targetIdx])
-			if score > 0.3 { // Minimum threshold to consider a match
+			if score >= 0.3 { // Minimum threshold to consider a match
 				candidates = append(candidates, scoredPair{
 					baseIdx:   baseIdx,
 					targetIdx: targetIdx,
@@ -127,16 +215,17 @@ func matchAppsBySimilarity(
 // appSimilarity computes similarity between two ExtractedApps
 // Returns a score between 0 and 1, where 1 means identical.
 //
-// The score is primarily driven by resource content similarity (80%),
-// with bonuses for matching name (10%) and matching source path (10%).
-// The identity bonuses act as tiebreakers: when two candidate matches
-// have similar content scores, the one with the same name+path wins.
-// But when content clearly favors a different match, content wins.
+// The score is primarily driven by resource content similarity (70%),
+// with bonuses for matching name (15%) and matching source path (15%).
+// The identity bonuses ensure that apps with the same name+path are
+// always matched, even when all resources change kind (e.g. Deployment
+// → StatefulSet). When content clearly favors a different match,
+// content still wins.
 func appSimilarity(a, b *extract.ExtractedApp) float64 {
 	const (
-		weightName       = 0.1
-		weightSourcePath = 0.1
-		weightResources  = 0.8
+		weightName       = 0.15
+		weightSourcePath = 0.15
+		weightResources  = 0.7
 	)
 
 	score := 0.0

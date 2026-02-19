@@ -12,8 +12,8 @@ Modified (1):
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
+#### Deployment/argocd-helm-chart-applicationset-controller (argocd)
 ```diff
-@@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@
              configMapKeyRef:
                key: applicationsetcontroller.log.format
                name: argocd-cmd-params-cm
@@ -161,7 +161,9 @@ Modified (1):
 +          name: argocd-cmd-params-cm
 +          optional: true
 +        name: argocd-cmd-params-cm
- ---
+```
+#### Deployment/argocd-helm-chart-dex-server (argocd)
+```diff
                  matchLabels:
                    app.kubernetes.io/name: argocd-dex-server
                topologyKey: kubernetes.io/hostname
@@ -253,7 +255,9 @@ Modified (1):
        - name: argocd-dex-server-tls
          secret:
            items:
- ---
+```
+#### Deployment/argocd-helm-chart-notifications-controller (argocd)
+```diff
                labelSelector:
                  matchLabels:
                    app.kubernetes.io/name: argocd-notifications-controller
@@ -343,7 +347,9 @@ Modified (1):
          secret:
            items:
            - key: tls.crt
- ---
+```
+#### Deployment/argocd-helm-chart-redis (argocd)
+```diff
          - ""
          - --appendonly
          - "no"
@@ -385,7 +391,9 @@ Modified (1):
        volumes:
        - configMap:
            defaultMode: 493
- ---
+```
+#### Deployment/argocd-helm-chart-repo-server (argocd)
+```diff
              configMapKeyRef:
                key: reposerver.log.format
                name: argocd-cmd-params-cm
@@ -579,7 +587,9 @@ Modified (1):
        - emptyDir: {}
          name: var-files
        - emptyDir: {}
- ---
+```
+#### Deployment/argocd-helm-chart-server (argocd)
+```diff
              configMapKeyRef:
                key: server.connection.status.cache.expiration
                name: argocd-cmd-params-cm
@@ -720,7 +730,9 @@ Modified (1):
        - configMap:
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
- ---
+```
+#### StatefulSet/argocd-helm-chart-application-controller (argocd)
+```diff
              configMapKeyRef:
                key: controller.log.format
                name: argocd-cmd-params-cm
@@ -919,7 +931,9 @@ Modified (1):
            - key: ca.crt
              path: ca.crt
            optional: true
- ---
+```
+#### ClusterRole/argocd-helm-chart-server
+```diff
    name: argocd-helm-chart-server
  rules:
  - apiGroups:
@@ -941,7 +955,9 @@ Modified (1):
  - apiGroups:
    - ""
    resources:
- ---
+```
+#### Role/argocd-helm-chart-application-controller (argocd)
+```diff
    - secrets
    - configmaps
    verbs:
@@ -963,7 +979,9 @@ Modified (1):
    - patch
    - delete
  - apiGroups:
- ---
+```
+#### Role/argocd-helm-chart-applicationset-controller (argocd)
+```diff
    verbs:
    - get
    - list
@@ -988,7 +1006,9 @@ Modified (1):
    - update
 -  - watch
 +  - create
- ---
+```
+#### ConfigMap/argocd-cm (argocd)
+```diff
  apiVersion: v1
  data:
    admin.enabled: "true"
@@ -1099,7 +1119,9 @@ Modified (1):
      app.kubernetes.io/component: server
      app.kubernetes.io/instance: argocd-helm-chart
      app.kubernetes.io/managed-by: Helm
- ---
+```
+#### ConfigMap/argocd-cmd-params-cm (argocd)
+```diff
  apiVersion: v1
  data:
 -  application.namespaces: ""
@@ -1151,7 +1173,9 @@ Modified (1):
      app.kubernetes.io/part-of: argocd
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
- ---
+```
+#### CustomResourceDefinition/applications.argoproj.io
+```diff
                        maxDuration:
                          description: MaxDuration is the maximum amount of time allowed
                            for the backoff strategy
@@ -1609,22 +1633,8 @@ Modified (1):
                              uses the Kubernetes version of the target cluster.
                            type: string
 +                        labelIncludeTemplates:
-+                          description: LabelIncludeTemplates specifies whether to
-+                            apply common labels to resource templates or not
-+                          type: boolean
-                         labelWithoutSelector:
-                           description: LabelWithoutSelector specifies whether to apply
-                             common labels to resource selectors or not
-                           type: boolean
-                         namePrefix:
-                           description: NamePrefix is a prefix appended to resources
-                             for Kustomize apps
-                           type: string
-                         nameSuffix:
-                           description: NameSuffix is a suffix appended t
++                          description: LabelIncludeTemplates sp
 🚨 Diff is too long
-```
-
 </details>
 
 ⚠️⚠️⚠️ Diff exceeds max length of 65536 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag

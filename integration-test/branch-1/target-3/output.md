@@ -5,7 +5,7 @@ Summary:
 Total: 2 files changed
 
 Deleted (1):
-- folder2 (-19)
+- folder2
 
 Modified (1):
 ± nginx-ingress (+1|-1)
@@ -15,10 +15,7 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-```diff
-@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
-Diff content omitted because '--hide-deleted-app-diff' is enabled.
-```
+_No resources rendered_
 
 </details>
 
@@ -26,8 +23,8 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
 <summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
+#### Deployment/nginx-ingress-ingress-nginx-controller (default)
 ```diff
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
          - name: POD_NAME
            valueFrom:
              fieldRef:
@@ -51,7 +48,6 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
            httpGet:
              path: /healthz
 ```
-
 </details>
 
 _Stats_:

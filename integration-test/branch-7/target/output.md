@@ -13,8 +13,8 @@ Modified (2):
 <summary>valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml)</summary>
 <br>
 
+#### Deployment/super-duper-app-name (default)
 ```diff
-@@ Application modified: valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -49,7 +49,9 @@ Modified (2):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
- ---
+```
+#### Service/super-duper-app-name (default)
+```diff
  apiVersion: v1
  kind: Service
  metadata:
@@ -71,7 +73,9 @@ Modified (2):
    selector:
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/name: myApp
- ---
+```
+#### ServiceAccount/super-duper-app-name (default)
+```diff
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -86,15 +90,14 @@ Modified (2):
 +  name: super-duper-app-name
    namespace: default
 ```
-
 </details>
 
 <details>
 <summary>watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
+#### Deployment/super-duper-app-name (default)
 ```diff
-@@ Application modified: watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -129,7 +132,9 @@ Modified (2):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
- ---
+```
+#### Service/super-duper-app-name (default)
+```diff
  apiVersion: v1
  kind: Service
  metadata:
@@ -151,7 +156,9 @@ Modified (2):
    selector:
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/name: myApp
- ---
+```
+#### ServiceAccount/super-duper-app-name (default)
+```diff
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -166,7 +173,6 @@ Modified (2):
 +  name: super-duper-app-name
    namespace: default
 ```
-
 </details>
 
 _Stats_:

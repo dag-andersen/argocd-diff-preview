@@ -62,9 +62,13 @@ data:
 		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
 	}
 
-	expectedComment := "@@ Application added: my-app (/path/app) @@\n"
-	if section.comment != expectedComment {
-		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	if len(section.resources) != 1 {
+		t.Fatalf("expected 1 resource section, got %d", len(section.resources))
+	}
+
+	expectedHeader := "@@ Application added: my-app (/path/app) @@\n"
+	if section.resources[0].Header != expectedHeader {
+		t.Errorf("expected header %q, got %q", expectedHeader, section.resources[0].Header)
 	}
 
 	// Current behavior: all resources in one block, each line prefixed with +
@@ -93,8 +97,8 @@ data:
 +  key: value
 `
 
-	if section.content != expectedContent {
-		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	if section.resources[0].Content != expectedContent {
+		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.resources[0].Content)
 	}
 }
 
@@ -144,9 +148,13 @@ spec:
 		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
 	}
 
-	expectedComment := "@@ Application deleted: my-app (/path/app) @@\n"
-	if section.comment != expectedComment {
-		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	if len(section.resources) != 1 {
+		t.Fatalf("expected 1 resource section, got %d", len(section.resources))
+	}
+
+	expectedHeader := "@@ Application deleted: my-app (/path/app) @@\n"
+	if section.resources[0].Header != expectedHeader {
+		t.Errorf("expected header %q, got %q", expectedHeader, section.resources[0].Header)
 	}
 
 	// Current behavior: all resources in one block, each line prefixed with -
@@ -168,8 +176,8 @@ spec:
 -  type: ClusterIP
 `
 
-	if section.content != expectedContent {
-		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	if section.resources[0].Content != expectedContent {
+		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.resources[0].Content)
 	}
 }
 
@@ -235,9 +243,13 @@ spec:
 		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
 	}
 
-	expectedComment := "@@ Application modified: my-app (/path/app) @@\n"
-	if section.comment != expectedComment {
-		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	if len(section.resources) != 1 {
+		t.Fatalf("expected 1 resource section, got %d", len(section.resources))
+	}
+
+	expectedHeader := "@@ Application modified: my-app (/path/app) @@\n"
+	if section.resources[0].Header != expectedHeader {
+		t.Errorf("expected header %q, got %q", expectedHeader, section.resources[0].Header)
 	}
 
 	// Current behavior: unified diff showing context lines with space prefix,
@@ -260,8 +272,8 @@ spec:
    type: ClusterIP
 `
 
-	if section.content != expectedContent {
-		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	if section.resources[0].Content != expectedContent {
+		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.resources[0].Content)
 	}
 }
 
@@ -292,11 +304,17 @@ func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
 	if len(htmlSections) != 1 {
 		t.Fatalf("expected 1 html section, got %d", len(htmlSections))
 	}
-	if markdownSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("markdown content = %q, want %q", markdownSections[0].content, deletedAppDiffHiddenMessage)
+	if len(markdownSections[0].resources) != 1 {
+		t.Fatalf("expected 1 markdown resource section, got %d", len(markdownSections[0].resources))
 	}
-	if htmlSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("html content = %q, want %q", htmlSections[0].content, deletedAppDiffHiddenMessage)
+	if markdownSections[0].resources[0].Content != deletedAppDiffHiddenMessage {
+		t.Fatalf("markdown content = %q, want %q", markdownSections[0].resources[0].Content, deletedAppDiffHiddenMessage)
+	}
+	if len(htmlSections[0].resources) != 1 {
+		t.Fatalf("expected 1 html resource section, got %d", len(htmlSections[0].resources))
+	}
+	if htmlSections[0].resources[0].Content != deletedAppDiffHiddenMessage {
+		t.Fatalf("html content = %q, want %q", htmlSections[0].resources[0].Content, deletedAppDiffHiddenMessage)
 	}
 }
 

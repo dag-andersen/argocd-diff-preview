@@ -53,6 +53,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -78,23 +88,18 @@ pre {
 `
 
 type HTMLSection struct {
-	appName       string
-	filePath      string
-	appURL        string
-	commentHeader string
-	content       string
+	appName   string
+	filePath  string
+	appURL    string
+	resources []ResourceSection
 }
 
-const htmlSection = `
+const htmlSectionTemplate = `
 <details>
 <summary>
 %summary%
 </summary>
-<div class="diff_container">
-<table>
-	%rows%
-</table>
-</div>
+%body%
 </details>
 `
 
@@ -102,7 +107,7 @@ const htmlLine = `
 	<tr class="%s"><td><pre>%s</pre></td></tr>`
 
 func (h *HTMLSection) printHTMLSection() string {
-	s := htmlSection
+	s := htmlSectionTemplate
 
 	// Build summary with optional link
 	var summary string
@@ -118,34 +123,39 @@ func (h *HTMLSection) printHTMLSection() string {
 	}
 	s = strings.ReplaceAll(s, "%summary%", summary)
 
-	var rows strings.Builder
-	// Pre-allocate capacity based on content length to avoid reallocations
-	// Each line gets ~50 chars of HTML wrapper + up to ~40 chars for HTML escaping expansion
-	estimatedLines := strings.Count(h.content, "\n") + 1
-	htmlOverhead := estimatedLines * 90
-	rows.Grow(len(h.content) + len(h.commentHeader) + htmlOverhead)
+	var body strings.Builder
 
-	// Add comment header
-	fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(strings.TrimRight(h.commentHeader, " \t\r\n")))
-
-	// Process content lines
-	for line := range strings.Lines(h.content) {
-		line = strings.TrimRight(line, " \t\r\n")
-		if len(line) == 0 {
-			continue // Skip empty lines
-		}
-		switch line[0] {
-		case '@':
-			fmt.Fprintf(&rows, htmlLine, "comment_line", html.EscapeString(line))
-		case '-':
-			fmt.Fprintf(&rows, htmlLine, "removed_line", html.EscapeString(line))
-		case '+':
-			fmt.Fprintf(&rows, htmlLine, "added_line", html.EscapeString(line))
-		default:
-			fmt.Fprintf(&rows, htmlLine, "normal_line", html.EscapeString(line))
+	if len(h.resources) == 0 {
+		body.WriteString("\n<p><em>No resources rendered</em></p>\n")
+	} else {
+		for _, r := range h.resources {
+			fmt.Fprintf(&body, "\n<h4 class=\"resource_header\">%s</h4>\n", html.EscapeString(r.Header))
+			if r.IsSkipped {
+				body.WriteString("<p><em>Skipped</em></p>\n")
+			} else {
+				body.WriteString("<div class=\"diff_container\">\n<table>\n")
+				for line := range strings.Lines(r.Content) {
+					line = strings.TrimRight(line, " \t\r\n")
+					if len(line) == 0 {
+						continue
+					}
+					switch line[0] {
+					case '@':
+						fmt.Fprintf(&body, htmlLine, "comment_line", html.EscapeString(line))
+					case '-':
+						fmt.Fprintf(&body, htmlLine, "removed_line", html.EscapeString(line))
+					case '+':
+						fmt.Fprintf(&body, htmlLine, "added_line", html.EscapeString(line))
+					default:
+						fmt.Fprintf(&body, htmlLine, "normal_line", html.EscapeString(line))
+					}
+				}
+				body.WriteString("\n</table>\n</div>\n")
+			}
 		}
 	}
-	s = strings.ReplaceAll(s, "%rows%", rows.String())
+
+	s = strings.ReplaceAll(s, "%body%", body.String())
 
 	return s
 }

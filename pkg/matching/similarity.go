@@ -14,8 +14,16 @@ type scoredPair struct {
 	score     float64
 }
 
-// resourceSetSimilarity computes Jaccard-like similarity between two sets of resources
-// It matches resources by kind first, then compares content
+// resourceSetSimilarity computes Jaccard-like similarity between two sets of resources.
+// It groups resources by kind, then compares content within each kind group.
+// This is used for app-level matching to decide which apps correspond across branches.
+//
+// Note: cross-kind name matching (for kind changes like Deployment → StatefulSet) is
+// intentionally NOT done here. Resource names are often shared across different apps
+// (e.g. multiple helm releases producing identically-named resources), so cross-kind
+// name matching at the similarity level would cause false positives in app matching.
+// Cross-kind matching is instead handled in matchResources(), which operates within
+// an already-matched app pair where name collisions are not an issue.
 func resourceSetSimilarity(manifestsA, manifestsB []unstructured.Unstructured) float64 {
 	if len(manifestsA) == 0 && len(manifestsB) == 0 {
 		return 1.0

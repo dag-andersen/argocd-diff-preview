@@ -12,8 +12,8 @@ Added (1):
 <summary>folder3 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-three
 ```diff
-@@ Application added: folder3 (examples/git-generator/app/app-set.yaml) @@
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
@@ -34,7 +34,6 @@ Added (1):
 +        ports:
 +        - containerPort: 80
 ```
-
 </details>
 
 _Stats_:

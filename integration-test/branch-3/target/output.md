@@ -12,8 +12,8 @@ Modified (1):
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
+#### Deployment/staging-myapp (default)
 ```diff
-@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -35,7 +35,6 @@ Modified (1):
        containers:
        - image: dag-andersen/myapp:latest
 ```
-
 </details>
 
 _Stats_:

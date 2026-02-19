@@ -15,6 +15,25 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+// ResourceDiff represents the diff output for a single resource within an application
+type ResourceDiff struct {
+	Kind         string
+	Name         string
+	Namespace    string
+	Content      string // diff text (with +/-/space prefixes)
+	AddedLines   int
+	DeletedLines int
+	IsSkipped    bool // true if resource matched an ignore rule
+}
+
+// Header returns a display header like "Kind/Name (namespace)" or "Kind/Name"
+func (r *ResourceDiff) Header() string {
+	if r.Namespace != "" {
+		return fmt.Sprintf("%s/%s (%s)", r.Kind, r.Name, r.Namespace)
+	}
+	return fmt.Sprintf("%s/%s", r.Kind, r.Name)
+}
+
 // AppDiff represents the diff output for a single application pair
 type AppDiff struct {
 	OldName       string // Name in base branch (empty if added)
@@ -22,7 +41,7 @@ type AppDiff struct {
 	OldSourcePath string // Source path in base branch
 	NewSourcePath string // Source path in target branch
 	Action        DiffAction
-	Content       string // The formatted diff content
+	Resources     []ResourceDiff // Per-resource diffs
 	AddedLines    int
 	DeletedLines  int
 }
@@ -94,18 +113,9 @@ func (d *AppDiff) ChangeStats() string {
 	}
 }
 
-// CommentHeader returns the header comment for the diff section
-func (d *AppDiff) CommentHeader() string {
-	switch d.Action {
-	case ActionAdded:
-		return fmt.Sprintf("@@ Application added: %s (%s) @@\n", d.PrettyName(), d.PrettyPath())
-	case ActionDeleted:
-		return fmt.Sprintf("@@ Application deleted: %s (%s) @@\n", d.PrettyName(), d.PrettyPath())
-	case ActionModified:
-		return fmt.Sprintf("@@ Application modified: %s (%s) @@\n", d.PrettyName(), d.PrettyPath())
-	default:
-		return ""
-	}
+// HasContent returns true if the diff has any resource content to show
+func (d *AppDiff) HasContent() bool {
+	return len(d.Resources) > 0
 }
 
 // GenerateAppDiffs uses similarity matching to generate diffs between base and target apps.
@@ -190,33 +200,33 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string, ignore
 		return diff, nil
 	}
 
-	// Build combined diff content from all changed resources
-	content, added, deleted, err := buildCombinedResourceDiff(changedResources, contextLines, ignorePattern, ignoreResourceRules)
+	// Build per-resource diffs
+	resources, added, deleted, err := buildResourceDiffs(changedResources, contextLines, ignorePattern, ignoreResourceRules)
 	if err != nil {
 		return diff, err
 	}
 
 	// If all changes were filtered out by ignorePattern, mark as unchanged
-	if content == "" && diff.Action == ActionModified {
+	if len(resources) == 0 && diff.Action == ActionModified {
 		diff.Action = ActionUnchanged
 		return diff, nil
 	}
 
-	diff.Content = content
+	diff.Resources = resources
 	diff.AddedLines = added
 	diff.DeletedLines = deleted
 
 	return diff, nil
 }
 
-// buildCombinedResourceDiff combines diffs from multiple resources into a single diff output
-func buildCombinedResourceDiff(
+// buildResourceDiffs generates per-resource diffs for all changed resources in an app
+func buildResourceDiffs(
 	resources []ResourcePair,
 	contextLines uint,
 	ignorePattern *string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
-) (string, int, int, error) {
-	var parts []string
+) ([]ResourceDiff, int, int, error) {
+	var result []ResourceDiff
 	totalAdded := 0
 	totalDeleted := 0
 
@@ -249,32 +259,41 @@ func buildCombinedResourceDiff(
 	})
 
 	for _, rp := range sortedResources {
+		ref := getResourceRef(&rp)
+
 		// Check if this resource matches any ignore rules.
-		// If so, emit a "Skipped Resource" context line instead of the full diff.
+		// If so, emit a skipped resource entry instead of the full diff.
 		if len(ignoreResourceRules) > 0 && resourceMatchesIgnoreRules(&rp, ignoreResourceRules) {
-			ref := getResourceRef(&rp)
-			parts = append(parts, fmt.Sprintf(" Skipped Resource: [ApiVersion: %s, Kind: %s, Name: %s]\n", ref.apiVersion, ref.kind, ref.name))
+			result = append(result, ResourceDiff{
+				Kind:      ref.kind,
+				Name:      ref.name,
+				Namespace: ref.namespace,
+				IsSkipped: true,
+			})
 			continue
 		}
 
 		// Generate diff for this resource pair
-		result, err := generateResourceDiff(rp, contextLines, ignorePattern)
+		diffResult, err := generateResourceDiff(rp, contextLines, ignorePattern)
 		if err != nil {
-			return "", 0, 0, err
+			return nil, 0, 0, err
 		}
 
-		if result.Content != "" {
-			parts = append(parts, result.Content)
-			totalAdded += result.AddedLines
-			totalDeleted += result.DeletedLines
+		if diffResult.Content != "" {
+			result = append(result, ResourceDiff{
+				Kind:         ref.kind,
+				Name:         ref.name,
+				Namespace:    ref.namespace,
+				Content:      diffResult.Content,
+				AddedLines:   diffResult.AddedLines,
+				DeletedLines: diffResult.DeletedLines,
+			})
+			totalAdded += diffResult.AddedLines
+			totalDeleted += diffResult.DeletedLines
 		}
 	}
 
-	// Join all resource diffs with a separator between YAML documents
-	// Use space prefix for the separator to match unified diff format (context line)
-	combined := strings.Join(parts, " ---\n")
-
-	return combined, totalAdded, totalDeleted, nil
+	return result, totalAdded, totalDeleted, nil
 }
 
 // generateResourceDiff generates diff for a single resource pair with ignore pattern support
@@ -316,22 +335,23 @@ type resourceRef struct {
 }
 
 // getResourceRef extracts sort-relevant fields from a ResourcePair,
-// preferring the base resource if present.
+// preferring the target resource if present (since it represents the new state).
+// Falls back to base for deleted resources.
 func getResourceRef(rp *ResourcePair) resourceRef {
-	if rp.Base != nil {
-		return resourceRef{
-			apiVersion: rp.Base.GetAPIVersion(),
-			kind:       rp.Base.GetKind(),
-			namespace:  rp.Base.GetNamespace(),
-			name:       rp.Base.GetName(),
-		}
-	}
 	if rp.Target != nil {
 		return resourceRef{
 			apiVersion: rp.Target.GetAPIVersion(),
 			kind:       rp.Target.GetKind(),
 			namespace:  rp.Target.GetNamespace(),
 			name:       rp.Target.GetName(),
+		}
+	}
+	if rp.Base != nil {
+		return resourceRef{
+			apiVersion: rp.Base.GetAPIVersion(),
+			kind:       rp.Base.GetKind(),
+			namespace:  rp.Base.GetNamespace(),
+			name:       rp.Base.GetName(),
 		}
 	}
 	return resourceRef{}

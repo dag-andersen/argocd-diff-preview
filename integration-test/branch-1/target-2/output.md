@@ -12,8 +12,8 @@ Deleted (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-two
 ```diff
-@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -34,7 +34,6 @@ Deleted (1):
 -        ports:
 -        - containerPort: 80
 ```
-
 </details>
 
 _Stats_:

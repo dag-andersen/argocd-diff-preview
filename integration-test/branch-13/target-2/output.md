@@ -12,8 +12,8 @@ Added (1):
 <summary>label-selectors-example (examples/label-selectors/app.yaml)</summary>
 <br>
 
+#### Deployment/super-app-name (some-namespace)
 ```diff
-@@ Application added: label-selectors-example (examples/label-selectors/app.yaml) @@
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
@@ -60,7 +60,9 @@ Added (1):
 +        securityContext: {}
 +      securityContext: {}
 +      serviceAccountName: super-app-name
- ---
+```
+#### Service/super-app-name (some-namespace)
+```diff
 +apiVersion: v1
 +kind: Service
 +metadata:
@@ -82,7 +84,9 @@ Added (1):
 +    app.kubernetes.io/instance: label-selectors-example
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
- ---
+```
+#### ServiceAccount/super-app-name (some-namespace)
+```diff
 +apiVersion: v1
 +automountServiceAccountToken: true
 +kind: ServiceAccount
@@ -96,7 +100,6 @@ Added (1):
 +  name: super-app-name
 +  namespace: some-namespace
 ```
-
 </details>
 
 _Skipped resources_: 

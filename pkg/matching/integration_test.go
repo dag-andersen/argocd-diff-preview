@@ -720,12 +720,16 @@ data:
 		t.Errorf("expected name=my-app, got %s", d.PrettyName())
 	}
 
-	// Because resources are diffed individually and joined, the output shows:
+	// Because resources are diffed individually, the output is now per-resource:
 	// 1. my-config as modified (data changed from key:value to keyOne/keyThree/keyTwo)
-	// 2. A `---` separator between resource diffs
-	// 3. other-config as fully deleted (all lines prefixed with `-`)
+	// 2. other-config as fully deleted (all lines prefixed with `-`)
 	// Note: a plain `git diff` would instead show these as a single merged text blob.
-	expectedContent := ` apiVersion: v1
+	if len(d.Resources) != 2 {
+		t.Fatalf("expected 2 resource diffs, got %d", len(d.Resources))
+	}
+
+	// First resource: my-config (modified)
+	expectedMyConfig := ` apiVersion: v1
  data:
 -  key: value
 +  keyOne: "1"
@@ -735,8 +739,16 @@ data:
  metadata:
    name: my-config
    namespace: default
- ---
--apiVersion: v1
+`
+	if d.Resources[0].Kind != "ConfigMap" || d.Resources[0].Name != "my-config" {
+		t.Errorf("expected first resource to be ConfigMap/my-config, got %s/%s", d.Resources[0].Kind, d.Resources[0].Name)
+	}
+	if d.Resources[0].Content != expectedMyConfig {
+		t.Errorf("my-config diff mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedMyConfig, d.Resources[0].Content)
+	}
+
+	// Second resource: other-config (deleted)
+	expectedOtherConfig := `-apiVersion: v1
 -data:
 -  keyOne: "1"
 -  keyThree: "3"
@@ -746,14 +758,428 @@ data:
 -  name: other-config
 -  namespace: default
 `
-
-	if d.Content != expectedContent {
-		t.Errorf("diff content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, d.Content)
+	if d.Resources[1].Kind != "ConfigMap" || d.Resources[1].Name != "other-config" {
+		t.Errorf("expected second resource to be ConfigMap/other-config, got %s/%s", d.Resources[1].Kind, d.Resources[1].Name)
+	}
+	if d.Resources[1].Content != expectedOtherConfig {
+		t.Errorf("other-config diff mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedOtherConfig, d.Resources[1].Content)
 	}
 	if d.AddedLines != 3 {
 		t.Errorf("expected 3 added lines, got %d", d.AddedLines)
 	}
 	if d.DeletedLines != 10 {
 		t.Errorf("expected 10 deleted lines, got %d", d.DeletedLines)
+	}
+}
+
+// TestFullFlow_KindChangeWithUnchangedResources tests a kind change alongside unchanged resources.
+// The Deployment→StatefulSet change should appear as modified, while the unchanged Service
+// should be filtered out entirely (no diff output for identical resources).
+func TestFullFlow_KindChangeWithUnchangedResources(t *testing.T) {
+	serviceYAML := `apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  ports:
+  - port: 80
+  selector:
+    app: my-app`
+
+	baseDeploymentYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app`
+
+	targetStatefulSetYAML := `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseDeploymentYAML, serviceYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetStatefulSetYAML, serviceYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff (modified), got %d", len(diffs))
+	}
+
+	d := diffs[0]
+	if d.Action != ActionModified {
+		t.Errorf("expected action=modified, got %s", d.Action)
+	}
+
+	// Only the kind-changed resource should appear; the identical Service is filtered out
+	if len(d.Resources) != 1 {
+		t.Fatalf("expected 1 resource diff (only the kind change), got %d", len(d.Resources))
+	}
+
+	resource := d.Resources[0]
+	if resource.Kind != "StatefulSet" {
+		t.Errorf("expected resource kind=StatefulSet, got %s", resource.Kind)
+	}
+	if resource.Name != "my-app" {
+		t.Errorf("expected resource name=my-app, got %s", resource.Name)
+	}
+	if !strings.Contains(resource.Content, "-kind: Deployment") {
+		t.Error("expected diff to contain '-kind: Deployment'")
+	}
+	if !strings.Contains(resource.Content, "+kind: StatefulSet") {
+		t.Error("expected diff to contain '+kind: StatefulSet'")
+	}
+}
+
+// TestFullFlow_KindChangeWithContentChanges tests a kind change combined with spec changes.
+// Both the kind change and content changes should appear in a single modified resource diff.
+func TestFullFlow_KindChangeWithContentChanges(t *testing.T) {
+	baseYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.19`
+
+	targetYAML := `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.21`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff (modified), got %d", len(diffs))
+	}
+
+	d := diffs[0]
+	if d.Action != ActionModified {
+		t.Errorf("expected action=modified, got %s", d.Action)
+	}
+	if len(d.Resources) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(d.Resources))
+	}
+
+	resource := d.Resources[0]
+	if resource.Kind != "StatefulSet" {
+		t.Errorf("expected resource kind=StatefulSet, got %s", resource.Kind)
+	}
+
+	// Should show kind change, replicas change, and image change
+	if !strings.Contains(resource.Content, "-kind: Deployment") {
+		t.Error("expected diff to show kind change from Deployment")
+	}
+	if !strings.Contains(resource.Content, "+kind: StatefulSet") {
+		t.Error("expected diff to show kind change to StatefulSet")
+	}
+	if !strings.Contains(resource.Content, "-  replicas: 3") {
+		t.Error("expected diff to show replicas change from 3")
+	}
+	if !strings.Contains(resource.Content, "+  replicas: 5") {
+		t.Error("expected diff to show replicas change to 5")
+	}
+	if !strings.Contains(resource.Content, "image: nginx:1.19") {
+		t.Errorf("expected diff to show image change from 1.19, got:\n%s", resource.Content)
+	}
+	if !strings.Contains(resource.Content, "image: nginx:1.21") {
+		t.Errorf("expected diff to show image change to 1.21, got:\n%s", resource.Content)
+	}
+}
+
+// TestFullFlow_CompleteResourceReplacement tests that when a resource is completely replaced
+// (different name, different kind, different content), it shows as one deleted and one added
+// resource within the same app diff.
+func TestFullFlow_CompleteResourceReplacement(t *testing.T) {
+	baseYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: old-app
+  namespace: default
+spec:
+  replicas: 3`
+
+	targetYAML := `apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: new-job
+  namespace: default
+spec:
+  schedule: "*/5 * * * *"`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 app diff (modified), got %d", len(diffs))
+	}
+
+	d := diffs[0]
+	if d.Action != ActionModified {
+		t.Errorf("expected action=modified, got %s", d.Action)
+	}
+
+	// Two resource diffs: one deleted (Deployment/old-app) and one added (CronJob/new-job)
+	if len(d.Resources) != 2 {
+		t.Fatalf("expected 2 resource diffs, got %d", len(d.Resources))
+	}
+
+	// Resources are sorted by apiVersion, then kind, then name
+	// CronJob (batch/v1) comes after Deployment (apps/v1) alphabetically by apiVersion
+	deploymentRes := d.Resources[0]
+	cronJobRes := d.Resources[1]
+
+	if deploymentRes.Kind != "Deployment" || deploymentRes.Name != "old-app" {
+		t.Errorf("expected first resource to be Deployment/old-app, got %s/%s", deploymentRes.Kind, deploymentRes.Name)
+	}
+	// All lines should be deletions (prefixed with -)
+	for line := range strings.SplitSeq(strings.TrimSuffix(deploymentRes.Content, "\n"), "\n") {
+		if !strings.HasPrefix(line, "-") {
+			t.Errorf("expected all lines in deleted resource to start with '-', got: %q", line)
+			break
+		}
+	}
+
+	if cronJobRes.Kind != "CronJob" || cronJobRes.Name != "new-job" {
+		t.Errorf("expected second resource to be CronJob/new-job, got %s/%s", cronJobRes.Kind, cronJobRes.Name)
+	}
+	// All lines should be additions (prefixed with +)
+	for line := range strings.SplitSeq(strings.TrimSuffix(cronJobRes.Content, "\n"), "\n") {
+		if !strings.HasPrefix(line, "+") {
+			t.Errorf("expected all lines in added resource to start with '+', got: %q", line)
+			break
+		}
+	}
+}
+
+// TestFullFlow_MultipleKindChanges tests that multiple resources can change kind simultaneously.
+// Both a Deployment→StatefulSet and a ConfigMap→Secret change should produce a single
+// modified app diff with two modified resource entries.
+func TestFullFlow_MultipleKindChanges(t *testing.T) {
+	baseDeployYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3`
+
+	baseConfigYAML := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  key: value`
+
+	targetStatefulSetYAML := `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3`
+
+	targetSecretYAML := `apiVersion: v1
+kind: Secret
+metadata:
+  name: my-config
+  namespace: default
+data:
+  key: dmFsdWU=`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseDeployYAML, baseConfigYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetStatefulSetYAML, targetSecretYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 app diff (modified), got %d", len(diffs))
+	}
+
+	d := diffs[0]
+	if d.Action != ActionModified {
+		t.Errorf("expected action=modified, got %s", d.Action)
+	}
+
+	// Both resources changed kind, so we expect 2 resource diffs
+	if len(d.Resources) != 2 {
+		t.Fatalf("expected 2 resource diffs, got %d", len(d.Resources))
+	}
+
+	// Resources are sorted by apiVersion, kind, namespace, name.
+	// apps/v1 StatefulSet comes before v1 Secret (by apiVersion)
+	statefulSetRes := d.Resources[0]
+	secretRes := d.Resources[1]
+
+	if statefulSetRes.Kind != "StatefulSet" || statefulSetRes.Name != "my-app" {
+		t.Errorf("expected first resource to be StatefulSet/my-app, got %s/%s", statefulSetRes.Kind, statefulSetRes.Name)
+	}
+	if !strings.Contains(statefulSetRes.Content, "-kind: Deployment") {
+		t.Error("expected StatefulSet diff to show kind change from Deployment")
+	}
+	if !strings.Contains(statefulSetRes.Content, "+kind: StatefulSet") {
+		t.Error("expected StatefulSet diff to show kind change to StatefulSet")
+	}
+
+	if secretRes.Kind != "Secret" || secretRes.Name != "my-config" {
+		t.Errorf("expected second resource to be Secret/my-config, got %s/%s", secretRes.Kind, secretRes.Name)
+	}
+	if !strings.Contains(secretRes.Content, "-kind: ConfigMap") {
+		t.Error("expected Secret diff to show kind change from ConfigMap")
+	}
+	if !strings.Contains(secretRes.Content, "+kind: Secret") {
+		t.Error("expected Secret diff to show kind change to Secret")
+	}
+}
+
+// TestFullFlow_KindChange tests that changing a resource's kind (e.g. Deployment → StatefulSet)
+// with the same name+namespace produces a single modified diff, not separate deleted+added diffs.
+// Resources are matched by name+namespace first (regardless of kind), so a kind change is treated
+// as a modification of the existing resource.
+func TestFullFlow_KindChange(t *testing.T) {
+	baseDeploymentYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app`
+
+	targetStatefulSetYAML := `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseDeploymentYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetStatefulSetYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Resources are matched by name+namespace across kinds, so the Deployment→StatefulSet
+	// change produces a single modified diff showing the kind change.
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff (modified), got %d", len(diffs))
+	}
+
+	modifiedDiff := diffs[0]
+
+	if modifiedDiff.Action != ActionModified {
+		t.Errorf("expected diff action=modified, got %s", modifiedDiff.Action)
+	}
+	if modifiedDiff.PrettyName() != "my-app" {
+		t.Errorf("expected app name=my-app, got %s", modifiedDiff.PrettyName())
+	}
+	if len(modifiedDiff.Resources) != 1 {
+		t.Fatalf("expected 1 resource in modified diff, got %d", len(modifiedDiff.Resources))
+	}
+
+	// The resource header uses the target kind (StatefulSet)
+	resource := modifiedDiff.Resources[0]
+	if resource.Kind != "StatefulSet" {
+		t.Errorf("expected resource kind=StatefulSet, got %s", resource.Kind)
+	}
+	if resource.Name != "my-app" {
+		t.Errorf("expected resource name=my-app, got %s", resource.Name)
+	}
+	if resource.Header() != "StatefulSet/my-app (default)" {
+		t.Errorf("expected header 'StatefulSet/my-app (default)', got %q", resource.Header())
+	}
+
+	// The diff content should show the kind change
+	expectedDiff := ` apiVersion: apps/v1
+-kind: Deployment
++kind: StatefulSet
+ metadata:
+   name: my-app
+   namespace: default
+ spec:
+   replicas: 3
+   selector:
+     matchLabels:
+       app: my-app
+`
+	if resource.Content != expectedDiff {
+		t.Errorf("Kind change diff mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedDiff, resource.Content)
 	}
 }

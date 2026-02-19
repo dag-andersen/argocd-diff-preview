@@ -18,8 +18,8 @@ Modified (7):
 <summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-one
 ```diff
-@@ Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml) @@
        app: myapp
    template:
      metadata:
@@ -33,15 +33,14 @@ Modified (7):
 -        - containerPort: 80
 +        - containerPort: 8080
 ```
-
 </details>
 
 <details>
 <summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-one
 ```diff
-@@ Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml) @@
        app: myapp
    template:
      metadata:
@@ -55,15 +54,14 @@ Modified (7):
 -        - containerPort: 80
 +        - containerPort: 8080
 ```
-
 </details>
 
 <details>
 <summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-one
 ```diff
-@@ Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml) @@
        app: myapp
    template:
      metadata:
@@ -77,15 +75,14 @@ Modified (7):
 -        - containerPort: 80
 +        - containerPort: 8080
 ```
-
 </details>
 
 <details>
 <summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
+#### Deployment/deploy-from-folder-one
 ```diff
-@@ Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml) @@
        app: myapp
    template:
      metadata:
@@ -99,15 +96,14 @@ Modified (7):
 -        - containerPort: 80
 +        - containerPort: 8080
 ```
-
 </details>
 
 <details>
 <summary>my-app -> my-super-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
+#### Deployment/super-app-name (default)
 ```diff
-@@ Application modified: my-app -> my-super-app (examples/helm/applications/my-app.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -142,7 +138,9 @@ Modified (7):
          imagePullPolicy: IfNotPresent
          livenessProbe:
            httpGet:
- ---
+```
+#### Service/super-app-name (default)
+```diff
  apiVersion: v1
  kind: Service
  metadata:
@@ -166,7 +164,9 @@ Modified (7):
 +    app.kubernetes.io/instance: my-super-app
      app.kubernetes.io/name: myApp
    type: ClusterIP
- ---
+```
+#### ServiceAccount/super-app-name (default)
+```diff
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -181,15 +181,14 @@ Modified (7):
    name: super-app-name
    namespace: default
 ```
-
 </details>
 
 <details>
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
+#### Deployment/staging-myapp (default)
 ```diff
-@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
      spec:
        containers:
        - image: dag-andersen/myapp:latest
@@ -203,15 +202,14 @@ Modified (7):
 -            memory: 128Mi
 +            memory: 64Mi
 ```
-
 </details>
 
 <details>
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
 <br>
 
+#### Deployment/nginx-ingress-ingress-nginx-controller (default)
 ```diff
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml) @@
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0
          helm.sh/chart: ingress-nginx-4.10.0
@@ -235,7 +233,6 @@ Modified (7):
              fieldRef:
                fieldPath: metadata.name
 ```
-
 </details>
 
 _Stats_:

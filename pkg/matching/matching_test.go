@@ -154,9 +154,9 @@ func TestMatchApps_RenamedAppWithSimilarContent(t *testing.T) {
 }
 
 func TestMatchApps_SwappedContent(t *testing.T) {
-	// Test that matching is by CONTENT, not by ID
-	// If app-1 and app-2 swap their content, we should match by content similarity
-	// not by ID, resulting in cross-matching
+	// When apps have the same name but swapped content, name-first matching
+	// pairs them by name. This is correct: the user sees each app as "modified"
+	// (content changed), which matches their mental model of named applications.
 
 	deploymentA := makeResource("apps/v1", "Deployment", "default", "deploy-a", map[string]any{
 		"spec": map[string]any{
@@ -200,13 +200,13 @@ func TestMatchApps_SwappedContent(t *testing.T) {
 		},
 	})
 
-	// Base: app-1 has deploymentA, app-2 has deploymentB
+	// Base: app-one has deploymentA, app-two has deploymentB
 	baseApps := []extract.ExtractedApp{
 		makeApp("app-1", "app-one", []unstructured.Unstructured{deploymentA}),
 		makeApp("app-2", "app-two", []unstructured.Unstructured{deploymentB}),
 	}
 
-	// Target: SWAPPED - app-1 now has deploymentB, app-2 now has deploymentA
+	// Target: SWAPPED - app-one now has deploymentB, app-two now has deploymentA
 	targetApps := []extract.ExtractedApp{
 		makeApp("app-1", "app-one", []unstructured.Unstructured{deploymentB}),
 		makeApp("app-2", "app-two", []unstructured.Unstructured{deploymentA}),
@@ -218,37 +218,17 @@ func TestMatchApps_SwappedContent(t *testing.T) {
 		t.Fatalf("expected 2 pairs, got %d", len(pairs))
 	}
 
-	// Check that matching was done by content, not by ID
-	// base app-1 (deploymentA) should match target app-2 (deploymentA)
-	// base app-2 (deploymentB) should match target app-1 (deploymentB)
+	// Name-first matching pairs app-one↔app-one and app-two↔app-two.
+	// Each pair shows the app as "modified" with swapped content.
 	for _, p := range pairs {
 		if p.Base == nil || p.Target == nil {
-			t.Fatal("expected both base and target to be non-nil (content-based matching)")
+			t.Fatal("expected both base and target to be non-nil")
 		}
-
-		// The key insight: if base has deploymentA, target should also have deploymentA
-		baseHasDeployA := hasResourceNamed(p.Base.Manifests, "deploy-a")
-		targetHasDeployA := hasResourceNamed(p.Target.Manifests, "deploy-a")
-		baseHasDeployB := hasResourceNamed(p.Base.Manifests, "deploy-b")
-		targetHasDeployB := hasResourceNamed(p.Target.Manifests, "deploy-b")
-
-		if baseHasDeployA && !targetHasDeployA {
-			t.Errorf("base has deploy-a but target doesn't - should have matched by content")
-		}
-		if baseHasDeployB && !targetHasDeployB {
-			t.Errorf("base has deploy-b but target doesn't - should have matched by content")
+		// Same-name apps should be matched together
+		if p.Base.Name != p.Target.Name {
+			t.Errorf("expected same-name match, got base=%s target=%s", p.Base.Name, p.Target.Name)
 		}
 	}
-}
-
-// hasResourceNamed checks if any manifest has the given name
-func hasResourceNamed(manifests []unstructured.Unstructured, name string) bool {
-	for _, m := range manifests {
-		if m.GetName() == name {
-			return true
-		}
-	}
-	return false
 }
 
 func TestMatchApps_CompletelyDifferentApps(t *testing.T) {
@@ -365,6 +345,163 @@ func TestMatchApps_EmptyLists(t *testing.T) {
 
 	if len(pairs) != 0 {
 		t.Errorf("expected 0 pairs for empty inputs, got %d", len(pairs))
+	}
+}
+
+func TestMatchApps_NearlyIdenticalAppSetApps(t *testing.T) {
+	// Simulates ApplicationSet-generated apps (prod, staging, dev) that produce
+	// nearly identical resources — differing only by the app.kubernetes.io/instance label.
+	// These MUST be matched by name to avoid non-deterministic cross-matching.
+
+	makeAppSetResource := func(kind, name, namespace, instance string) unstructured.Unstructured {
+		return makeResource("apps/v1", kind, namespace, name, map[string]any{
+			"metadata": map[string]any{
+				"name":      name,
+				"namespace": namespace,
+				"labels": map[string]any{
+					"app.kubernetes.io/instance": instance,
+					"app.kubernetes.io/name":     name,
+				},
+			},
+			"spec": map[string]any{
+				"replicas": int64(3),
+				"selector": map[string]any{
+					"matchLabels": map[string]any{
+						"app.kubernetes.io/instance": instance,
+					},
+				},
+			},
+		})
+	}
+
+	makeAppSetApp := func(envName string) extract.ExtractedApp {
+		appName := "my-app-set-" + envName
+		return extract.ExtractedApp{
+			Id:         appName,
+			Name:       appName,
+			SourcePath: "examples/helm/charts/myApp",
+			Manifests: []unstructured.Unstructured{
+				makeAppSetResource("Deployment", "super-app-name", "default", appName),
+				makeAppSetResource("Service", "super-app-name", "default", appName),
+				makeResource("v1", "ServiceAccount", "default", "super-app-name", map[string]any{
+					"metadata": map[string]any{
+						"name":      "super-app-name",
+						"namespace": "default",
+						"labels": map[string]any{
+							"app.kubernetes.io/instance": appName,
+							"app.kubernetes.io/name":     "super-app-name",
+						},
+					},
+				}),
+			},
+			Branch: git.Base,
+		}
+	}
+
+	// All three apps have identical manifests between base and target
+	// (only the instance label varies between apps, not between branches)
+	baseApps := []extract.ExtractedApp{
+		makeAppSetApp("prod"),
+		makeAppSetApp("staging"),
+		makeAppSetApp("dev"),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppSetApp("dev"),
+		makeAppSetApp("prod"),
+		makeAppSetApp("staging"),
+	}
+
+	// Run matching 10 times to verify determinism
+	for run := range 10 {
+		pairs := MatchApps(baseApps, targetApps)
+
+		if len(pairs) != 3 {
+			t.Fatalf("run %d: expected 3 pairs, got %d", run, len(pairs))
+		}
+
+		for _, p := range pairs {
+			if p.Base == nil || p.Target == nil {
+				t.Fatalf("run %d: expected all pairs to be matched (no additions/deletions)", run)
+			}
+			if p.Base.Name != p.Target.Name {
+				t.Errorf("run %d: expected same-name match, got base=%s target=%s (app-level swap detected!)",
+					run, p.Base.Name, p.Target.Name)
+			}
+		}
+	}
+}
+
+func TestMatchApps_RenamedAppFallsToSimilarity(t *testing.T) {
+	// When an app is genuinely renamed (different name on both sides),
+	// Phase 2 similarity matching should still find the correct pairing.
+	deployment := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{
+			"replicas": int64(3),
+			"selector": map[string]any{
+				"matchLabels": map[string]any{
+					"app": "my-app",
+				},
+			},
+		},
+	})
+
+	baseApps := []extract.ExtractedApp{
+		{Id: "old-id", Name: "old-app-name", SourcePath: "/path/to/app", Manifests: []unstructured.Unstructured{deployment}, Branch: git.Base},
+	}
+	targetApps := []extract.ExtractedApp{
+		{Id: "new-id", Name: "new-app-name", SourcePath: "/path/to/app", Manifests: []unstructured.Unstructured{deployment}, Branch: git.Target},
+	}
+
+	pairs := MatchApps(baseApps, targetApps)
+
+	if len(pairs) != 1 {
+		t.Fatalf("expected 1 pair, got %d", len(pairs))
+	}
+	if pairs[0].Base == nil || pairs[0].Target == nil {
+		t.Fatal("expected matched pair (both non-nil)")
+	}
+	if pairs[0].Base.Name != "old-app-name" || pairs[0].Target.Name != "new-app-name" {
+		t.Errorf("expected old-app-name↔new-app-name, got %s↔%s", pairs[0].Base.Name, pairs[0].Target.Name)
+	}
+}
+
+func TestMatchApps_DuplicateNamesWithDifferentPaths(t *testing.T) {
+	// Two apps share the same name "app1" but have different source paths.
+	// Phase 1 (name+path) should match each to its correct counterpart,
+	// NOT blindly pair them by positional index within the name group.
+	service := makeResource("v1", "Service", "", "my-service", map[string]any{
+		"spec": map[string]any{
+			"ports": []any{
+				map[string]any{"port": int64(80)},
+			},
+		},
+	})
+
+	baseApps := []extract.ExtractedApp{
+		{Id: "id-1", Name: "app1", SourcePath: "path/set-1", Manifests: []unstructured.Unstructured{service}, Branch: git.Base},
+		{Id: "id-2", Name: "app1", SourcePath: "path/set-2", Manifests: []unstructured.Unstructured{service}, Branch: git.Base},
+	}
+	// Target in different order
+	targetApps := []extract.ExtractedApp{
+		{Id: "id-2", Name: "app1", SourcePath: "path/set-2", Manifests: []unstructured.Unstructured{service}, Branch: git.Target},
+		{Id: "id-1", Name: "app1", SourcePath: "path/set-1", Manifests: []unstructured.Unstructured{service}, Branch: git.Target},
+	}
+
+	pairs := MatchApps(baseApps, targetApps)
+
+	if len(pairs) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(pairs))
+	}
+
+	for _, p := range pairs {
+		if p.Base == nil || p.Target == nil {
+			t.Fatal("expected both base and target to be non-nil")
+		}
+		// Same source path must be matched together
+		if p.Base.SourcePath != p.Target.SourcePath {
+			t.Errorf("expected same source path match, got base=%s target=%s",
+				p.Base.SourcePath, p.Target.SourcePath)
+		}
 	}
 }
 
@@ -1041,10 +1178,10 @@ func TestResourceMatchesIgnoreRules_BothNil(t *testing.T) {
 	}
 }
 
-// Tests for buildCombinedResourceDiff with ignore rules
+// Tests for buildResourceDiffs with ignore rules
 
-func TestBuildCombinedResourceDiff_SkippedResourceLine(t *testing.T) {
-	// A modified resource that matches an ignore rule should produce a "Skipped Resource" line
+func TestBuildResourceDiffs_SkippedResource(t *testing.T) {
+	// A modified resource that matches an ignore rule should produce a skipped ResourceDiff
 	base := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
 		"spec": map[string]any{"replicas": int64(3)},
 	})
@@ -1057,19 +1194,22 @@ func TestBuildCombinedResourceDiff_SkippedResourceLine(t *testing.T) {
 		{Group: "apps", Kind: "Deployment", Name: "my-deploy"},
 	}
 
-	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(content, "Skipped Resource:") {
-		t.Errorf("expected 'Skipped Resource:' in output, got: %s", content)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(result))
 	}
-	if !strings.Contains(content, "Kind: Deployment") {
-		t.Errorf("expected 'Kind: Deployment' in output, got: %s", content)
+	if !result[0].IsSkipped {
+		t.Error("expected resource to be marked as skipped")
 	}
-	if !strings.Contains(content, "Name: my-deploy") {
-		t.Errorf("expected 'Name: my-deploy' in output, got: %s", content)
+	if result[0].Kind != "Deployment" {
+		t.Errorf("expected Kind=Deployment, got %s", result[0].Kind)
+	}
+	if result[0].Name != "my-deploy" {
+		t.Errorf("expected Name=my-deploy, got %s", result[0].Name)
 	}
 	// Skipped resources should not count as added/deleted
 	if added != 0 || deleted != 0 {
@@ -1077,7 +1217,7 @@ func TestBuildCombinedResourceDiff_SkippedResourceLine(t *testing.T) {
 	}
 }
 
-func TestBuildCombinedResourceDiff_MixSkippedAndNormal(t *testing.T) {
+func TestBuildResourceDiffs_MixSkippedAndNormal(t *testing.T) {
 	// One resource is ignored, another is not — should see both in output
 	deployBase := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
 		"spec": map[string]any{"replicas": int64(3)},
@@ -1101,22 +1241,40 @@ func TestBuildCombinedResourceDiff_MixSkippedAndNormal(t *testing.T) {
 		{Group: "apps", Kind: "Deployment", Name: "*"},
 	}
 
-	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should have the skipped line for Deployment
-	if !strings.Contains(content, "Skipped Resource:") {
-		t.Errorf("expected 'Skipped Resource:' for ignored Deployment, got: %s", content)
-	}
-	if !strings.Contains(content, "Kind: Deployment") {
-		t.Errorf("expected 'Kind: Deployment' in skipped line, got: %s", content)
+	if len(result) != 2 {
+		t.Fatalf("expected 2 resource diffs, got %d", len(result))
 	}
 
-	// Should have actual diff for ConfigMap (old-value -> new-value)
-	if !strings.Contains(content, "old-value") || !strings.Contains(content, "new-value") {
-		t.Errorf("expected ConfigMap diff with old-value/new-value in output, got: %s", content)
+	// Find skipped and normal entries
+	var skipped, normal *ResourceDiff
+	for i := range result {
+		if result[i].IsSkipped {
+			skipped = &result[i]
+		} else {
+			normal = &result[i]
+		}
+	}
+
+	if skipped == nil {
+		t.Fatal("expected one skipped resource")
+	}
+	if skipped.Kind != "Deployment" {
+		t.Errorf("expected skipped Kind=Deployment, got %s", skipped.Kind)
+	}
+
+	if normal == nil {
+		t.Fatal("expected one normal resource")
+	}
+	if normal.Kind != "ConfigMap" {
+		t.Errorf("expected normal Kind=ConfigMap, got %s", normal.Kind)
+	}
+	if !strings.Contains(normal.Content, "old-value") || !strings.Contains(normal.Content, "new-value") {
+		t.Errorf("expected ConfigMap diff with old-value/new-value, got: %s", normal.Content)
 	}
 
 	// Only the ConfigMap change should count
@@ -1125,7 +1283,7 @@ func TestBuildCombinedResourceDiff_MixSkippedAndNormal(t *testing.T) {
 	}
 }
 
-func TestBuildCombinedResourceDiff_NoIgnoreRules(t *testing.T) {
+func TestBuildResourceDiffs_NoIgnoreRules(t *testing.T) {
 	// Without ignore rules, changed resources should produce normal diffs
 	base := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
 		"data": map[string]any{"key": "old"},
@@ -1136,21 +1294,24 @@ func TestBuildCombinedResourceDiff_NoIgnoreRules(t *testing.T) {
 
 	resources := []ResourcePair{{Base: &base, Target: &target}}
 
-	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, nil)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if strings.Contains(content, "Skipped Resource:") {
-		t.Errorf("expected no 'Skipped Resource:' without ignore rules, got: %s", content)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(result))
+	}
+	if result[0].IsSkipped {
+		t.Error("expected resource NOT to be skipped without ignore rules")
 	}
 	if added == 0 || deleted == 0 {
 		t.Errorf("expected nonzero added/deleted, got added=%d deleted=%d", added, deleted)
 	}
 }
 
-func TestBuildCombinedResourceDiff_AllSkipped(t *testing.T) {
-	// When all resources are ignored, output should only contain skipped lines
+func TestBuildResourceDiffs_AllSkipped(t *testing.T) {
+	// When all resources are ignored, output should only contain skipped entries
 	deploy := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
 		"spec": map[string]any{"replicas": int64(3)},
 	})
@@ -1167,15 +1328,20 @@ func TestBuildCombinedResourceDiff_AllSkipped(t *testing.T) {
 		{Group: "*", Kind: "*", Name: "*"},
 	}
 
-	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should have two skipped lines
-	count := strings.Count(content, "Skipped Resource:")
-	if count != 2 {
-		t.Errorf("expected 2 'Skipped Resource:' lines, got %d in output: %s", count, content)
+	// Should have two skipped entries
+	skippedCount := 0
+	for _, r := range result {
+		if r.IsSkipped {
+			skippedCount++
+		}
+	}
+	if skippedCount != 2 {
+		t.Errorf("expected 2 skipped resources, got %d", skippedCount)
 	}
 
 	if added != 0 || deleted != 0 {
@@ -1183,7 +1349,7 @@ func TestBuildCombinedResourceDiff_AllSkipped(t *testing.T) {
 	}
 }
 
-func TestBuildCombinedResourceDiff_SkippedAddedResource(t *testing.T) {
+func TestBuildResourceDiffs_SkippedAddedResource(t *testing.T) {
 	// A newly added resource that matches an ignore rule should show as skipped
 	target := makeResource("v1", "Secret", "default", "my-secret", map[string]any{
 		"data": map[string]any{"password": "hunter2"},
@@ -1194,23 +1360,26 @@ func TestBuildCombinedResourceDiff_SkippedAddedResource(t *testing.T) {
 		{Group: "*", Kind: "Secret", Name: "*"},
 	}
 
-	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(content, "Skipped Resource:") {
-		t.Errorf("expected 'Skipped Resource:' for added ignored resource, got: %s", content)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(result))
 	}
-	if !strings.Contains(content, "Kind: Secret") {
-		t.Errorf("expected 'Kind: Secret' in skipped line, got: %s", content)
+	if !result[0].IsSkipped {
+		t.Error("expected added resource to be marked as skipped")
+	}
+	if result[0].Kind != "Secret" {
+		t.Errorf("expected Kind=Secret, got %s", result[0].Kind)
 	}
 	if added != 0 || deleted != 0 {
 		t.Errorf("expected 0 added/deleted for skipped resource, got added=%d deleted=%d", added, deleted)
 	}
 }
 
-func TestBuildCombinedResourceDiff_SkippedDeletedResource(t *testing.T) {
+func TestBuildResourceDiffs_SkippedDeletedResource(t *testing.T) {
 	// A deleted resource that matches an ignore rule should show as skipped
 	base := makeResource("v1", "Secret", "default", "my-secret", map[string]any{
 		"data": map[string]any{"password": "hunter2"},
@@ -1221,21 +1390,24 @@ func TestBuildCombinedResourceDiff_SkippedDeletedResource(t *testing.T) {
 		{Group: "*", Kind: "Secret", Name: "*"},
 	}
 
-	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(content, "Skipped Resource:") {
-		t.Errorf("expected 'Skipped Resource:' for deleted ignored resource, got: %s", content)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(result))
+	}
+	if !result[0].IsSkipped {
+		t.Error("expected deleted resource to be marked as skipped")
 	}
 	if added != 0 || deleted != 0 {
 		t.Errorf("expected 0 added/deleted for skipped resource, got added=%d deleted=%d", added, deleted)
 	}
 }
 
-func TestBuildCombinedResourceDiff_SkippedResourceFormat(t *testing.T) {
-	// Verify the exact format of the skipped resource line
+func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
+	// Verify the Header() method works correctly for skipped resources
 	base := makeResource("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "apps.example.com", nil)
 	target := makeResource("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "apps.example.com", map[string]any{
 		"spec": map[string]any{"group": "example.com"},
@@ -1246,13 +1418,20 @@ func TestBuildCombinedResourceDiff_SkippedResourceFormat(t *testing.T) {
 		{Group: "*", Kind: "CustomResourceDefinition", Name: "*"},
 	}
 
-	content, _, _, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	result, _, _, err := buildResourceDiffs(resources, 3, nil, rules)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := " Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: apps.example.com]"
-	if !strings.Contains(content, expected) {
-		t.Errorf("expected exact format %q, got: %s", expected, content)
+	if len(result) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(result))
+	}
+	if !result[0].IsSkipped {
+		t.Error("expected resource to be marked as skipped")
+	}
+	// CRDs are cluster-scoped (no namespace), so header should be Kind/Name without parens
+	expectedHeader := "CustomResourceDefinition/apps.example.com"
+	if result[0].Header() != expectedHeader {
+		t.Errorf("expected header %q, got %q", expectedHeader, result[0].Header())
 	}
 }

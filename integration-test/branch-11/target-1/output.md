@@ -8,7 +8,13 @@ Added (1):
 + empty-application
 ```
 
-No changes found
+<details>
+<summary>empty-application (examples/empty-app/app.yaml)</summary>
+<br>
+
+_No resources rendered_
+
+</details>
 
 _Stats_:
 [Applications: 1], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
