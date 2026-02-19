@@ -660,3 +660,100 @@ spec:
 		t.Errorf("expected diff to contain '@@ skipped' indicator for separated chunks, got:\n%s", diff.Content)
 	}
 }
+
+// TestFullFlow_TwoBaseResourcesOneTarget documents the current behavior when base has 2 resources
+// and target has 1 resource whose content resembles the deleted resource's data.
+// Because resources are matched individually (by name/kind/content similarity), the output shows
+// my-config as a modified resource and other-config as a separately deleted resource, joined by
+// a `---` separator. This differs from a plain `git diff` which would show them as a single
+// merged text blob.
+func TestFullFlow_TwoBaseResourcesOneTarget(t *testing.T) {
+	baseConfigYAML := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  key: value`
+
+	baseOtherConfigYAML := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: other-config
+  namespace: default
+data:
+  keyOne: "1"
+  keyTwo: "2"
+  keyThree: "3"`
+
+	targetConfigYAML := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+  namespace: default
+data:
+  keyOne: "1"
+  keyTwo: "2"
+  keyThree: "3"`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseConfigYAML, baseOtherConfigYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetConfigYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff, got %d", len(diffs))
+	}
+
+	d := diffs[0]
+	if d.Action != ActionModified {
+		t.Errorf("expected action=modified, got %s", d.Action)
+	}
+	if d.PrettyName() != "my-app" {
+		t.Errorf("expected name=my-app, got %s", d.PrettyName())
+	}
+
+	// Because resources are diffed individually and joined, the output shows:
+	// 1. my-config as modified (data changed from key:value to keyOne/keyThree/keyTwo)
+	// 2. A `---` separator between resource diffs
+	// 3. other-config as fully deleted (all lines prefixed with `-`)
+	// Note: a plain `git diff` would instead show these as a single merged text blob.
+	expectedContent := ` apiVersion: v1
+ data:
+-  key: value
++  keyOne: "1"
++  keyThree: "3"
++  keyTwo: "2"
+ kind: ConfigMap
+ metadata:
+   name: my-config
+   namespace: default
+ ---
+-apiVersion: v1
+-data:
+-  keyOne: "1"
+-  keyThree: "3"
+-  keyTwo: "2"
+-kind: ConfigMap
+-metadata:
+-  name: other-config
+-  namespace: default
+`
+
+	if d.Content != expectedContent {
+		t.Errorf("diff content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, d.Content)
+	}
+	if d.AddedLines != 3 {
+		t.Errorf("expected 3 added lines, got %d", d.AddedLines)
+	}
+	if d.DeletedLines != 10 {
+		t.Errorf("expected 10 deleted lines, got %d", d.DeletedLines)
+	}
+}
