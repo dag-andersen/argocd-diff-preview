@@ -7,6 +7,7 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -968,5 +969,290 @@ func TestResourcePair_Diff_ContextLines(t *testing.T) {
 	// But more context should result in more total content
 	if len(result10.Content) <= len(result0.Content) {
 		t.Error("expected more content with more context lines")
+	}
+}
+
+// Tests for resourceMatchesIgnoreRules
+
+func TestResourceMatchesIgnoreRules_BaseMatches(t *testing.T) {
+	base := makeResource("apps/v1", "Deployment", "default", "my-deploy", nil)
+	rp := ResourcePair{Base: &base, Target: nil}
+
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "apps", Kind: "Deployment", Name: "my-deploy"},
+	}
+
+	if !resourceMatchesIgnoreRules(&rp, rules) {
+		t.Error("expected resource to match ignore rule via base")
+	}
+}
+
+func TestResourceMatchesIgnoreRules_TargetMatches(t *testing.T) {
+	target := makeResource("v1", "ConfigMap", "default", "my-config", nil)
+	rp := ResourcePair{Base: nil, Target: &target}
+
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "", Kind: "ConfigMap", Name: "my-config"},
+	}
+
+	if !resourceMatchesIgnoreRules(&rp, rules) {
+		t.Error("expected resource to match ignore rule via target")
+	}
+}
+
+func TestResourceMatchesIgnoreRules_NoMatch(t *testing.T) {
+	base := makeResource("apps/v1", "Deployment", "default", "my-deploy", nil)
+	target := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{"replicas": int64(5)},
+	})
+	rp := ResourcePair{Base: &base, Target: &target}
+
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "", Kind: "ConfigMap", Name: "*"},
+	}
+
+	if resourceMatchesIgnoreRules(&rp, rules) {
+		t.Error("expected resource NOT to match ignore rule")
+	}
+}
+
+func TestResourceMatchesIgnoreRules_WildcardKind(t *testing.T) {
+	base := makeResource("v1", "Secret", "default", "my-secret", nil)
+	rp := ResourcePair{Base: &base, Target: nil}
+
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "*", Kind: "Secret", Name: "*"},
+	}
+
+	if !resourceMatchesIgnoreRules(&rp, rules) {
+		t.Error("expected wildcard rule to match")
+	}
+}
+
+func TestResourceMatchesIgnoreRules_BothNil(t *testing.T) {
+	rp := ResourcePair{Base: nil, Target: nil}
+
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "*", Kind: "*", Name: "*"},
+	}
+
+	if resourceMatchesIgnoreRules(&rp, rules) {
+		t.Error("expected no match when both base and target are nil")
+	}
+}
+
+// Tests for buildCombinedResourceDiff with ignore rules
+
+func TestBuildCombinedResourceDiff_SkippedResourceLine(t *testing.T) {
+	// A modified resource that matches an ignore rule should produce a "Skipped Resource" line
+	base := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{"replicas": int64(3)},
+	})
+	target := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{"replicas": int64(5)},
+	})
+
+	resources := []ResourcePair{{Base: &base, Target: &target}}
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "apps", Kind: "Deployment", Name: "my-deploy"},
+	}
+
+	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(content, "Skipped Resource:") {
+		t.Errorf("expected 'Skipped Resource:' in output, got: %s", content)
+	}
+	if !strings.Contains(content, "Kind: Deployment") {
+		t.Errorf("expected 'Kind: Deployment' in output, got: %s", content)
+	}
+	if !strings.Contains(content, "Name: my-deploy") {
+		t.Errorf("expected 'Name: my-deploy' in output, got: %s", content)
+	}
+	// Skipped resources should not count as added/deleted
+	if added != 0 || deleted != 0 {
+		t.Errorf("expected 0 added/deleted for skipped resource, got added=%d deleted=%d", added, deleted)
+	}
+}
+
+func TestBuildCombinedResourceDiff_MixSkippedAndNormal(t *testing.T) {
+	// One resource is ignored, another is not — should see both in output
+	deployBase := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{"replicas": int64(3)},
+	})
+	deployTarget := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{"replicas": int64(5)},
+	})
+	configBase := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "old-value"},
+	})
+	configTarget := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "new-value"},
+	})
+
+	resources := []ResourcePair{
+		{Base: &deployBase, Target: &deployTarget},
+		{Base: &configBase, Target: &configTarget},
+	}
+	// Only ignore the Deployment, not the ConfigMap
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "apps", Kind: "Deployment", Name: "*"},
+	}
+
+	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have the skipped line for Deployment
+	if !strings.Contains(content, "Skipped Resource:") {
+		t.Errorf("expected 'Skipped Resource:' for ignored Deployment, got: %s", content)
+	}
+	if !strings.Contains(content, "Kind: Deployment") {
+		t.Errorf("expected 'Kind: Deployment' in skipped line, got: %s", content)
+	}
+
+	// Should have actual diff for ConfigMap (old-value -> new-value)
+	if !strings.Contains(content, "old-value") || !strings.Contains(content, "new-value") {
+		t.Errorf("expected ConfigMap diff with old-value/new-value in output, got: %s", content)
+	}
+
+	// Only the ConfigMap change should count
+	if added == 0 || deleted == 0 {
+		t.Errorf("expected nonzero added/deleted from ConfigMap diff, got added=%d deleted=%d", added, deleted)
+	}
+}
+
+func TestBuildCombinedResourceDiff_NoIgnoreRules(t *testing.T) {
+	// Without ignore rules, changed resources should produce normal diffs
+	base := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "old"},
+	})
+	target := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "new"},
+	})
+
+	resources := []ResourcePair{{Base: &base, Target: &target}}
+
+	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(content, "Skipped Resource:") {
+		t.Errorf("expected no 'Skipped Resource:' without ignore rules, got: %s", content)
+	}
+	if added == 0 || deleted == 0 {
+		t.Errorf("expected nonzero added/deleted, got added=%d deleted=%d", added, deleted)
+	}
+}
+
+func TestBuildCombinedResourceDiff_AllSkipped(t *testing.T) {
+	// When all resources are ignored, output should only contain skipped lines
+	deploy := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
+		"spec": map[string]any{"replicas": int64(3)},
+	})
+	config := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	// Added deployment + deleted configmap — both ignored
+	resources := []ResourcePair{
+		{Base: nil, Target: &deploy},
+		{Base: &config, Target: nil},
+	}
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "*", Kind: "*", Name: "*"},
+	}
+
+	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have two skipped lines
+	count := strings.Count(content, "Skipped Resource:")
+	if count != 2 {
+		t.Errorf("expected 2 'Skipped Resource:' lines, got %d in output: %s", count, content)
+	}
+
+	if added != 0 || deleted != 0 {
+		t.Errorf("expected 0 added/deleted when all resources skipped, got added=%d deleted=%d", added, deleted)
+	}
+}
+
+func TestBuildCombinedResourceDiff_SkippedAddedResource(t *testing.T) {
+	// A newly added resource that matches an ignore rule should show as skipped
+	target := makeResource("v1", "Secret", "default", "my-secret", map[string]any{
+		"data": map[string]any{"password": "hunter2"},
+	})
+
+	resources := []ResourcePair{{Base: nil, Target: &target}}
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "*", Kind: "Secret", Name: "*"},
+	}
+
+	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(content, "Skipped Resource:") {
+		t.Errorf("expected 'Skipped Resource:' for added ignored resource, got: %s", content)
+	}
+	if !strings.Contains(content, "Kind: Secret") {
+		t.Errorf("expected 'Kind: Secret' in skipped line, got: %s", content)
+	}
+	if added != 0 || deleted != 0 {
+		t.Errorf("expected 0 added/deleted for skipped resource, got added=%d deleted=%d", added, deleted)
+	}
+}
+
+func TestBuildCombinedResourceDiff_SkippedDeletedResource(t *testing.T) {
+	// A deleted resource that matches an ignore rule should show as skipped
+	base := makeResource("v1", "Secret", "default", "my-secret", map[string]any{
+		"data": map[string]any{"password": "hunter2"},
+	})
+
+	resources := []ResourcePair{{Base: &base, Target: nil}}
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "*", Kind: "Secret", Name: "*"},
+	}
+
+	content, added, deleted, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(content, "Skipped Resource:") {
+		t.Errorf("expected 'Skipped Resource:' for deleted ignored resource, got: %s", content)
+	}
+	if added != 0 || deleted != 0 {
+		t.Errorf("expected 0 added/deleted for skipped resource, got added=%d deleted=%d", added, deleted)
+	}
+}
+
+func TestBuildCombinedResourceDiff_SkippedResourceFormat(t *testing.T) {
+	// Verify the exact format of the skipped resource line
+	base := makeResource("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "apps.example.com", nil)
+	target := makeResource("apiextensions.k8s.io/v1", "CustomResourceDefinition", "", "apps.example.com", map[string]any{
+		"spec": map[string]any{"group": "example.com"},
+	})
+
+	resources := []ResourcePair{{Base: &base, Target: &target}}
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "*", Kind: "CustomResourceDefinition", Name: "*"},
+	}
+
+	content, _, _, err := buildCombinedResourceDiff(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := " Skipped Resource: [ApiVersion: apiextensions.k8s.io/v1, Kind: CustomResourceDefinition, Name: apps.example.com]"
+	if !strings.Contains(content, expected) {
+		t.Errorf("expected exact format %q, got: %s", expected, content)
 	}
 }
