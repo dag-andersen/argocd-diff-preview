@@ -109,18 +109,8 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	}
 
 	// Phase 2: Match remaining by name+namespace across kinds (for kind changes)
-	var unmatchedBase []int
-	for i := range baseManifests {
-		if !matchedBaseIndices[i] {
-			unmatchedBase = append(unmatchedBase, i)
-		}
-	}
-	var unmatchedTarget []int
-	for i := range targetManifests {
-		if !matchedTargetIndices[i] {
-			unmatchedTarget = append(unmatchedTarget, i)
-		}
-	}
+	unmatchedBase := unmatchedIndices(len(baseManifests), matchedBaseIndices)
+	unmatchedTarget := unmatchedIndices(len(targetManifests), matchedTargetIndices)
 
 	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
 		baseByKey := make(map[string][]int) // namespace/name -> indices
@@ -159,18 +149,8 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	}
 
 	// Phase 3: Match remaining within the same kind by content similarity
-	unmatchedBase = nil
-	for i := range baseManifests {
-		if !matchedBaseIndices[i] {
-			unmatchedBase = append(unmatchedBase, i)
-		}
-	}
-	unmatchedTarget = nil
-	for i := range targetManifests {
-		if !matchedTargetIndices[i] {
-			unmatchedTarget = append(unmatchedTarget, i)
-		}
-	}
+	unmatchedBase = unmatchedIndices(len(baseManifests), matchedBaseIndices)
+	unmatchedTarget = unmatchedIndices(len(targetManifests), matchedTargetIndices)
 
 	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
 		kindPairs := matchUnmatchedByKind(baseManifests, targetManifests, unmatchedBase, unmatchedTarget)
@@ -192,18 +172,8 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	}
 
 	// Phase 4: Final fallback - match across ANY kind by similarity, with lower threshold
-	unmatchedBase = nil
-	for i := range baseManifests {
-		if !matchedBaseIndices[i] {
-			unmatchedBase = append(unmatchedBase, i)
-		}
-	}
-	unmatchedTarget = nil
-	for i := range targetManifests {
-		if !matchedTargetIndices[i] {
-			unmatchedTarget = append(unmatchedTarget, i)
-		}
-	}
+	unmatchedBase = unmatchedIndices(len(baseManifests), matchedBaseIndices)
+	unmatchedTarget = unmatchedIndices(len(targetManifests), matchedTargetIndices)
 
 	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
 		similarityMatches := matchResourcesBySimilarity(baseManifests, targetManifests, unmatchedBase, unmatchedTarget, similarityThresholdCrossKind)
@@ -221,20 +191,10 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	}
 
 	// Remaining unmatched base resources are deletions
-	unmatchedBase = nil
-	for i := range baseManifests {
-		if !matchedBaseIndices[i] {
-			unmatchedBase = append(unmatchedBase, i)
-		}
-	}
+	unmatchedBase = unmatchedIndices(len(baseManifests), matchedBaseIndices)
 
 	// Remaining unmatched target resources are additions
-	unmatchedTarget = nil
-	for i := range targetManifests {
-		if !matchedTargetIndices[i] {
-			unmatchedTarget = append(unmatchedTarget, i)
-		}
-	}
+	unmatchedTarget = unmatchedIndices(len(targetManifests), matchedTargetIndices)
 
 	// Now add the final additions and deletions that couldn't be matched at all
 	for _, idx := range unmatchedBase {
@@ -251,6 +211,17 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	}
 
 	return changedPairs
+}
+
+// unmatchedIndices returns the indices from 0..n-1 that are NOT in the matched map.
+func unmatchedIndices(n int, matched map[int]bool) []int {
+	var result []int
+	for i := range n {
+		if !matched[i] {
+			result = append(result, i)
+		}
+	}
+	return result
 }
 
 // fullResourceKey returns a string key for a resource (kind/namespace/name)
@@ -377,18 +348,8 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 	}
 
 	// Collect unmatched
-	var unmatchedBase []int
-	for i := range baseResources {
-		if !matchedBaseIndices[i] {
-			unmatchedBase = append(unmatchedBase, i)
-		}
-	}
-	var unmatchedTarget []int
-	for i := range targetResources {
-		if !matchedTargetIndices[i] {
-			unmatchedTarget = append(unmatchedTarget, i)
-		}
-	}
+	unmatchedBase := unmatchedIndices(len(baseResources), matchedBaseIndices)
+	unmatchedTarget := unmatchedIndices(len(targetResources), matchedTargetIndices)
 
 	// Phase 2: Match unmatched by content similarity
 	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
