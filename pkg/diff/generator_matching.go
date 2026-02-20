@@ -71,42 +71,7 @@ func GenerateMatchingDiff(
 		return err
 	}
 
-	// Markdown output
-	log.Debug().Msg("Creating markdown output")
-	markdownOutput := MarkdownOutput{
-		title:         title,
-		summary:       summary,
-		sections:      markdownSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
-	}
-	markdown := markdownOutput.printDiff(maxDiffMessageCharCount)
-	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
-	log.Debug().Msgf("Writing markdown output to %s", markdownPath)
-	if err := utils.WriteFile(markdownPath, markdown); err != nil {
-		return fmt.Errorf("failed to write markdown: %w", err)
-	}
-	log.Debug().Msgf("Wrote markdown output to %s", markdownPath)
-
-	// HTML output
-	log.Debug().Msg("Creating html output")
-	htmlOutput := HTMLOutput{
-		title:         title,
-		summary:       summary,
-		sections:      htmlSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
-	}
-	htmlDiff := htmlOutput.printDiff()
-	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
-	log.Debug().Msgf("Writing html output to %s", htmlPath)
-	if err := utils.WriteFile(htmlPath, htmlDiff); err != nil {
-		return fmt.Errorf("failed to write html: %w", err)
-	}
-	log.Debug().Msgf("Wrote html output to %s", htmlPath)
-
-	log.Info().Msgf("🙏 Please check the %s and %s files for differences", markdownPath, htmlPath)
-	return nil
+	return writeOutputs(outputFolder, title, summary, markdownSections, htmlSections, statsInfo, selectionInfo, maxDiffMessageCharCount)
 }
 
 // buildMatchingSummary builds a summary string from AppDiffs

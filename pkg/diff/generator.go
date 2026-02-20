@@ -13,7 +13,9 @@ import (
 	"github.com/go-git/go-git/v5/utils/merkletrie"
 	"github.com/rs/zerolog/log"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
@@ -26,14 +28,32 @@ type AppInfo struct {
 	FileContent string
 }
 
+// convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
+func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp, ignoreResourceRules []resource_filter.IgnoreResourceRule) ([]AppInfo, error) {
+	appInfos := make([]AppInfo, len(extractedApps))
+	for i, extractedApp := range extractedApps {
+		manifestString, err := extractedApp.FlattenToString(ignoreResourceRules)
+		if err != nil {
+			return nil, err
+		}
+		appInfos[i] = AppInfo{
+			Id:          extractedApp.Id,
+			Name:        extractedApp.Name,
+			SourcePath:  extractedApp.SourcePath,
+			FileContent: manifestString,
+		}
+	}
+	return appInfos, nil
+}
+
 // GenerateDiff generates a diff between base and target branches
 func GenerateDiff(
 	title string,
 	outputFolder string,
 	baseBranch *gitt.Branch,
 	targetBranch *gitt.Branch,
-	baseApps []AppInfo,
-	targetApps []AppInfo,
+	baseManifests []extract.ExtractedApp,
+	targetManifests []extract.ExtractedApp,
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
@@ -41,7 +61,19 @@ func GenerateDiff(
 	statsInfo StatsInfo,
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) error {
+
+	baseApps, err := convertExtractedAppsToAppInfos(baseManifests, ignoreResourceRules)
+	if err != nil {
+		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
+		return err
+	}
+	targetApps, err := convertExtractedAppsToAppInfos(targetManifests, ignoreResourceRules)
+	if err != nil {
+		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
+		return err
+	}
 
 	maxDiffMessageCharCount := maxCharCount
 	if maxDiffMessageCharCount <= 0 {
@@ -64,42 +96,7 @@ func GenerateDiff(
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
 
-	// Markdown
-	log.Debug().Msg("Creating markdown output")
-	MarkdownOutput := MarkdownOutput{
-		title:         title,
-		summary:       summary,
-		sections:      markdownFileSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
-	}
-	markdown := MarkdownOutput.printDiff(maxDiffMessageCharCount)
-	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
-	log.Debug().Msgf("Writing markdown output to %s", markdownPath)
-	if err := utils.WriteFile(markdownPath, markdown); err != nil {
-		return fmt.Errorf("failed to write markdown: %w", err)
-	}
-	log.Debug().Msgf("Wrote markdown output to %s", markdownPath)
-
-	// HTML
-	log.Debug().Msg("Creating html output")
-	HTMLOutput := HTMLOutput{
-		title:         title,
-		summary:       summary,
-		sections:      htmlFileSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
-	}
-	htmlDiff := HTMLOutput.printDiff()
-	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
-	log.Debug().Msgf("Writing html output to %s", htmlPath)
-	if err := utils.WriteFile(htmlPath, htmlDiff); err != nil {
-		return fmt.Errorf("failed to write html: %w", err)
-	}
-	log.Debug().Msgf("Wrote html output to %s", htmlPath)
-
-	log.Info().Msgf("🙏 Please check the %s and %s files for differences", markdownPath, htmlPath)
-	return nil
+	return writeOutputs(outputFolder, title, summary, markdownFileSections, htmlFileSections, statsInfo, selectionInfo, maxDiffMessageCharCount)
 }
 
 func writeManifestsToDisk(apps []AppInfo, folder string) error {

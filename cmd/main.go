@@ -327,8 +327,17 @@ func run(cfg *Config) error {
 		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
-	// Generate diff using similarity-based matching
-	if err := diff.GenerateMatchingDiff(
+	// Select diff generator based on --diff-method flag
+	var diffGenerator diff.DiffGeneratorFunc
+	switch cfg.DiffMethod {
+	case "git":
+		diffGenerator = diff.GenerateDiff
+	default:
+		diffGenerator = diff.GenerateMatchingDiff
+	}
+
+	// Generate diff
+	if err := diffGenerator(
 		cfg.Title,
 		cfg.OutputFolder,
 		baseBranch,

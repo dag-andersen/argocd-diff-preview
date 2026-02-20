@@ -67,6 +67,7 @@ var (
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
 	DefaultConcurrency                = uint(40)
+	DefaultDiffMethod                 = "matching"
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -112,6 +113,7 @@ type RawOptions struct {
 	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
 	ArgocdUIURL                string `mapstructure:"argocd-ui-url"`
 	Concurrency                uint   `mapstructure:"concurrency"`
+	DiffMethod                 string `mapstructure:"diff-method"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -152,6 +154,7 @@ type Config struct {
 	UseArgoCDApi               bool
 	ArgocdUIURL                string
 	Concurrency                uint
+	DiffMethod                 string
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -244,6 +247,7 @@ func Parse() *Config {
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 	viper.SetDefault("concurrency", DefaultConcurrency)
+	viper.SetDefault("diff-method", DefaultDiffMethod)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -298,6 +302,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
+	rootCmd.Flags().String("diff-method", DefaultDiffMethod, "Diff method to use: 'matching' (similarity-based, default) or 'git' (legacy git-based)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -381,6 +386,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		UseArgoCDApi:               o.UseArgoCDApi,
 		ArgocdUIURL:                o.ArgocdUIURL,
 		Concurrency:                o.Concurrency,
+		DiffMethod:                 o.DiffMethod,
 	}
 
 	var err error
@@ -424,6 +430,14 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid cluster configuration: %w", err)
 		}
+	}
+
+	// Validate diff method
+	switch cfg.DiffMethod {
+	case "matching", "git":
+		// valid
+	default:
+		return nil, fmt.Errorf("unsupported diff-method: %q (must be 'matching' or 'git')", cfg.DiffMethod)
 	}
 
 	// Check if argocd CLI is installed when not using API mode
@@ -664,5 +678,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.Concurrency != DefaultConcurrency {
 		log.Info().Msgf("✨ - concurrency: %d", o.Concurrency)
+	}
+	if o.DiffMethod != DefaultDiffMethod {
+		log.Info().Msgf("✨ - diff-method: %s", o.DiffMethod)
 	}
 }
