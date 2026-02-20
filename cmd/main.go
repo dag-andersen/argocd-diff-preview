@@ -327,17 +327,8 @@ func run(cfg *Config) error {
 		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
-	// Select diff generator based on --diff-method flag
-	var diffGenerator diff.DiffGeneratorFunc
-	switch cfg.DiffMethod {
-	case "git":
-		diffGenerator = diff.GenerateDiff
-	default:
-		diffGenerator = diff.GenerateMatchingDiff
-	}
-
 	// Generate diff
-	if err := diffGenerator(
+	if err := diff.GenerateMatchingDiff(
 		cfg.Title,
 		cfg.OutputFolder,
 		baseBranch,
