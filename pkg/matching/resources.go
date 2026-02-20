@@ -7,6 +7,20 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+var (
+	// similarityThresholdSameKind is the Jaccard similarity threshold (0-1) required
+	// to match two unmatched resources of the SAME kind based on content similarity.
+	// This helps catch resource renames (e.g., Deployment/old-name -> Deployment/new-name).
+	similarityThresholdSameKind = 0.5
+
+	// similarityThresholdCrossKind is the Jaccard similarity threshold (0-1) required
+	// to match two unmatched resources of DIFFERENT kinds based on content similarity.
+	// This helps catch both kind AND name changes (e.g., Deployment/old -> StatefulSet/new).
+	// It is slightly lower than same-kind because cross-kind resources naturally have
+	// less overlap (e.g., Deployment spec vs StatefulSet spec).
+	similarityThresholdCrossKind = 0.35
+)
+
 // ResourcePair represents a matched pair of Kubernetes resources within an app pair
 type ResourcePair struct {
 	Base   *unstructured.Unstructured // nil if resource was added
@@ -45,11 +59,14 @@ func (p *Pair) ChangedResources() []ResourcePair {
 // matchResources finds the best pairing between base and target resources,
 // returning only pairs where the resources differ (or are added/deleted).
 //
-// It uses a three-phase matching strategy:
+// It uses a four-phase matching strategy:
 //  1. Match by kind+name+namespace (exact identity) — strongest signal
 //  2. Match remaining by name+namespace across kinds — catches kind changes
 //     (e.g. Deployment → StatefulSet with the same name)
-//  3. Match remaining within the same kind by content similarity — fallback
+//  3. Match remaining within the same kind by content similarity — catches name changes
+//     (e.g. Deployment/old-name → Deployment/new-name)
+//  4. Final fallback across ANY kind by content similarity — catches both kind and name changes
+//     (e.g. Deployment/old-name → StatefulSet/new-name)
 func matchResources(baseManifests, targetManifests []unstructured.Unstructured) []ResourcePair {
 	matchedBaseIndices := make(map[int]bool)
 	matchedTargetIndices := make(map[int]bool)
@@ -141,7 +158,7 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 		}
 	}
 
-	// Phase 3: Collect remaining unmatched, group by kind, and match by similarity
+	// Phase 3: Match remaining within the same kind by content similarity
 	unmatchedBase = nil
 	for i := range baseManifests {
 		if !matchedBaseIndices[i] {
@@ -155,9 +172,82 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 		}
 	}
 
-	if len(unmatchedBase) > 0 || len(unmatchedTarget) > 0 {
+	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
 		kindPairs := matchUnmatchedByKind(baseManifests, targetManifests, unmatchedBase, unmatchedTarget)
-		changedPairs = append(changedPairs, kindPairs...)
+
+		for _, p := range kindPairs {
+			// Find indices and mark as matched
+			for _, baseIdx := range unmatchedBase {
+				if p.Base != nil && resourcesEqual(p.Base, &baseManifests[baseIdx]) {
+					matchedBaseIndices[baseIdx] = true
+				}
+			}
+			for _, targetIdx := range unmatchedTarget {
+				if p.Target != nil && resourcesEqual(p.Target, &targetManifests[targetIdx]) {
+					matchedTargetIndices[targetIdx] = true
+				}
+			}
+			changedPairs = append(changedPairs, p)
+		}
+	}
+
+	// Phase 4: Final fallback - match across ANY kind by similarity, with lower threshold
+	unmatchedBase = nil
+	for i := range baseManifests {
+		if !matchedBaseIndices[i] {
+			unmatchedBase = append(unmatchedBase, i)
+		}
+	}
+	unmatchedTarget = nil
+	for i := range targetManifests {
+		if !matchedTargetIndices[i] {
+			unmatchedTarget = append(unmatchedTarget, i)
+		}
+	}
+
+	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
+		similarityMatches := matchResourcesBySimilarity(baseManifests, targetManifests, unmatchedBase, unmatchedTarget, similarityThresholdCrossKind)
+
+		for _, sm := range similarityMatches {
+			if !resourcesEqual(&baseManifests[sm.baseIdx], &targetManifests[sm.targetIdx]) {
+				changedPairs = append(changedPairs, ResourcePair{
+					Base:   &baseManifests[sm.baseIdx],
+					Target: &targetManifests[sm.targetIdx],
+				})
+			}
+			matchedBaseIndices[sm.baseIdx] = true
+			matchedTargetIndices[sm.targetIdx] = true
+		}
+	}
+
+	// Remaining unmatched base resources are deletions
+	unmatchedBase = nil
+	for i := range baseManifests {
+		if !matchedBaseIndices[i] {
+			unmatchedBase = append(unmatchedBase, i)
+		}
+	}
+
+	// Remaining unmatched target resources are additions
+	unmatchedTarget = nil
+	for i := range targetManifests {
+		if !matchedTargetIndices[i] {
+			unmatchedTarget = append(unmatchedTarget, i)
+		}
+	}
+
+	// Now add the final additions and deletions that couldn't be matched at all
+	for _, idx := range unmatchedBase {
+		changedPairs = append(changedPairs, ResourcePair{
+			Base:   &baseManifests[idx],
+			Target: nil,
+		})
+	}
+	for _, idx := range unmatchedTarget {
+		changedPairs = append(changedPairs, ResourcePair{
+			Base:   nil,
+			Target: &targetManifests[idx],
+		})
 	}
 
 	return changedPairs
@@ -205,7 +295,7 @@ func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstruct
 	}
 	sort.Strings(sortedKinds)
 
-	var changedPairs []ResourcePair
+	var matchedPairs []ResourcePair
 
 	for _, kind := range sortedKinds {
 		baseIdxs := baseByKind[kind]
@@ -222,10 +312,16 @@ func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstruct
 		}
 
 		kindPairs := matchResourcesOfSameKind(baseRes, targetRes)
-		changedPairs = append(changedPairs, kindPairs...)
+
+		// Only include modified (not deleted/added - those wait for Phase 4)
+		for _, p := range kindPairs {
+			if p.Base != nil && p.Target != nil {
+				matchedPairs = append(matchedPairs, p)
+			}
+		}
 	}
 
-	return changedPairs
+	return matchedPairs
 }
 
 // matchResourcesOfSameKind matches resources of the same kind and returns only changed pairs
@@ -296,7 +392,7 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 
 	// Phase 2: Match unmatched by content similarity
 	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
-		similarityMatches := matchResourcesBySimilarity(baseResources, targetResources, unmatchedBase, unmatchedTarget)
+		similarityMatches := matchResourcesBySimilarity(baseResources, targetResources, unmatchedBase, unmatchedTarget, similarityThresholdSameKind)
 
 		for _, sm := range similarityMatches {
 			// Only include if not identical
@@ -361,13 +457,14 @@ func resourcesEqual(a, b *unstructured.Unstructured) bool {
 func matchResourcesBySimilarity(
 	baseResources, targetResources []unstructured.Unstructured,
 	unmatchedBase, unmatchedTarget []int,
+	threshold float64,
 ) []scoredPair {
 	var candidates []scoredPair
 
 	for _, baseIdx := range unmatchedBase {
 		for _, targetIdx := range unmatchedTarget {
 			score := contentSimilarity(&baseResources[baseIdx], &targetResources[targetIdx])
-			if score > 0.5 { // Higher threshold for resource matching
+			if score > threshold {
 				candidates = append(candidates, scoredPair{
 					baseIdx:   baseIdx,
 					targetIdx: targetIdx,

@@ -1183,3 +1183,75 @@ spec:
 		t.Errorf("Kind change diff mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedDiff, resource.Content)
 	}
 }
+
+// TestFullFlow_OrderChange tests that changing a resource's kind (e.g. Deployment → StatefulSet)
+// and name (example-deploy-1 → example-sfs-1) results in correct diffs via cross-kind similarity matching.
+func TestFullFlow_OrderChange(t *testing.T) {
+	baseYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-change-example-deploy-1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: example-deploy-1
+  template:
+    metadata:
+      labels:
+        app: example-deploy-1
+    spec:
+      containers:
+        - name: myapp
+          image: dag-andersen/myapp:latest
+          ports:
+            - containerPort: 80`
+
+	targetYAML := `apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: order-change-example-sfs-1
+spec:
+  serviceName: order-change-example-sfs-1
+  replicas: 2
+  selector:
+    matchLabels:
+      app: example-sfs-1
+  template:
+    metadata:
+      labels:
+        app: example-sfs-1
+    spec:
+      containers:
+        - name: myapp
+          image: dag-andersen/myapp:latest
+          ports:
+            - containerPort: 80`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", baseYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "app-1", "my-app", targetYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 diff, got %d", len(diffs))
+	}
+
+	d := diffs[0]
+	if d.Action != ActionModified {
+		t.Errorf("expected action=modified, got %s", d.Action)
+	}
+
+	// Because of Phase 4 cross-kind similarity matching, it should pair them up
+	// and show as a single modified resource instead of 1 deleted + 1 added
+	if len(d.Resources) != 1 {
+		t.Fatalf("expected 1 resource in diff, got %d", len(d.Resources))
+	}
+}
