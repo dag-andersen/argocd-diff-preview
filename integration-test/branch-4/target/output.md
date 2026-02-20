@@ -12,7 +12,7 @@ Added (1):
 <summary>folder3 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-three
+#### Deployment: deploy-from-folder-three
 ```diff
 +apiVersion: apps/v1
 +kind: Deployment

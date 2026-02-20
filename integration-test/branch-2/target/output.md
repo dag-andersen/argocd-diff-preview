@@ -12,7 +12,7 @@ Modified (1):
 <summary>my-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
-#### Deployment/new-app-name (default)
+#### Deployment: super-app-name → new-app-name (default)
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -53,7 +53,7 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
 ```
-#### Service/new-app-name (default)
+#### Service: super-app-name → new-app-name (default)
 ```diff
  apiVersion: v1
  kind: Service
@@ -77,7 +77,7 @@ Modified (1):
      app.kubernetes.io/instance: my-app
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount/new-app-name (default)
+#### ServiceAccount: super-app-name → new-app-name (default)
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true

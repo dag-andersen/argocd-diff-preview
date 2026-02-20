@@ -12,7 +12,7 @@ Modified (1):
 <summary>my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
-#### Deployment/experiment (default)
+#### Deployment: super-app-name → experiment (default)
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -49,7 +49,7 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
 ```
-#### Service/experiment (default)
+#### Service: super-app-name → experiment (default)
 ```diff
  apiVersion: v1
  kind: Service
@@ -73,7 +73,7 @@ Modified (1):
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount/experiment (default)
+#### ServiceAccount: super-app-name → experiment (default)
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true

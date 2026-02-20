@@ -18,20 +18,47 @@ import (
 // ResourceDiff represents the diff output for a single resource within an application
 type ResourceDiff struct {
 	Kind         string
+	OldKind      string // empty if unchanged or added/deleted
 	Name         string
+	OldName      string // empty if unchanged or added/deleted
 	Namespace    string
+	OldNamespace string // empty if unchanged or added/deleted
 	Content      string // diff text (with +/-/space prefixes)
 	AddedLines   int
 	DeletedLines int
 	IsSkipped    bool // true if resource matched an ignore rule
 }
 
-// Header returns a display header like "Kind/Name (namespace)" or "Kind/Name"
+// Header returns a display header for the resource.
+// Format: "Kind: Name (Namespace)" with arrows for changes:
+//   - Kind change:      "OldKind → NewKind: Name (Namespace)"
+//   - Name change:      "Kind: OldName → NewName (Namespace)"
+//   - Namespace change: "Kind: Name (OldNs → NewNs)"
 func (r *ResourceDiff) Header() string {
-	if r.Namespace != "" {
-		return fmt.Sprintf("%s/%s (%s)", r.Kind, r.Name, r.Namespace)
+	// Kind part
+	kindStr := r.Kind
+	if r.OldKind != "" && r.OldKind != r.Kind {
+		kindStr = fmt.Sprintf("%s → %s", r.OldKind, r.Kind)
 	}
-	return fmt.Sprintf("%s/%s", r.Kind, r.Name)
+
+	// Name part
+	nameStr := r.Name
+	if r.OldName != "" && r.OldName != r.Name {
+		nameStr = fmt.Sprintf("%s → %s", r.OldName, r.Name)
+	}
+
+	header := fmt.Sprintf("%s: %s", kindStr, nameStr)
+
+	// Namespace part
+	nsStr := r.Namespace
+	if r.OldNamespace != "" && r.OldNamespace != r.Namespace {
+		nsStr = fmt.Sprintf("%s → %s", r.OldNamespace, r.Namespace)
+	}
+
+	if nsStr != "" {
+		return fmt.Sprintf("%s (%s)", header, nsStr)
+	}
+	return header
 }
 
 // AppDiff represents the diff output for a single application pair
@@ -261,14 +288,24 @@ func buildResourceDiffs(
 	for _, rp := range sortedResources {
 		ref := getResourceRef(&rp)
 
+		var oldKind, oldName, oldNamespace string
+		if rp.Base != nil && rp.Target != nil {
+			oldKind = rp.Base.GetKind()
+			oldName = rp.Base.GetName()
+			oldNamespace = rp.Base.GetNamespace()
+		}
+
 		// Check if this resource matches any ignore rules.
 		// If so, emit a skipped resource entry instead of the full diff.
 		if len(ignoreResourceRules) > 0 && resourceMatchesIgnoreRules(&rp, ignoreResourceRules) {
 			result = append(result, ResourceDiff{
-				Kind:      ref.kind,
-				Name:      ref.name,
-				Namespace: ref.namespace,
-				IsSkipped: true,
+				Kind:         ref.kind,
+				OldKind:      oldKind,
+				Name:         ref.name,
+				OldName:      oldName,
+				Namespace:    ref.namespace,
+				OldNamespace: oldNamespace,
+				IsSkipped:    true,
 			})
 			continue
 		}
@@ -282,8 +319,11 @@ func buildResourceDiffs(
 		if diffResult.Content != "" {
 			result = append(result, ResourceDiff{
 				Kind:         ref.kind,
+				OldKind:      oldKind,
 				Name:         ref.name,
+				OldName:      oldName,
 				Namespace:    ref.namespace,
+				OldNamespace: oldNamespace,
 				Content:      diffResult.Content,
 				AddedLines:   diffResult.AddedLines,
 				DeletedLines: diffResult.DeletedLines,

@@ -18,7 +18,7 @@ Modified (7):
 <summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
        app: myapp
    template:
@@ -39,7 +39,7 @@ Modified (7):
 <summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
        app: myapp
    template:
@@ -60,7 +60,7 @@ Modified (7):
 <summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
        app: myapp
    template:
@@ -81,7 +81,7 @@ Modified (7):
 <summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
        app: myapp
    template:
@@ -102,7 +102,7 @@ Modified (7):
 <summary>my-app -> my-super-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
-#### Deployment/super-app-name (default)
+#### Deployment: super-app-name (default)
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -139,7 +139,7 @@ Modified (7):
          livenessProbe:
            httpGet:
 ```
-#### Service/super-app-name (default)
+#### Service: super-app-name (default)
 ```diff
  apiVersion: v1
  kind: Service
@@ -165,7 +165,7 @@ Modified (7):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
-#### ServiceAccount/super-app-name (default)
+#### ServiceAccount: super-app-name (default)
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true
@@ -187,7 +187,7 @@ Modified (7):
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
-#### Deployment/staging-myapp (default)
+#### Deployment: staging-myapp (default)
 ```diff
      spec:
        containers:
@@ -208,7 +208,7 @@ Modified (7):
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
 <br>
 
-#### Deployment/nginx-ingress-ingress-nginx-controller (default)
+#### Deployment: nginx-ingress-ingress-nginx-controller (default)
 ```diff
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0

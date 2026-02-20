@@ -12,7 +12,7 @@ Deleted (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-two
+#### Deployment: deploy-from-folder-two
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment

@@ -1162,8 +1162,8 @@ spec:
 	if resource.Name != "my-app" {
 		t.Errorf("expected resource name=my-app, got %s", resource.Name)
 	}
-	if resource.Header() != "StatefulSet/my-app (default)" {
-		t.Errorf("expected header 'StatefulSet/my-app (default)', got %q", resource.Header())
+	if resource.Header() != "Deployment → StatefulSet: my-app (default)" {
+		t.Errorf("expected header 'Deployment → StatefulSet: my-app (default)', got %q", resource.Header())
 	}
 
 	// The diff content should show the kind change

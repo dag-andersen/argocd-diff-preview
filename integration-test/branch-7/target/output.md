@@ -13,7 +13,7 @@ Modified (2):
 <summary>valid-manifest-generate-paths-example (examples/manifest-generate-paths/valid-annotation.yaml)</summary>
 <br>
 
-#### Deployment/super-duper-app-name (default)
+#### Deployment: super-app-name → super-duper-app-name (default)
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -50,7 +50,7 @@ Modified (2):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
 ```
-#### Service/super-duper-app-name (default)
+#### Service: super-app-name → super-duper-app-name (default)
 ```diff
  apiVersion: v1
  kind: Service
@@ -74,7 +74,7 @@ Modified (2):
      app.kubernetes.io/instance: valid-manifest-generate-paths-example
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount/super-duper-app-name (default)
+#### ServiceAccount: super-app-name → super-duper-app-name (default)
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true
@@ -96,7 +96,7 @@ Modified (2):
 <summary>watch-pattern-valid-regex-example (examples/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
-#### Deployment/super-duper-app-name (default)
+#### Deployment: super-app-name → super-duper-app-name (default)
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -133,7 +133,7 @@ Modified (2):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: super-duper-app-name
 ```
-#### Service/super-duper-app-name (default)
+#### Service: super-app-name → super-duper-app-name (default)
 ```diff
  apiVersion: v1
  kind: Service
@@ -157,7 +157,7 @@ Modified (2):
      app.kubernetes.io/instance: watch-pattern-valid-regex-example
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount/super-duper-app-name (default)
+#### ServiceAccount: super-app-name → super-duper-app-name (default)
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true

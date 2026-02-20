@@ -1429,8 +1429,8 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 	if !result[0].IsSkipped {
 		t.Error("expected resource to be marked as skipped")
 	}
-	// CRDs are cluster-scoped (no namespace), so header should be Kind/Name without parens
-	expectedHeader := "CustomResourceDefinition/apps.example.com"
+	// CRDs are cluster-scoped (no namespace), so header should be Kind: Name without parens
+	expectedHeader := "CustomResourceDefinition: apps.example.com"
 	if result[0].Header() != expectedHeader {
 		t.Errorf("expected header %q, got %q", expectedHeader, result[0].Header())
 	}

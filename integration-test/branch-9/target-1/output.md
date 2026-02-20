@@ -20,7 +20,7 @@ Deleted (9):
 <summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -48,7 +48,7 @@ Deleted (9):
 <summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -76,7 +76,7 @@ Deleted (9):
 <summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -104,7 +104,7 @@ Deleted (9):
 <summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-one
+#### Deployment: deploy-from-folder-one
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -132,7 +132,7 @@ Deleted (9):
 <summary>custom-target-revision-example (examples/custom-target-revision/app/app.yaml)</summary>
 <br>
 
-#### Deployment/my-deployment (default)
+#### Deployment: my-deployment (default)
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -155,7 +155,7 @@ Deleted (9):
 <summary>my-app-set-dev (examples/basic-appset/my-app-set.yaml)</summary>
 <br>
 
-#### Deployment/super-app-name (default)
+#### Deployment: super-app-name (default)
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -204,7 +204,7 @@ Deleted (9):
 -      securityContext: {}
 -      serviceAccountName: super-app-name
 ```
-#### Service/super-app-name (default)
+#### Service: super-app-name (default)
 ```diff
 -apiVersion: v1
 -kind: Service
@@ -228,7 +228,7 @@ Deleted (9):
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
 ```
-#### ServiceAccount/super-app-name (default)
+#### ServiceAccount: super-app-name (default)
 ```diff
 -apiVersion: v1
 -automountServiceAccountToken: true
@@ -249,7 +249,7 @@ Deleted (9):
 <summary>my-app-set-prod (examples/basic-appset/my-app-set.yaml)</summary>
 <br>
 
-#### Deployment/super-app-name (default)
+#### Deployment: super-app-name (default)
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -298,7 +298,7 @@ Deleted (9):
 -      securityContext: {}
 -      serviceAccountName: super-app-name
 ```
-#### Service/super-app-name (default)
+#### Service: super-app-name (default)
 ```diff
 -apiVersion: v1
 -kind: Service
@@ -322,7 +322,7 @@ Deleted (9):
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
 ```
-#### ServiceAccount/super-app-name (default)
+#### ServiceAccount: super-app-name (default)
 ```diff
 -apiVersion: v1
 -automountServiceAccountToken: true
@@ -343,7 +343,7 @@ Deleted (9):
 <summary>my-app-set-staging (examples/basic-appset/my-app-set.yaml)</summary>
 <br>
 
-#### Deployment/super-app-name (default)
+#### Deployment: super-app-name (default)
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -392,7 +392,7 @@ Deleted (9):
 -      securityContext: {}
 -      serviceAccountName: super-app-name
 ```
-#### Service/super-app-name (default)
+#### Service: super-app-name (default)
 ```diff
 -apiVersion: v1
 -kind: Service
@@ -416,7 +416,7 @@ Deleted (9):
 -    app.kubernetes.io/name: myApp
 -  type: ClusterIP
 ```
-#### ServiceAccount/super-app-name (default)
+#### ServiceAccount: super-app-name (default)
 ```diff
 -apiVersion: v1
 -automountServiceAccountToken: true

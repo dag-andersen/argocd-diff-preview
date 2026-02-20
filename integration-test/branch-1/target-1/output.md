@@ -15,7 +15,7 @@ Modified (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-two
+#### Deployment: deploy-from-folder-two
 ```diff
 -apiVersion: apps/v1
 -kind: Deployment
@@ -43,7 +43,7 @@ Modified (1):
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
-#### Deployment/nginx-ingress-ingress-nginx-controller (default)
+#### Deployment: nginx-ingress-ingress-nginx-controller (default)
 ```diff
                fieldPath: metadata.namespace
          - name: LD_PRELOAD

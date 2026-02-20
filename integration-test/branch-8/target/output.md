@@ -15,7 +15,7 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-two
+#### Deployment: deploy-from-folder-two
 ```diff
        app: myapp
    template:
@@ -36,7 +36,7 @@ Modified (1):
 <summary>folder3 [<a href="https://argocd.example.com/applications/folder3">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-#### Deployment/deploy-from-folder-three
+#### Deployment: deploy-from-folder-three
 ```diff
 +apiVersion: apps/v1
 +kind: Deployment

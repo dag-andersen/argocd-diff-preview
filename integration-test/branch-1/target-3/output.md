@@ -23,7 +23,7 @@ _No resources rendered_
 <summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
 <br>
 
-#### Deployment/nginx-ingress-ingress-nginx-controller (default)
+#### Deployment: nginx-ingress-ingress-nginx-controller (default)
 ```diff
          - name: POD_NAME
            valueFrom:
