@@ -1435,3 +1435,457 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 		t.Errorf("expected header %q, got %q", expectedHeader, result[0].Header())
 	}
 }
+
+// Tests for shouldIgnoreLine
+
+func TestShouldIgnoreLine_RegexMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		pattern  string
+		expected bool
+	}{
+		{
+			name:     "simple string match",
+			line:     "checksum/config: abc123",
+			pattern:  "checksum/config",
+			expected: true,
+		},
+		{
+			name:     "regex match with wildcard",
+			line:     "image: nginx:1.21.0",
+			pattern:  `image:.*nginx`,
+			expected: true,
+		},
+		{
+			name:     "no match",
+			line:     "replicas: 3",
+			pattern:  "image:",
+			expected: false,
+		},
+		{
+			name:     "empty line",
+			line:     "",
+			pattern:  "anything",
+			expected: false,
+		},
+		{
+			name:     "empty pattern matches everything",
+			line:     "some line",
+			pattern:  "",
+			expected: true,
+		},
+		{
+			name:     "regex special characters in pattern",
+			line:     "app.kubernetes.io/version: v1",
+			pattern:  `app\.kubernetes\.io/version`,
+			expected: true,
+		},
+		{
+			name:     "invalid regex falls back to string contains",
+			line:     "line with [invalid regex",
+			pattern:  "[invalid",
+			expected: true, // falls back to strings.Contains
+		},
+		{
+			name:     "invalid regex no match in fallback",
+			line:     "no bracket here",
+			pattern:  "[invalid",
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := shouldIgnoreLine(tc.line, tc.pattern)
+			if result != tc.expected {
+				t.Errorf("shouldIgnoreLine(%q, %q) = %v, want %v", tc.line, tc.pattern, result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for shouldShowLine
+
+func TestShouldShowLine(t *testing.T) {
+	customPattern := `my-custom-ignore`
+
+	tests := []struct {
+		name          string
+		line          string
+		isChange      bool
+		ignorePattern *string
+		expected      bool
+	}{
+		{
+			name:          "non-change line always shown",
+			line:          "helm.sh/chart: my-chart-1.0",
+			isChange:      false,
+			ignorePattern: nil,
+			expected:      true,
+		},
+		{
+			name:          "change line matching default pattern is hidden",
+			line:          "helm.sh/chart: my-chart-1.0",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "change line matching app.kubernetes.io/version is hidden",
+			line:          "app.kubernetes.io/version: 1.2.3",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "change line matching checksum/config is hidden",
+			line:          "checksum/config: abc123def",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "change line matching caBundle is hidden",
+			line:          "caBundle: LS0tLS1CRUdJTi...",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "indented default pattern is hidden",
+			line:          "    helm.sh/chart: my-chart-2.0",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
+			name:          "change line not matching any pattern is shown",
+			line:          "replicas: 5",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      true,
+		},
+		{
+			name:          "change line matching custom pattern is hidden",
+			line:          "my-custom-ignore: true",
+			isChange:      true,
+			ignorePattern: &customPattern,
+			expected:      false,
+		},
+		{
+			name:          "change line not matching custom pattern but matching default is hidden",
+			line:          "helm.sh/chart: chart-1.0",
+			isChange:      true,
+			ignorePattern: &customPattern,
+			expected:      false,
+		},
+		{
+			name:          "change line not matching either pattern is shown",
+			line:          "replicas: 3",
+			isChange:      true,
+			ignorePattern: &customPattern,
+			expected:      true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := shouldShowLine(tc.line, tc.isChange, tc.ignorePattern)
+			if result != tc.expected {
+				t.Errorf("shouldShowLine(%q, %v, %v) = %v, want %v", tc.line, tc.isChange, tc.ignorePattern, result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for ResourceDiff.Header()
+
+func TestResourceDiff_Header(t *testing.T) {
+	tests := []struct {
+		name     string
+		diff     ResourceDiff
+		expected string
+	}{
+		{
+			name: "simple resource with namespace",
+			diff: ResourceDiff{
+				Kind: "Deployment", Name: "my-app", Namespace: "default",
+			},
+			expected: "Deployment: my-app (default)",
+		},
+		{
+			name: "cluster-scoped resource (no namespace)",
+			diff: ResourceDiff{
+				Kind: "ClusterRole", Name: "admin",
+			},
+			expected: "ClusterRole: admin",
+		},
+		{
+			name: "kind change",
+			diff: ResourceDiff{
+				Kind: "StatefulSet", OldKind: "Deployment",
+				Name: "my-app", Namespace: "default",
+			},
+			expected: "Deployment → StatefulSet: my-app (default)",
+		},
+		{
+			name: "name change",
+			diff: ResourceDiff{
+				Kind: "Deployment",
+				Name: "new-name", OldName: "old-name",
+				Namespace: "default",
+			},
+			expected: "Deployment: old-name → new-name (default)",
+		},
+		{
+			name: "namespace change",
+			diff: ResourceDiff{
+				Kind: "Deployment", Name: "my-app",
+				Namespace: "production", OldNamespace: "staging",
+			},
+			expected: "Deployment: my-app (staging → production)",
+		},
+		{
+			name: "kind and name change",
+			diff: ResourceDiff{
+				Kind: "StatefulSet", OldKind: "Deployment",
+				Name: "new-app", OldName: "old-app",
+				Namespace: "default",
+			},
+			expected: "Deployment → StatefulSet: old-app → new-app (default)",
+		},
+		{
+			name: "all three change",
+			diff: ResourceDiff{
+				Kind: "StatefulSet", OldKind: "Deployment",
+				Name: "new-app", OldName: "old-app",
+				Namespace: "prod", OldNamespace: "dev",
+			},
+			expected: "Deployment → StatefulSet: old-app → new-app (dev → prod)",
+		},
+		{
+			name: "old kind same as new kind (no arrow)",
+			diff: ResourceDiff{
+				Kind: "Deployment", OldKind: "Deployment",
+				Name: "my-app", Namespace: "default",
+			},
+			expected: "Deployment: my-app (default)",
+		},
+		{
+			name: "old name same as new name (no arrow)",
+			diff: ResourceDiff{
+				Kind: "Deployment",
+				Name: "my-app", OldName: "my-app",
+				Namespace: "default",
+			},
+			expected: "Deployment: my-app (default)",
+		},
+		{
+			name: "old namespace same as new namespace (no arrow)",
+			diff: ResourceDiff{
+				Kind: "Deployment", Name: "my-app",
+				Namespace: "default", OldNamespace: "default",
+			},
+			expected: "Deployment: my-app (default)",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.diff.Header()
+			if result != tc.expected {
+				t.Errorf("Header() = %q, want %q", result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for AppDiff.ChangeStats()
+
+func TestAppDiff_ChangeStats(t *testing.T) {
+	tests := []struct {
+		name     string
+		diff     AppDiff
+		expected string
+	}{
+		{
+			name:     "both added and deleted",
+			diff:     AppDiff{AddedLines: 10, DeletedLines: 5},
+			expected: " (+10|-5)",
+		},
+		{
+			name:     "only added",
+			diff:     AppDiff{AddedLines: 7, DeletedLines: 0},
+			expected: " (+7)",
+		},
+		{
+			name:     "only deleted",
+			diff:     AppDiff{AddedLines: 0, DeletedLines: 3},
+			expected: " (-3)",
+		},
+		{
+			name:     "no changes",
+			diff:     AppDiff{AddedLines: 0, DeletedLines: 0},
+			expected: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.diff.ChangeStats()
+			if result != tc.expected {
+				t.Errorf("ChangeStats() = %q, want %q", result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for AppDiff.HasContent()
+
+func TestAppDiff_HasContent(t *testing.T) {
+	tests := []struct {
+		name     string
+		diff     AppDiff
+		expected bool
+	}{
+		{
+			name:     "has resources",
+			diff:     AppDiff{Resources: []ResourceDiff{{Kind: "Deployment", Name: "x"}}},
+			expected: true,
+		},
+		{
+			name:     "empty resources",
+			diff:     AppDiff{Resources: []ResourceDiff{}},
+			expected: false,
+		},
+		{
+			name:     "nil resources",
+			diff:     AppDiff{Resources: nil},
+			expected: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.diff.HasContent()
+			if result != tc.expected {
+				t.Errorf("HasContent() = %v, want %v", result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for AppDiff.PrettyName()
+
+func TestAppDiff_PrettyName(t *testing.T) {
+	tests := []struct {
+		name     string
+		diff     AppDiff
+		expected string
+	}{
+		{
+			name:     "both names same",
+			diff:     AppDiff{OldName: "my-app", NewName: "my-app"},
+			expected: "my-app",
+		},
+		{
+			name:     "renamed app",
+			diff:     AppDiff{OldName: "old-app", NewName: "new-app"},
+			expected: "old-app -> new-app",
+		},
+		{
+			name:     "only new name (added app)",
+			diff:     AppDiff{NewName: "new-app"},
+			expected: "new-app",
+		},
+		{
+			name:     "only old name (deleted app)",
+			diff:     AppDiff{OldName: "old-app"},
+			expected: "old-app",
+		},
+		{
+			name:     "both empty",
+			diff:     AppDiff{},
+			expected: "Unknown",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.diff.PrettyName()
+			if result != tc.expected {
+				t.Errorf("PrettyName() = %q, want %q", result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for AppDiff.PrettyPath()
+
+func TestAppDiff_PrettyPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		diff     AppDiff
+		expected string
+	}{
+		{
+			name:     "both paths same",
+			diff:     AppDiff{OldSourcePath: "/path/to/app", NewSourcePath: "/path/to/app"},
+			expected: "/path/to/app",
+		},
+		{
+			name:     "path changed",
+			diff:     AppDiff{OldSourcePath: "/old/path", NewSourcePath: "/new/path"},
+			expected: "/old/path -> /new/path",
+		},
+		{
+			name:     "only new path (added app)",
+			diff:     AppDiff{NewSourcePath: "/new/path"},
+			expected: "/new/path",
+		},
+		{
+			name:     "only old path (deleted app)",
+			diff:     AppDiff{OldSourcePath: "/old/path"},
+			expected: "/old/path",
+		},
+		{
+			name:     "both empty",
+			diff:     AppDiff{},
+			expected: "Unknown",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.diff.PrettyPath()
+			if result != tc.expected {
+				t.Errorf("PrettyPath() = %q, want %q", result, tc.expected)
+			}
+		})
+	}
+}
+
+// Tests for DiffAction.String()
+
+func TestDiffAction_String(t *testing.T) {
+	tests := []struct {
+		action   DiffAction
+		expected string
+	}{
+		{ActionAdded, "added"},
+		{ActionDeleted, "deleted"},
+		{ActionModified, "modified"},
+		{ActionUnchanged, "unchanged"},
+		{DiffAction(99), "unknown"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.expected, func(t *testing.T) {
+			result := tc.action.String()
+			if result != tc.expected {
+				t.Errorf("DiffAction(%d).String() = %q, want %q", tc.action, result, tc.expected)
+			}
+		})
+	}
+}

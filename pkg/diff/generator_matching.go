@@ -12,9 +12,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// GenerateMatchingDiff generates a diff using similarity-based matching instead of ID-based matching.
+// GeneratePreview generates a diff using similarity-based matching instead of ID-based matching.
 // This correctly handles cases where apps or resources are renamed.
-func GenerateMatchingDiff(
+func GeneratePreview(
 	title string,
 	outputFolder string,
 	baseBranch *gitt.Branch,

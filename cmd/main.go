@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
@@ -13,7 +12,6 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -328,7 +326,7 @@ func run(cfg *Config) error {
 	}
 
 	// Generate diff
-	if err := diff.GenerateMatchingDiff(
+	if err := diff.GeneratePreview(
 		cfg.Title,
 		cfg.OutputFolder,
 		baseBranch,
@@ -352,100 +350,3 @@ func run(cfg *Config) error {
 
 	return nil
 }
-
-// printMatchingDiffs uses the matching package to generate and print diffs to terminal.
-// Useful for debugging the matching logic. Uncomment the call in run() to use it.
-//
-//nolint:unused // Kept for debugging purposes
-func printMatchingDiffs(baseManifests, targetManifests []extract.ExtractedApp, contextLines uint) {
-	log.Info().Msg("═══════════════════════════════════════════════════════════════════")
-	log.Info().Msg("🧪 TESTING NEW MATCHING PACKAGE")
-	log.Info().Msg("═══════════════════════════════════════════════════════════════════")
-
-	// Step 1: Match apps by content similarity
-	pairs := matching.MatchApps(baseManifests, targetManifests)
-	log.Info().Msgf("📊 Matched %d app pairs", len(pairs))
-
-	for _, pair := range pairs {
-		// Determine pair type and name
-		var pairType, appName string
-		switch {
-		case pair.Base == nil && pair.Target != nil:
-			pairType = "ADDED"
-			appName = pair.Target.Name
-		case pair.Base != nil && pair.Target == nil:
-			pairType = "DELETED"
-			appName = pair.Base.Name
-		case pair.Base != nil && pair.Target != nil:
-			pairType = "MODIFIED"
-			appName = pair.Base.Name
-			if pair.Base.Name != pair.Target.Name {
-				appName = fmt.Sprintf("%s → %s", pair.Base.Name, pair.Target.Name)
-			}
-		default:
-			continue // Skip if both nil
-		}
-
-		// Step 2: Get changed resources for this pair
-		changedResources := pair.ChangedResources()
-
-		if len(changedResources) == 0 {
-			log.Info().Msgf("📦 App [%s] %s: No changes", pairType, appName)
-			continue
-		}
-
-		log.Info().Msgf("📦 App [%s] %s: %d changed resources", pairType, appName, len(changedResources))
-
-		// Step 3: Generate and print diff for each changed resource
-		for _, rp := range changedResources {
-			// Determine resource info
-			var resourceType, resourceName, resourceKind string
-			switch {
-			case rp.Base == nil && rp.Target != nil:
-				resourceType = "+"
-				resourceName = rp.Target.GetName()
-				resourceKind = rp.Target.GetKind()
-			case rp.Base != nil && rp.Target == nil:
-				resourceType = "-"
-				resourceName = rp.Base.GetName()
-				resourceKind = rp.Base.GetKind()
-			case rp.Base != nil && rp.Target != nil:
-				resourceType = "~"
-				resourceName = rp.Base.GetName()
-				resourceKind = rp.Base.GetKind()
-				if rp.Base.GetName() != rp.Target.GetName() {
-					resourceName = fmt.Sprintf("%s → %s", rp.Base.GetName(), rp.Target.GetName())
-				}
-			}
-
-			// Generate diff
-			diffResult, err := rp.Diff(contextLines)
-			if err != nil {
-				log.Error().Err(err).Msgf("  ❌ Failed to generate diff for %s/%s", resourceKind, resourceName)
-				continue
-			}
-
-			log.Info().Msgf("  [%s] %s/%s (+%d/-%d lines)",
-				resourceType, resourceKind, resourceName,
-				diffResult.AddedLines, diffResult.DeletedLines)
-
-			// Print the actual diff content (indented)
-			if diffResult.Content != "" {
-				fmt.Println("  ┌─────────────────────────────────────────────────────────────")
-				for line := range strings.SplitSeq(diffResult.Content, "\n") {
-					if line != "" {
-						fmt.Printf("  │ %s\n", line)
-					}
-				}
-				fmt.Println("  └─────────────────────────────────────────────────────────────")
-			}
-		}
-	}
-
-	log.Info().Msg("═══════════════════════════════════════════════════════════════════")
-	log.Info().Msg("🧪 END OF MATCHING PACKAGE TEST")
-	log.Info().Msg("═══════════════════════════════════════════════════════════════════")
-}
-
-// Uncomment the following line in run() after extract.RenderApplicationsFromBothBranches to debug matching:
-// printMatchingDiffs(baseManifests, targetManifests, cfg.LineCount)
