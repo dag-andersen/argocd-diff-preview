@@ -2,6 +2,7 @@ package matching
 
 import (
 	"maps"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -1436,85 +1437,16 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 	}
 }
 
-// Tests for shouldIgnoreLine
-
-func TestShouldIgnoreLine_RegexMatch(t *testing.T) {
-	tests := []struct {
-		name     string
-		line     string
-		pattern  string
-		expected bool
-	}{
-		{
-			name:     "simple string match",
-			line:     "checksum/config: abc123",
-			pattern:  "checksum/config",
-			expected: true,
-		},
-		{
-			name:     "regex match with wildcard",
-			line:     "image: nginx:1.21.0",
-			pattern:  `image:.*nginx`,
-			expected: true,
-		},
-		{
-			name:     "no match",
-			line:     "replicas: 3",
-			pattern:  "image:",
-			expected: false,
-		},
-		{
-			name:     "empty line",
-			line:     "",
-			pattern:  "anything",
-			expected: false,
-		},
-		{
-			name:     "empty pattern matches everything",
-			line:     "some line",
-			pattern:  "",
-			expected: true,
-		},
-		{
-			name:     "regex special characters in pattern",
-			line:     "app.kubernetes.io/version: v1",
-			pattern:  `app\.kubernetes\.io/version`,
-			expected: true,
-		},
-		{
-			name:     "invalid regex falls back to string contains",
-			line:     "line with [invalid regex",
-			pattern:  "[invalid",
-			expected: true, // falls back to strings.Contains
-		},
-		{
-			name:     "invalid regex no match in fallback",
-			line:     "no bracket here",
-			pattern:  "[invalid",
-			expected: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := shouldIgnoreLine(tc.line, tc.pattern)
-			if result != tc.expected {
-				t.Errorf("shouldIgnoreLine(%q, %q) = %v, want %v", tc.line, tc.pattern, result, tc.expected)
-			}
-		})
-	}
-}
-
 // Tests for shouldShowLine
 
 func TestShouldShowLine(t *testing.T) {
-	customPattern := `my-custom-ignore`
+	customPattern := regexp.MustCompile(`my-custom-ignore`)
 
 	tests := []struct {
 		name          string
 		line          string
 		isChange      bool
-		ignorePattern *string
+		ignorePattern *regexp.Regexp
 		expected      bool
 	}{
 		{
@@ -1570,21 +1502,21 @@ func TestShouldShowLine(t *testing.T) {
 			name:          "change line matching custom pattern is hidden",
 			line:          "my-custom-ignore: true",
 			isChange:      true,
-			ignorePattern: &customPattern,
+			ignorePattern: customPattern,
 			expected:      false,
 		},
 		{
 			name:          "change line not matching custom pattern but matching default is hidden",
 			line:          "helm.sh/chart: chart-1.0",
 			isChange:      true,
-			ignorePattern: &customPattern,
+			ignorePattern: customPattern,
 			expected:      false,
 		},
 		{
 			name:          "change line not matching either pattern is shown",
 			line:          "replicas: 3",
 			isChange:      true,
-			ignorePattern: &customPattern,
+			ignorePattern: customPattern,
 			expected:      true,
 		},
 	}

@@ -155,19 +155,15 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 	if len(unmatchedBase) > 0 && len(unmatchedTarget) > 0 {
 		kindPairs := matchUnmatchedByKind(baseManifests, targetManifests, unmatchedBase, unmatchedTarget)
 
-		for _, p := range kindPairs {
-			// Find indices and mark as matched
-			for _, baseIdx := range unmatchedBase {
-				if p.Base != nil && resourcesEqual(p.Base, &baseManifests[baseIdx]) {
-					matchedBaseIndices[baseIdx] = true
-				}
+		for _, sm := range kindPairs {
+			if !resourcesEqual(&baseManifests[sm.baseIdx], &targetManifests[sm.targetIdx]) {
+				changedPairs = append(changedPairs, ResourcePair{
+					Base:   &baseManifests[sm.baseIdx],
+					Target: &targetManifests[sm.targetIdx],
+				})
 			}
-			for _, targetIdx := range unmatchedTarget {
-				if p.Target != nil && resourcesEqual(p.Target, &targetManifests[targetIdx]) {
-					matchedTargetIndices[targetIdx] = true
-				}
-			}
-			changedPairs = append(changedPairs, p)
+			matchedBaseIndices[sm.baseIdx] = true
+			matchedTargetIndices[sm.targetIdx] = true
 		}
 	}
 
@@ -239,8 +235,9 @@ func sortedMapKeys(m map[string][]int) []string {
 	return keys
 }
 
-// matchUnmatchedByKind groups unmatched resources by kind and matches within each kind
-func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstructured, unmatchedBase, unmatchedTarget []int) []ResourcePair {
+// matchUnmatchedByKind groups unmatched resources by kind and matches within each kind.
+// Returns scoredPair with indices into the original baseManifests/targetManifests slices.
+func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstructured, unmatchedBase, unmatchedTarget []int) []scoredPair {
 	// Group unmatched by kind
 	baseByKind := make(map[string][]int)
 	for _, i := range unmatchedBase {
@@ -266,7 +263,7 @@ func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstruct
 	}
 	sort.Strings(sortedKinds)
 
-	var matchedPairs []ResourcePair
+	var matchedPairs []scoredPair
 
 	for _, kind := range sortedKinds {
 		baseIdxs := baseByKind[kind]
@@ -284,10 +281,15 @@ func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstruct
 
 		kindPairs := matchResourcesOfSameKind(baseRes, targetRes)
 
-		// Only include modified (not deleted/added - those wait for Phase 4)
+		// Only include modified pairs (not deleted/added - those wait for Phase 4).
+		// Translate local indices back to original indices.
 		for _, p := range kindPairs {
-			if p.Base != nil && p.Target != nil {
-				matchedPairs = append(matchedPairs, p)
+			if p.baseIdx >= 0 && p.targetIdx >= 0 {
+				matchedPairs = append(matchedPairs, scoredPair{
+					baseIdx:   baseIdxs[p.baseIdx],
+					targetIdx: targetIdxs[p.targetIdx],
+					score:     p.score,
+				})
 			}
 		}
 	}
@@ -295,26 +297,28 @@ func matchUnmatchedByKind(baseManifests, targetManifests []unstructured.Unstruct
 	return matchedPairs
 }
 
-// matchResourcesOfSameKind matches resources of the same kind and returns only changed pairs
-func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unstructured) []ResourcePair {
+// matchResourcesOfSameKind matches resources of the same kind and returns index pairs.
+// The returned scoredPair indices are local to the provided baseResources/targetResources slices.
+// A baseIdx of -1 means the resource was added (no base), a targetIdx of -1 means deleted (no target).
+func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unstructured) []scoredPair {
 	if len(baseResources) == 0 && len(targetResources) == 0 {
 		return nil
 	}
 
 	// If no base resources, all target resources are additions
 	if len(baseResources) == 0 {
-		result := make([]ResourcePair, len(targetResources))
+		result := make([]scoredPair, len(targetResources))
 		for i := range targetResources {
-			result[i] = ResourcePair{Base: nil, Target: &targetResources[i]}
+			result[i] = scoredPair{baseIdx: -1, targetIdx: i}
 		}
 		return result
 	}
 
 	// If no target resources, all base resources are deletions
 	if len(targetResources) == 0 {
-		result := make([]ResourcePair, len(baseResources))
+		result := make([]scoredPair, len(baseResources))
 		for i := range baseResources {
-			result[i] = ResourcePair{Base: &baseResources[i], Target: nil}
+			result[i] = scoredPair{baseIdx: i, targetIdx: -1}
 		}
 		return result
 	}
@@ -328,7 +332,7 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 
 	matchedBaseIndices := make(map[int]bool)
 	matchedTargetIndices := make(map[int]bool)
-	var result []ResourcePair
+	var result []scoredPair
 
 	// Phase 1: Match by identity (namespace/name)
 	for i := range targetResources {
@@ -336,9 +340,10 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 		if baseIdx, found := baseByKey[key]; found {
 			// Check if content is identical
 			if !resourcesEqual(&baseResources[baseIdx], &targetResources[i]) {
-				result = append(result, ResourcePair{
-					Base:   &baseResources[baseIdx],
-					Target: &targetResources[i],
+				result = append(result, scoredPair{
+					baseIdx:   baseIdx,
+					targetIdx: i,
+					score:     1.0, // exact identity match
 				})
 			}
 			// Mark as matched (even if identical - we don't want to re-match)
@@ -358,10 +363,7 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 		for _, sm := range similarityMatches {
 			// Only include if not identical
 			if !resourcesEqual(&baseResources[sm.baseIdx], &targetResources[sm.targetIdx]) {
-				result = append(result, ResourcePair{
-					Base:   &baseResources[sm.baseIdx],
-					Target: &targetResources[sm.targetIdx],
-				})
+				result = append(result, sm)
 			}
 			matchedBaseIndices[sm.baseIdx] = true
 			matchedTargetIndices[sm.targetIdx] = true
@@ -387,17 +389,17 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 
 	// Remaining unmatched base resources are deletions
 	for _, idx := range unmatchedBase {
-		result = append(result, ResourcePair{
-			Base:   &baseResources[idx],
-			Target: nil,
+		result = append(result, scoredPair{
+			baseIdx:   idx,
+			targetIdx: -1,
 		})
 	}
 
 	// Remaining unmatched target resources are additions
 	for _, idx := range unmatchedTarget {
-		result = append(result, ResourcePair{
-			Base:   nil,
-			Target: &targetResources[idx],
+		result = append(result, scoredPair{
+			baseIdx:   -1,
+			targetIdx: idx,
 		})
 	}
 

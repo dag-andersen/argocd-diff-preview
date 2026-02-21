@@ -161,13 +161,24 @@ func GenerateAppDiffs(
 	ignorePattern *string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) ([]AppDiff, error) {
+	// Compile the ignore pattern regex once up front
+	var compiledIgnorePattern *regexp.Regexp
+	if ignorePattern != nil && *ignorePattern != "" {
+		var err error
+		compiledIgnorePattern, err = regexp.Compile(*ignorePattern)
+		if err != nil {
+			// If regex compilation fails, fall back to a literal string match
+			compiledIgnorePattern = regexp.MustCompile(regexp.QuoteMeta(*ignorePattern))
+		}
+	}
+
 	// Match apps by content similarity
 	pairs := MatchApps(baseApps, targetApps)
 
 	var diffs []AppDiff
 
 	for _, pair := range pairs {
-		appDiff, err := generateAppDiff(pair, contextLines, ignorePattern, ignoreResourceRules)
+		appDiff, err := generateAppDiff(pair, contextLines, compiledIgnorePattern, ignoreResourceRules)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate diff for app pair: %w", err)
 		}
@@ -198,7 +209,7 @@ func GenerateAppDiffs(
 }
 
 // generateAppDiff generates the diff for a single app pair
-func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string, ignoreResourceRules []resource_filter.IgnoreResourceRule) (AppDiff, error) {
+func generateAppDiff(pair Pair, contextLines uint, ignorePattern *regexp.Regexp, ignoreResourceRules []resource_filter.IgnoreResourceRule) (AppDiff, error) {
 	diff := AppDiff{}
 
 	// Set names and paths
@@ -260,7 +271,7 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string, ignore
 func buildResourceDiffs(
 	resources []ResourcePair,
 	contextLines uint,
-	ignorePattern *string,
+	ignorePattern *regexp.Regexp,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) ([]ResourceDiff, int, int, error) {
 	var result []ResourceDiff
@@ -347,7 +358,7 @@ func buildResourceDiffs(
 }
 
 // generateResourceDiff generates diff for a single resource pair with ignore pattern support
-func generateResourceDiff(rp ResourcePair, contextLines uint, ignorePattern *string) (DiffResult, error) {
+func generateResourceDiff(rp ResourcePair, contextLines uint, ignorePattern *regexp.Regexp) (DiffResult, error) {
 	baseYAML, err := resourceToYAML(rp.Base)
 	if err != nil {
 		return DiffResult{}, fmt.Errorf("failed to marshal base resource: %w", err)
@@ -394,7 +405,7 @@ func getResourceRef(rp *ResourcePair) resourceRef {
 }
 
 // formatResourceDiff formats a diff between two YAML strings with ignore pattern support
-func formatResourceDiff(baseYAML, targetYAML string, contextLines uint, ignorePattern *string) DiffResult {
+func formatResourceDiff(baseYAML, targetYAML string, contextLines uint, ignorePattern *regexp.Regexp) DiffResult {
 	diffs := diff.Do(baseYAML, targetYAML)
 	return formatDiffWithIgnore(diffs, contextLines, ignorePattern)
 }
@@ -414,7 +425,7 @@ var defaultIgnorePatterns = []string{
 }
 
 // formatDiffWithIgnore formats diffs with support for ignore patterns
-func formatDiffWithIgnore(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *string) DiffResult {
+func formatDiffWithIgnore(diffs []diffmatchpatch.Diff, contextLines uint, ignorePattern *regexp.Regexp) DiffResult {
 	// Process diffs into lines with metadata
 	processedLines := processDiffLinesWithIgnore(diffs, ignorePattern)
 
@@ -446,7 +457,7 @@ type processedLineWithIgnore struct {
 }
 
 // processDiffLinesWithIgnore converts raw diffs into processedLine structs with ignore support
-func processDiffLinesWithIgnore(diffs []diffmatchpatch.Diff, ignorePattern *string) []processedLineWithIgnore {
+func processDiffLinesWithIgnore(diffs []diffmatchpatch.Diff, ignorePattern *regexp.Regexp) []processedLineWithIgnore {
 	var processedLines []processedLineWithIgnore
 
 	for _, d := range diffs {
@@ -472,14 +483,14 @@ func processDiffLinesWithIgnore(diffs []diffmatchpatch.Diff, ignorePattern *stri
 }
 
 // shouldShowLine determines if a line should be shown in the diff output
-func shouldShowLine(line string, isChange bool, ignorePattern *string) bool {
+func shouldShowLine(line string, isChange bool, ignorePattern *regexp.Regexp) bool {
 	if !isChange {
 		return true
 	}
 
 	// Check custom ignore pattern
-	if ignorePattern != nil && *ignorePattern != "" {
-		if shouldIgnoreLine(line, *ignorePattern) {
+	if ignorePattern != nil {
+		if ignorePattern.MatchString(line) {
 			return false
 		}
 	}
@@ -492,16 +503,6 @@ func shouldShowLine(line string, isChange bool, ignorePattern *string) bool {
 	}
 
 	return true
-}
-
-// shouldIgnoreLine checks if a line should be ignored based on regex pattern
-func shouldIgnoreLine(line, pattern string) bool {
-	matched, err := regexp.MatchString(pattern, line)
-	if err != nil {
-		// If regex fails, fall back to simple string matching
-		return strings.Contains(line, pattern)
-	}
-	return matched
 }
 
 // buildOutputWithIgnore converts chunks into the final diff output string
