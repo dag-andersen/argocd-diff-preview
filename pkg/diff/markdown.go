@@ -114,17 +114,32 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 			part = fmt.Sprintf("#### %s\n```diff\n%s\n```\n", r.Header, content)
 		}
 
-		if truncatedBody.Len()+len(part) > spaceForBody {
-			// Try to fit a partial resource
-			remaining := spaceForBody - truncatedBody.Len()
-			if remaining > minSizeForSectionContent {
-				truncated := part[:remaining]
-				truncated = strings.TrimRight(truncated, " \t\n\r")
-				truncatedBody.WriteString(truncated)
-			}
+		// If the full resource fits, include it and continue
+		if truncatedBody.Len()+len(part) <= spaceForBody {
+			truncatedBody.WriteString(part)
+			continue
+		}
+
+		// Resource doesn't fit — try to include a truncated version.
+		// Skipped sections are small and not worth partially including.
+		if r.IsSkipped {
 			break
 		}
-		truncatedBody.WriteString(part)
+
+		// Split into header/content/footer so we can truncate only the content
+		// while structurally guaranteeing the code fence closes
+		resHeader := fmt.Sprintf("#### %s\n```diff\n", r.Header)
+		resFooter := "\n```\n"
+		remaining := spaceForBody - truncatedBody.Len() - len(resHeader) - len(resFooter)
+		if remaining > minSizeForSectionContent {
+			content := strings.TrimRight(r.Content, "\n")
+			truncatedContent := content[:min(remaining, len(content))]
+			truncatedContent = strings.TrimRight(truncatedContent, " \t\n\r")
+			truncatedBody.WriteString(resHeader)
+			truncatedBody.WriteString(truncatedContent)
+			truncatedBody.WriteString(resFooter)
+		}
+		break
 	}
 
 	log.Debug().Msgf("Markdown - returning truncated content with warning")

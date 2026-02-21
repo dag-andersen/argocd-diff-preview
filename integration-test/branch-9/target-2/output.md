@@ -20,7 +20,9 @@ Deleted (1):
 -  labels:
 -    app.kubernetes.io/component: admission-webhook
 -    app.kubernetes.io/instance: nginx-ingress
--    app.kubernetes.io/managed-b
+-    app.kubernetes.io/mana
+```
+
 🚨 Diff is too long
 </details>
 
