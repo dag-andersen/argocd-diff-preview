@@ -208,10 +208,7 @@ func flattenObject(prefix string, obj any, result map[string]bool) {
 		}
 	case []any:
 		for i, value := range v {
-			newPrefix := prefix + "[" + string(rune('0'+i)) + "]"
-			if i >= 10 {
-				newPrefix = prefix + "[*]" // Simplify for large arrays
-			}
+			newPrefix := fmt.Sprintf("%s[%d]", prefix, i)
 			flattenObject(newPrefix, value, result)
 		}
 	default:
