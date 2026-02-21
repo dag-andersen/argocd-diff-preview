@@ -24,7 +24,7 @@ func emptyReasonMarkdown(reason matching.EmptyReason) string {
 	case matching.EmptyReasonHiddenDiff:
 		return "_Diff hidden because `--hide-deleted-app-diff` is enabled_"
 	default:
-		return ""
+		return "_Empty for unknown reason_"
 	}
 }
 

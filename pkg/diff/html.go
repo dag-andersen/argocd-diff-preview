@@ -105,7 +105,7 @@ func emptyReasonHTML(reason matching.EmptyReason) string {
 	case matching.EmptyReasonHiddenDiff:
 		return "<p><em>Diff hidden because <code>--hide-deleted-app-diff</code> is enabled</em></p>"
 	default:
-		return ""
+		return "<p><em>Empty for unknown reason</em></p>"
 	}
 }
 
