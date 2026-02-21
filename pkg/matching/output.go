@@ -11,8 +11,6 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/go-git/go-git/v5/utils/diff"
 	"github.com/sergi/go-diff/diffmatchpatch"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/yaml"
 )
 
 // ResourceDiff represents the diff output for a single resource within an application
@@ -71,8 +69,17 @@ type AppDiff struct {
 	Resources     []ResourceDiff // Per-resource diffs
 	AddedLines    int
 	DeletedLines  int
-	EmptyMessage  string // Message to show when Resources is empty (explains why)
+	EmptyReason   EmptyReason // Why Resources is empty (only meaningful when len(Resources) == 0)
 }
+
+// EmptyReason describes why an application section has no resource diffs
+type EmptyReason int
+
+const (
+	EmptyReasonNone        EmptyReason = iota // not empty — has resources
+	EmptyReasonNoResources                    // application genuinely rendered no resources
+	EmptyReasonHiddenDiff                     // diff hidden by --hide-deleted-app-diff
+)
 
 // DiffAction represents the type of change
 type DiffAction int
@@ -225,7 +232,7 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string, ignore
 		if diff.Action == ActionModified {
 			diff.Action = ActionUnchanged
 		} else {
-			diff.EmptyMessage = "Application rendered no resources"
+			diff.EmptyReason = EmptyReasonNoResources
 		}
 		return diff, nil
 	}
@@ -341,32 +348,18 @@ func buildResourceDiffs(
 
 // generateResourceDiff generates diff for a single resource pair with ignore pattern support
 func generateResourceDiff(rp ResourcePair, contextLines uint, ignorePattern *string) (DiffResult, error) {
-	baseYAML, err := resourceToYAMLSorted(rp.Base)
+	baseYAML, err := resourceToYAML(rp.Base)
 	if err != nil {
 		return DiffResult{}, fmt.Errorf("failed to marshal base resource: %w", err)
 	}
 
-	targetYAML, err := resourceToYAMLSorted(rp.Target)
+	targetYAML, err := resourceToYAML(rp.Target)
 	if err != nil {
 		return DiffResult{}, fmt.Errorf("failed to marshal target resource: %w", err)
 	}
 
 	// Use the existing format logic from pkg/diff which handles ignore patterns
 	return formatResourceDiff(baseYAML, targetYAML, contextLines, ignorePattern), nil
-}
-
-// resourceToYAMLSorted converts an unstructured resource to YAML string with sorted keys
-func resourceToYAMLSorted(r *unstructured.Unstructured) (string, error) {
-	if r == nil {
-		return "", nil
-	}
-
-	yamlBytes, err := yaml.Marshal(r.Object)
-	if err != nil {
-		return "", err
-	}
-
-	return string(yamlBytes), nil
 }
 
 // resourceRef holds sort-relevant fields from a ResourcePair

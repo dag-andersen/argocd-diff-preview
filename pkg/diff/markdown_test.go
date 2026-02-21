@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
 )
 
 func TestMarkdownSectionHeader(t *testing.T) {
@@ -329,11 +331,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 
 	t.Run("Empty resources", func(t *testing.T) {
 		section := MarkdownSection{
-			appName:      "App",
-			filePath:     "path.yaml",
-			appURL:       "",
-			resources:    []ResourceSection{},
-			emptyMessage: "Application rendered no resources",
+			appName:     "App",
+			filePath:    "path.yaml",
+			appURL:      "",
+			resources:   []ResourceSection{},
+			emptyReason: matching.EmptyReasonNoResources,
 		}
 		content, truncated := section.build(1000)
 		if truncated {

@@ -3,6 +3,8 @@ package diff
 import (
 	"strings"
 	"testing"
+
+	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
 	"time"
 )
 
@@ -63,10 +65,10 @@ func TestHTMLSection_PrintHTMLSection_WithURL(t *testing.T) {
 
 func TestHTMLSection_PrintHTMLSection_EmptyResources(t *testing.T) {
 	section := HTMLSection{
-		appName:      "my-app",
-		filePath:     "path/to/app",
-		resources:    []ResourceSection{},
-		emptyMessage: "Application rendered no resources",
+		appName:     "my-app",
+		filePath:    "path/to/app",
+		resources:   []ResourceSection{},
+		emptyReason: matching.EmptyReasonNoResources,
 	}
 
 	result := section.printHTMLSection()

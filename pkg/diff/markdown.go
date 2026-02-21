@@ -4,15 +4,28 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
 	"github.com/rs/zerolog/log"
 )
 
 type MarkdownSection struct {
-	appName      string
-	filePath     string
-	appURL       string
-	resources    []ResourceSection
-	emptyMessage string // message to show when resources is empty
+	appName     string
+	filePath    string
+	appURL      string
+	resources   []ResourceSection
+	emptyReason matching.EmptyReason
+}
+
+// emptyReasonMarkdown returns the markdown-formatted message for an EmptyReason
+func emptyReasonMarkdown(reason matching.EmptyReason) string {
+	switch reason {
+	case matching.EmptyReasonNoResources:
+		return "_Application rendered no resources_"
+	case matching.EmptyReasonHiddenDiff:
+		return "_Diff hidden because `--hide-deleted-app-diff` is enabled_"
+	default:
+		return ""
+	}
 }
 
 func markdownSectionHeader(appName, filePath, appURL string) string {
@@ -41,7 +54,8 @@ func (m *MarkdownSection) Size() int {
 		}
 	}
 	if len(m.resources) == 0 {
-		size += len(fmt.Sprintf("_%s_\n\n", m.emptyMessage))
+		msg := emptyReasonMarkdown(m.emptyReason)
+		size += len(msg) + len("\n\n")
 	}
 	size += len(markdownSectionFooter())
 	return size
@@ -60,7 +74,8 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	var body strings.Builder
 
 	if len(m.resources) == 0 {
-		fmt.Fprintf(&body, "_%s_\n\n", m.emptyMessage)
+		body.WriteString(emptyReasonMarkdown(m.emptyReason))
+		body.WriteString("\n\n")
 	} else {
 		for _, r := range m.resources {
 			if r.IsSkipped {

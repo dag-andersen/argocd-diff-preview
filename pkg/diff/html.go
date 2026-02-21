@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html"
 	"strings"
+
+	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
 )
 
 type HTMLOutput struct {
@@ -88,11 +90,23 @@ pre {
 `
 
 type HTMLSection struct {
-	appName      string
-	filePath     string
-	appURL       string
-	resources    []ResourceSection
-	emptyMessage string // message to show when resources is empty
+	appName     string
+	filePath    string
+	appURL      string
+	resources   []ResourceSection
+	emptyReason matching.EmptyReason
+}
+
+// emptyReasonHTML returns the HTML-formatted message for an EmptyReason
+func emptyReasonHTML(reason matching.EmptyReason) string {
+	switch reason {
+	case matching.EmptyReasonNoResources:
+		return "<p><em>Application rendered no resources</em></p>"
+	case matching.EmptyReasonHiddenDiff:
+		return "<p><em>Diff hidden because <code>--hide-deleted-app-diff</code> is enabled</em></p>"
+	default:
+		return ""
+	}
 }
 
 const htmlSectionTemplate = `
@@ -127,7 +141,7 @@ func (h *HTMLSection) printHTMLSection() string {
 	var body strings.Builder
 
 	if len(h.resources) == 0 {
-		fmt.Fprintf(&body, "\n<p><em>%s</em></p>\n", html.EscapeString(h.emptyMessage))
+		fmt.Fprintf(&body, "\n%s\n", emptyReasonHTML(h.emptyReason))
 	} else {
 		for _, r := range h.resources {
 			fmt.Fprintf(&body, "\n<h4 class=\"resource_header\">%s</h4>\n", html.EscapeString(r.Header))
