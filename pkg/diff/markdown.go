@@ -42,25 +42,6 @@ func markdownSectionFooter() string {
 	return "</details>\n\n"
 }
 
-func (m *MarkdownSection) Size() int {
-	size := len(markdownSectionHeader(m.appName, m.filePath, m.appURL))
-	for _, r := range m.resources {
-		if r.IsSkipped {
-			// "#### Header\n\n_Skipped_\n\n"
-			size += len("#### ") + len(r.Header) + len("\n\n_Skipped_\n\n")
-		} else {
-			// "#### Header\n```diff\ncontent\n```\n"
-			size += len("#### ") + len(r.Header) + len("\n```diff\n") + len(r.Content) + len("```\n")
-		}
-	}
-	if len(m.resources) == 0 {
-		msg := emptyReasonMarkdown(m.emptyReason)
-		size += len(msg) + len("\n\n")
-	}
-	size += len(markdownSectionFooter())
-	return size
-}
-
 var (
 	minSizeForSectionContent = 100
 	diffTooLongWarning       = "\n🚨 Diff is too long"
