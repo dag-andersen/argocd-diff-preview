@@ -96,32 +96,30 @@ func resourceListSimilarity(listA, listB []unstructured.Unstructured) float64 {
 		return 1.0
 	}
 
-	// Try to match by name first
-	byNameA := make(map[string]*unstructured.Unstructured)
+	// Try to match by name first (use slices to handle duplicate names)
+	byNameA := make(map[string][]*unstructured.Unstructured)
 	for i := range listA {
 		key := listA[i].GetNamespace() + "/" + listA[i].GetName()
-		byNameA[key] = &listA[i]
+		byNameA[key] = append(byNameA[key], &listA[i])
 	}
 
 	matchedCount := 0
 	totalSimilarity := 0.0
 
-	usedA := make(map[string]bool)
-
 	for i := range listB {
 		key := listB[i].GetNamespace() + "/" + listB[i].GetName()
-		if a, found := byNameA[key]; found {
-			// Exact name match - compare content
-			totalSimilarity += contentSimilarity(a, &listB[i])
+		if aList := byNameA[key]; len(aList) > 0 {
+			// Exact name match - compare content, consume one A resource
+			totalSimilarity += contentSimilarity(aList[0], &listB[i])
 			matchedCount++
-			usedA[key] = true
+			byNameA[key] = aList[1:] // remove the consumed entry
 		}
 	}
 
 	// For unmatched, find best content match (sort keys for deterministic order)
 	unmatchedKeys := make([]string, 0)
 	for key := range byNameA {
-		if !usedA[key] {
+		if len(byNameA[key]) > 0 {
 			unmatchedKeys = append(unmatchedKeys, key)
 		}
 	}
@@ -129,7 +127,7 @@ func resourceListSimilarity(listA, listB []unstructured.Unstructured) float64 {
 
 	var unmatchedA []*unstructured.Unstructured
 	for _, key := range unmatchedKeys {
-		unmatchedA = append(unmatchedA, byNameA[key])
+		unmatchedA = append(unmatchedA, byNameA[key]...)
 	}
 
 	var unmatchedB []*unstructured.Unstructured
