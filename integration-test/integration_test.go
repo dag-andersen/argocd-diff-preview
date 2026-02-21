@@ -182,11 +182,10 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-6/base",
 	},
 	{
-		Name:          "branch-7/target",
-		TargetBranch:  "integration-test/branch-7/target",
-		BaseBranch:    "integration-test/branch-7/base",
-		FilesChanged:  "examples/helm/values/filtered.yaml",
-		CreateCluster: "true",
+		Name:         "branch-7/target",
+		TargetBranch: "integration-test/branch-7/target",
+		BaseBranch:   "integration-test/branch-7/base",
+		FilesChanged: "examples/helm/values/filtered.yaml",
 	},
 	{
 		Name:         "branch-8/target",
@@ -253,6 +252,11 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-13/base",
 		Suffix:       "-2",
 		Selector:     "team=your-team",
+	},
+	{
+		Name:         "branch-15/target",
+		TargetBranch: "integration-test/branch-15/target",
+		BaseBranch:   "integration-test/branch-15/base",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --use-argocd-api is not used,
@@ -330,17 +334,10 @@ func TestIntegration(t *testing.T) {
 		}
 	})
 
-	// Create a copy of testCases to shuffle
-	shuffledCases := make([]TestCase, len(testCases))
-	copy(shuffledCases, testCases)
+	// Order tests to minimize cluster recreations
+	shuffledCases := orderTestCases(testCases)
 
-	// Shuffle using time-based seed
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	rng.Shuffle(len(shuffledCases), func(i, j int) {
-		shuffledCases[i], shuffledCases[j] = shuffledCases[j], shuffledCases[i]
-	})
-
-	t.Logf("Running %d tests in randomized order", len(shuffledCases))
+	t.Logf("Running %d tests in optimized order", len(shuffledCases))
 
 	// Track how many tests since last cluster creation
 	testsSinceClusterCreation := 0
@@ -426,6 +423,55 @@ func printToTTY(msg string) {
 		_, _ = tty.WriteString(msg)
 		_ = tty.Close()
 	}
+}
+
+// orderTestCases groups and shuffles test cases to minimize cluster recreations.
+// Tests are partitioned by RBAC configuration (roles-enabled vs roles-disabled),
+// shuffled within each group, and then concatenated. Tests that explicitly require
+// CreateCluster are placed at the front of each group so they overlap with the
+// cluster creation that already happens at group boundaries.
+func orderTestCases(cases []TestCase) []TestCase {
+	var rolesEnabled, rolesDisabled []TestCase
+	for _, tc := range cases {
+		needsRolesDisabled := tc.DisableClusterRoles == "true" || tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi)
+		if needsRolesDisabled {
+			rolesDisabled = append(rolesDisabled, tc)
+		} else {
+			rolesEnabled = append(rolesEnabled, tc)
+		}
+	}
+
+	// Shuffle each group independently
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng.Shuffle(len(rolesEnabled), func(i, j int) {
+		rolesEnabled[i], rolesEnabled[j] = rolesEnabled[j], rolesEnabled[i]
+	})
+	rng.Shuffle(len(rolesDisabled), func(i, j int) {
+		rolesDisabled[i], rolesDisabled[j] = rolesDisabled[j], rolesDisabled[i]
+	})
+
+	// Move CreateCluster tests to the front of each group
+	sortCreateClusterFirst := func(group []TestCase) {
+		slices.SortStableFunc(group, func(a, b TestCase) int {
+			aCreate := a.CreateCluster == "true"
+			bCreate := b.CreateCluster == "true"
+			if aCreate && !bCreate {
+				return -1
+			}
+			if !aCreate && bCreate {
+				return 1
+			}
+			return 0
+		})
+	}
+	sortCreateClusterFirst(rolesEnabled)
+	sortCreateClusterFirst(rolesDisabled)
+
+	// Concatenate: roles-enabled first, then roles-disabled
+	result := make([]TestCase, 0, len(cases))
+	result = append(result, rolesEnabled...)
+	result = append(result, rolesDisabled...)
+	return result
 }
 
 // deleteKindCluster deletes the kind cluster used for testing

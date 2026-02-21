@@ -1,0 +1,71 @@
+## Argo CD Diff Preview
+
+Summary:
+```yaml
+Total: 1 files changed
+
+Modified (1):
+± order-change-example (+8|-7)
+```
+
+<details>
+<summary>order-change-example (examples/order-change/app/app-set.yaml)</summary>
+<br>
+
+```diff
+@@ Application modified: order-change-example (examples/order-change/app/app-set.yaml) @@
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+-  name: order-change-example-deploy-1
++  name: order-change-example-deploy-2
+   namespace: default
+ spec:
+   replicas: 2
+   selector:
+     matchLabels:
+-      app: example-deploy-1
++      app: example-deploy-2
+   template:
+     metadata:
+       labels:
+-        app: example-deploy-1
++        app: example-deploy-2
+     spec:
+       containers:
+       - image: dag-andersen/myapp:latest
+         name: myapp
+         ports:
+         - containerPort: 80
+ ---
+ apiVersion: apps/v1
+-kind: Deployment
++kind: StatefulSet
+ metadata:
+-  name: order-change-example-deploy-2
++  name: order-change-example-sfs-1
+   namespace: default
+ spec:
+   replicas: 2
+   selector:
+     matchLabels:
+-      app: example-deploy-2
++      app: example-sfs-1
++  serviceName: order-change-example-sfs-1
+   template:
+     metadata:
+       labels:
+-        app: example-deploy-2
++        app: example-sfs-1
+     spec:
+       containers:
+       - image: dag-andersen/myapp:latest
+         name: myapp
+         ports:
+         - containerPort: 80
+```
+
+</details>
+
+_Stats_:
+[Applications: 46], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
