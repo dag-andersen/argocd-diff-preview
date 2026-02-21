@@ -324,10 +324,10 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 	}
 
 	// Try to match by namespace/name first (identity matching)
-	baseByKey := make(map[string]int) // key -> index
+	baseByKey := make(map[string][]int) // key -> indices
 	for i := range baseResources {
 		key := resourceKey(&baseResources[i])
-		baseByKey[key] = i
+		baseByKey[key] = append(baseByKey[key], i)
 	}
 
 	matchedBaseIndices := make(map[int]bool)
@@ -336,19 +336,29 @@ func matchResourcesOfSameKind(baseResources, targetResources []unstructured.Unst
 
 	// Phase 1: Match by identity (namespace/name)
 	for i := range targetResources {
+		if matchedTargetIndices[i] {
+			continue
+		}
 		key := resourceKey(&targetResources[i])
-		if baseIdx, found := baseByKey[key]; found {
-			// Check if content is identical
-			if !resourcesEqual(&baseResources[baseIdx], &targetResources[i]) {
-				result = append(result, scoredPair{
-					baseIdx:   baseIdx,
-					targetIdx: i,
-					score:     1.0, // exact identity match
-				})
+		if baseIdxs, found := baseByKey[key]; found {
+			// Find the first unmatched base with this key
+			for _, baseIdx := range baseIdxs {
+				if matchedBaseIndices[baseIdx] {
+					continue
+				}
+				// Check if content is identical
+				if !resourcesEqual(&baseResources[baseIdx], &targetResources[i]) {
+					result = append(result, scoredPair{
+						baseIdx:   baseIdx,
+						targetIdx: i,
+						score:     1.0, // exact identity match
+					})
+				}
+				// Mark as matched (even if identical - we don't want to re-match)
+				matchedBaseIndices[baseIdx] = true
+				matchedTargetIndices[i] = true
+				break
 			}
-			// Mark as matched (even if identical - we don't want to re-match)
-			matchedBaseIndices[baseIdx] = true
-			matchedTargetIndices[i] = true
 		}
 	}
 

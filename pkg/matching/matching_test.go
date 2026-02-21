@@ -680,6 +680,281 @@ func TestChangedResources_AppDeleted(t *testing.T) {
 	}
 }
 
+// Tests for duplicate resources (Argo CD can produce duplicate kind+namespace/name from the same Application)
+
+func TestChangedResources_DuplicateResourcesBothIdentical(t *testing.T) {
+	// When base and target both have two identical resources with the same kind/namespace/name,
+	// they should all be matched and no changes should be reported.
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 0 {
+		t.Errorf("expected 0 changed resources when both sides have identical duplicates, got %d", len(changed))
+	}
+}
+
+func TestChangedResources_DuplicateResourcesOneModified(t *testing.T) {
+	// Base has two identical ConfigMaps. Target has one identical and one modified.
+	// Should show exactly 1 changed resource (the modified one).
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+	configMapModified := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "new-value"},
+	})
+
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMapModified})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 1 {
+		t.Fatalf("expected 1 changed resource (one modified duplicate), got %d", len(changed))
+	}
+	if changed[0].Base == nil || changed[0].Target == nil {
+		t.Error("expected both base and target to be non-nil for modified duplicate")
+	}
+}
+
+func TestChangedResources_DuplicateResourcesAddedOne(t *testing.T) {
+	// Base has one ConfigMap, target has two with the same name.
+	// Should show 1 addition.
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 1 {
+		t.Fatalf("expected 1 changed resource (one added duplicate), got %d", len(changed))
+	}
+	if changed[0].Base != nil {
+		t.Error("expected base to be nil for added duplicate resource")
+	}
+	if changed[0].Target == nil {
+		t.Error("expected target to be non-nil for added duplicate resource")
+	}
+}
+
+func TestChangedResources_DuplicateResourcesDeletedOne(t *testing.T) {
+	// Base has two ConfigMaps with the same name, target has one.
+	// Should show 1 deletion.
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 1 {
+		t.Fatalf("expected 1 changed resource (one deleted duplicate), got %d", len(changed))
+	}
+	if changed[0].Base == nil {
+		t.Error("expected base to be non-nil for deleted duplicate resource")
+	}
+	if changed[0].Target != nil {
+		t.Error("expected target to be nil for deleted duplicate resource")
+	}
+}
+
+func TestChangedResources_ThreeDuplicatesWithMixedChanges(t *testing.T) {
+	// Base has 3 identical ConfigMaps, target has 3 where one is modified.
+	// Should show exactly 1 changed resource.
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+	configMapModified := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "changed"},
+	})
+
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap, configMap})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{configMap, configMap, configMapModified})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 1 {
+		t.Fatalf("expected 1 changed resource (one modified out of 3 duplicates), got %d", len(changed))
+	}
+	if changed[0].Base == nil || changed[0].Target == nil {
+		t.Error("expected both base and target to be non-nil for modified resource")
+	}
+}
+
+func TestChangedResources_DuplicateResourcesDifferentKinds(t *testing.T) {
+	// Two resources share namespace/name but have different kinds (Deployment and Service).
+	// Both exist in base and target, both duplicated. All should match correctly.
+	deploy := makeResource("apps/v1", "Deployment", "default", "my-app", map[string]any{
+		"spec": map[string]any{"replicas": int64(3)},
+	})
+	service := makeResource("v1", "Service", "default", "my-app", map[string]any{
+		"spec": map[string]any{"type": "ClusterIP"},
+	})
+
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{deploy, deploy, service, service})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{deploy, deploy, service, service})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 0 {
+		t.Errorf("expected 0 changed resources when all duplicates are identical, got %d", len(changed))
+	}
+}
+
+func TestMatchResources_DuplicatesDontSilentlyDisappear(t *testing.T) {
+	// Regression test: ensure that when matchResources processes duplicate resources
+	// (same kind+namespace+name), no resource silently disappears from the output.
+	// All resources must either be matched or appear as additions/deletions.
+	configMapA := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "a"},
+	})
+	configMapB := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "b"},
+	})
+	configMapC := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "c"},
+	})
+
+	base := []unstructured.Unstructured{configMapA, configMapB}
+	target := []unstructured.Unstructured{configMapA, configMapC}
+
+	pairs := matchResources(base, target)
+
+	// We should see changes for:
+	// - configMapA matched with configMapA (identical, filtered out)
+	// - configMapB matched with configMapC (modified)
+	// Total: 1 changed pair
+	if len(pairs) != 1 {
+		t.Fatalf("expected 1 changed pair, got %d", len(pairs))
+	}
+	if pairs[0].Base == nil || pairs[0].Target == nil {
+		t.Fatal("expected both base and target to be non-nil for the modified pair")
+	}
+}
+
+func TestMatchResources_ManyDuplicatesSameContent(t *testing.T) {
+	// Stress test: 3 identical resources on each side. All should match 1:1, no changes.
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	base := []unstructured.Unstructured{configMap, configMap, configMap}
+	target := []unstructured.Unstructured{configMap, configMap, configMap}
+
+	pairs := matchResources(base, target)
+
+	if len(pairs) != 0 {
+		t.Errorf("expected 0 changed pairs for 3 identical duplicates on each side, got %d", len(pairs))
+	}
+}
+
+func TestMatchResources_AsymmetricDuplicates(t *testing.T) {
+	// Base has 3 copies, target has 1 copy. Should show 2 deletions.
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	base := []unstructured.Unstructured{configMap, configMap, configMap}
+	target := []unstructured.Unstructured{configMap}
+
+	pairs := matchResources(base, target)
+
+	if len(pairs) != 2 {
+		t.Fatalf("expected 2 changed pairs (2 deletions), got %d", len(pairs))
+	}
+
+	deletions := 0
+	for _, p := range pairs {
+		if p.Base != nil && p.Target == nil {
+			deletions++
+		}
+	}
+	if deletions != 2 {
+		t.Errorf("expected 2 deletions, got %d", deletions)
+	}
+}
+
+func TestMatchResourcesOfSameKind_DuplicateNamespaceNameHandledCorrectly(t *testing.T) {
+	// Directly test matchResourcesOfSameKind with duplicate namespace/name resources.
+	// Previously this used map[string]int which would silently drop the first duplicate.
+	configMapV1 := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"version": "1"},
+	})
+	configMapV2 := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"version": "2"},
+	})
+	configMapV3 := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"version": "3"},
+	})
+
+	base := []unstructured.Unstructured{configMapV1, configMapV2}
+	target := []unstructured.Unstructured{configMapV1, configMapV3}
+
+	pairs := matchResourcesOfSameKind(base, target)
+
+	// We expect:
+	// - configMapV1 (base[0]) matched with configMapV1 (target[0]) → identical, no diff reported
+	// - configMapV2 (base[1]) matched with configMapV3 (target[1]) → modified
+	// Both base resources should be accounted for (no silent drops).
+	modified := 0
+	deleted := 0
+	added := 0
+	for _, p := range pairs {
+		switch {
+		case p.baseIdx >= 0 && p.targetIdx >= 0:
+			modified++
+		case p.baseIdx >= 0 && p.targetIdx < 0:
+			deleted++
+		case p.baseIdx < 0 && p.targetIdx >= 0:
+			added++
+		}
+	}
+
+	// matchResourcesOfSameKind filters out identical pairs, so we expect only the modified one
+	if modified != 1 {
+		t.Errorf("expected 1 modified pair, got %d (modified=%d, deleted=%d, added=%d)",
+			len(pairs), modified, deleted, added)
+	}
+	if deleted != 0 || added != 0 {
+		t.Errorf("expected no deletions or additions, got deleted=%d, added=%d", deleted, added)
+	}
+}
+
+func TestMatchResourcesOfSameKind_AllDuplicatesIdentical(t *testing.T) {
+	// All resources identical across base and target — nothing should appear in output
+	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
+		"data": map[string]any{"key": "value"},
+	})
+
+	base := []unstructured.Unstructured{configMap, configMap}
+	target := []unstructured.Unstructured{configMap, configMap}
+
+	pairs := matchResourcesOfSameKind(base, target)
+
+	// matchResourcesOfSameKind excludes identical pairs from its returned scoredPairs
+	for _, p := range pairs {
+		if p.baseIdx >= 0 && p.targetIdx >= 0 {
+			t.Errorf("unexpected modified pair: base[%d] ↔ target[%d]", p.baseIdx, p.targetIdx)
+		}
+	}
+}
+
 func TestChangedResources_MixedChanges(t *testing.T) {
 	// Complex scenario: one resource unchanged, one modified, one added, one deleted
 	deployUnchanged := makeResource("apps/v1", "Deployment", "default", "unchanged", map[string]any{
