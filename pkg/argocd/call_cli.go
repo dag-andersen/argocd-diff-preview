@@ -11,6 +11,8 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // CLIOperations implements the Operations interface using the ArgoCD CLI.
@@ -113,34 +115,115 @@ func (c *CLIOperations) Login() error {
 	return nil
 }
 
-// AppsetGenerate runs 'argocd appset generate' on a file and returns the output
-func (c *CLIOperations) AppsetGenerate(appSetPath string) (string, error) {
-	out, err := c.runArgocdCommand("appset", "generate", appSetPath, "-o", "yaml")
+// AppsetGenerate runs 'argocd appset generate' on an ApplicationSet resource and returns the generated applications.
+// The tempFolder parameter specifies where to write the temporary ApplicationSet file.
+func (c *CLIOperations) AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error) {
+	// Marshal the resource to YAML
+	yamlBytes, err := yaml.Marshal(resource.Object)
 	if err != nil {
-		return "", fmt.Errorf("failed to run argocd appset generate: %w", err)
+		return nil, fmt.Errorf("failed to marshal ApplicationSet to YAML: %w", err)
 	}
 
-	return out, nil
+	// Ensure the app-sets directory exists
+	appSetsDir := fmt.Sprintf("%s/app-sets", tempFolder)
+	if err := os.MkdirAll(appSetsDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create app-sets directory: %w", err)
+	}
+
+	filename := fmt.Sprintf("%s/%s-%s.yaml", appSetsDir, resource.GetName(), utils.UniqueId())
+
+	if err := os.WriteFile(filename, yamlBytes, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	out, err := c.runArgocdCommand("appset", "generate", filename, "-o", "yaml")
+	if err != nil {
+		return nil, fmt.Errorf("failed to run argocd appset generate: %w", err)
+	}
+
+	// Parse the YAML output into unstructured objects
+	return parseAppsetGenerateOutput(out)
+}
+
+// parseAppsetGenerateOutput parses the YAML output from 'argocd appset generate' into unstructured objects
+func parseAppsetGenerateOutput(output string) ([]unstructured.Unstructured, error) {
+	output = strings.TrimSpace(output)
+	if output == "" || output == "null" {
+		return nil, nil
+	}
+
+	// Check if output is a list (starts with "-") or a single object
+	if strings.HasPrefix(output, "-") {
+		var apps []unstructured.Unstructured
+		if err := yaml.Unmarshal([]byte(output), &apps); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML list output: %w", err)
+		}
+		return apps, nil
+	}
+
+	// Single object
+	var app unstructured.Unstructured
+	if err := yaml.Unmarshal([]byte(output), &app); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML output: %w", err)
+	}
+	return []unstructured.Unstructured{app}, nil
 }
 
 // GetManifests returns the manifests for an application using the CLI
-func (c *CLIOperations) GetManifests(appName string) (string, bool, error) {
+func (c *CLIOperations) GetManifests(appName string) ([]unstructured.Unstructured, bool, error) {
 	out, err := c.runArgocdCommand("app", "manifests", appName)
 	if err != nil {
 		if exists, err := c.k8sClient.CheckIfResourceExists(ApplicationGVR, c.namespace, appName); !exists && err != nil {
 			log.Warn().Msgf("App '%s' does not exist", appName)
-			return "", false, fmt.Errorf("app '%s' does not exist: %w", appName, err)
+			return nil, false, fmt.Errorf("app '%s' does not exist: %w", appName, err)
 		}
 
-		return "", true, fmt.Errorf("failed to get manifests for app: %w", err)
+		return nil, true, fmt.Errorf("failed to get manifests for app: %w", err)
 	}
 
 	if strings.TrimSpace(out) == "" {
 		log.Debug().Msgf("No manifests found with `argocd app manifests '%s'`", appName)
-		return "", true, nil
+		return []unstructured.Unstructured{}, true, nil
 	}
 
-	return out, true, nil
+	// Parse YAML output into unstructured objects
+	manifests, err := parseYAMLManifests(out)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to parse manifests: %w", err)
+	}
+
+	return manifests, true, nil
+}
+
+// parseYAMLManifests parses a multi-document YAML string into unstructured objects
+func parseYAMLManifests(yamlStr string) ([]unstructured.Unstructured, error) {
+	documents := utils.SplitYAMLDocuments(yamlStr)
+	manifests := make([]unstructured.Unstructured, 0, len(documents))
+
+	for _, doc := range documents {
+		var obj map[string]any
+		if err := yaml.Unmarshal([]byte(doc), &obj); err != nil {
+			return nil, fmt.Errorf("failed to parse YAML document: %w", err)
+		}
+
+		// Skip empty objects
+		if len(obj) == 0 {
+			continue
+		}
+
+		// Validate required fields
+		apiVersion, _, _ := unstructured.NestedString(obj, "apiVersion")
+		kind, _, _ := unstructured.NestedString(obj, "kind")
+		name, _, _ := unstructured.NestedString(obj, "metadata", "name")
+		if apiVersion == "" || kind == "" || name == "" {
+			log.Debug().Msgf("Skipping manifest with missing apiVersion, kind, or name")
+			continue
+		}
+
+		manifests = append(manifests, unstructured.Unstructured{Object: obj})
+	}
+
+	return manifests, nil
 }
 
 // AddSourceNamespaceToDefaultAppProject adds "*" to the sourceNamespaces of the default AppProject

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -22,12 +23,13 @@ type Operations interface {
 	// and use the provided token instead.
 	Login() error
 
-	// AppsetGenerate generates applications from an ApplicationSet file
-	AppsetGenerate(appSetPath string) (string, error)
+	// AppsetGenerate generates applications from an ApplicationSet resource.
+	// The tempFolder parameter specifies where to write temporary files (CLI mode only).
+	AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error)
 
 	// GetManifests returns the manifests for an application.
 	// Returns: (manifests, appExists, error)
-	GetManifests(appName string) (string, bool, error)
+	GetManifests(appName string) ([]unstructured.Unstructured, bool, error)
 
 	// CheckVersionCompatibility checks if the client/library version is compatible
 	// with the ArgoCD server version
