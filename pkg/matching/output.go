@@ -71,6 +71,7 @@ type AppDiff struct {
 	Resources     []ResourceDiff // Per-resource diffs
 	AddedLines    int
 	DeletedLines  int
+	EmptyMessage  string // Message to show when Resources is empty (explains why)
 }
 
 // DiffAction represents the type of change
@@ -223,6 +224,8 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *string, ignore
 	if len(changedResources) == 0 {
 		if diff.Action == ActionModified {
 			diff.Action = ActionUnchanged
+		} else {
+			diff.EmptyMessage = "Application rendered no resources"
 		}
 		return diff, nil
 	}

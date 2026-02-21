@@ -8,10 +8,11 @@ import (
 )
 
 type MarkdownSection struct {
-	appName   string
-	filePath  string
-	appURL    string
-	resources []ResourceSection
+	appName      string
+	filePath     string
+	appURL       string
+	resources    []ResourceSection
+	emptyMessage string // message to show when resources is empty
 }
 
 func markdownSectionHeader(appName, filePath, appURL string) string {
@@ -40,7 +41,7 @@ func (m *MarkdownSection) Size() int {
 		}
 	}
 	if len(m.resources) == 0 {
-		size += len("_No resources rendered_\n\n")
+		size += len(fmt.Sprintf("_%s_\n\n", m.emptyMessage))
 	}
 	size += len(markdownSectionFooter())
 	return size
@@ -59,7 +60,7 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	var body strings.Builder
 
 	if len(m.resources) == 0 {
-		body.WriteString("_No resources rendered_\n\n")
+		fmt.Fprintf(&body, "_%s_\n\n", m.emptyMessage)
 	} else {
 		for _, r := range m.resources {
 			if r.IsSkipped {

@@ -12,7 +12,7 @@ Added (1):
 <summary>empty-application (examples/empty-app/app.yaml)</summary>
 <br>
 
-_No resources rendered_
+_Application rendered no resources_
 
 </details>
 

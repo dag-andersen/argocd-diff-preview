@@ -88,10 +88,11 @@ pre {
 `
 
 type HTMLSection struct {
-	appName   string
-	filePath  string
-	appURL    string
-	resources []ResourceSection
+	appName      string
+	filePath     string
+	appURL       string
+	resources    []ResourceSection
+	emptyMessage string // message to show when resources is empty
 }
 
 const htmlSectionTemplate = `
@@ -126,7 +127,7 @@ func (h *HTMLSection) printHTMLSection() string {
 	var body strings.Builder
 
 	if len(h.resources) == 0 {
-		body.WriteString("\n<p><em>No resources rendered</em></p>\n")
+		fmt.Fprintf(&body, "\n<p><em>%s</em></p>\n", html.EscapeString(h.emptyMessage))
 	} else {
 		for _, r := range h.resources {
 			fmt.Fprintf(&body, "\n<h4 class=\"resource_header\">%s</h4>\n", html.EscapeString(r.Header))

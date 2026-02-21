@@ -63,15 +63,16 @@ func TestHTMLSection_PrintHTMLSection_WithURL(t *testing.T) {
 
 func TestHTMLSection_PrintHTMLSection_EmptyResources(t *testing.T) {
 	section := HTMLSection{
-		appName:   "my-app",
-		filePath:  "path/to/app",
-		resources: []ResourceSection{},
+		appName:      "my-app",
+		filePath:     "path/to/app",
+		resources:    []ResourceSection{},
+		emptyMessage: "Application rendered no resources",
 	}
 
 	result := section.printHTMLSection()
 
-	if !strings.Contains(result, "No resources rendered") {
-		t.Errorf("expected 'No resources rendered' for empty resources, got:\n%s", result)
+	if !strings.Contains(result, "Application rendered no resources") {
+		t.Errorf("expected 'Application rendered no resources' for empty resources, got:\n%s", result)
 	}
 }
 

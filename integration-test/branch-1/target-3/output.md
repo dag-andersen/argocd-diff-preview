@@ -15,7 +15,7 @@ Modified (1):
 <summary>folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
-_No resources rendered_
+_Diff hidden because `--hide-deleted-app-diff` is enabled_
 
 </details>
 

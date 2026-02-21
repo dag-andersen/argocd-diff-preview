@@ -329,10 +329,11 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 
 	t.Run("Empty resources", func(t *testing.T) {
 		section := MarkdownSection{
-			appName:   "App",
-			filePath:  "path.yaml",
-			appURL:    "",
-			resources: []ResourceSection{},
+			appName:      "App",
+			filePath:     "path.yaml",
+			appURL:       "",
+			resources:    []ResourceSection{},
+			emptyMessage: "Application rendered no resources",
 		}
 		content, truncated := section.build(1000)
 		if truncated {
@@ -341,8 +342,8 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 		if !strings.Contains(content, "<summary>App (path.yaml)</summary>") {
 			t.Errorf("Should contain the section summary")
 		}
-		if !strings.Contains(content, "_No resources rendered_") {
-			t.Errorf("Should contain 'No resources rendered' for empty resources")
+		if !strings.Contains(content, "_Application rendered no resources_") {
+			t.Errorf("Should contain 'Application rendered no resources' for empty resources")
 		}
 	})
 

@@ -56,6 +56,7 @@ func GeneratePreview(
 				appDiffs[i].Resources = nil
 				appDiffs[i].AddedLines = 0
 				appDiffs[i].DeletedLines = 0
+				appDiffs[i].EmptyMessage = "Diff hidden because `--hide-deleted-app-diff` is enabled"
 			}
 		}
 	}
@@ -183,17 +184,19 @@ func buildMatchingSections(diffs []matching.AppDiff, argocdUIURL string) ([]Mark
 		}
 
 		markdownSections = append(markdownSections, MarkdownSection{
-			appName:   d.PrettyName(),
-			filePath:  d.PrettyPath(),
-			appURL:    appURL,
-			resources: sections,
+			appName:      d.PrettyName(),
+			filePath:     d.PrettyPath(),
+			appURL:       appURL,
+			resources:    sections,
+			emptyMessage: d.EmptyMessage,
 		})
 
 		htmlSections = append(htmlSections, HTMLSection{
-			appName:   d.PrettyName(),
-			filePath:  d.PrettyPath(),
-			appURL:    appURL,
-			resources: sections,
+			appName:      d.PrettyName(),
+			filePath:     d.PrettyPath(),
+			appURL:       appURL,
+			resources:    sections,
+			emptyMessage: d.EmptyMessage,
 		})
 	}
 
