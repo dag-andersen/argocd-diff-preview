@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"math"
 	"sort"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
@@ -187,7 +188,7 @@ func matchAppsBySimilarity(
 
 	// Sort by score descending (greedy matching), with deterministic tiebreakers
 	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].score != candidates[j].score {
+		if math.Abs(candidates[i].score-candidates[j].score) > 1e-9 {
 			return candidates[i].score > candidates[j].score
 		}
 		if candidates[i].baseIdx != candidates[j].baseIdx {

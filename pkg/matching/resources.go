@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"math"
 	"reflect"
 	"sort"
 
@@ -78,32 +79,30 @@ func matchResources(baseManifests, targetManifests []unstructured.Unstructured) 
 		key := fullResourceKey(&baseManifests[i])
 		baseByFullKey[key] = append(baseByFullKey[key], i)
 	}
+	targetByFullKey := make(map[string][]int)
+	for i := range targetManifests {
+		key := fullResourceKey(&targetManifests[i])
+		targetByFullKey[key] = append(targetByFullKey[key], i)
+	}
 
 	// Sort keys for deterministic ordering
 	sortedFullKeys := sortedMapKeys(baseByFullKey)
 
 	for _, key := range sortedFullKeys {
 		baseIdxs := baseByFullKey[key]
-		for _, bi := range baseIdxs {
-			if matchedBaseIndices[bi] {
-				continue
-			}
-			// Find a matching target
-			for ti := range targetManifests {
-				if matchedTargetIndices[ti] {
-					continue
-				}
-				if fullResourceKey(&targetManifests[ti]) == key {
-					matchedBaseIndices[bi] = true
-					matchedTargetIndices[ti] = true
-					if !resourcesEqual(&baseManifests[bi], &targetManifests[ti]) {
-						changedPairs = append(changedPairs, ResourcePair{
-							Base:   &baseManifests[bi],
-							Target: &targetManifests[ti],
-						})
-					}
-					break
-				}
+		targetIdxs := targetByFullKey[key]
+
+		matchLen := min(len(baseIdxs), len(targetIdxs))
+		for i := range matchLen {
+			bi := baseIdxs[i]
+			ti := targetIdxs[i]
+			matchedBaseIndices[bi] = true
+			matchedTargetIndices[ti] = true
+			if !resourcesEqual(&baseManifests[bi], &targetManifests[ti]) {
+				changedPairs = append(changedPairs, ResourcePair{
+					Base:   &baseManifests[bi],
+					Target: &targetManifests[ti],
+				})
 			}
 		}
 	}
@@ -448,7 +447,7 @@ func matchResourcesBySimilarity(
 	}
 
 	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].score != candidates[j].score {
+		if math.Abs(candidates[i].score-candidates[j].score) > 1e-9 {
 			return candidates[i].score > candidates[j].score
 		}
 		if candidates[i].baseIdx != candidates[j].baseIdx {
