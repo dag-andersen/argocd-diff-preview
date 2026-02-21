@@ -410,7 +410,7 @@ func formatResourceDiff(baseYAML, targetYAML string, contextLines uint, ignorePa
 	return formatDiffWithIgnore(diffs, contextLines, ignorePattern)
 }
 
-// Patterns that should always be ignored (same as pkg/diff/format.go)
+// Patterns that should always be ignored
 var defaultIgnorePatterns = []string{
 	"app.kubernetes.io/version: ",
 	"helm.sh/chart: ",

@@ -105,6 +105,7 @@ func resourceListSimilarity(listA, listB []unstructured.Unstructured) float64 {
 
 	matchedCount := 0
 	totalSimilarity := 0.0
+	matchedBIndices := make(map[int]bool)
 
 	for i := range listB {
 		key := listB[i].GetNamespace() + "/" + listB[i].GetName()
@@ -112,6 +113,7 @@ func resourceListSimilarity(listA, listB []unstructured.Unstructured) float64 {
 			// Exact name match - compare content, consume one A resource
 			totalSimilarity += contentSimilarity(aList[0], &listB[i])
 			matchedCount++
+			matchedBIndices[i] = true
 			byNameA[key] = aList[1:] // remove the consumed entry
 		}
 	}
@@ -132,8 +134,7 @@ func resourceListSimilarity(listA, listB []unstructured.Unstructured) float64 {
 
 	var unmatchedB []*unstructured.Unstructured
 	for i := range listB {
-		key := listB[i].GetNamespace() + "/" + listB[i].GetName()
-		if _, found := byNameA[key]; !found {
+		if !matchedBIndices[i] {
 			unmatchedB = append(unmatchedB, &listB[i])
 		}
 	}

@@ -1,6 +1,7 @@
 package diff
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
@@ -139,7 +140,7 @@ func TestSelectionInfo_String_DifferentApplicationCounts(t *testing.T) {
 	if result == "" {
 		t.Fatal("expected non-empty string when application counts differ")
 	}
-	if expected := "Applications: `2` (base) -> `5` (target)"; !contains(result, expected) {
+	if expected := "Applications: `2` (base) -> `5` (target)"; !strings.Contains(result, expected) {
 		t.Errorf("expected %q in output, got %q", expected, result)
 	}
 }
@@ -154,7 +155,7 @@ func TestSelectionInfo_String_DifferentApplicationSetCounts(t *testing.T) {
 	if result == "" {
 		t.Fatal("expected non-empty string when app set counts differ")
 	}
-	if expected := "ApplicationSets: `0` (base) -> `2` (target)"; !contains(result, expected) {
+	if expected := "ApplicationSets: `0` (base) -> `2` (target)"; !strings.Contains(result, expected) {
 		t.Errorf("expected %q in output, got %q", expected, result)
 	}
 }
@@ -169,17 +170,4 @@ func TestSelectionInfo_String_ZeroCounts(t *testing.T) {
 	if result != "" {
 		t.Errorf("expected empty string when all counts are zero, got %q", result)
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstring(s, substr))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
