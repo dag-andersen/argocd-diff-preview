@@ -1712,6 +1712,49 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 	}
 }
 
+func TestBuildResourceDiffs_CrossKindPairSkippedByBaseIgnoreRule(t *testing.T) {
+	// Scenario: The matching system pairs a Secret (base) with a ConfigMap (target)
+	// because they have high content similarity (cross-kind match from Phase 3/4).
+	// An ignore rule exists for Secret. Because resourceMatchesIgnoreRules uses OR
+	// logic (either side matching triggers skip), the entire pair is marked as skipped
+	// — even though the target ConfigMap does NOT match the ignore rule.
+	//
+	// This test documents the current behavior. If this is ever changed to only check
+	// the target side (or require both sides to match), update this test accordingly.
+	base := makeResource("v1", "Secret", "default", "my-credentials", map[string]any{
+		"data": map[string]any{"password": "hunter2"},
+	})
+	target := makeResource("v1", "ConfigMap", "default", "my-credentials", map[string]any{
+		"data": map[string]any{"password": "hunter2"},
+	})
+
+	resources := []ResourcePair{{Base: &base, Target: &target}}
+	rules := []resource_filter.IgnoreResourceRule{
+		{Group: "", Kind: "Secret", Name: "*"},
+	}
+
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("expected 1 resource diff, got %d", len(result))
+	}
+
+	// Current behavior: the pair IS skipped because the base (Secret) matches the rule.
+	// The target (ConfigMap) does NOT match the rule, but the OR logic means
+	// matching either side is sufficient.
+	if !result[0].IsSkipped {
+		t.Error("expected resource pair to be skipped (base Secret matches ignore rule)")
+	}
+
+	// Skipped resources should not count as added/deleted
+	if added != 0 || deleted != 0 {
+		t.Errorf("expected 0 added/deleted for skipped resource, got added=%d deleted=%d", added, deleted)
+	}
+}
+
 // Tests for shouldShowLine
 
 func TestShouldShowLine(t *testing.T) {
