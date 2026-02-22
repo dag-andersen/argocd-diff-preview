@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/argoproj/argo-cd/v3/common"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -98,6 +99,26 @@ func patchApplication(
 // SetNamespace sets the namespace of the resource
 func (a *ArgoResource) SetNamespace(namespace string) {
 	a.Yaml.SetNamespace(namespace)
+}
+
+// SetApplicationSetRefreshAnnotation sets the argocd.argoproj.io/application-set-refresh annotation
+// to "true" on ApplicationSets. This forces the ApplicationSet controller to refresh its cache
+// before generating applications, ensuring the generated applications reflect the latest state.
+func (a *ArgoResource) SetApplicationSetRefreshAnnotation() {
+	if a.Yaml == nil {
+		return
+	}
+	if a.Kind != ApplicationSet {
+		return
+	}
+
+	annotations := a.Yaml.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[common.AnnotationApplicationSetRefresh] = "true"
+	a.Yaml.SetAnnotations(annotations)
+	log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msg("Set application-set-refresh annotation")
 }
 
 // SetProjectToDefault sets the project to "default"
