@@ -328,16 +328,18 @@ func run(cfg *Config) error {
 
 	// Write per-app manifest files if requested
 	if cfg.WritePerAppManifests {
+		writeStart := time.Now()
 		if err := writePerAppManifests(cfg.OutputFolder, baseBranch, baseManifests, cfg.IgnoreResourceRules); err != nil {
 			return err
 		}
 		if err := writePerAppManifests(cfg.OutputFolder, targetBranch, targetManifests, cfg.IgnoreResourceRules); err != nil {
 			return err
 		}
+		log.Info().Msgf("💾 Writing per-app manifests to '%s' took %s", cfg.OutputFolder, time.Since(writeStart).Round(time.Millisecond))
 	}
 
 	// Generate diff
-	if err := diff.GeneratePreview(
+	previewDuration, err := diff.GeneratePreview(
 		cfg.Title,
 		cfg.OutputFolder,
 		baseBranch,
@@ -352,9 +354,17 @@ func run(cfg *Config) error {
 		selectionInfo,
 		cfg.ArgocdUIURL,
 		cfg.IgnoreResourceRules,
-	); err != nil {
+	)
+	if err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err
+	}
+
+	// if preview took more than 5 seconds, log the duration
+	if previewDuration > 5*time.Second {
+		log.Info().Msgf("🔮 Diff generation took %s", previewDuration.Round(time.Millisecond))
+	} else {
+		log.Debug().Msgf("Diff generation took %s", previewDuration.Round(time.Millisecond))
 	}
 
 	log.Info().Msgf("⏰ Run time stats: %s", statsInfo.Stats())

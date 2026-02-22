@@ -3,6 +3,7 @@ package diff
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
@@ -29,13 +30,14 @@ func GeneratePreview(
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
-) error {
+) (time.Duration, error) {
+	startTime := time.Now()
 	maxDiffMessageCharCount := maxCharCount
 	if maxDiffMessageCharCount <= 0 {
 		maxDiffMessageCharCount = 65536
 	}
 
-	log.Info().Msgf("🔮 Generating diff between %s and %s (using similarity matching)",
+	log.Info().Msgf("🔮 Generating diff between %s and %s",
 		baseBranch.Name, targetBranch.Name)
 
 	// Set default context line count if not provided
@@ -46,7 +48,7 @@ func GeneratePreview(
 	// Generate diffs using the matching package
 	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules)
 	if err != nil {
-		return fmt.Errorf("failed to generate matching diffs: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to generate matching diffs: %w", err)
 	}
 
 	// Handle hideDeletedAppDiff option
@@ -67,11 +69,6 @@ func GeneratePreview(
 	// Convert to markdown/HTML sections
 	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
 
-	// Write YAML outputs for base and target branches
-	if err := writeMatchingYAMLOutputs(outputFolder, baseBranch, targetBranch, baseManifests, targetManifests, ignoreResourceRules); err != nil {
-		return err
-	}
-
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
 	markdownOutput := MarkdownOutput{
@@ -85,7 +82,7 @@ func GeneratePreview(
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	log.Debug().Msgf("Writing markdown output to %s", markdownPath)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
-		return fmt.Errorf("failed to write markdown: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to write markdown: %w", err)
 	}
 	log.Debug().Msgf("Wrote markdown output to %s", markdownPath)
 
@@ -102,12 +99,13 @@ func GeneratePreview(
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
 	log.Debug().Msgf("Writing html output to %s", htmlPath)
 	if err := utils.WriteFile(htmlPath, htmlDiff); err != nil {
-		return fmt.Errorf("failed to write html: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to write html: %w", err)
 	}
 	log.Debug().Msgf("Wrote html output to %s", htmlPath)
 
 	log.Info().Msgf("🙏 Please check the %s and %s files for differences", markdownPath, htmlPath)
-	return nil
+
+	return time.Since(startTime), nil
 }
 
 // buildMatchingSummary builds a summary string from AppDiffs
@@ -220,52 +218,4 @@ func buildAppURLFromDiff(d matching.AppDiff, argocdUIURL string) string {
 
 	baseURL := strings.TrimRight(argocdUIURL, "/")
 	return fmt.Sprintf("%s/applications/%s", baseURL, appName)
-}
-
-// writeMatchingYAMLOutputs writes the combined YAML outputs for both branches
-func writeMatchingYAMLOutputs(
-	outputFolder string,
-	baseBranch, targetBranch *gitt.Branch,
-	baseManifests, targetManifests []extract.ExtractedApp,
-	ignoreResourceRules []resource_filter.IgnoreResourceRule,
-) error {
-	// Collect YAML from base manifests
-	var baseYAMLParts []string
-	for _, app := range baseManifests {
-		yaml, err := app.FlattenToString(ignoreResourceRules)
-		if err != nil {
-			return fmt.Errorf("failed to flatten base app %s: %w", app.Name, err)
-		}
-		if yaml != "" {
-			baseYAMLParts = append(baseYAMLParts, yaml)
-		}
-	}
-
-	// Collect YAML from target manifests
-	var targetYAMLParts []string
-	for _, app := range targetManifests {
-		yaml, err := app.FlattenToString(ignoreResourceRules)
-		if err != nil {
-			return fmt.Errorf("failed to flatten target app %s: %w", app.Name, err)
-		}
-		if yaml != "" {
-			targetYAMLParts = append(targetYAMLParts, yaml)
-		}
-	}
-
-	// Write base YAML
-	basePath := fmt.Sprintf("%s/%s.yaml", outputFolder, baseBranch.FolderName())
-	if err := utils.WriteFile(basePath, strings.Join(baseYAMLParts, "\n---\n")); err != nil {
-		log.Error().Msg("❌ Failed to write base manifests")
-		return err
-	}
-
-	// Write target YAML
-	targetPath := fmt.Sprintf("%s/%s.yaml", outputFolder, targetBranch.FolderName())
-	if err := utils.WriteFile(targetPath, strings.Join(targetYAMLParts, "\n---\n")); err != nil {
-		log.Error().Msg("❌ Failed to write target manifests")
-		return err
-	}
-
-	return nil
 }
