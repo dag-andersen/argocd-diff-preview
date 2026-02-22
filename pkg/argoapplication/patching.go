@@ -118,6 +118,7 @@ func (a *ArgoResource) SetApplicationSetRefreshAnnotation() {
 	}
 	annotations[common.AnnotationApplicationSetRefresh] = "true"
 	a.Yaml.SetAnnotations(annotations)
+	log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msg("Set application-set-refresh annotation")
 }
 
 // SetProjectToDefault sets the project to "default"
