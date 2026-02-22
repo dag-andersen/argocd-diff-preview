@@ -192,12 +192,10 @@ func GenerateAppDiffs(
 	}
 
 	// Sort diffs: deleted first, then modified, then added (like existing behavior)
+	actionOrder := map[DiffAction]int{ActionDeleted: 0, ActionModified: 1, ActionAdded: 2}
 	sort.SliceStable(diffs, func(i, j int) bool {
 		if diffs[i].Action != diffs[j].Action {
-			// Order: Deleted (1), Modified (2), Added (0) -> we want Deleted, Modified, Added
-			// Map to sort order: Added=2, Deleted=0, Modified=1
-			order := map[DiffAction]int{ActionDeleted: 0, ActionModified: 1, ActionAdded: 2}
-			return order[diffs[i].Action] < order[diffs[j].Action]
+			return actionOrder[diffs[i].Action] < actionOrder[diffs[j].Action]
 		}
 		if diffs[i].PrettyName() != diffs[j].PrettyName() {
 			return diffs[i].PrettyName() < diffs[j].PrettyName()
