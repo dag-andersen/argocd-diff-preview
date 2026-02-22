@@ -12,6 +12,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
@@ -325,6 +326,16 @@ func run(cfg *Config) error {
 		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
+	// Write per-app manifest files if requested
+	if cfg.WritePerAppManifests {
+		if err := writePerAppManifests(cfg.OutputFolder, baseBranch, baseManifests, cfg.IgnoreResourceRules); err != nil {
+			return err
+		}
+		if err := writePerAppManifests(cfg.OutputFolder, targetBranch, targetManifests, cfg.IgnoreResourceRules); err != nil {
+			return err
+		}
+	}
+
 	// Generate diff
 	if err := diff.GeneratePreview(
 		cfg.Title,
@@ -348,5 +359,38 @@ func run(cfg *Config) error {
 
 	log.Info().Msgf("⏰ Run time stats: %s", statsInfo.Stats())
 
+	return nil
+}
+
+// writePerAppManifests writes individual manifest files per application to a branch-specific folder.
+// This replicates the old behavior where per-app files were written to output/base/ and output/target/.
+func writePerAppManifests(
+	outputFolder string,
+	branch *git.Branch,
+	apps []extract.ExtractedApp,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+) error {
+	folder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
+
+	if err := utils.CreateFolder(folder, true); err != nil {
+		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
+	}
+
+	for _, app := range apps {
+		content, err := app.FlattenToString(ignoreResourceRules)
+		if err != nil {
+			return fmt.Errorf("failed to flatten app %s: %w", app.Name, err)
+		}
+		if content == "" {
+			continue
+		}
+
+		filePath := fmt.Sprintf("%s/%s", folder, app.Id)
+		if err := utils.WriteFile(filePath, content); err != nil {
+			return fmt.Errorf("failed to write manifest for app %s: %w", app.Name, err)
+		}
+	}
+
+	log.Debug().Msgf("Wrote %d per-app manifest files to %s", len(apps), folder)
 	return nil
 }

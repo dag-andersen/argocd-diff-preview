@@ -12,6 +12,7 @@ BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 use_argocd_api ?= false
 debug ?= false
 argocd_ui_url ?= ""
+write_per_app_manifests ?= false
 
 GO_TEST_FLAGS ?=
 
@@ -50,6 +51,7 @@ run-with-go: go-build pull-repository
 		--redirect-target-revisions="HEAD" \
 		--use-argocd-api="$(use_argocd_api)" \
 		--argocd-ui-url="${argocd_ui_url}" \
+		--write-per-app-manifests="$(write_per_app_manifests)" \
 		--debug="$(debug)"
 
 run-with-docker: pull-repository docker-build
