@@ -199,6 +199,8 @@ func convertAppSetsToApps(
 		}
 	}
 
+	isFirstAppSet := true
+
 	for _, appSet := range appSets {
 		// Skip non-ApplicationSets
 		if appSet.Kind != ApplicationSet {
@@ -208,6 +210,13 @@ func convertAppSetsToApps(
 		}
 
 		appSetsProcessedCount++
+
+		// Set the refresh annotation only on the first ApplicationSet to trigger
+		// ArgoCD to pull from git. Subsequent ApplicationSets will use the cached data.
+		if isFirstAppSet {
+			appSet.SetApplicationSetRefreshAnnotation()
+			isFirstAppSet = false
+		}
 
 		// Generate applications using argocd appset generate
 		retryCount := 5
