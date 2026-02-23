@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 9 files changed
-
 Deleted (9):
 - app1 (-19)
 - app1 (-19)

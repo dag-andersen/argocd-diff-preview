@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Added (1):
 + folder3 (+19)
 ```

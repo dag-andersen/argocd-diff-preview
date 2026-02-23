@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 7 files changed
-
 Modified (7):
 ± app1 (+1|-1)
 ± app1 (+1|-1)

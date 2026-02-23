@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 2 files changed
-
 Deleted (1):
 - folder2
 

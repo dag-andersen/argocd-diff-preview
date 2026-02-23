@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 2 files changed
-
 Modified (2):
 ± valid-manifest-generate-paths-example (+4|-4)
 ± watch-pattern-valid-regex-example (+4|-4)

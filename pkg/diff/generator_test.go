@@ -10,14 +10,14 @@ import (
 // Tests for buildMatchingSummary
 
 func TestBuildMatchingSummary_NoDiffs(t *testing.T) {
-	result := buildMatchingSummary(nil)
+	result := buildSummary(nil)
 	if result != "No changes found" {
 		t.Errorf("expected 'No changes found', got %q", result)
 	}
 }
 
 func TestBuildMatchingSummary_EmptySlice(t *testing.T) {
-	result := buildMatchingSummary([]matching.AppDiff{})
+	result := buildSummary([]matching.AppDiff{})
 	if result != "No changes found" {
 		t.Errorf("expected 'No changes found', got %q", result)
 	}
@@ -29,11 +29,8 @@ func TestBuildMatchingSummary_OnlyAdded(t *testing.T) {
 		{NewName: "app-2", Action: matching.ActionAdded, AddedLines: 5},
 	}
 
-	result := buildMatchingSummary(diffs)
+	result := buildSummary(diffs)
 
-	if !strings.Contains(result, "Total: 2 files changed") {
-		t.Errorf("expected total count, got:\n%s", result)
-	}
 	if !strings.Contains(result, "Added (2):") {
 		t.Errorf("expected 'Added (2):', got:\n%s", result)
 	}
@@ -57,11 +54,8 @@ func TestBuildMatchingSummary_OnlyDeleted(t *testing.T) {
 		{OldName: "app-1", Action: matching.ActionDeleted, DeletedLines: 15},
 	}
 
-	result := buildMatchingSummary(diffs)
+	result := buildSummary(diffs)
 
-	if !strings.Contains(result, "Total: 1 files changed") {
-		t.Errorf("expected total count, got:\n%s", result)
-	}
 	if !strings.Contains(result, "Deleted (1):") {
 		t.Errorf("expected 'Deleted (1):', got:\n%s", result)
 	}
@@ -75,11 +69,8 @@ func TestBuildMatchingSummary_OnlyModified(t *testing.T) {
 		{OldName: "app-1", NewName: "app-1", Action: matching.ActionModified, AddedLines: 3, DeletedLines: 2},
 	}
 
-	result := buildMatchingSummary(diffs)
+	result := buildSummary(diffs)
 
-	if !strings.Contains(result, "Total: 1 files changed") {
-		t.Errorf("expected total count, got:\n%s", result)
-	}
 	if !strings.Contains(result, "Modified (1):") {
 		t.Errorf("expected 'Modified (1):', got:\n%s", result)
 	}
@@ -95,11 +86,8 @@ func TestBuildMatchingSummary_MixedActions(t *testing.T) {
 		{NewName: "new-app", Action: matching.ActionAdded, AddedLines: 12},
 	}
 
-	result := buildMatchingSummary(diffs)
+	result := buildSummary(diffs)
 
-	if !strings.Contains(result, "Total: 3 files changed") {
-		t.Errorf("expected 'Total: 3 files changed', got:\n%s", result)
-	}
 	if !strings.Contains(result, "Added (1):") {
 		t.Errorf("expected 'Added (1):', got:\n%s", result)
 	}
@@ -116,7 +104,7 @@ func TestBuildMatchingSummary_RenamedApp(t *testing.T) {
 		{OldName: "old-name", NewName: "new-name", Action: matching.ActionModified, AddedLines: 1},
 	}
 
-	result := buildMatchingSummary(diffs)
+	result := buildSummary(diffs)
 
 	// PrettyName for renamed app should show "old-name -> new-name"
 	if !strings.Contains(result, "± old-name -> new-name") {
@@ -130,7 +118,7 @@ func TestBuildMatchingSummary_NoChangeStats(t *testing.T) {
 		{OldName: "app-1", NewName: "app-1", Action: matching.ActionModified},
 	}
 
-	result := buildMatchingSummary(diffs)
+	result := buildSummary(diffs)
 
 	// ChangeStats() returns "" when both are 0, so just the name
 	if !strings.Contains(result, "± app-1\n") {

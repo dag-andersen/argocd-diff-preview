@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± my-app-watch-pattern-valid-regex (+4|-4)
 ```

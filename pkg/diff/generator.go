@@ -64,7 +64,7 @@ func GeneratePreview(
 	}
 
 	// Build summary
-	summary := buildMatchingSummary(appDiffs)
+	summary := buildSummary(appDiffs)
 
 	// Convert to markdown/HTML sections
 	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
@@ -108,8 +108,8 @@ func GeneratePreview(
 	return time.Since(startTime), nil
 }
 
-// buildMatchingSummary builds a summary string from AppDiffs
-func buildMatchingSummary(diffs []matching.AppDiff) string {
+// buildSummary builds a summary string from AppDiffs
+func buildSummary(diffs []matching.AppDiff) string {
 	if len(diffs) == 0 {
 		return "No changes found"
 	}
@@ -131,10 +131,8 @@ func buildMatchingSummary(diffs []matching.AppDiff) string {
 		}
 	}
 
-	fmt.Fprintf(&summaryBuilder, "Total: %d files changed\n", addedCount+deletedCount+modifiedCount)
-
 	if addedCount > 0 {
-		fmt.Fprintf(&summaryBuilder, "\nAdded (%d):\n", addedCount)
+		fmt.Fprintf(&summaryBuilder, "Added (%d):\n", addedCount)
 		for _, d := range diffs {
 			if d.Action == matching.ActionAdded {
 				fmt.Fprintf(&summaryBuilder, "+ %s%s\n", d.PrettyName(), d.ChangeStats())
@@ -143,7 +141,11 @@ func buildMatchingSummary(diffs []matching.AppDiff) string {
 	}
 
 	if deletedCount > 0 {
-		fmt.Fprintf(&summaryBuilder, "\nDeleted (%d):\n", deletedCount)
+		// Add a newline before Deleted section if there was an Added section
+		if summaryBuilder.Len() > 0 {
+			fmt.Fprintln(&summaryBuilder)
+		}
+		fmt.Fprintf(&summaryBuilder, "Deleted (%d):\n", deletedCount)
 		for _, d := range diffs {
 			if d.Action == matching.ActionDeleted {
 				fmt.Fprintf(&summaryBuilder, "- %s%s\n", d.PrettyName(), d.ChangeStats())
@@ -152,7 +154,11 @@ func buildMatchingSummary(diffs []matching.AppDiff) string {
 	}
 
 	if modifiedCount > 0 {
-		fmt.Fprintf(&summaryBuilder, "\nModified (%d):\n", modifiedCount)
+		// Add a newline before Modified section if there was an Added or Deleted section
+		if summaryBuilder.Len() > 0 {
+			fmt.Fprintln(&summaryBuilder)
+		}
+		fmt.Fprintf(&summaryBuilder, "Modified (%d):\n", modifiedCount)
 		for _, d := range diffs {
 			if d.Action == matching.ActionModified {
 				fmt.Fprintf(&summaryBuilder, "± %s%s\n", d.PrettyName(), d.ChangeStats())

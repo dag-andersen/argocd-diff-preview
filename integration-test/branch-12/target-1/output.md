@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± argocd-helm-chart (+2434|-62)
 ```
@@ -1633,7 +1631,7 @@ Modified (1):
                              uses the Kubernetes version of the target cluster.
                            type: string
 +                        labelIncludeTemplates:
-+                          description: LabelI
++                          description: LabelIncludeTemplates specifie
 ```
 
 🚨 Diff is too long

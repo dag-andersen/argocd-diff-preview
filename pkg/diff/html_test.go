@@ -188,7 +188,7 @@ func TestHTMLSection_PrintHTMLSection_MultipleResources(t *testing.T) {
 func TestHTMLOutput_PrintDiff_Basic(t *testing.T) {
 	output := HTMLOutput{
 		title:   "Test Diff",
-		summary: "Total: 1 files changed",
+		summary: "Added (1):\n+ my-app (+10)",
 		sections: []HTMLSection{
 			{
 				appName:  "my-app",
@@ -209,7 +209,7 @@ func TestHTMLOutput_PrintDiff_Basic(t *testing.T) {
 	if !strings.Contains(result, "<h1>Test Diff</h1>") {
 		t.Errorf("expected title in output, got:\n%s", result)
 	}
-	if !strings.Contains(result, "Total: 1 files changed") {
+	if !strings.Contains(result, "Added (1):") {
 		t.Errorf("expected summary in output, got:\n%s", result)
 	}
 	if !strings.Contains(result, "my-app") {

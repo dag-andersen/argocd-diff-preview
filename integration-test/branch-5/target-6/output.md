@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± my-app-labels (+4|-4)
 ```
