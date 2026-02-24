@@ -34,6 +34,26 @@ docker-build:
 docker-build-release:
 	docker build . -f $(docker_file) -t image --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) --build-arg BUILD_DATE=$(BUILD_DATE)
 
+run-with-go-no-clone: go-build
+	./bin/argocd-diff-preview \
+		--base-branch="$(base_branch)" \
+		--target-branch="$(target_branch)" \
+		--repo="$(github_org)/$(gitops_repo)" \
+		--keep-cluster-alive \
+		--create-cluster=false \
+		--file-regex="$(regex)" \
+		--diff-ignore="$(diff_ignore)" \
+		--timeout=$(timeout) \
+		--selector="$(selector)" \
+		--argocd-namespace="$(argocd_namespace)" \
+		--files-changed="$(files_changed)" \
+		--line-count="$(line_count)" \
+		--redirect-target-revisions="HEAD" \
+		--use-argocd-api="$(use_argocd_api)" \
+		--argocd-ui-url="${argocd_ui_url}" \
+		--write-per-app-manifests="$(write_per_app_manifests)" \
+		--debug="$(debug)"
+
 run-with-go: go-build pull-repository
 	./bin/argocd-diff-preview \
 		--base-branch="$(base_branch)" \

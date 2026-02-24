@@ -13,6 +13,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/reposerverextract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/google/uuid"
@@ -302,16 +303,16 @@ func run(cfg *Config) error {
 	// Store info about how many aps were skipped
 	selectionInfo := diff.ConvertArgoSelectionToSelectionInfo(baseApps, targetApps)
 
-	// Extract resources from the cluster based on each branch, passing the manifests directly
-	deleteAfterProcessing := !cfg.CreateCluster
-	baseManifests, targetManifests, extractDuration, err := extract.RenderApplicationsFromBothBranches(
+	// Extract resources by streaming source files directly to the Argo CD repo server via gRPC.
+	// This bypasses the cluster reconciliation loop used by extract.RenderApplicationsFromBothBranches.
+	baseManifests, targetManifests, extractDuration, err := reposerverextract.RenderApplicationsFromBothBranches(
 		argocd,
+		baseBranch,
+		targetBranch,
 		cfg.Timeout,
 		cfg.Concurrency,
 		baseApps.SelectedApps,
 		targetApps.SelectedApps,
-		uniqueID,
-		deleteAfterProcessing,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
