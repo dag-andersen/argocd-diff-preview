@@ -319,10 +319,6 @@ func run(cfg *Config) error {
 			baseApps.SelectedApps,
 			targetApps.SelectedApps,
 		)
-		if err != nil {
-			log.Error().Msg("❌ Failed to extract resources")
-			return err
-		}
 	} else {
 		// Extract resources from the cluster based on each branch, passing the manifests directly
 		deleteAfterProcessing := !cfg.CreateCluster

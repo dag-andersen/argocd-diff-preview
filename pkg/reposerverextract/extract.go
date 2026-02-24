@@ -573,15 +573,15 @@ func buildManifestRequestWithPackaging(
 // (refName, path/to/file, true), or returns ("", "", false) if the string
 // doesn't match the expected pattern.
 func splitRefPath(valueFile string) (refName, path string, ok bool) {
-	if !strings.HasPrefix(valueFile, "$") {
+	rest, hasPrefix := strings.CutPrefix(valueFile, "$")
+	if !hasPrefix {
 		return
 	}
-	rest := valueFile[1:] // strip leading '$'
-	idx := strings.IndexByte(rest, '/')
-	if idx < 0 {
+	refName, path, ok = strings.Cut(rest, "/")
+	if !ok {
 		return rest, "", true // ref with no sub-path
 	}
-	return rest[:idx], rest[idx+1:], true
+	return refName, path, true
 }
 
 // copyDir recursively copies src into dst, creating dst if needed.
@@ -603,7 +603,7 @@ func copyDir(src, dst string) error {
 }
 
 // copyFile copies a single file from src to dst, creating parent directories.
-func copyFile(src, dst string) error {
+func copyFile(src, dst string) (err error) {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
@@ -611,7 +611,11 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() {
+		if cerr := r.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 	w, err := os.Create(dst)
 	if err != nil {
 		return err
@@ -716,168 +720,4 @@ func normalizeNamespaces(
 		result[i] = *ptr
 	}
 	return result, nil
-}
-
-// applyIgnoreDifferences applies Application-level ignoreDifferences rules to
-// the manifests. Because the rule types and logic live in pkg/extract as
-// unexported identifiers, we re-implement the logic here inline.
-// The implementation is a structural copy of extract.parseIgnoreDifferencesFromApp
-// and extract.applyIgnoreDifferencesToManifests.
-func applyIgnoreDifferences(manifests []unstructured.Unstructured, app argoapplication.ArgoResource) {
-	if app.Yaml == nil {
-		return
-	}
-
-	var rawRules []any
-	switch app.Kind {
-	case argoapplication.Application:
-		rawRules, _, _ = unstructured.NestedSlice(app.Yaml.Object, "spec", "ignoreDifferences")
-	case argoapplication.ApplicationSet:
-		rawRules, _, _ = unstructured.NestedSlice(app.Yaml.Object, "spec", "template", "spec", "ignoreDifferences")
-	default:
-		return
-	}
-
-	if len(rawRules) == 0 {
-		return
-	}
-
-	for i := range manifests {
-		m := &manifests[i]
-		kind := m.GetKind()
-		name := m.GetName()
-		namespace := m.GetNamespace()
-		apiVersion := m.GetAPIVersion()
-
-		group := groupFromAPIVersion(apiVersion)
-
-		for _, rawRule := range rawRules {
-			ruleMap, ok := rawRule.(map[string]any)
-			if !ok {
-				continue
-			}
-
-			rKind, _ := ruleMap["kind"].(string)
-			rGroup, _ := ruleMap["group"].(string)
-			rName, _ := ruleMap["name"].(string)
-			rNamespace, _ := ruleMap["namespace"].(string)
-
-			if rKind != "" && !equalFold(rKind, kind) {
-				continue
-			}
-			if rGroup != "" && !equalFold(rGroup, group) {
-				continue
-			}
-			if rName != "" && rName != name {
-				continue
-			}
-			if rNamespace != "" && rNamespace != namespace {
-				continue
-			}
-
-			// Apply jsonPointers
-			if ptrs, ok := ruleMap["jsonPointers"].([]any); ok {
-				for _, p := range ptrs {
-					if ptr, ok := p.(string); ok {
-						deleteAtJSONPointer(m.Object, ptr)
-					}
-				}
-			}
-		}
-	}
-}
-
-func groupFromAPIVersion(apiVersion string) string {
-	for i := len(apiVersion) - 1; i >= 0; i-- {
-		if apiVersion[i] == '/' {
-			return apiVersion[:i]
-		}
-	}
-	return "" // core group
-}
-
-func equalFold(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		ca, cb := a[i], b[i]
-		if ca >= 'A' && ca <= 'Z' {
-			ca += 'a' - 'A'
-		}
-		if cb >= 'A' && cb <= 'Z' {
-			cb += 'a' - 'A'
-		}
-		if ca != cb {
-			return false
-		}
-	}
-	return true
-}
-
-// deleteAtJSONPointer traverses obj following an RFC 6901 JSON Pointer and
-// deletes the leaf key (for maps) or masks the element (for arrays).
-func deleteAtJSONPointer(obj map[string]any, pointer string) {
-	if pointer == "" || pointer[0] != '/' {
-		return
-	}
-	tokens := splitJSONPointer(pointer[1:])
-	var parent any = obj
-	for i, tok := range tokens {
-		last := i == len(tokens)-1
-		switch cur := parent.(type) {
-		case map[string]any:
-			if last {
-				delete(cur, tok)
-				return
-			}
-			next, ok := cur[tok]
-			if !ok {
-				return
-			}
-			parent = next
-		default:
-			return
-		}
-	}
-}
-
-func splitJSONPointer(s string) []string {
-	var tokens []string
-	start := 0
-	for i := 0; i <= len(s); i++ {
-		if i == len(s) || s[i] == '/' {
-			tok := s[start:i]
-			// Unescape RFC 6901 tokens: ~1 → '/', ~0 → '~'
-			tok = replaceAll(tok, "~1", "/")
-			tok = replaceAll(tok, "~0", "~")
-			tokens = append(tokens, tok)
-			start = i + 1
-		}
-	}
-	return tokens
-}
-
-func replaceAll(s, old, newStr string) string {
-	result := ""
-	for {
-		idx := index(s, old)
-		if idx < 0 {
-			return result + s
-		}
-		result += s[:idx] + newStr
-		s = s[idx+len(old):]
-	}
-}
-
-func index(s, sub string) int {
-	if len(sub) == 0 {
-		return 0
-	}
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
 }
