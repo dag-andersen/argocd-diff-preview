@@ -21,7 +21,7 @@ var (
 	useDocker     = flag.Bool("docker", false, "use Docker instead of Go binary")
 	debug         = flag.Bool("debug", false, "enable debug mode for the tool")
 	createCluster = flag.Bool("create-cluster", false, "force creation of a new cluster (deletes existing one)")
-	renderMode    = flag.String("render-mode", "", "force all tests to use a specific render mode (cli, server-api, repo-server-api)")
+	renderMode    = flag.String("render-method", "", "force all tests to use a specific render mode (cli, server-api, repo-server-api)")
 	binaryPath    = flag.String("binary", "./bin/argocd-diff-preview", "path to the Go binary (relative to repo root)")
 	dockerImage   = flag.String("image", "argocd-diff-preview", "Docker image name to use")
 )
@@ -59,7 +59,7 @@ type TestCase struct {
 	IgnoreResources            string
 	ArgocdLoginOptions         string
 	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
-	RenderMode                 string // "cli", "server-api", "repo-server-api", or "" to use global flag
+	RenderMethod                 string // "cli", "server-api", "repo-server-api", or "" to use global flag
 	DisableClusterRoles        string // Mount createClusterRoles.yaml (sets createClusterRoles: false)
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	ExpectFailure              bool   // If true, the test is expected to fail
@@ -174,7 +174,7 @@ var testCases = []TestCase{
 		Suffix:                     "-9",
 		WatchIfNoWatchPatternFound: "true",
 		AutoDetectFilesChanged:     "true",
-		RenderMode:                 "server-api",
+		RenderMethod:                 "server-api",
 	},
 	{
 		Name:         "branch-6/target",
@@ -259,11 +259,11 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-15/base",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
-	// When createClusterRoles: false is set but --render-mode=cli is used,
+	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.
 	// NOTE: This test MUST create a new cluster because the role changes only take
 	// effect when ArgoCD is installed during cluster creation.
-	// NOTE: RenderMode is explicitly set to "cli" to override the global flag,
+	// NOTE: RenderMethod is explicitly set to "cli" to override the global flag,
 	// because this test specifically tests the failure case without the API.
 	{
 		Name:                   "branch-1/target-no-cluster-roles",
@@ -272,7 +272,7 @@ var testCases = []TestCase{
 		Suffix:                 "-no-cluster-roles",
 		DisableClusterRoles:    "true",
 		CreateCluster:          "true",
-		RenderMode:             "cli",
+		RenderMethod:             "cli",
 		AutoDetectFilesChanged: "true",
 		ExpectFailure:          true,
 	},
@@ -289,19 +289,19 @@ var testCases = []TestCase{
 	},
 }
 
-// effectiveRenderMode returns the render mode that should be used for a test case.
-// tc.RenderMode takes highest precedence, then the global -render-mode flag.
+// effectiveRenderMethod returns the render mode that should be used for a test case.
+// tc.RenderMethod takes highest precedence, then the global -render-method flag.
 // Returns "" when the tool should use its own default (cli).
-func effectiveRenderMode(tc TestCase) string {
-	if tc.RenderMode != "" {
-		return tc.RenderMode
+func effectiveRenderMethod(tc TestCase) string {
+	if tc.RenderMethod != "" {
+		return tc.RenderMethod
 	}
 	return *renderMode
 }
 
 // isAPIMode reports whether the effective render mode uses the Argo CD API.
 func isAPIMode(tc TestCase) bool {
-	m := effectiveRenderMode(tc)
+	m := effectiveRenderMethod(tc)
 	return m == "server-api" || m == "repo-server-api"
 }
 
@@ -853,8 +853,8 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	if tc.KindOptions != "" {
 		args = append(args, "-e", fmt.Sprintf("KIND_OPTIONS=%s", tc.KindOptions))
 	}
-	if m := effectiveRenderMode(tc); m != "" {
-		args = append(args, "-e", fmt.Sprintf("RENDER_MODE=%s", m))
+	if m := effectiveRenderMethod(tc); m != "" {
+		args = append(args, "-e", fmt.Sprintf("RENDER_METHOD=%s", m))
 	}
 
 	// Set CREATE_CLUSTER based on the createCluster parameter (overrides tc.CreateCluster)
@@ -949,8 +949,8 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	if tc.KindOptions != "" {
 		args = append(args, "--kind-options", tc.KindOptions)
 	}
-	if m := effectiveRenderMode(tc); m != "" {
-		args = append(args, "--render-mode", m)
+	if m := effectiveRenderMethod(tc); m != "" {
+		args = append(args, "--render-method", m)
 	}
 
 	// Set --create-cluster based on the createCluster parameter (overrides tc.CreateCluster)

@@ -386,5 +386,5 @@ spec:
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "3 content sources")
 	assert.Contains(t, err.Error(), "repo-server-api")
-	assert.Contains(t, err.Error(), "--render-mode")
+	assert.Contains(t, err.Error(), "--render-method")
 }

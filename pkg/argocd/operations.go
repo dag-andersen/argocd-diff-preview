@@ -65,9 +65,9 @@ type apiConnection struct {
 // If renderMode is cli, returns a CLIOperations instance.
 // The authToken parameter is optional - if provided, it will be used instead of
 // authenticating with the ArgoCD server during Login().
-func NewOperations(renderMode vars.RenderMode, k8sClient *utils.K8sClient, namespace string, loginOptions string, authToken string) Operations {
+func NewOperations(renderMode vars.RenderMethod, k8sClient *utils.K8sClient, namespace string, loginOptions string, authToken string) Operations {
 	switch renderMode {
-	case vars.RenderModeServerAPI, vars.RenderModeRepoServerAPI:
+	case vars.RenderMethodServerAPI, vars.RenderMethodRepoServerAPI:
 		return &APIOperations{
 			k8sClient: k8sClient,
 			namespace: namespace,
@@ -77,7 +77,7 @@ func NewOperations(renderMode vars.RenderMode, k8sClient *utils.K8sClient, names
 				authToken:            authToken,
 			},
 		}
-	default: // vars.RenderModeCLI
+	default: // vars.RenderMethodCLI
 		return &CLIOperations{
 			k8sClient:    k8sClient,
 			namespace:    namespace,

@@ -42,11 +42,11 @@ type ArgoCDInstallation struct {
 	ChartRepoUsername string
 	ChartRepoPassword string
 	LoginOptions      string
-	renderMode        vars.RenderMode
+	renderMode        vars.RenderMethod
 	operations        Operations // CLI or API implementation
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMode, authToken string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:         client,
 		Namespace:         namespace,
@@ -62,7 +62,7 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 	}
 }
 
-func (a *ArgoCDInstallation) RenderMode() vars.RenderMode {
+func (a *ArgoCDInstallation) RenderMethod() vars.RenderMethod {
 	return a.renderMode
 }
 
@@ -252,8 +252,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	if result, ok := chartValues["createClusterRoles"]; ok {
 		if result == "false" {
 			log.Info().Msgf("Installing with 'createClusterRoles: %s'", result)
-			if a.RenderMode() == vars.RenderModeCLI {
-				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work when using '--render-mode=cli' (default)")
+			if a.RenderMethod() == vars.RenderMethodCLI {
+				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work when using '--render-method=cli' (default)")
 			}
 		}
 	}

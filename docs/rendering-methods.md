@@ -1,6 +1,6 @@
 # Rendering Methods
 
-Argo CD Diff Preview supports three different ways to render application manifests. You can choose the rendering method using the `--render-mode` flag.
+Argo CD Diff Preview supports three different ways to render application manifests. You can choose the rendering method using the `--render-method` flag.
 
 ## 1. CLI (`cli`) - Default
 

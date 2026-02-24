@@ -410,7 +410,7 @@ func buildManifestRequestWithPackaging(
 	// server-api).
 	if len(contentSources) > 1 {
 		return nil, "", nil, fmt.Errorf(
-			"application %s has %d content sources, but the repo-server-api render mode only supports a single content source per application; switch to --render-mode=cli or --render-mode=server-api",
+			"application %s has %d content sources, but the repo-server-api render mode only supports a single content source per application; switch to --render-method=cli or --render-method=server-api",
 			app.GetLongName(), len(contentSources),
 		)
 	}

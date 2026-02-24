@@ -35,13 +35,13 @@ var (
 	BuildDate = "unknown"
 )
 
-// RenderMode aliases for convenience
-type RenderMode = vars.RenderMode
+// RenderMethod aliases for convenience
+type RenderMethod = vars.RenderMethod
 
 const (
-	RenderModeCLI           = vars.RenderModeCLI
-	RenderModeServerAPI     = vars.RenderModeServerAPI
-	RenderModeRepoServerAPI = vars.RenderModeRepoServerAPI
+	RenderMethodCLI           = vars.RenderMethodCLI
+	RenderMethodServerAPI     = vars.RenderMethodServerAPI
+	RenderMethodRepoServerAPI = vars.RenderMethodRepoServerAPI
 )
 
 // defaults
@@ -79,7 +79,7 @@ var (
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
 	DefaultConcurrency                = uint(40)
-	DefaultRenderMode                 = ""
+	DefaultRenderMethod                 = ""
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -117,7 +117,7 @@ type RawOptions struct {
 	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
 	ArgocdAuthToken            string `mapstructure:"argocd-auth-token"`
 	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
-	RenderMode                 string `mapstructure:"render-mode"`
+	RenderMethod                 string `mapstructure:"render-method"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -163,7 +163,7 @@ type Config struct {
 	Title                      string
 	HideDeletedAppDiff         bool
 	DisableClientThrottling    bool
-	RenderMode                 RenderMode
+	RenderMethod                 RenderMethod
 	ArgocdUIURL                string
 	Concurrency                uint
 
@@ -251,7 +251,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-login-options", DefaultArgocdLoginOptions)
 	viper.SetDefault("argocd-auth-token", DefaultArgocdAuthToken)
 	viper.SetDefault("use-argocd-api", DefaultUseArgoCDApi)
-	viper.SetDefault("render-mode", DefaultRenderMode)
+	viper.SetDefault("render-method", DefaultRenderMethod)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -292,8 +292,8 @@ func Parse() *Config {
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
-	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI (deprecated: use --render-mode instead)")
-	rootCmd.Flags().String("render-mode", DefaultRenderMode, "Render mode for Argo CD manifests. Options: cli, server-api, repo-server-api. Takes precedence over --use-argocd-api")
+	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI (deprecated: use --render-method instead)")
+	rootCmd.Flags().String("render-method", DefaultRenderMethod, "Render mode for Argo CD manifests. Options: cli, server-api, repo-server-api. Takes precedence over --use-argocd-api")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
@@ -410,9 +410,9 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	// Note: Concurrency 0 means unlimited, so we don't apply a default for zero
 
 	// Parse render mode (takes precedence over --use-argocd-api)
-	cfg.RenderMode, err = o.parseRenderMode()
+	cfg.RenderMethod, err = o.parseRenderMethod()
 	if err != nil {
-		return nil, fmt.Errorf("invalid render-mode: %w", err)
+		return nil, fmt.Errorf("invalid render-method: %w", err)
 	}
 
 	// Parse file regex
@@ -448,9 +448,9 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	}
 
 	// Check if argocd CLI is installed when not using API mode
-	if cfg.RenderMode == RenderModeCLI && !cfg.DryRun {
+	if cfg.RenderMethod == RenderMethodCLI && !cfg.DryRun {
 		if _, err := exec.LookPath("argocd"); err != nil {
-			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--render-mode=server-api' / '--use-argocd-api=true' to use the API instead")
+			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--render-method=server-api' / '--use-argocd-api=true' to use the API instead")
 		}
 	}
 
@@ -498,26 +498,26 @@ func (o *RawOptions) parseRedirectRevisions() []string {
 	return strings.Split(o.RedirectTargetRevisions, ",")
 }
 
-// parseRenderMode resolves the effective RenderMode.
-// --render-mode takes precedence; if unset, falls back to --use-argocd-api.
-func (o *RawOptions) parseRenderMode() (RenderMode, error) {
-	if o.RenderMode != "" {
-		switch RenderMode(strings.ToLower(o.RenderMode)) {
-		case RenderModeCLI:
-			return RenderModeCLI, nil
-		case RenderModeServerAPI:
-			return RenderModeServerAPI, nil
-		case RenderModeRepoServerAPI:
-			return RenderModeRepoServerAPI, nil
+// parseRenderMethod resolves the effective RenderMethod.
+// --render-method takes precedence; if unset, falls back to --use-argocd-api.
+func (o *RawOptions) parseRenderMethod() (RenderMethod, error) {
+	if o.RenderMethod != "" {
+		switch RenderMethod(strings.ToLower(o.RenderMethod)) {
+		case RenderMethodCLI:
+			return RenderMethodCLI, nil
+		case RenderMethodServerAPI:
+			return RenderMethodServerAPI, nil
+		case RenderMethodRepoServerAPI:
+			return RenderMethodRepoServerAPI, nil
 		default:
-			return "", fmt.Errorf("unsupported render-mode %q: must be one of cli, server-api, repo-server-api", o.RenderMode)
+			return "", fmt.Errorf("unsupported render-method %q: must be one of cli, server-api, repo-server-api", o.RenderMethod)
 		}
 	}
 	// Fall back to legacy --use-argocd-api flag
 	if o.UseArgoCDApi {
-		return RenderModeServerAPI, nil
+		return RenderMethodServerAPI, nil
 	}
-	return RenderModeCLI, nil
+	return RenderMethodCLI, nil
 }
 
 // parseClusterType parses the cluster type and returns the appropriate cluster provider
@@ -617,8 +617,8 @@ func (o *Config) LogConfig() {
 				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
 		}
-		if o.RenderMode != RenderModeCLI {
-			log.Info().Msgf("✨ - render-mode: %s", o.RenderMode)
+		if o.RenderMethod != RenderMethodCLI {
+			log.Info().Msgf("✨ - render-method: %s", o.RenderMethod)
 		}
 	}
 

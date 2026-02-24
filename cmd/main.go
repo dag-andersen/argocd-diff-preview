@@ -204,7 +204,7 @@ func run(cfg *Config) error {
 		cfg.ArgocdChartRepoUsername,
 		cfg.ArgocdChartRepoPassword,
 		cfg.ArgocdLoginOptions,
-		cfg.RenderMode,
+		cfg.RenderMethod,
 		cfg.ArgocdAuthToken,
 	)
 
@@ -306,7 +306,7 @@ func run(cfg *Config) error {
 	var baseManifests, targetManifests []extract.ExtractedApp
 	var extractDuration time.Duration
 
-	if cfg.RenderMode == RenderModeRepoServerAPI {
+	if cfg.RenderMethod == RenderMethodRepoServerAPI {
 
 		// Extract resources by streaming source files directly to the Argo CD repo server via gRPC.
 		// This bypasses the cluster reconciliation loop used by extract.RenderApplicationsFromBothBranches.
