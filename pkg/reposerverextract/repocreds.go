@@ -91,33 +91,17 @@ func FetchRepoCreds(ctx context.Context, k8sClient *utils.K8sClient, namespace s
 	}
 
 	// ── Per-repo credential enrichment ───────────────────────────────────────
-	// Build a URL-keyed map of all registered repositories (git + Helm + OCI)
-	// with credentials fully enriched. We get this by listing all repositories
-	// via the DB and calling GetRepository (which internally calls enrichCredsToRepo)
-	// for each unique URL we encounter across sources.
-	//
-	// We collect URLs from the already-fetched helmRepos/ociRepos lists.
-	// Git repos (type=git) are also stored as ArgoCD secrets — we list them
-	// by iterating the credentials we already fetched.
-	seenURLs := map[string]bool{}
-	for _, r := range helmRepos {
-		seenURLs[r.Repo] = true
-	}
-	for _, r := range ociRepos {
-		seenURLs[r.Repo] = true
+	// ListRepositories returns all registered repos (git + Helm + OCI) with
+	// credentials already enriched via enrichCredsToRepos — one API call
+	// instead of a per-URL loop.
+	allRepos, err := argoDB.ListRepositories(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list repositories: %w", err)
 	}
 
-	reposByURL := make(map[string]*v1alpha1.Repository, len(seenURLs))
-	for repoURL := range seenURLs {
-		enriched, err := argoDB.GetRepository(ctx, repoURL, "")
-		if err != nil {
-			// Non-fatal: log and skip. The repo server may still succeed if
-			// it can fall back to unauthenticated access.
-			log.Warn().Err(err).Str("repo", repoURL).Msg("⚠️ Failed to enrich repository credentials; proceeding without them")
-			reposByURL[repoURL] = &v1alpha1.Repository{Repo: repoURL}
-			continue
-		}
-		reposByURL[repoURL] = enriched
+	reposByURL := make(map[string]*v1alpha1.Repository, len(allRepos))
+	for _, r := range allRepos {
+		reposByURL[r.Repo] = r
 	}
 
 	log.Info().
