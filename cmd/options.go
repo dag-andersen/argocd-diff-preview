@@ -22,6 +22,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
 var (
@@ -31,6 +32,15 @@ var (
 	Commit = "unknown"
 	// BuildDate is the date the binary was built
 	BuildDate = "unknown"
+)
+
+// RenderMode aliases for convenience
+type RenderMode = vars.RenderMode
+
+const (
+	RenderModeCLI           = vars.RenderModeCLI
+	RenderModeServerAPI     = vars.RenderModeServerAPI
+	RenderModeRepoServerAPI = vars.RenderModeRepoServerAPI
 )
 
 // defaults
@@ -68,6 +78,7 @@ var (
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
 	DefaultConcurrency                = uint(40)
+	DefaultRenderMode                 = ""
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -105,6 +116,7 @@ type RawOptions struct {
 	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
 	ArgocdAuthToken            string `mapstructure:"argocd-auth-token"`
 	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
+	RenderMode                 string `mapstructure:"render-mode"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -150,7 +162,7 @@ type Config struct {
 	Title                      string
 	HideDeletedAppDiff         bool
 	DisableClientThrottling    bool
-	UseArgoCDApi               bool
+	RenderMode                 RenderMode
 	ArgocdUIURL                string
 	Concurrency                uint
 
@@ -238,6 +250,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-login-options", DefaultArgocdLoginOptions)
 	viper.SetDefault("argocd-auth-token", DefaultArgocdAuthToken)
 	viper.SetDefault("use-argocd-api", DefaultUseArgoCDApi)
+	viper.SetDefault("render-mode", DefaultRenderMode)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -278,7 +291,8 @@ func Parse() *Config {
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
-	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI")
+	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI (deprecated: use --render-mode instead)")
+	rootCmd.Flags().String("render-mode", DefaultRenderMode, "Render mode for Argo CD manifests. Options: cli, server-api, repo-server-api. Takes precedence over --use-argocd-api")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
@@ -379,7 +393,6 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		Title:                      o.Title,
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
 		DisableClientThrottling:    o.DisableClientThrottling,
-		UseArgoCDApi:               o.UseArgoCDApi,
 		ArgocdUIURL:                o.ArgocdUIURL,
 		Concurrency:                o.Concurrency,
 	}
@@ -394,6 +407,12 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		cfg.MaxDiffLength = DefaultMaxDiffLength
 	}
 	// Note: Concurrency 0 means unlimited, so we don't apply a default for zero
+
+	// Parse render mode (takes precedence over --use-argocd-api)
+	cfg.RenderMode, err = o.parseRenderMode()
+	if err != nil {
+		return nil, fmt.Errorf("invalid render-mode: %w", err)
+	}
 
 	// Parse file regex
 	cfg.FileRegex, err = o.parseFileRegex()
@@ -428,9 +447,9 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	}
 
 	// Check if argocd CLI is installed when not using API mode
-	if !cfg.UseArgoCDApi && !cfg.DryRun {
+	if cfg.RenderMode == RenderModeCLI && !cfg.DryRun {
 		if _, err := exec.LookPath("argocd"); err != nil {
-			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--use-argocd-api=true' to use the API instead")
+			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--render-mode=server-api' / '--use-argocd-api=true' to use the API instead")
 		}
 	}
 
@@ -476,6 +495,28 @@ func (o *RawOptions) parseRedirectRevisions() []string {
 		return nil
 	}
 	return strings.Split(o.RedirectTargetRevisions, ",")
+}
+
+// parseRenderMode resolves the effective RenderMode.
+// --render-mode takes precedence; if unset, falls back to --use-argocd-api.
+func (o *RawOptions) parseRenderMode() (RenderMode, error) {
+	if o.RenderMode != "" {
+		switch RenderMode(strings.ToLower(o.RenderMode)) {
+		case RenderModeCLI:
+			return RenderModeCLI, nil
+		case RenderModeServerAPI:
+			return RenderModeServerAPI, nil
+		case RenderModeRepoServerAPI:
+			return RenderModeRepoServerAPI, nil
+		default:
+			return "", fmt.Errorf("unsupported render-mode %q: must be one of cli, server-api, repo-server-api", o.RenderMode)
+		}
+	}
+	// Fall back to legacy --use-argocd-api flag
+	if o.UseArgoCDApi {
+		return RenderModeServerAPI, nil
+	}
+	return RenderModeCLI, nil
 }
 
 // parseClusterType parses the cluster type and returns the appropriate cluster provider
@@ -571,8 +612,8 @@ func (o *Config) LogConfig() {
 				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
 		}
-		if o.UseArgoCDApi {
-			log.Info().Msgf("✨ - use-argocd-api: %t", o.UseArgoCDApi)
+		if o.RenderMode != RenderModeCLI {
+			log.Info().Msgf("✨ - render-mode: %s", o.RenderMode)
 		}
 	}
 

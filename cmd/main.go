@@ -204,7 +204,7 @@ func run(cfg *Config) error {
 		cfg.ArgocdChartRepoUsername,
 		cfg.ArgocdChartRepoPassword,
 		cfg.ArgocdLoginOptions,
-		cfg.UseArgoCDApi,
+		cfg.RenderMode,
 		cfg.ArgocdAuthToken,
 	)
 
@@ -303,17 +303,39 @@ func run(cfg *Config) error {
 	// Store info about how many aps were skipped
 	selectionInfo := diff.ConvertArgoSelectionToSelectionInfo(baseApps, targetApps)
 
-	// Extract resources by streaming source files directly to the Argo CD repo server via gRPC.
-	// This bypasses the cluster reconciliation loop used by extract.RenderApplicationsFromBothBranches.
-	baseManifests, targetManifests, extractDuration, err := reposerverextract.RenderApplicationsFromBothBranches(
-		argocd,
-		baseBranch,
-		targetBranch,
-		cfg.Timeout,
-		cfg.Concurrency,
-		baseApps.SelectedApps,
-		targetApps.SelectedApps,
-	)
+	var baseManifests, targetManifests []extract.ExtractedApp
+	var extractDuration time.Duration
+
+	if cfg.RenderMode == RenderModeRepoServerAPI {
+
+		// Extract resources by streaming source files directly to the Argo CD repo server via gRPC.
+		// This bypasses the cluster reconciliation loop used by extract.RenderApplicationsFromBothBranches.
+		baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranches(
+			argocd,
+			baseBranch,
+			targetBranch,
+			cfg.Timeout,
+			cfg.Concurrency,
+			baseApps.SelectedApps,
+			targetApps.SelectedApps,
+		)
+		if err != nil {
+			log.Error().Msg("❌ Failed to extract resources")
+			return err
+		}
+	} else {
+		// Extract resources from the cluster based on each branch, passing the manifests directly
+		deleteAfterProcessing := !cfg.CreateCluster
+		baseManifests, targetManifests, extractDuration, err = extract.RenderApplicationsFromBothBranches(
+			argocd,
+			cfg.Timeout,
+			cfg.Concurrency,
+			baseApps.SelectedApps,
+			targetApps.SelectedApps,
+			uniqueID,
+			deleteAfterProcessing,
+		)
+	}
 	if err != nil {
 		log.Error().Msg("❌ Failed to extract resources")
 		return err

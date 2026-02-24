@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -59,13 +60,13 @@ type apiConnection struct {
 	portForwardLocalPort int // Local port for port forwarding (e.g., 8081)
 }
 
-// NewOperations creates the appropriate Operations implementation based on the useAPI flag.
-// If useAPI is true, returns an APIOperations instance.
-// If useAPI is false, returns a CLIOperations instance.
+// NewOperations creates the appropriate Operations implementation based on the renderMode.
+// If renderMode is server-api or repo-server-api, returns an APIOperations instance.
+// If renderMode is cli, returns a CLIOperations instance.
 // The authToken parameter is optional - if provided, it will be used instead of
 // authenticating with the ArgoCD server during Login().
-func NewOperations(useAPI bool, k8sClient *utils.K8sClient, namespace string, loginOptions string, authToken string) Operations {
-	if useAPI {
+func NewOperations(renderMode vars.RenderMode, k8sClient *utils.K8sClient, namespace string, loginOptions string, authToken string) Operations {
+	if renderMode.IsAPI() {
 		return &APIOperations{
 			k8sClient: k8sClient,
 			namespace: namespace,

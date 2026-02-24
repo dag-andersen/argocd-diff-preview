@@ -47,8 +47,8 @@ var errorMessages = []string{
 }
 
 var helpMessages = map[ErrorKind]string{
-	ErrorClusterVersionFailed: "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--use-argocd-api=true' is not set",
-	ErrorClusterScopeRBAC:     "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--use-argocd-api=true' is not set",
+	ErrorClusterVersionFailed: "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--render-mode=server-api' is not set",
+	ErrorClusterScopeRBAC:     "This error usually happens if your cluster is configured with 'createClusterRoles: false' and '--render-mode=server-api' is not set",
 }
 
 // GetHelpMessage returns a helpful message for a given error if one exists
