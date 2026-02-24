@@ -82,6 +82,15 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
 	}
 
+	// Fetch all repository credentials from the cluster once, upfront.
+	// The repo server has no access to Kubernetes secrets — credentials must be
+	// provided by the caller in every ManifestRequest. We mirror what the
+	// ArgoCD app controller does in controller/state.go before calling the repo server.
+	creds, err := FetchRepoCreds(context.Background(), argocd.K8sClient, argocd.Namespace)
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to fetch repository credentials: %w", err)
+	}
+
 	// Create a single repo server client shared across all goroutines.
 	// EnsurePortForward is idempotent and mutex-protected inside the client.
 	repoClient := reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
@@ -152,7 +161,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources)
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds)
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -222,13 +231,14 @@ func renderApp(
 	app argoapplication.ArgoResource,
 	branchFolderByType map[git.BranchType]string,
 	namespacedScopedResources map[schema.GroupKind]bool,
+	creds *RepoCreds,
 ) ([]unstructured.Unstructured, error) {
 	branchFolder, ok := branchFolderByType[app.Branch]
 	if !ok {
 		return nil, fmt.Errorf("unknown branch type: %s", app.Branch)
 	}
 
-	request, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder)
+	request, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, creds)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build manifest request: %w", err)
 	}
@@ -338,6 +348,7 @@ func renderApp(
 func buildManifestRequestWithPackaging(
 	app argoapplication.ArgoResource,
 	branchFolder string,
+	creds *RepoCreds,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
 	obj := app.Yaml.Object
 
@@ -417,7 +428,9 @@ func buildManifestRequestWithPackaging(
 		if primarySource.Chart != "" {
 			// Remote Helm chart – no local files to stream.
 			request = &repoapiclient.ManifestRequest{
-				Repo:               &v1alpha1.Repository{Repo: primarySource.RepoURL},
+				Repo:               creds.GetRepo(primarySource.RepoURL),
+				Repos:              creds.HelmRepos(&primarySource),
+				HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
 				Revision:           primarySource.TargetRevision,
 				AppName:            app.Id,
 				Namespace:          namespace,
@@ -427,7 +440,9 @@ func buildManifestRequestWithPackaging(
 			return request, "", nil, nil
 		}
 		request = &repoapiclient.ManifestRequest{
-			Repo:               &v1alpha1.Repository{Repo: primarySource.RepoURL},
+			Repo:               creds.GetRepo(primarySource.RepoURL),
+			Repos:              creds.HelmRepos(&primarySource),
+			HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
 			Revision:           primarySource.TargetRevision,
 			AppName:            app.Id,
 			Namespace:          namespace,
@@ -460,7 +475,9 @@ func buildManifestRequestWithPackaging(
 			}
 		}
 		request = &repoapiclient.ManifestRequest{
-			Repo:               &v1alpha1.Repository{Repo: primarySource.RepoURL},
+			Repo:               creds.GetRepo(primarySource.RepoURL),
+			Repos:              creds.HelmRepos(&primarySource),
+			HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
 			Revision:           primarySource.TargetRevision,
 			AppName:            app.Id,
 			Namespace:          namespace,
@@ -540,7 +557,9 @@ func buildManifestRequestWithPackaging(
 	}
 
 	request = &repoapiclient.ManifestRequest{
-		Repo:               &v1alpha1.Repository{Repo: rewrittenSource.RepoURL},
+		Repo:               creds.GetRepo(rewrittenSource.RepoURL),
+		Repos:              creds.HelmRepos(&rewrittenSource),
+		HelmRepoCreds:      creds.HelmRepoCreds(&rewrittenSource),
 		Revision:           rewrittenSource.TargetRevision,
 		AppName:            app.Id,
 		Namespace:          namespace,

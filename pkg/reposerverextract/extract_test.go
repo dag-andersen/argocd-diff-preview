@@ -85,7 +85,7 @@ spec:
     targetRevision: HEAD
 `)
 
-	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder)
+	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, nil)
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -121,7 +121,7 @@ spec:
     targetRevision: v1.14.5
 `)
 
-	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder)
+	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, nil)
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -182,7 +182,7 @@ spec:
           - $local/clusters/prod/cert-manager-values.yaml
 `)
 
-	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder)
+	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, nil)
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -257,7 +257,7 @@ spec:
           - $cfg/values-prod.yaml
 `)
 
-	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder)
+	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, streamDir, "local chart with refs must stream a temp dir")
 	defer cleanup()
@@ -311,7 +311,7 @@ spec:
               - $local/charts/prometheus/values.yaml
 `)
 
-	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder)
+	req, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, nil)
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -344,7 +344,7 @@ spec:
     namespace: default
 `)
 
-	_, _, cleanup, err := buildManifestRequestWithPackaging(app, t.TempDir())
+	_, _, cleanup, err := buildManifestRequestWithPackaging(app, t.TempDir(), nil)
 	if cleanup != nil {
 		defer cleanup()
 	}
