@@ -287,11 +287,10 @@ func (c *Client) generateManifestsOnce(ctx context.Context, tgzFile *os.File, ch
 	if err != nil {
 		return nil, fmt.Errorf("failed to open GenerateManifestWithFiles stream: %w", err)
 	}
-	defer func() {
-		if closeErr := stream.CloseSend(); closeErr != nil {
-			log.Warn().Err(closeErr).Msg("Failed to close GenerateManifestWithFiles send stream")
-		}
-	}()
+	// Note: do NOT defer stream.CloseSend() here. CloseAndRecv() (step 4 below)
+	// calls CloseSend() internally as its first action, so a deferred call would
+	// fire on an already-closed stream and emit a spurious warn log on every
+	// successful render.
 
 	// 1. Send the manifest request metadata.
 	log.Debug().Str("app", request.AppName).Msg("Sending manifest request to repo server")
@@ -376,7 +375,9 @@ func (c *Client) GenerateManifestsRemote(ctx context.Context, request *repoapicl
 
 		repoClient := repoapiclient.NewRepoServerServiceClient(conn)
 		response, err := repoClient.GenerateManifest(ctx, request)
-		_ = conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			log.Warn().Err(closeErr).Msg("Failed to close gRPC connection to repo server")
+		}
 
 		if err == nil {
 			log.Debug().

@@ -574,7 +574,8 @@ func buildManifestRequestWithPackaging(
 
 // splitRefPath splits a $refName/path/to/file value-file string into
 // (refName, path/to/file, true), or returns ("", "", false) if the string
-// doesn't match the expected pattern.
+// doesn't match the expected pattern. A ref with no sub-path (e.g. "$cfg"
+// with no trailing "/") is considered invalid and returns false.
 func splitRefPath(valueFile string) (refName, path string, ok bool) {
 	rest, hasPrefix := strings.CutPrefix(valueFile, "$")
 	if !hasPrefix {
@@ -582,7 +583,11 @@ func splitRefPath(valueFile string) (refName, path string, ok bool) {
 	}
 	refName, path, ok = strings.Cut(rest, "/")
 	if !ok {
-		return rest, "", true // ref with no sub-path
+		// No sub-path after the ref name — this is a malformed value file
+		// (e.g. "$cfg" instead of "$cfg/values.yaml"). A path pointing at a
+		// ref directory root is not a valid file reference, so treat it as
+		// unrecognised.
+		return "", "", false
 	}
 	return refName, path, true
 }
