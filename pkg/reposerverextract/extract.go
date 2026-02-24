@@ -20,7 +20,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -122,8 +121,6 @@ func RenderApplicationsFromBothBranches(
 	}
 	sem := make(chan struct{}, semSize)
 
-	var wg sync.WaitGroup
-
 	totalApps := len(allApps)
 	var renderedApps atomic.Int32
 
@@ -148,9 +145,7 @@ func RenderApplicationsFromBothBranches(
 
 	for _, app := range allApps {
 		sem <- struct{}{}
-		wg.Add(1)
 		go func(app argoapplication.ArgoResource) {
-			defer wg.Done()
 			defer func() { <-sem }()
 
 			if remainingTime() <= 0 {
@@ -200,7 +195,6 @@ func RenderApplicationsFromBothBranches(
 	}
 
 	close(progressDone)
-	wg.Wait()
 
 	if firstError != nil {
 		return nil, nil, time.Since(startTime), firstError
@@ -409,8 +403,17 @@ func buildManifestRequestWithPackaging(
 		return nil, "", nil, fmt.Errorf("application %s has no content source (all sources are ref-only)", app.GetLongName())
 	}
 
-	// We render one content source per call. If there are multiple content
-	// sources, pick the first one (same simplification as kubechecks).
+	// Only a single content source per render call is supported. If an application
+	// has multiple content sources (i.e. multiple sources that each produce
+	// manifests), the repo-server-api render mode cannot handle it. Ask the user
+	// to switch to a mode that supports full multi-source rendering (e.g. cli or
+	// server-api).
+	if len(contentSources) > 1 {
+		return nil, "", nil, fmt.Errorf(
+			"application %s has %d content sources, but the repo-server-api render mode only supports a single content source per application; switch to --render-mode=cli or --render-mode=server-api",
+			app.GetLongName(), len(contentSources),
+		)
+	}
 	primarySource := contentSources[0]
 
 	// ── Fast path: no ref sources → stream the whole branch folder ────────────
