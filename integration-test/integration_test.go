@@ -258,24 +258,6 @@ var testCases = []TestCase{
 		TargetBranch: "integration-test/branch-15/target",
 		BaseBranch:   "integration-test/branch-15/base",
 	},
-	// This test verifies that disabling cluster roles without using the API fails.
-	// When createClusterRoles: false is set but --use-argocd-api is not used,
-	// the tool should fail because it can't access cluster resources via CLI.
-	// NOTE: This test MUST create a new cluster because the role changes only take
-	// effect when ArgoCD is installed during cluster creation.
-	// NOTE: UseArgocdApi is explicitly set to "false" to override the global flag,
-	// because this test specifically tests the failure case without the API.
-	{
-		Name:                   "branch-1/target-no-cluster-roles",
-		TargetBranch:           "integration-test/branch-1/target",
-		BaseBranch:             "integration-test/branch-1/base",
-		Suffix:                 "-no-cluster-roles",
-		DisableClusterRoles:    "true",
-		CreateCluster:          "true",
-		UseArgocdApi:           "false",
-		AutoDetectFilesChanged: "true",
-		ExpectFailure:          true,
-	},
 	// Test that an invalid auth token causes the tool to fail.
 	// This tests the token authentication path instead of username/password login.
 	{

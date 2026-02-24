@@ -376,9 +376,9 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	replaceAppIdInManifests(manifests, app.Id, app.Name)
 
 	// Apply Application-level ignoreDifferences (jsonPointers) before comparing diffs
-	rules := parseIgnoreDifferencesFromApp(app)
+	rules := ParseIgnoreDifferencesFromApp(app)
 	if len(rules) > 0 {
-		applyIgnoreDifferencesToManifests(manifests, rules)
+		ApplyIgnoreDifferencesToManifests(manifests, rules)
 	}
 
 	err = removeArgoCDTrackingID(manifests)

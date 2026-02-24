@@ -24,10 +24,10 @@ type ignoreDifferenceRule struct {
 
 const maskedValue = "<argocd-diff-preview:ignored>"
 
-// parseIgnoreDifferencesFromApp extracts ignoreDifferences rules from an Application manifest.
+// ParseIgnoreDifferencesFromApp extracts ignoreDifferences rules from an Application manifest.
 // It supports both Application (spec.ignoreDifferences) and ApplicationSet templates
 // (spec.template.spec.ignoreDifferences), though in our flow Applications are already generated.
-func parseIgnoreDifferencesFromApp(app argoapplication.ArgoResource) []ignoreDifferenceRule {
+func ParseIgnoreDifferencesFromApp(app argoapplication.ArgoResource) []ignoreDifferenceRule {
 	var rules []ignoreDifferenceRule
 
 	if app.Yaml == nil {
@@ -97,10 +97,10 @@ func parseSingleIgnoreRule(item any) (ignoreDifferenceRule, bool) {
 	return rule, true
 }
 
-// applyIgnoreDifferencesToManifests mutates the manifests in-place to remove/mask fields
+// ApplyIgnoreDifferencesToManifests mutates the manifests in-place to remove/mask fields
 // specified by the ignoreDifferences rules. This ensures both branches produce identical
 // content at those paths and therefore do not show up in the final diff.
-func applyIgnoreDifferencesToManifests(manifests []unstructured.Unstructured, rules []ignoreDifferenceRule) {
+func ApplyIgnoreDifferencesToManifests(manifests []unstructured.Unstructured, rules []ignoreDifferenceRule) {
 	if len(rules) == 0 {
 		return
 	}
@@ -298,4 +298,12 @@ func decodeJSONPointerToken(s string) string {
 	s = strings.ReplaceAll(s, "~1", "/")
 	s = strings.ReplaceAll(s, "~0", "~")
 	return s
+}
+
+// ApplyIgnoreDifferences parses ignoreDifferences rules from the given ArgoResource
+// and applies them to manifests in-place. This is the public entry point for use
+// by packages outside of extract (e.g. reposerverextract).
+func ApplyIgnoreDifferences(manifests []unstructured.Unstructured, app argoapplication.ArgoResource) {
+	rules := ParseIgnoreDifferencesFromApp(app)
+	ApplyIgnoreDifferencesToManifests(manifests, rules)
 }

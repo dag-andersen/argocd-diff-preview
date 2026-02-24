@@ -159,8 +159,7 @@ func RenderApplicationsFromBothBranches(
 			}
 
 			renderedApps.Add(1)
-			extractedApp := extract.CreateExtractedApp(app.Id, app.Name, app.FileName, manifests, app.Branch)
-			results <- result{app: extractedApp}
+			results <- result{app: extract.CreateExtractedApp(app.Id, app.Name, app.FileName, manifests, app.Branch)}
 		}(app)
 	}
 
@@ -294,8 +293,8 @@ func renderApp(
 
 	replaceAppIDInManifests(manifests, app.Id, app.Name)
 
-	// ignoreDifferences are package-private in extract; duplicate the logic here.
-	applyIgnoreDifferences(manifests, app)
+	// Apply ignoreDifferences rules using the shared implementation in pkg/extract.
+	extract.ApplyIgnoreDifferences(manifests, app)
 
 	if err := removeArgoCDTrackingID(manifests); err != nil {
 		return nil, fmt.Errorf("failed to remove Argo CD tracking ID: %w", err)
@@ -437,6 +436,41 @@ func buildManifestRequestWithPackaging(
 		}
 		return request, branchFolder, nil, nil
 	}
+	// ── Slow path: ref sources present ───────────────────────────────────────
+	//
+	// Special case: external Helm chart primary source WITH ref sources.
+	// Example pattern (cluster-common-charts ApplicationSet):
+	//   sources:
+	//     - repoURL: https://github.com/…  ref: local          ← ref source
+	//     - chart: cert-manager  repoURL: https://charts.jetstack.io  ← primary
+	//       helm.valueFiles: [$local/path/to/values.yaml]
+	//
+	// We cannot stream local files for a chart: source via GenerateManifestWithFiles
+	// because the repo server tries to read Chart.yaml from the tarball root and
+	// fails (the chart lives in an external registry, not in the tarball).
+	// Instead, use the unary GenerateManifest RPC and populate RefSources so the
+	// repo server fetches the ref content from its own git cache. The $ref/…
+	// value file paths are left unchanged (no rewriting needed).
+	if primarySource.Chart != "" {
+		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
+		for _, ref := range refSources {
+			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
+				Repo:           v1alpha1.Repository{Repo: ref.RepoURL},
+				TargetRevision: ref.TargetRevision,
+			}
+		}
+		request = &repoapiclient.ManifestRequest{
+			Repo:               &v1alpha1.Repository{Repo: primarySource.RepoURL},
+			Revision:           primarySource.TargetRevision,
+			AppName:            app.Id,
+			Namespace:          namespace,
+			ApplicationSource:  &primarySource,
+			HasMultipleSources: hasMultipleSources,
+			RefSources:         refSourcesMap,
+		}
+		return request, "", nil, nil
+	}
+
 	//   <tempDir>/<primarySource.Path>/  ← content source files
 	//   <tempDir>/.refs/<refName>/       ← files for each ref source
 	tempDir, err := os.MkdirTemp("", "argocd-diff-preview-*")
