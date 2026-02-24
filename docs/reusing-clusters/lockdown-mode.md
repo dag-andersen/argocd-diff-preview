@@ -18,7 +18,7 @@ In lockdown mode, `argocd-diff-preview` uses the Argo CD API directly to retriev
 ## Requirements
 
 - Argo CD installed with `createClusterRoles: false` (namespace-scoped)
-- The `--use-argocd-api="true"` flag enabled when running `argocd-diff-preview`
+- The `--render-method=server-api` flag enabled when running `argocd-diff-preview`
 
 ## Installing Namespace-Scoped Argo CD
 
@@ -71,7 +71,7 @@ helm install argo-cd argo/argo-cd \
 
 ## Running `argocd-diff-preview` in Lockdown Mode
 
-To use lockdown mode, add the `--use-argocd-api="true"` flag:
+To use lockdown mode, add the `--render-method=server-api` flag:
 
 ```bash title=".github/workflows/generate-diff.yml" linenums="1" hl_lines="13"
 docker run \
@@ -86,7 +86,7 @@ docker run \
   dagandersen/argocd-diff-preview:v0.1.25 \
   --argocd-namespace=argocd-diff-preview \
   --create-cluster=false \
-  --use-argocd-api="true"
+  --render-method=server-api
 ```
 
 ## Limitations

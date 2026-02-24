@@ -22,7 +22,6 @@ nav:
 - Overview: index.md
 - Demo: demo.md
 - How it works: how-it-works.md
-- Rendering Methods: rendering-methods.md
 - Design Philosophy: design-philosophy.md
 - Getting started:
   - getting-started/github-actions-workflow.md
@@ -38,6 +37,7 @@ nav:
 - generated-applications.md
 - Multi-repo: multi-repo.md
 - application-selection.md
+- Rendering Methods: rendering-methods.md
 - Filter Output: filter-output.md
 - Output formats: output.md
 - All Options: options.md
