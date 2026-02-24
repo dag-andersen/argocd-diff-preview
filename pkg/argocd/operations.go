@@ -66,7 +66,8 @@ type apiConnection struct {
 // The authToken parameter is optional - if provided, it will be used instead of
 // authenticating with the ArgoCD server during Login().
 func NewOperations(renderMode vars.RenderMode, k8sClient *utils.K8sClient, namespace string, loginOptions string, authToken string) Operations {
-	if renderMode.IsAPI() {
+	switch renderMode {
+	case vars.RenderModeServerAPI, vars.RenderModeRepoServerAPI:
 		return &APIOperations{
 			k8sClient: k8sClient,
 			namespace: namespace,
@@ -76,11 +77,12 @@ func NewOperations(renderMode vars.RenderMode, k8sClient *utils.K8sClient, names
 				authToken:            authToken,
 			},
 		}
-	}
-	return &CLIOperations{
-		k8sClient:    k8sClient,
-		namespace:    namespace,
-		loginOptions: loginOptions,
-		authToken:    authToken,
+	default: // vars.RenderModeCLI
+		return &CLIOperations{
+			k8sClient:    k8sClient,
+			namespace:    namespace,
+			loginOptions: loginOptions,
+			authToken:    authToken,
+		}
 	}
 }

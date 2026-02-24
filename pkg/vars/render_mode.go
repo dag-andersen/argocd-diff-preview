@@ -8,9 +8,3 @@ const (
 	RenderModeServerAPI     RenderMode = "server-api"
 	RenderModeRepoServerAPI RenderMode = "repo-server-api"
 )
-
-// IsAPI reports whether the render mode uses the Argo CD API (server-api or repo-server-api)
-// rather than the CLI.
-func (r RenderMode) IsAPI() bool {
-	return r == RenderModeServerAPI || r == RenderModeRepoServerAPI
-}

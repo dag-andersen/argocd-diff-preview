@@ -350,3 +350,41 @@ spec:
 	}
 	assert.Error(t, err, "application with no source should return an error")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7.  Multiple content sources → error directing user to switch render mode
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestBuildManifestRequest_MultipleContentSources_ReturnsError(t *testing.T) {
+	// An application with two real content sources (both have a path, neither is
+	// ref-only) cannot be rendered by the repo-server-api mode, which only
+	// supports a single content source per call.
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multi-source-app
+spec:
+  destination:
+    namespace: default
+  sources:
+    - repoURL: https://github.com/org/repo.git
+      path: services/frontend
+      targetRevision: HEAD
+    - repoURL: https://github.com/org/repo.git
+      path: services/backend
+      targetRevision: HEAD
+    - repoURL: https://github.com/org/repo.git
+      path: services/database
+      targetRevision: HEAD
+`)
+
+	_, _, cleanup, err := buildManifestRequestWithPackaging(app, t.TempDir(), nil)
+	if cleanup != nil {
+		defer cleanup()
+	}
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "3 content sources")
+	assert.Contains(t, err.Error(), "repo-server-api")
+	assert.Contains(t, err.Error(), "--render-mode")
+}

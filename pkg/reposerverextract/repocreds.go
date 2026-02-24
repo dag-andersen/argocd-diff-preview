@@ -104,12 +104,15 @@ func FetchRepoCreds(ctx context.Context, k8sClient *utils.K8sClient, namespace s
 		reposByURL[r.Repo] = r
 	}
 
-	log.Info().
-		Int("helmRepos", len(helmRepos)).
-		Int("ociRepos", len(ociRepos)).
-		Int("helmRepoCreds", len(helmRepoCreds)).
-		Int("ociRepoCreds", len(ociRepoCreds)).
-		Msg("📦 Fetched ArgoCD repository credentials from cluster")
+	if len(helmRepos)+len(ociRepos)+len(helmRepoCreds)+len(ociRepoCreds)+len(allRepos) > 0 {
+		log.Info().
+			Int("helmRepos", len(helmRepos)).
+			Int("ociRepos", len(ociRepos)).
+			Int("helmRepoCreds", len(helmRepoCreds)).
+			Int("ociRepoCreds", len(ociRepoCreds)).
+			Int("repos", len(allRepos)).
+			Msg("📦 Fetched ArgoCD repository credentials from cluster")
+	}
 
 	return &RepoCreds{
 		helmRepos:     helmRepos,

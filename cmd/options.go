@@ -12,6 +12,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
@@ -564,6 +565,10 @@ func configureLogging(cfg *Config) {
 	// structured logr-based sink that ErrorS/InfoS write to.
 	klog.SetOutput(io.Discard)
 	klog.SetLogger(logr.Discard())
+
+	// Suppress logrus output from ArgoCD internals (e.g., "Starting configmap/secret
+	// informers", "Configmap/secret informer synced" from util/settings).
+	logrus.SetOutput(io.Discard)
 
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true}
 	if cfg.Debug {
