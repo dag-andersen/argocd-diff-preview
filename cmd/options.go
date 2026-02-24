@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -515,9 +516,13 @@ func (o *RawOptions) parseClusterType() (cluster.Provider, error) {
 
 // configureLogging sets up the logger based on the config
 func configureLogging(cfg *Config) {
-	// Suppress klog warnings from client-go (e.g., "unrecognized format" warnings).
-	// Without this, installing the Argo CD Helm chart will print "Warning: unrecognized format "int64"".
+	// Suppress klog output from client-go (e.g., "unrecognized format "int64"" from
+	// Helm chart installs, and "Unhandled Error" broken-pipe noise from the port-forward
+	// machinery when gRPC connections are closed while the tunnel is still open).
+	// klog.SetOutput silences the old text-format logger; klog.SetLogger silences the
+	// structured logr-based sink that ErrorS/InfoS write to.
 	klog.SetOutput(io.Discard)
+	klog.SetLogger(logr.Discard())
 
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true}
 	if cfg.Debug {
