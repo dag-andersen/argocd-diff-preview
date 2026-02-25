@@ -376,9 +376,9 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	replaceAppIdInManifests(manifests, app.Id, app.Name)
 
 	// Apply Application-level ignoreDifferences (jsonPointers) before comparing diffs
-	rules := parseIgnoreDifferencesFromApp(app)
+	rules := ParseIgnoreDifferencesFromApp(app)
 	if len(rules) > 0 {
-		applyIgnoreDifferencesToManifests(manifests, rules)
+		ApplyIgnoreDifferencesToManifests(manifests, rules)
 	}
 
 	err = removeArgoCDTrackingID(manifests)
@@ -389,7 +389,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	// Normalize namespaces and deduplicate resources (same logic as Argo CD controller)
 	// Only needed for API mode - CLI's `argocd app manifests` already does this
 	// This is also used as a sanity check to always verify That the API implementation matches the CLI implementation in terms of namespace handling and deduplication.
-	if argocd.UseAPI() {
+	if argocd.RenderMethod() != vars.RenderMethodCLI {
 		destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
 		manifests, err = normalizeNamespaces(manifests, destNamespace, namespacedScopedResources, app.GetLongName())
 		if err != nil {

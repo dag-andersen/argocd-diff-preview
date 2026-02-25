@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,11 +42,11 @@ type ArgoCDInstallation struct {
 	ChartRepoUsername string
 	ChartRepoPassword string
 	LoginOptions      string
-	useAPI            bool       // true if using API mode, false for CLI mode
+	renderMode        vars.RenderMethod
 	operations        Operations // CLI or API implementation
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, useAPI bool, authToken string) *ArgoCDInstallation {
+func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:         client,
 		Namespace:         namespace,
@@ -56,13 +57,13 @@ func New(client *utils.K8sClient, namespace string, version string, repoName str
 		ChartRepoUsername: repoUsername,
 		ChartRepoPassword: repoPassword,
 		LoginOptions:      loginOptions,
-		useAPI:            useAPI,
-		operations:        NewOperations(useAPI, client, namespace, loginOptions, authToken),
+		renderMode:        renderMode,
+		operations:        NewOperations(renderMode, client, namespace, loginOptions, authToken),
 	}
 }
 
-func (a *ArgoCDInstallation) UseAPI() bool {
-	return a.useAPI
+func (a *ArgoCDInstallation) RenderMethod() vars.RenderMethod {
+	return a.renderMode
 }
 
 func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
@@ -251,8 +252,8 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	if result, ok := chartValues["createClusterRoles"]; ok {
 		if result == "false" {
 			log.Info().Msgf("Installing with 'createClusterRoles: %s'", result)
-			if !a.UseAPI() {
-				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work unless you use '--use-argocd-api=true'")
+			if a.RenderMethod() == vars.RenderMethodCLI {
+				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work when using '--render-method=cli' (default)")
 			}
 		}
 	}

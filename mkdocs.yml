@@ -37,6 +37,7 @@ nav:
 - generated-applications.md
 - Multi-repo: multi-repo.md
 - application-selection.md
+- Rendering Methods: rendering-methods.md
 - Filter Output: filter-output.md
 - Output formats: output.md
 - All Options: options.md

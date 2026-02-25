@@ -10,7 +10,11 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
-// Patterns that should always be ignored
+// Patterns that should always be ignored.
+// These cover values that are non-deterministic across Helm renders — e.g.
+// self-signed TLS certificates generated at template time, chart version
+// labels, and config checksums. Lines whose trimmed content starts with any
+// of these prefixes are suppressed from diff output regardless of branch.
 var ignorePatterns = []string{
 	"app.kubernetes.io/version: ",
 	"helm.sh/chart: ",
@@ -22,6 +26,9 @@ var ignorePatterns = []string{
 	"checksum/config-maps: ",
 	"checksum/secrets: ",
 	"caBundle: ",
+	"ca.crt: ",
+	"tls.crt: ",
+	"tls.key: ",
 }
 
 // shouldIgnoreLine checks if a line should be ignored based on regex pattern
