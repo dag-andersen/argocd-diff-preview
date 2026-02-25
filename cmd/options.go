@@ -79,7 +79,8 @@ var (
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
 	DefaultConcurrency                = uint(40)
-	DefaultRenderMethod                 = ""
+	DefaultRenderMethod               = ""
+	DefaultArgocdConfigPath           = "./argocd-config"
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -116,8 +117,9 @@ type RawOptions struct {
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
 	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
 	ArgocdAuthToken            string `mapstructure:"argocd-auth-token"`
+	ArgocdConfigPath           string `mapstructure:"argocd-config"`
 	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
-	RenderMethod                 string `mapstructure:"render-method"`
+	RenderMethod               string `mapstructure:"render-method"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -159,11 +161,12 @@ type Config struct {
 	ArgocdChartRepoPassword    string
 	ArgocdLoginOptions         string
 	ArgocdAuthToken            string
+	ArgocdConfigPath           string
 	LogFormat                  string
 	Title                      string
 	HideDeletedAppDiff         bool
 	DisableClientThrottling    bool
-	RenderMethod                 RenderMethod
+	RenderMethod               RenderMethod
 	ArgocdUIURL                string
 	Concurrency                uint
 
@@ -259,6 +262,7 @@ func Parse() *Config {
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 	viper.SetDefault("concurrency", DefaultConcurrency)
+	viper.SetDefault("argocd-config", DefaultArgocdConfigPath)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -281,6 +285,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("argocd-chart-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
 	rootCmd.Flags().String("argocd-auth-token", DefaultArgocdAuthToken, "Argo CD Auth Token for API access")
 	rootCmd.Flags().String("argocd-login-options", DefaultArgocdLoginOptions, "Additional options to pass to 'argocd login' command")
+	rootCmd.Flags().String("argocd-config", DefaultArgocdConfigPath, "Path to the Argo CD config folder (contains values.yaml for Helm chart customization)")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
@@ -390,6 +395,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		ArgocdChartRepoPassword:    o.ArgocdChartRepoPassword,
 		ArgocdLoginOptions:         o.ArgocdLoginOptions,
 		ArgocdAuthToken:            o.ArgocdAuthToken,
+		ArgocdConfigPath:           o.ArgocdConfigPath,
 		LogFormat:                  o.LogFormat,
 		Title:                      o.Title,
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
@@ -627,6 +633,9 @@ func (o *Config) LogConfig() {
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
 	log.Info().Msgf("✨ - output-folder: %s", o.OutputFolder)
 	log.Info().Msgf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
+	if o.ArgocdConfigPath != DefaultArgocdConfigPath {
+		log.Info().Msgf("✨ - argocd-config: %s", o.ArgocdConfigPath)
+	}
 	log.Info().Msgf("✨ - repo: %s", o.Repo)
 	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
 	if o.LogFormat != DefaultLogFormat {
