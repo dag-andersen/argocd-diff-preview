@@ -25,6 +25,7 @@ const (
 	ErrorFetchChart           ErrorKind = "error fetching chart: failed to fetch chart: failed to get command args to log"
 	ErrorClusterVersionFailed ErrorKind = "ComparisonError: Failed to load target state: failed to get cluster version for cluster"
 	ErrorClusterScopeRBAC     ErrorKind = "forbidden: User \"system:serviceaccount:"
+	ErrorPluginNotFound       ErrorKind = "could not find cmp-server plugin with name"
 )
 
 var errorMessages = []string{
@@ -44,6 +45,7 @@ var errorMessages = []string{
 	string(ErrorFetchChart),
 	string(ErrorClusterVersionFailed),
 	string(ErrorClusterScopeRBAC),
+	string(ErrorPluginNotFound),
 }
 
 var helpMessages = map[ErrorKind]string{

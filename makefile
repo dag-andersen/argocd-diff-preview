@@ -13,6 +13,7 @@ use_argocd_api ?= false
 debug ?= false
 argocd_ui_url ?= ""
 render_method ?= ""
+argocd_config_dir ?= ""
 
 GO_TEST_FLAGS ?=
 
@@ -51,7 +52,8 @@ run-with-go: go-build pull-repository
 		--redirect-target-revisions="HEAD" \
 		--render-method="$(render_method)" \
 		--argocd-ui-url="${argocd_ui_url}" \
-		--debug="$(debug)"
+		--debug="$(debug)" \
+		--argocd-config-dir="$(argocd_config_dir)"
 
 run-with-docker: pull-repository docker-build
 	docker rm argocd-diff-preview || true
