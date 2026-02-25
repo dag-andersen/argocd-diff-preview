@@ -5,4 +5,4 @@ image:
   tag: "1.25"
 
 service:
-  port: 80
+  port: 8080
