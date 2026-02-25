@@ -1,0 +1,6 @@
+apiVersion: v2
+name: my-app
+description: A simple app chart used to demonstrate the helm+kustomize post-render naming issue
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

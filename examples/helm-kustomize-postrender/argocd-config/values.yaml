@@ -1,0 +1,30 @@
+configs:
+  cmp:
+    create: true
+    plugins:
+      kustomize-build-with-helm-oci:
+        init:
+          command: ["sh", "-c"]
+          args: ["helm dependency build"]
+        generate:
+          command: ["sh", "-c"]
+          args:
+            [
+              "helm template . -f values.yaml --name-template ${ARGOCD_ENV_DIFF_NAME:-$ARGOCD_APP_NAME} --namespace $ARGOCD_APP_NAMESPACE --include-crds --api-versions monitoring.coreos.com/v1 > all.yaml && kustomize build",
+            ]
+repoServer:
+  extraContainers:
+    - name: kustomize-build-with-helm-oci
+      command:
+        - argocd-cmp-server
+      image: '{{ default .Values.global.image.repository .Values.repoServer.image.repository }}:{{ default (include "argo-cd.defaultTag" .) .Values.repoServer.image.tag }}'
+      volumeMounts:
+        - name: plugins
+          mountPath: /home/argocd/cmp-server/plugins
+        - name: cmp-kustomize-build-with-helm
+          mountPath: /home/argocd/cmp-server/config/plugin.yaml
+          subPath: kustomize-build-with-helm-oci.yaml
+  volumes:
+    - name: cmp-kustomize-build-with-helm
+      configMap:
+        name: argocd-cmp-cm

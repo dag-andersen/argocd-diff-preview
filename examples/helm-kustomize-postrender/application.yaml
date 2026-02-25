@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/helm-kustomize-postrender/.*"
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  source:
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview
+    # The CMP runs inside this directory:
+    #   helm template . -f values.yaml --name-template $ARGOCD_APP_NAME ... > all.yaml
+    #   kustomize build
+    # kustomization.yaml and patches/ live here alongside the chart files.
+    path: examples/helm-kustomize-postrender/chart
+    plugin:
+      name: kustomize-build-with-helm-oci

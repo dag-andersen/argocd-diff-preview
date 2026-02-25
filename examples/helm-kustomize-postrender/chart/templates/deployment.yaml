@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # The deployment name equals the Helm release name.
+  # In ArgoCD, releaseName is set to the Application name (e.g. "my-app"),
+  # so this becomes e.g. "my-app" at deploy time.
+  name: {{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.service.port }}

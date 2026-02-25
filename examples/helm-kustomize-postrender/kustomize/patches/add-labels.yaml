@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Must match the helm releaseName exactly ("my-app").
+  # When argocd-diff-preview mangles the app name, this name no longer
+  # matches the rendered Deployment name and kustomize throws an error.
+  name: my-app
+spec:
+  template:
+    metadata:
+      labels:
+        foo: bar
