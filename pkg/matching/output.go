@@ -420,6 +420,9 @@ var defaultIgnorePatterns = []string{
 	"checksum/config-maps: ",
 	"checksum/secrets: ",
 	"caBundle: ",
+	"ca.crt: ",
+	"tls.crt: ",
+	"tls.key: ",
 }
 
 // formatDiffWithIgnore formats diffs with support for ignore patterns
