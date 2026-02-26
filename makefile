@@ -12,6 +12,7 @@ BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 use_argocd_api ?= false
 debug ?= false
 argocd_ui_url ?= ""
+render_method ?= ""
 write_per_app_manifests ?= false
 
 GO_TEST_FLAGS ?=
@@ -49,7 +50,7 @@ run-with-go: go-build pull-repository
 		--files-changed="$(files_changed)" \
 		--line-count="$(line_count)" \
 		--redirect-target-revisions="HEAD" \
-		--use-argocd-api="$(use_argocd_api)" \
+		--render-method="$(render_method)" \
 		--argocd-ui-url="${argocd_ui_url}" \
 		--write-per-app-manifests="$(write_per_app_manifests)" \
 		--debug="$(debug)"
@@ -80,7 +81,7 @@ run-with-docker: pull-repository docker-build
 		-e MAX_DIFF_LENGTH="$(max_diff_length)" \
 		image \
 		--argocd-namespace="$(argocd_namespace)" \
-		--use-argocd-api="$(use_argocd_api)" \
+		--render-method="$(render_method)" \
 		--debug="$(debug)"
 
 mkdocs:
@@ -106,12 +107,19 @@ run-integration-tests-go: go-build
 run-integration-tests-docker: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker ./...
 
-# Run integration tests with the Argo CD API
+# Run integration tests with the Argo CD server API
 run-integration-tests-go-with-api: go-build
-	cd integration-test && go test -v -timeout 60m -run TestIntegration -use-argocd-api ./...
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=server-api ./...
 
 run-integration-tests-docker-with-api: go-build
-	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -use-argocd-api ./...
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -render-method=server-api ./...
+
+# Run integration tests with the Argo CD repo server API
+run-integration-tests-go-with-repo-server-api: go-build
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=repo-server-api ./...
+
+run-integration-tests-docker-with-repo-server-api: go-build
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -render-method=repo-server-api ./...
 
 # Update golden files for integration tests
 update-integration-tests: go-build
@@ -123,6 +131,7 @@ update-integration-tests-docker: go-build
 # Run before release
 check-release: run-lint run-unit-tests
 	$(MAKE) run-integration-tests-go
+	$(MAKE) run-integration-tests-go-with-repo-server-api
 	$(MAKE) run-integration-tests-docker-with-api
 
 # Loop the above commands until one fails

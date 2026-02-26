@@ -45,6 +45,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--argocd-auth-token <token>`             | `ARGOCD_AUTH_TOKEN`          | -                                      | Argo CD authentication token (skips default admin login)                                    |
 | `--argocd-namespace <namespace>`          | `ARGOCD_NAMESPACE`           | `argocd`                               | Namespace to use for Argo CD                                                                |
 | `--argocd-ui-url <url>`                   | `ARGOCD_UI_URL`              | -                                      | Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com) |
+| `--argocd-config-dir <path>`              | `ARGOCD_CONFIG_DIR`          | `./argocd-config`                      | Path to the Argo CD config folder (contains values.yaml for Helm chart customization)       |
 |                                           |
 | `--base-branch <branch>`, `-b`            | `BASE_BRANCH`                | `main`                                 | Base branch name                                                                            |
 | `--cluster <tool>`                        | `CLUSTER`                    | `auto`                                 | Local cluster tool. Options: `kind`, `minikube`, `k3d`, `auto`                              |
@@ -61,6 +62,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--max-diff-length <length>`              | `MAX_DIFF_LENGTH`            | `65536`                                | Max diff message character count (only limits the generated Markdown file)                  |
 | `--output-folder <folder>`, `-o`          | `OUTPUT_FOLDER`              | `./output`                             | Output folder where the diff will be saved                                                  |
 | `--redirect-target-revisions <revs>`      | `REDIRECT_TARGET_REVISIONS`  | -                                      | List of target revisions to redirect                                                        |
+| `--render-method <method>`                | `RENDER_METHOD`              | `cli`                                  | Manifest rendering method. Options: `cli`, `server-api`, `repo-server-api`                  |
 | `--secrets-folder <folder>`, `-s`         | `SECRETS_FOLDER`             | `./secrets`                            | Secrets folder where the secrets are read from                                              |
 | `--selector <selector>`, `-l`             | `SELECTOR`                   | -                                      | Label selector to filter on (e.g., `key1=value1,key2=value2`)                               |
 | `--timeout <seconds>`                     | `TIMEOUT`                    | `180`                                  | Set timeout in seconds                                                                      |

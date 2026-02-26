@@ -97,7 +97,8 @@ When switching between modes, the cluster is automatically deleted and recreated
 integration-test/
 ├── integration_test.go      # Main test harness
 ├── auth_token_test.go       # Auth token generation tests
-├── createClusterRoles.yaml  # Helm values for disabling cluster roles
+├── no-cluster-roles/
+│   └── values.yaml          # Helm values for disabling cluster roles
 ├── localUserValues.yaml     # Helm values for local user auth
 ├── README.md                # This file
 │

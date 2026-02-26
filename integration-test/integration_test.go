@@ -21,7 +21,7 @@ var (
 	useDocker     = flag.Bool("docker", false, "use Docker instead of Go binary")
 	debug         = flag.Bool("debug", false, "enable debug mode for the tool")
 	createCluster = flag.Bool("create-cluster", false, "force creation of a new cluster (deletes existing one)")
-	useArgocdApi  = flag.Bool("use-argocd-api", false, "force all tests to use the Argo CD API instead of CLI")
+	renderMode    = flag.String("render-method", "", "force all tests to use a specific render mode (cli, server-api, repo-server-api)")
 	binaryPath    = flag.String("binary", "./bin/argocd-diff-preview", "path to the Go binary (relative to repo root)")
 	dockerImage   = flag.String("image", "argocd-diff-preview", "Docker image name to use")
 )
@@ -59,8 +59,8 @@ type TestCase struct {
 	IgnoreResources            string
 	ArgocdLoginOptions         string
 	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
-	UseArgocdApi               string // "true" = force enable, "false" = force disable, "" = use global flag
-	DisableClusterRoles        string // Mount createClusterRoles.yaml (sets createClusterRoles: false)
+	RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global flag
+	DisableClusterRoles        string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
@@ -174,7 +174,7 @@ var testCases = []TestCase{
 		Suffix:                     "-9",
 		WatchIfNoWatchPatternFound: "true",
 		AutoDetectFilesChanged:     "true",
-		UseArgocdApi:               "true",
+		RenderMethod:               "server-api",
 	},
 	{
 		Name:         "branch-6/target",
@@ -259,11 +259,11 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-15/base",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
-	// When createClusterRoles: false is set but --use-argocd-api is not used,
+	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.
 	// NOTE: This test MUST create a new cluster because the role changes only take
 	// effect when ArgoCD is installed during cluster creation.
-	// NOTE: UseArgocdApi is explicitly set to "false" to override the global flag,
+	// NOTE: RenderMethod is explicitly set to "cli" to override the global flag,
 	// because this test specifically tests the failure case without the API.
 	{
 		Name:                   "branch-1/target-no-cluster-roles",
@@ -272,7 +272,7 @@ var testCases = []TestCase{
 		Suffix:                 "-no-cluster-roles",
 		DisableClusterRoles:    "true",
 		CreateCluster:          "true",
-		UseArgocdApi:           "false",
+		RenderMethod:           "cli",
 		AutoDetectFilesChanged: "true",
 		ExpectFailure:          true,
 	},
@@ -287,6 +287,22 @@ var testCases = []TestCase{
 		FilesChanged:    "examples/helm/applications/nginx.yaml",
 		ExpectFailure:   true,
 	},
+}
+
+// effectiveRenderMethod returns the render mode that should be used for a test case.
+// tc.RenderMethod takes highest precedence, then the global -render-method flag.
+// Returns "" when the tool should use its own default (cli).
+func effectiveRenderMethod(tc TestCase) string {
+	if tc.RenderMethod != "" {
+		return tc.RenderMethod
+	}
+	return *renderMode
+}
+
+// isAPIMode reports whether the effective render mode uses the Argo CD API.
+func isAPIMode(tc TestCase) bool {
+	m := effectiveRenderMethod(tc)
+	return m == "server-api" || m == "repo-server-api"
 }
 
 // timePattern matches timing information in output that varies between runs
@@ -346,9 +362,8 @@ func TestIntegration(t *testing.T) {
 	for i, tc := range shuffledCases {
 		// Determine if this test needs cluster roles disabled:
 		// - DisableClusterRoles explicitly set, OR
-		// - UseArgocdApi explicitly set to true, OR
-		// - Global useArgocdApi flag is set AND test doesn't explicitly disable it
-		testNeedsRolesDisabled := tc.DisableClusterRoles == "true" || tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi)
+		// - Effective render mode uses the API
+		testNeedsRolesDisabled := tc.DisableClusterRoles == "true" || isAPIMode(tc)
 
 		// Check current cluster state
 		clusterExists := kindClusterExists()
@@ -433,7 +448,7 @@ func printToTTY(msg string) {
 func orderTestCases(cases []TestCase) []TestCase {
 	var rolesEnabled, rolesDisabled []TestCase
 	for _, tc := range cases {
-		needsRolesDisabled := tc.DisableClusterRoles == "true" || tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi)
+		needsRolesDisabled := tc.DisableClusterRoles == "true" || isAPIMode(tc)
 		if needsRolesDisabled {
 			rolesDisabled = append(rolesDisabled, tc)
 		} else {
@@ -680,34 +695,6 @@ func runWithGoBinary(tc TestCase, createCluster bool) error {
 		return fmt.Errorf("failed to get repo root: %w", err)
 	}
 
-	// If DisableClusterRoles is set OR we're using the API mode, temporarily replace
-	// argocd-config/values.yaml with the createClusterRoles.yaml file (which sets
-	// createClusterRoles: false). This tests the API mode in a more restrictive environment.
-	if tc.DisableClusterRoles == "true" || tc.UseArgocdApi == "true" || *useArgocdApi {
-		valuesPath := filepath.Join(repoRoot, "argocd-config", "values.yaml")
-		createClusterRolesPath := filepath.Join(repoRoot, "integration-test", "createClusterRoles.yaml")
-
-		// Backup original values.yaml
-		originalContent, err := os.ReadFile(valuesPath)
-		if err != nil {
-			return fmt.Errorf("failed to read original values.yaml: %w", err)
-		}
-
-		// Copy createClusterRoles.yaml to values.yaml
-		newContent, err := os.ReadFile(createClusterRolesPath)
-		if err != nil {
-			return fmt.Errorf("failed to read createClusterRoles.yaml: %w", err)
-		}
-		if err := os.WriteFile(valuesPath, newContent, 0644); err != nil {
-			return fmt.Errorf("failed to write values.yaml: %w", err)
-		}
-
-		// Restore original values.yaml after the test
-		defer func() {
-			_ = os.WriteFile(valuesPath, originalContent, 0644)
-		}()
-	}
-
 	// Binary path is relative to repo root
 	absBinaryPath := filepath.Join(repoRoot, *binaryPath)
 
@@ -785,11 +772,10 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		"-v", fmt.Sprintf("%s/kind-config:/kind-config", repoRoot),
 	}
 
-	// Mount argocd-config: when use_argocd_api is true or DisableClusterRoles is set,
-	// mount the special createClusterRoles.yaml file (which sets createClusterRoles: false).
-	// This tests the API mode in a more restrictive environment without cluster-wide permissions.
-	if tc.UseArgocdApi == "true" || *useArgocdApi || tc.DisableClusterRoles == "true" {
-		args = append(args, "-v", fmt.Sprintf("%s/integration-test/createClusterRoles.yaml:/argocd-config/values.yaml", repoRoot))
+	// When using API mode or DisableClusterRoles is set, mount only the values.yaml file
+	// (which sets createClusterRoles: false) into the default argocd-config path in the container.
+	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
+		args = append(args, "-v", fmt.Sprintf("%s/integration-test/no-cluster-roles/values.yaml:/argocd-config/values.yaml", repoRoot))
 	}
 
 	// Pass Docker API version if needed (when client is newer than server)
@@ -838,9 +824,8 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	if tc.KindOptions != "" {
 		args = append(args, "-e", fmt.Sprintf("KIND_OPTIONS=%s", tc.KindOptions))
 	}
-	// UseArgocdApi: "true" = force enable, "false" = force disable, "" = use global flag
-	if tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi) {
-		args = append(args, "-e", "USE_ARGOCD_API=true")
+	if m := effectiveRenderMethod(tc); m != "" {
+		args = append(args, "-e", fmt.Sprintf("RENDER_METHOD=%s", m))
 	}
 
 	// Set CREATE_CLUSTER based on the createCluster parameter (overrides tc.CreateCluster)
@@ -935,9 +920,8 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	if tc.KindOptions != "" {
 		args = append(args, "--kind-options", tc.KindOptions)
 	}
-	// UseArgocdApi: "true" = force enable, "false" = force disable, "" = use global flag
-	if tc.UseArgocdApi == "true" || (tc.UseArgocdApi != "false" && *useArgocdApi) {
-		args = append(args, "--use-argocd-api")
+	if m := effectiveRenderMethod(tc); m != "" {
+		args = append(args, "--render-method", m)
 	}
 
 	// Set --create-cluster based on the createCluster parameter (overrides tc.CreateCluster)
@@ -953,6 +937,13 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	if tc.ArgocdUIURL != "" {
 		args = append(args, "--argocd-ui-url", tc.ArgocdUIURL)
+	}
+
+	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),
+	// pass --argocd-config-dir pointing at the no-cluster-roles directory (createClusterRoles: false).
+	// This avoids mutating the shared argocd-config/values.yaml on disk.
+	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
+		args = append(args, "--argocd-config-dir", "./integration-test/no-cluster-roles")
 	}
 
 	return args

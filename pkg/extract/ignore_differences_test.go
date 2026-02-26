@@ -215,7 +215,7 @@ func TestParseIgnoreDifferencesFromApp(t *testing.T) {
 				ar = argoapplication.NewArgoResource(nil, argoapplication.Application, "test-app", "test-app", "app.yaml", git.Target)
 			}
 
-			rules := parseIgnoreDifferencesFromApp(*ar)
+			rules := ParseIgnoreDifferencesFromApp(*ar)
 
 			require.Len(t, rules, tt.expectedCount)
 
@@ -548,7 +548,7 @@ func TestApplyIgnoreDifferencesToManifests(t *testing.T) {
 				}
 			}
 
-			applyIgnoreDifferencesToManifests(manifestsCopy, tt.rules)
+			ApplyIgnoreDifferencesToManifests(manifestsCopy, tt.rules)
 
 			tt.validate(t, manifestsCopy)
 		})
@@ -1326,7 +1326,7 @@ func TestApplyIgnoreDifferencesWithJQPathExpressions(t *testing.T) {
 				}
 			}
 
-			applyIgnoreDifferencesToManifests(manifestsCopy, tt.rules)
+			ApplyIgnoreDifferencesToManifests(manifestsCopy, tt.rules)
 
 			tt.validate(t, manifestsCopy)
 		})

@@ -9,8 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/klog/v2"
@@ -21,6 +23,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
 
 var (
@@ -30,6 +33,15 @@ var (
 	Commit = "unknown"
 	// BuildDate is the date the binary was built
 	BuildDate = "unknown"
+)
+
+// RenderMethod aliases for convenience
+type RenderMethod = vars.RenderMethod
+
+const (
+	RenderMethodCLI           = vars.RenderMethodCLI
+	RenderMethodServerAPI     = vars.RenderMethodServerAPI
+	RenderMethodRepoServerAPI = vars.RenderMethodRepoServerAPI
 )
 
 // defaults
@@ -67,6 +79,8 @@ var (
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
 	DefaultConcurrency                = uint(40)
+	DefaultRenderMethod               = ""
+	DefaultArgocdConfigPath           = "./argocd-config"
 	DefaultWritePerAppManifests       = false
 )
 
@@ -104,7 +118,9 @@ type RawOptions struct {
 	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
 	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
 	ArgocdAuthToken            string `mapstructure:"argocd-auth-token"`
+	ArgocdConfigPath           string `mapstructure:"argocd-config-dir"`
 	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
+	RenderMethod               string `mapstructure:"render-method"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
 	Title                      string `mapstructure:"title"`
@@ -147,11 +163,12 @@ type Config struct {
 	ArgocdChartRepoPassword    string
 	ArgocdLoginOptions         string
 	ArgocdAuthToken            string
+	ArgocdConfigPath           string
 	LogFormat                  string
 	Title                      string
 	HideDeletedAppDiff         bool
 	DisableClientThrottling    bool
-	UseArgoCDApi               bool
+	RenderMethod               RenderMethod
 	ArgocdUIURL                string
 	Concurrency                uint
 	WritePerAppManifests       bool
@@ -240,6 +257,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-login-options", DefaultArgocdLoginOptions)
 	viper.SetDefault("argocd-auth-token", DefaultArgocdAuthToken)
 	viper.SetDefault("use-argocd-api", DefaultUseArgoCDApi)
+	viper.SetDefault("render-method", DefaultRenderMethod)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
@@ -247,6 +265,7 @@ func Parse() *Config {
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 	viper.SetDefault("concurrency", DefaultConcurrency)
+	viper.SetDefault("argocd-config-dir", DefaultArgocdConfigPath)
 	viper.SetDefault("write-per-app-manifests", DefaultWritePerAppManifests)
 
 	// Basic flags
@@ -270,6 +289,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("argocd-chart-repo-password", DefaultArgocdChartRepoPassword, "Argo CD Helm Repo Password")
 	rootCmd.Flags().String("argocd-auth-token", DefaultArgocdAuthToken, "Argo CD Auth Token for API access")
 	rootCmd.Flags().String("argocd-login-options", DefaultArgocdLoginOptions, "Additional options to pass to 'argocd login' command")
+	rootCmd.Flags().String("argocd-config-dir", DefaultArgocdConfigPath, "Path to the Argo CD config folder (contains values.yaml for Helm chart customization)")
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
@@ -281,7 +301,8 @@ func Parse() *Config {
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
-	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI")
+	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI (deprecated: use --render-method instead)")
+	rootCmd.Flags().String("render-method", DefaultRenderMethod, "Render mode for Argo CD manifests. Options: cli, server-api, repo-server-api. Takes precedence over --use-argocd-api")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
 	rootCmd.Flags().String("kind-options", DefaultKindOptions, "kind options (only for kind)")
@@ -379,11 +400,11 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		ArgocdChartRepoPassword:    o.ArgocdChartRepoPassword,
 		ArgocdLoginOptions:         o.ArgocdLoginOptions,
 		ArgocdAuthToken:            o.ArgocdAuthToken,
+		ArgocdConfigPath:           o.ArgocdConfigPath,
 		LogFormat:                  o.LogFormat,
 		Title:                      o.Title,
 		HideDeletedAppDiff:         o.HideDeletedAppDiff,
 		DisableClientThrottling:    o.DisableClientThrottling,
-		UseArgoCDApi:               o.UseArgoCDApi,
 		ArgocdUIURL:                o.ArgocdUIURL,
 		Concurrency:                o.Concurrency,
 		WritePerAppManifests:       o.WritePerAppManifests,
@@ -399,6 +420,12 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		cfg.MaxDiffLength = DefaultMaxDiffLength
 	}
 	// Note: Concurrency 0 means unlimited, so we don't apply a default for zero
+
+	// Parse render mode (takes precedence over --use-argocd-api)
+	cfg.RenderMethod, err = o.parseRenderMethod()
+	if err != nil {
+		return nil, fmt.Errorf("invalid render-method: %w", err)
+	}
 
 	// Parse file regex
 	cfg.FileRegex, err = o.parseFileRegex()
@@ -433,9 +460,9 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	}
 
 	// Check if argocd CLI is installed when not using API mode
-	if !cfg.UseArgoCDApi && !cfg.DryRun {
+	if cfg.RenderMethod == RenderMethodCLI && !cfg.DryRun {
 		if _, err := exec.LookPath("argocd"); err != nil {
-			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--use-argocd-api=true' to use the API instead")
+			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--render-method=server-api' / '--use-argocd-api=true' to use the API instead")
 		}
 	}
 
@@ -483,6 +510,28 @@ func (o *RawOptions) parseRedirectRevisions() []string {
 	return strings.Split(o.RedirectTargetRevisions, ",")
 }
 
+// parseRenderMethod resolves the effective RenderMethod.
+// --render-method takes precedence; if unset, falls back to --use-argocd-api.
+func (o *RawOptions) parseRenderMethod() (RenderMethod, error) {
+	if o.RenderMethod != "" {
+		switch RenderMethod(strings.ToLower(o.RenderMethod)) {
+		case RenderMethodCLI:
+			return RenderMethodCLI, nil
+		case RenderMethodServerAPI:
+			return RenderMethodServerAPI, nil
+		case RenderMethodRepoServerAPI:
+			return RenderMethodRepoServerAPI, nil
+		default:
+			return "", fmt.Errorf("unsupported render-method %q: must be one of cli, server-api, repo-server-api", o.RenderMethod)
+		}
+	}
+	// Fall back to legacy --use-argocd-api flag
+	if o.UseArgoCDApi {
+		return RenderMethodServerAPI, nil
+	}
+	return RenderMethodCLI, nil
+}
+
 // parseClusterType parses the cluster type and returns the appropriate cluster provider
 func (o *RawOptions) parseClusterType() (cluster.Provider, error) {
 	var provider cluster.Provider
@@ -521,9 +570,17 @@ func (o *RawOptions) parseClusterType() (cluster.Provider, error) {
 
 // configureLogging sets up the logger based on the config
 func configureLogging(cfg *Config) {
-	// Suppress klog warnings from client-go (e.g., "unrecognized format" warnings).
-	// Without this, installing the Argo CD Helm chart will print "Warning: unrecognized format "int64"".
+	// Suppress klog output from client-go (e.g., "unrecognized format "int64"" from
+	// Helm chart installs, and "Unhandled Error" broken-pipe noise from the port-forward
+	// machinery when gRPC connections are closed while the tunnel is still open).
+	// klog.SetOutput silences the old text-format logger; klog.SetLogger silences the
+	// structured logr-based sink that ErrorS/InfoS write to.
 	klog.SetOutput(io.Discard)
+	klog.SetLogger(logr.Discard())
+
+	// Suppress logrus output from ArgoCD internals (e.g., "Starting configmap/secret
+	// informers", "Configmap/secret informer synced" from util/settings).
+	logrus.SetOutput(io.Discard)
 
 	consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true}
 	if cfg.Debug {
@@ -572,8 +629,8 @@ func (o *Config) LogConfig() {
 				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
 		}
-		if o.UseArgoCDApi {
-			log.Info().Msgf("✨ - use-argocd-api: %t", o.UseArgoCDApi)
+		if o.RenderMethod != RenderMethodCLI {
+			log.Info().Msgf("✨ - render-method: %s", o.RenderMethod)
 		}
 	}
 
@@ -582,6 +639,9 @@ func (o *Config) LogConfig() {
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
 	log.Info().Msgf("✨ - output-folder: %s", o.OutputFolder)
 	log.Info().Msgf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
+	if o.ArgocdConfigPath != DefaultArgocdConfigPath {
+		log.Info().Msgf("✨ - argocd-config-dir: %s", o.ArgocdConfigPath)
+	}
 	log.Info().Msgf("✨ - repo: %s", o.Repo)
 	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
 	if o.LogFormat != DefaultLogFormat {
