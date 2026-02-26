@@ -45,6 +45,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--argocd-auth-token <token>`             | `ARGOCD_AUTH_TOKEN`          | -                                      | Argo CD authentication token (skips default admin login)                                    |
 | `--argocd-namespace <namespace>`          | `ARGOCD_NAMESPACE`           | `argocd`                               | Namespace to use for Argo CD                                                                |
 | `--argocd-ui-url <url>`                   | `ARGOCD_UI_URL`              | -                                      | Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com) |
+| `--argocd-config-dir <path>`              | `ARGOCD_CONFIG_DIR`          | `./argocd-config`                      | Path to the Argo CD config folder (contains values.yaml for Helm chart customization)       |
 |                                           |
 | `--base-branch <branch>`, `-b`            | `BASE_BRANCH`                | `main`                                 | Base branch name                                                                            |
 | `--cluster <tool>`                        | `CLUSTER`                    | `auto`                                 | Local cluster tool. Options: `kind`, `minikube`, `k3d`, `auto`                              |
