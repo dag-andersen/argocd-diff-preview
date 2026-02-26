@@ -940,10 +940,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	}
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),
-	// pass --argocd-config pointing at the no-cluster-roles directory (createClusterRoles: false).
+	// pass --argocd-config-dir pointing at the no-cluster-roles directory (createClusterRoles: false).
 	// This avoids mutating the shared argocd-config/values.yaml on disk.
 	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
-		args = append(args, "--argocd-config", "./integration-test/no-cluster-roles")
+		args = append(args, "--argocd-config-dir", "./integration-test/no-cluster-roles")
 	}
 
 	return args
