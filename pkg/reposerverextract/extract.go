@@ -531,7 +531,7 @@ func buildManifestRequestForSource(
 		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
 		for _, ref := range refSources {
 			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
-				Repo:           v1alpha1.Repository{Repo: ref.RepoURL},
+				Repo:           *creds.GetRepo(ref.RepoURL),
 				TargetRevision: ref.TargetRevision,
 			}
 		}
@@ -563,7 +563,7 @@ func buildManifestRequestForSource(
 		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
 		for _, ref := range refSources {
 			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
-				Repo:           v1alpha1.Repository{Repo: ref.RepoURL},
+				Repo:           *creds.GetRepo(ref.RepoURL),
 				TargetRevision: ref.TargetRevision,
 			}
 		}

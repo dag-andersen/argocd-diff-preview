@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/stretchr/testify/assert"
@@ -545,4 +546,58 @@ spec:
 	// Same repo — should stream the branch folder, not use remote RPC.
 	assert.Equal(t, branchFolder, streamDir, "same-repo source must still stream locally even when prRepo is set")
 	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// repocreds: GetRepo normalises .git suffix on lookup
+//
+// Secrets are often registered WITHOUT a trailing ".git" while app repoURLs
+// include one (or vice versa). GetRepo must find credentials in both cases.
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestGetRepo_NormalizesGitSuffix(t *testing.T) {
+	withGit := "https://github.com/org/repo.git"
+	withoutGit := "https://github.com/org/repo"
+
+	fakeRepo := &v1alpha1.Repository{
+		Repo:     withoutGit,
+		Username: "robot",
+		Password: "secret",
+	}
+
+	// Build a RepoCreds as if the secret was stored without ".git".
+	rc := &RepoCreds{
+		reposByURL: map[string]*v1alpha1.Repository{
+			normalizeRepoURL(withoutGit): fakeRepo,
+		},
+	}
+
+	// Lookup with the ".git" form must succeed.
+	got := rc.GetRepo(withGit)
+	assert.Equal(t, "robot", got.Username,
+		"GetRepo with .git suffix must find credentials stored without .git")
+
+	// Lookup with the exact stored form must also succeed.
+	got2 := rc.GetRepo(withoutGit)
+	assert.Equal(t, "robot", got2.Username,
+		"GetRepo without .git suffix must find credentials stored without .git")
+
+	// Unknown URL must return a bare stub (no panic, no credentials).
+	unknown := rc.GetRepo("https://github.com/other-org/other-repo.git")
+	assert.Equal(t, "https://github.com/other-org/other-repo.git", unknown.Repo)
+	assert.Empty(t, unknown.Username)
+}
+
+func TestNormalizeRepoURL(t *testing.T) {
+	cases := []struct {
+		input, want string
+	}{
+		{"https://github.com/org/repo.git", "https://github.com/org/repo"},
+		{"https://github.com/org/repo", "https://github.com/org/repo"},
+		{"HTTPS://GitHub.com/Org/Repo.git", "https://github.com/org/repo"},
+		{"https://github.com/org/repo.git.git", "https://github.com/org/repo.git"},
+	}
+	for _, tc := range cases {
+		assert.Equal(t, tc.want, normalizeRepoURL(tc.input), "input: %s", tc.input)
+	}
 }
