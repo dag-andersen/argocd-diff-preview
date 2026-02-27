@@ -319,6 +319,7 @@ func run(cfg *Config) error {
 			cfg.Concurrency,
 			baseApps.SelectedApps,
 			targetApps.SelectedApps,
+			cfg.Repo,
 		)
 	} else {
 		// Extract resources from the cluster based on each branch, passing the manifests directly

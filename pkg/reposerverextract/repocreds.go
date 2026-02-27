@@ -18,6 +18,7 @@ package reposerverextract
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/argoproj/argo-cd/v3/util/db"
@@ -101,7 +102,7 @@ func FetchRepoCreds(ctx context.Context, k8sClient *utils.K8sClient, namespace s
 
 	reposByURL := make(map[string]*v1alpha1.Repository, len(allRepos))
 	for _, r := range allRepos {
-		reposByURL[r.Repo] = r
+		reposByURL[normalizeRepoURL(r.Repo)] = r
 	}
 
 	if len(helmRepos)+len(ociRepos)+len(helmRepoCreds)+len(ociRepoCreds)+len(allRepos) > 0 {
@@ -131,12 +132,27 @@ func (rc *RepoCreds) GetRepo(repoURL string) *v1alpha1.Repository {
 	if rc == nil {
 		return &v1alpha1.Repository{Repo: repoURL}
 	}
-	if r, ok := rc.reposByURL[repoURL]; ok {
+	if r, ok := rc.reposByURL[normalizeRepoURL(repoURL)]; ok {
 		return r
 	}
 	// URL not found in the registry — return a bare stub.
 	// This is correct for public repositories that don't need credentials.
 	return &v1alpha1.Repository{Repo: repoURL}
+}
+
+// normalizeRepoURL returns a canonical form of a repository URL used for
+// credential lookups. It lowercases the URL and strips a trailing ".git"
+// suffix so that secrets stored without ".git" match app repoURLs that include
+// it (and vice versa). For example:
+//
+//	https://github.com/StoryHouse-SubscriptionSystems/argo-apps
+//	https://github.com/StoryHouse-SubscriptionSystems/argo-apps.git
+//
+// both normalise to the same key.
+func normalizeRepoURL(u string) string {
+	u = strings.ToLower(u)
+	u = strings.TrimSuffix(u, ".git")
+	return u
 }
 
 // HelmRepos returns the Helm + OCI repository lists to pass as
