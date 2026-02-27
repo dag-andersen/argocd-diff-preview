@@ -55,6 +55,12 @@ func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
 // baseBranch / targetBranch identify the local folders that hold each branch's
 // checked-out source files (e.g. "base-branch/" or "target-branch/").
 //
+// prRepo is the URL of the pull-request repository (e.g.
+// "https://github.com/org/repo.git"). Sources whose repoURL does not match
+// this URL point at a different repository whose files are not checked out
+// locally; those sources are rendered via the remote GenerateManifest RPC so
+// the repo server fetches them itself.
+//
 // The return type is identical to extract.RenderApplicationsFromBothBranches
 // so that callers can swap implementations with minimal changes.
 func RenderApplicationsFromBothBranches(
@@ -65,6 +71,7 @@ func RenderApplicationsFromBothBranches(
 	maxConcurrency uint,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
+	prRepo string,
 ) ([]extract.ExtractedApp, []extract.ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
@@ -156,7 +163,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds)
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, prRepo)
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -219,6 +226,10 @@ func RenderApplicationsFromBothBranches(
 //
 // ApplicationSet resources are handled by reading sources from
 // spec.template.spec rather than spec.
+//
+// prRepo is the URL of the pull-request repository. Sources whose repoURL does
+// not match prRepo are rendered via the remote GenerateManifest RPC instead of
+// streaming local files (which would not exist for a foreign repository).
 func renderApp(
 	ctx context.Context,
 	repoClient *reposerver.Client,
@@ -226,6 +237,7 @@ func renderApp(
 	branchFolderByType map[git.BranchType]string,
 	namespacedScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
+	prRepo string,
 ) ([]unstructured.Unstructured, error) {
 	branchFolder, ok := branchFolderByType[app.Branch]
 	if !ok {
@@ -240,7 +252,7 @@ func renderApp(
 	var allManifestStrings []string
 
 	for i, contentSource := range contentSources {
-		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds)
+		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, prRepo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
 		}
@@ -412,6 +424,11 @@ func splitSources(app argoapplication.ArgoResource) (
 // in the ManifestRequest are rewritten to relative paths, following the same
 // approach used by other tools that integrate with the repo server.
 //
+// prRepo is the URL of the pull-request repository. When the primary source's
+// repoURL does not match prRepo the source files are not present locally;
+// in that case the function returns streamDir="" so the caller uses the remote
+// GenerateManifest RPC and the repo server fetches the content itself.
+//
 // cleanup must be called by the caller when the stream directory is no longer
 // needed.
 func buildManifestRequestForSource(
@@ -421,6 +438,7 @@ func buildManifestRequestForSource(
 	hasMultipleSources bool,
 	branchFolder string,
 	creds *RepoCreds,
+	prRepo string,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
 	obj := app.Yaml.Object
 
@@ -448,6 +466,28 @@ func buildManifestRequestForSource(
 	if len(refSources) == 0 {
 		if primarySource.Chart != "" {
 			// Remote Helm chart – no local files to stream.
+			request = &repoapiclient.ManifestRequest{
+				Repo:               creds.GetRepo(primarySource.RepoURL),
+				Repos:              creds.HelmRepos(&primarySource),
+				HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
+				Revision:           primarySource.TargetRevision,
+				AppName:            app.Id,
+				Namespace:          namespace,
+				ApplicationSource:  &primarySource,
+				HasMultipleSources: hasMultipleSources,
+			}
+			return request, "", nil, nil
+		}
+		// Cross-repo source: the source's repoURL points at a different
+		// repository than the PR repo. Those files are not checked out
+		// locally, so we cannot stream them. Fall back to the remote
+		// GenerateManifest RPC and let the repo server fetch them itself.
+		if prRepo != "" && !strings.Contains(strings.ToLower(primarySource.RepoURL), strings.ToLower(prRepo)) {
+			log.Debug().
+				Str("App", app.GetLongName()).
+				Str("sourceRepoURL", primarySource.RepoURL).
+				Str("prRepo", prRepo).
+				Msg("Source repoURL does not match PR repo — using remote RPC")
 			request = &repoapiclient.ManifestRequest{
 				Repo:               creds.GetRepo(primarySource.RepoURL),
 				Repos:              creds.HelmRepos(&primarySource),
@@ -488,6 +528,38 @@ func buildManifestRequestForSource(
 	// repo server fetches the ref content from its own git cache. The $ref/…
 	// value file paths are left unchanged (no rewriting needed).
 	if primarySource.Chart != "" {
+		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
+		for _, ref := range refSources {
+			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
+				Repo:           v1alpha1.Repository{Repo: ref.RepoURL},
+				TargetRevision: ref.TargetRevision,
+			}
+		}
+		request = &repoapiclient.ManifestRequest{
+			Repo:               creds.GetRepo(primarySource.RepoURL),
+			Repos:              creds.HelmRepos(&primarySource),
+			HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
+			Revision:           primarySource.TargetRevision,
+			AppName:            app.Id,
+			Namespace:          namespace,
+			ApplicationSource:  &primarySource,
+			HasMultipleSources: hasMultipleSources,
+			RefSources:         refSourcesMap,
+		}
+		return request, "", nil, nil
+	}
+
+	// ── Slow path: ref sources present — cross-repo primary source ────────────
+	// When the primary source lives in a different repository from the PR, we
+	// cannot stream its files locally. Use the remote RPC and let the repo
+	// server fetch both the primary content and the ref sources from their
+	// respective git caches. Value-file $ref/… paths are left unrewritten.
+	if prRepo != "" && !strings.Contains(strings.ToLower(primarySource.RepoURL), strings.ToLower(prRepo)) {
+		log.Debug().
+			Str("App", app.GetLongName()).
+			Str("sourceRepoURL", primarySource.RepoURL).
+			Str("prRepo", prRepo).
+			Msg("Source repoURL does not match PR repo (slow path) — using remote RPC")
 		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
 		for _, ref := range refSources {
 			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{

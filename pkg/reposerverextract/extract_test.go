@@ -91,7 +91,7 @@ spec:
 	require.Empty(t, refSources)
 	assert.False(t, hasMultipleSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -132,7 +132,7 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -199,7 +199,7 @@ spec:
 	require.Len(t, contentSources, 1, "only the chart source is a content source")
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -280,7 +280,7 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
 	require.NoError(t, err)
 	require.NotEmpty(t, streamDir, "local chart with refs must stream a temp dir")
 	defer cleanup()
@@ -339,7 +339,7 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -421,7 +421,7 @@ spec:
 
 	// Build a request for each content source – this must not error.
 	for i, cs := range contentSources {
-		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil)
+		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, "")
 		require.NoError(t, buildErr, "content source %d should not error", i)
 		if cleanup != nil {
 			defer cleanup()
@@ -434,14 +434,115 @@ spec:
 	}
 
 	// Verify the paths are correctly assigned to each request.
-	req0, _, cleanup0, _ := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil)
+	req0, _, cleanup0, _ := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
 	if cleanup0 != nil {
 		defer cleanup0()
 	}
-	req1, _, cleanup1, _ := buildManifestRequestForSource(app, contentSources[1], refSources, hasMultipleSources, branchFolder, nil)
+	req1, _, cleanup1, _ := buildManifestRequestForSource(app, contentSources[1], refSources, hasMultipleSources, branchFolder, nil, "")
 	if cleanup1 != nil {
 		defer cleanup1()
 	}
 	assert.Equal(t, "management-prod/applicationsets", req0.ApplicationSource.Path)
 	assert.Equal(t, "management-prod/root", req1.ApplicationSource.Path)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8.  Cross-repo source → must use remote RPC (streamDir == "")
+//
+//	This is the failure pattern from production: an application whose
+//	spec.source.repoURL points at a DIFFERENT repository than the PR repo.
+//	The source path does not exist locally, so streaming would fail with
+//	"app path does not exist".
+//
+//	Fix: when prRepo is set and the source repoURL doesn't match, return
+//	streamDir="" so the caller uses the remote GenerateManifest RPC and
+//	the repo server fetches the content itself.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_CrossRepoSource_UsesRemoteRPC(t *testing.T) {
+	// The PR repo is "argo-management-cluster", but the app points at "argo-apps".
+	// "argo-apps" is NOT checked out locally.
+	prRepo := "https://github.com/egmontadministration/argo-management-cluster.git"
+	branchFolder := t.TempDir() // does NOT contain the argo-apps path
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloud-services
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/egmontadministration/argo-apps.git
+    path: eks-platformservices-nonprod/apps/service-cloud-services/cloud-services
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloud-services
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// CRITICAL: streamDir must be empty — the path lives in a foreign repo.
+	// Streaming local files would fail with "app path does not exist".
+	assert.Empty(t, streamDir,
+		"REGRESSION: source in a foreign repo must use the remote RPC (streamDir must be empty) "+
+			"not stream local files that don't exist")
+
+	// The request should still be properly constructed.
+	assert.Equal(t, "https://github.com/egmontadministration/argo-apps.git", req.Repo.Repo)
+	assert.Equal(t, "eks-platformservices-nonprod/apps/service-cloud-services/cloud-services", req.ApplicationSource.Path)
+	assert.Equal(t, "HEAD", req.Revision)
+	assert.Equal(t, "cloud-services", req.Namespace)
+	assert.False(t, hasMultipleSources)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9.  Same-repo source with prRepo set → still uses local streaming
+//
+//	Verifies the happy path is not broken when prRepo is set: sources that
+//	belong to the PR repo should still be streamed from local disk.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_SameRepoSource_WithPrRepo_StreamsLocally(t *testing.T) {
+	prRepo := "https://github.com/org/repo.git"
+	branchFolder := makeBranchFolder(t, "apps/my-app")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Same repo — should stream the branch folder, not use remote RPC.
+	assert.Equal(t, branchFolder, streamDir, "same-repo source must still stream locally even when prRepo is set")
+	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
 }
