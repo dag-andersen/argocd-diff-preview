@@ -421,6 +421,8 @@ spec:
 	assert.True(t, hasMultipleSources)
 
 	// Build a request for each content source – this must not error.
+	// Capture requests so we can verify per-source paths without duplicate calls.
+	reqs := make([]struct{ path string }, len(contentSources))
 	for i, cs := range contentSources {
 		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, "")
 		require.NoError(t, buildErr, "content source %d should not error", i)
@@ -432,19 +434,12 @@ spec:
 		assert.Equal(t, branchFolder, streamDir, "content source %d should stream the branch folder", i)
 		assert.True(t, req.HasMultipleSources, "HasMultipleSources must be true for both requests")
 		assert.Equal(t, "argocd", req.Namespace)
+		reqs[i].path = req.ApplicationSource.Path
 	}
 
 	// Verify the paths are correctly assigned to each request.
-	req0, _, cleanup0, _ := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
-	if cleanup0 != nil {
-		defer cleanup0()
-	}
-	req1, _, cleanup1, _ := buildManifestRequestForSource(app, contentSources[1], refSources, hasMultipleSources, branchFolder, nil, "")
-	if cleanup1 != nil {
-		defer cleanup1()
-	}
-	assert.Equal(t, "management-prod/applicationsets", req0.ApplicationSource.Path)
-	assert.Equal(t, "management-prod/root", req1.ApplicationSource.Path)
+	assert.Equal(t, "management-prod/applicationsets", reqs[0].path)
+	assert.Equal(t, "management-prod/root", reqs[1].path)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

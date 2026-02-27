@@ -83,6 +83,14 @@ func RenderApplicationsFromBothBranches(
 	log.Info().Msgf("📌 Final number of Applications planned to be rendered via repo server: [Base: %d], [Target: %d]",
 		len(baseApps), len(targetApps))
 
+	if err := extract.VerifyNoApplicationSets(baseApps); err != nil {
+		return nil, nil, time.Since(startTime), err
+	}
+
+	if err := extract.VerifyNoApplicationSets(targetApps); err != nil {
+		return nil, nil, time.Since(startTime), err
+	}
+
 	namespacedScopedResources, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
@@ -482,7 +490,7 @@ func buildManifestRequestForSource(
 		// repository than the PR repo. Those files are not checked out
 		// locally, so we cannot stream them. Fall back to the remote
 		// GenerateManifest RPC and let the repo server fetch them itself.
-		if prRepo != "" && !strings.Contains(strings.ToLower(primarySource.RepoURL), strings.ToLower(prRepo)) {
+		if prRepo != "" && normalizeRepoURL(primarySource.RepoURL) != normalizeRepoURL(prRepo) {
 			log.Debug().
 				Str("App", app.GetLongName()).
 				Str("sourceRepoURL", primarySource.RepoURL).
@@ -554,7 +562,7 @@ func buildManifestRequestForSource(
 	// cannot stream its files locally. Use the remote RPC and let the repo
 	// server fetch both the primary content and the ref sources from their
 	// respective git caches. Value-file $ref/… paths are left unrewritten.
-	if prRepo != "" && !strings.Contains(strings.ToLower(primarySource.RepoURL), strings.ToLower(prRepo)) {
+	if prRepo != "" && normalizeRepoURL(primarySource.RepoURL) != normalizeRepoURL(prRepo) {
 		log.Debug().
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).
