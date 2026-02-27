@@ -61,7 +61,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
-	log.Info().Msgf("Converted ApplicationSets to Applications in %s", time.Since(startTime).Round(time.Second))
+	log.Debug().Msgf("Converted ApplicationSets to Applications in %s", time.Since(startTime).Round(time.Second))
 
 	return baseApps, targetApps, time.Since(startTime), nil
 }
@@ -182,8 +182,9 @@ type AppSetConversionResult struct {
 
 // appSetGenerateResult holds the output of a single ApplicationSet generation call.
 type appSetGenerateResult struct {
-	apps []ArgoResource // generated Applications from this ApplicationSet
-	err  error
+	index int            // original index in the onlyAppSets slice (for stable ordering)
+	apps  []ArgoResource // generated Applications from this ApplicationSet
+	err   error
 }
 
 // maxAppSetConcurrency is the maximum number of ApplicationSet generation
@@ -235,16 +236,16 @@ func convertAppSetsToApps(
 	results := make(chan appSetGenerateResult, len(onlyAppSets))
 	var wg sync.WaitGroup
 
-	for _, appSet := range onlyAppSets {
+	for i, appSet := range onlyAppSets {
 		wg.Add(1)
 		sem <- struct{}{} // acquire semaphore slot
-		go func(appSet ArgoResource) {
+		go func(i int, appSet ArgoResource) {
 			defer wg.Done()
 			defer func() { <-sem }() // release semaphore slot
 
 			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder)
-			results <- appSetGenerateResult{apps: apps, err: err}
-		}(appSet)
+			results <- appSetGenerateResult{index: i, apps: apps, err: err}
+		}(i, appSet)
 	}
 
 	// Close results channel once all goroutines finish.
@@ -253,18 +254,25 @@ func convertAppSetsToApps(
 		close(results)
 	}()
 
-	// --- collect results ----------------------------------------------------
+	// --- collect results (preserve original ordering) -------------------------
 
 	generatedApplicationsCount := 0
-	appsNew := make([]ArgoResource, 0, len(plainApps))
-	appsNew = append(appsNew, plainApps...)
+	// Collect results into an indexed slice so the final order matches
+	// the original onlyAppSets slice, regardless of goroutine scheduling.
+	orderedResults := make([][]ArgoResource, len(onlyAppSets))
 
 	for res := range results {
 		if res.err != nil {
 			return nil, res.err
 		}
 		generatedApplicationsCount += len(res.apps)
-		appsNew = append(appsNew, res.apps...)
+		orderedResults[res.index] = res.apps
+	}
+
+	appsNew := make([]ArgoResource, 0, len(plainApps)+generatedApplicationsCount)
+	appsNew = append(appsNew, plainApps...)
+	for _, apps := range orderedResults {
+		appsNew = append(appsNew, apps...)
 	}
 
 	return &AppSetConversionResult{
