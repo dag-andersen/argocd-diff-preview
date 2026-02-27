@@ -212,11 +212,11 @@ func RenderApplicationsFromBothBranches(
 // renderApp packages a single application's source directory and streams it to
 // the repo server, returning the post-processed manifests.
 //
-// Both single-source and multi-source apps go through the same packaging path:
-// the relevant source subdirectory (and any ref source files) are assembled
-// into a temporary directory which is then streamed to the repo server.
-// $ref/… value-file paths are rewritten to relative paths before the call,
-// following the same approach used by other tools that integrate with the repo server.
+// For multi-content-source applications the repo server is called once per
+// content source and the resulting manifests are merged before post-processing.
+// Ref-only sources (used for $ref value-file paths) are always forwarded to
+// every content-source call so that cross-source references keep working.
+//
 // ApplicationSet resources are handled by reading sources from
 // spec.template.spec rather than spec.
 func renderApp(
@@ -232,44 +232,58 @@ func renderApp(
 		return nil, fmt.Errorf("unknown branch type: %s", app.Branch)
 	}
 
-	request, streamDir, cleanup, err := buildManifestRequestWithPackaging(app, branchFolder, creds)
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build manifest request: %w", err)
-	}
-	if cleanup != nil {
-		defer cleanup()
+		return nil, fmt.Errorf("failed to split sources: %w", err)
 	}
 
-	// streamDir == "" signals that the primary source is a remote chart (e.g. an
-	// external Helm registry). In that case we use the regular (non-file-streaming)
-	// GenerateManifest RPC so that the repo server fetches the chart itself.
-	useRemote := streamDir == ""
+	var allManifestStrings []string
 
-	log.Debug().
-		Str("App", app.GetLongName()).
-		Str("streamDir", streamDir).
-		Bool("multiSource", request.HasMultipleSources).
-		Bool("remoteChart", useRemote).
-		Msg("Rendering application via repo server")
+	for i, contentSource := range contentSources {
+		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds)
+		if err != nil {
+			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
+		}
 
-	var manifestStrings []string
-	if useRemote {
-		manifestStrings, err = repoClient.GenerateManifestsRemote(ctx, request)
-	} else {
-		manifestStrings, err = repoClient.GenerateManifests(ctx, streamDir, request)
+		// streamDir == "" signals that the primary source is a remote chart (e.g. an
+		// external Helm registry). In that case we use the regular (non-file-streaming)
+		// GenerateManifest RPC so that the repo server fetches the chart itself.
+		useRemote := streamDir == ""
+
+		log.Debug().
+			Str("App", app.GetLongName()).
+			Int("sourceIndex", i).
+			Str("streamDir", streamDir).
+			Bool("multiSource", request.HasMultipleSources).
+			Bool("remoteChart", useRemote).
+			Msg("Rendering application source via repo server")
+
+		var manifestStrings []string
+		if useRemote {
+			manifestStrings, err = repoClient.GenerateManifestsRemote(ctx, request)
+		} else {
+			manifestStrings, err = repoClient.GenerateManifests(ctx, streamDir, request)
+		}
+		// Clean up the temp dir immediately after the RPC completes — don't defer
+		// inside a loop, which would keep all temp dirs alive until renderApp returns.
+		if cleanup != nil {
+			cleanup()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("repo server returned error for content source %d: %w", i, err)
+		}
+
+		allManifestStrings = append(allManifestStrings, manifestStrings...)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("repo server returned error: %w", err)
-	}
 
-	if len(manifestStrings) == 0 {
+	if len(allManifestStrings) == 0 {
 		log.Warn().Str("App", app.GetLongName()).Msg("⚠️ Repo server returned no manifests")
 		return []unstructured.Unstructured{}, nil
 	}
 
 	// Parse JSON manifest strings into unstructured objects.
-	manifests := make([]unstructured.Unstructured, 0, len(manifestStrings))
-	for i, raw := range manifestStrings {
+	manifests := make([]unstructured.Unstructured, 0, len(allManifestStrings))
+	for i, raw := range allManifestStrings {
 		var obj map[string]any
 		if err := json.Unmarshal([]byte(raw), &obj); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal manifest %d for %s: %w", i, app.GetLongName(), err)
@@ -321,77 +335,56 @@ func renderApp(
 	return filtered, nil
 }
 
-// buildManifestRequestWithPackaging constructs the ManifestRequest and the
-// directory to stream to the repo server.
+// splitSources parses the application's spec.sources / spec.source and splits
+// them into content sources (sources that produce manifests) and ref-only
+// sources (sources whose sole purpose is to provide files referenced by $ref/…
+// value-file paths in another source).
 //
-// Both single-source and multi-source apps are handled through a single unified
-// path: a temporary directory is always created and only the relevant source
-// subdirectory (plus any ref source files) is copied into it. This avoids
-// streaming the entire branch checkout and keeps the logic uniform.
-//
-// For multi-source apps with $ref value files the ref source directories are
-// placed under <tempDir>/.refs/<refName>/ and the corresponding $ref/… paths
-// in the ManifestRequest are rewritten to relative paths, following the same
-// approach used by other tools that integrate with the repo server.
-//
-// For ApplicationSet resources the sources live under spec.template.spec rather
-// than directly under spec; this function handles both layouts.
-//
-// cleanup must be called by the caller when the stream directory is no longer
-// needed.
-func buildManifestRequestWithPackaging(
-	app argoapplication.ArgoResource,
-	branchFolder string,
-	creds *RepoCreds,
-) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
+// The returned hasMultipleSources flag reflects whether the original
+// Application YAML used spec.sources (true) or spec.source (false), which is
+// forwarded verbatim in every ManifestRequest so the repo server knows the
+// application's topology.
+func splitSources(app argoapplication.ArgoResource) (
+	contentSources []v1alpha1.ApplicationSource,
+	refSources []v1alpha1.ApplicationSource,
+	hasMultipleSources bool,
+	err error,
+) {
 	obj := app.Yaml.Object
 
-	// ── Determine the YAML path prefix based on kind ─────────────────────────
-	// Application:    spec.{source,sources}  /  spec.destination.namespace
-	// ApplicationSet: spec.template.spec.{source,sources}  /  spec.template.spec.destination.namespace
 	var specPath []string
 	switch app.Kind {
 	case argoapplication.ApplicationSet:
 		specPath = []string{"spec", "template", "spec"}
-	default: // Application
+	default:
 		specPath = []string{"spec"}
 	}
 
-	namespace, _, _ := unstructured.NestedString(obj, append(specPath, "destination", "namespace")...)
-
-	// ── Collect sources into a unified slice ──────────────────────────────────
-	// Normalise both single-source (spec.source) and multi-source (spec.sources)
-	// into one []v1alpha1.ApplicationSource so the rest of the function is
-	// identical for both cases.
-	hasMultipleSources := false
 	var appSources v1alpha1.ApplicationSources
 
 	if sourcesRaw, found, _ := unstructured.NestedSlice(obj, append(specPath, "sources")...); found && len(sourcesRaw) > 0 {
 		hasMultipleSources = true
 		sourcesBytes, marshalErr := json.Marshal(sourcesRaw)
 		if marshalErr != nil {
-			return nil, "", nil, fmt.Errorf("failed to marshal spec.sources: %w", marshalErr)
+			return nil, nil, false, fmt.Errorf("failed to marshal spec.sources: %w", marshalErr)
 		}
 		if unmarshalErr := json.Unmarshal(sourcesBytes, &appSources); unmarshalErr != nil {
-			return nil, "", nil, fmt.Errorf("failed to unmarshal ApplicationSources: %w", unmarshalErr)
+			return nil, nil, false, fmt.Errorf("failed to unmarshal ApplicationSources: %w", unmarshalErr)
 		}
 	} else if sourceRaw, found, _ := unstructured.NestedMap(obj, append(specPath, "source")...); found {
 		sourceBytes, marshalErr := json.Marshal(sourceRaw)
 		if marshalErr != nil {
-			return nil, "", nil, fmt.Errorf("failed to marshal spec.source: %w", marshalErr)
+			return nil, nil, false, fmt.Errorf("failed to marshal spec.source: %w", marshalErr)
 		}
 		var singleSource v1alpha1.ApplicationSource
 		if unmarshalErr := json.Unmarshal(sourceBytes, &singleSource); unmarshalErr != nil {
-			return nil, "", nil, fmt.Errorf("failed to unmarshal ApplicationSource: %w", unmarshalErr)
+			return nil, nil, false, fmt.Errorf("failed to unmarshal ApplicationSource: %w", unmarshalErr)
 		}
 		appSources = v1alpha1.ApplicationSources{singleSource}
 	} else {
-		return nil, "", nil, fmt.Errorf("application %s has neither spec.source nor spec.sources", app.GetLongName())
+		return nil, nil, false, fmt.Errorf("application %s has neither spec.source nor spec.sources", app.GetLongName())
 	}
 
-	// ── Split into content sources and ref-only sources ───────────────────────
-	var contentSources []v1alpha1.ApplicationSource
-	var refSources []v1alpha1.ApplicationSource
 	for _, s := range appSources {
 		if s.Ref != "" && s.Path == "" {
 			refSources = append(refSources, s)
@@ -400,21 +393,46 @@ func buildManifestRequestWithPackaging(
 		}
 	}
 	if len(contentSources) == 0 {
-		return nil, "", nil, fmt.Errorf("application %s has no content source (all sources are ref-only)", app.GetLongName())
+		return nil, nil, false, fmt.Errorf("application %s has no content source (all sources are ref-only)", app.GetLongName())
 	}
 
-	// Only a single content source per render call is supported. If an application
-	// has multiple content sources (i.e. multiple sources that each produce
-	// manifests), the repo-server-api render mode cannot handle it. Ask the user
-	// to switch to a mode that supports full multi-source rendering (e.g. cli or
-	// server-api).
-	if len(contentSources) > 1 {
-		return nil, "", nil, fmt.Errorf(
-			"application %s has %d content sources, but the repo-server-api render mode only supports a single content source per application; switch to --render-method=cli or --render-method=server-api",
-			app.GetLongName(), len(contentSources),
-		)
+	return contentSources, refSources, hasMultipleSources, nil
+}
+
+// buildManifestRequestForSource constructs the ManifestRequest and the
+// directory to stream to the repo server for a single content source.
+//
+// refSources contains all ref-only sources from the same application; they are
+// forwarded so the repo server (or local path rewriting) can resolve $ref/…
+// value-file paths. hasMultipleSources reflects the original application's
+// spec topology and is forwarded verbatim in the request.
+//
+// For multi-source apps with $ref value files the ref source directories are
+// placed under <tempDir>/.refs/<refName>/ and the corresponding $ref/… paths
+// in the ManifestRequest are rewritten to relative paths, following the same
+// approach used by other tools that integrate with the repo server.
+//
+// cleanup must be called by the caller when the stream directory is no longer
+// needed.
+func buildManifestRequestForSource(
+	app argoapplication.ArgoResource,
+	primarySource v1alpha1.ApplicationSource,
+	refSources []v1alpha1.ApplicationSource,
+	hasMultipleSources bool,
+	branchFolder string,
+	creds *RepoCreds,
+) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
+	obj := app.Yaml.Object
+
+	var specPath []string
+	switch app.Kind {
+	case argoapplication.ApplicationSet:
+		specPath = []string{"spec", "template", "spec"}
+	default:
+		specPath = []string{"spec"}
 	}
-	primarySource := contentSources[0]
+
+	namespace, _, _ := unstructured.NestedString(obj, append(specPath, "destination", "namespace")...)
 
 	// ── Fast path: no ref sources → stream the whole branch folder ────────────
 	// The repo server resolves ApplicationSource.Path relative to the stream
