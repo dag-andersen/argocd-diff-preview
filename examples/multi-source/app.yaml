@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: multi-source-app
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  sources:
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      path: examples/multi-source/services/frontend
+    - repoURL: https://github.com/dag-andersen/argocd-diff-preview
+      path: examples/multi-source/services/backend
