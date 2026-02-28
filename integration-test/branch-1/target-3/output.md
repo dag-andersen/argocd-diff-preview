@@ -22,6 +22,45 @@ _Diff hidden because `--hide-deleted-app-diff` is enabled_
 <summary>multi-source-app [<a href="https://argocd.example.com/applications/multi-source-app">link</a>] (examples/multi-source/app.yaml)</summary>
 <br>
 
+#### Deployment: backend (default)
+```diff
+       app: backend
+   template:
+     metadata:
+       labels:
+         app: backend
+     spec:
+       containers:
+       - image: my-org/backend:1.0.0
+         name: backend
+         ports:
+-        - containerPort: 8080
++        - containerPort: 80
+```
+#### Deployment: frontend (default)
+```diff
+   replicas: 2
+   selector:
+     matchLabels:
+       app: frontend
+   template:
+     metadata:
+       labels:
+         app: frontend
+     spec:
+       containers:
+-      - image: nginx:1.25
++      - image: nginx:1.26
+         name: frontend
+         ports:
+         - containerPort: 80
+```
+</details>
+
+<details>
+<summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/external-chart/nginx.yaml)</summary>
+<br>
+
 #### Deployment: nginx-ingress-ingress-nginx-controller (default)
 ```diff
          - name: POD_NAME

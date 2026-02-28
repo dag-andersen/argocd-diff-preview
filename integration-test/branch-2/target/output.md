@@ -12,7 +12,6 @@ Modified (1):
 
 #### Deployment: super-app-name → new-app-name (default)
 ```diff
-@@ Application modified: internal-chart-example (examples/internal-chart/app.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
