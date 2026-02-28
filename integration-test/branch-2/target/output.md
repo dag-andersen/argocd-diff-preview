@@ -3,20 +3,21 @@
 Summary:
 ```yaml
 Modified (1):
-± my-app (+5|-5)
+± internal-chart-example (+5|-5)
 ```
 
 <details>
-<summary>my-app (examples/helm/applications/my-app.yaml)</summary>
+<summary>internal-chart-example (examples/internal-chart/app.yaml)</summary>
 <br>
 
 #### Deployment: super-app-name → new-app-name (default)
 ```diff
+@@ Application modified: internal-chart-example (examples/internal-chart/app.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
    labels:
-     app.kubernetes.io/instance: my-app
+     app.kubernetes.io/instance: internal-chart-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
@@ -29,12 +30,12 @@ Modified (1):
 +  replicas: 5
    selector:
      matchLabels:
-       app.kubernetes.io/instance: my-app
+       app.kubernetes.io/instance: internal-chart-example
        app.kubernetes.io/name: myApp
    template:
      metadata:
        labels:
-         app.kubernetes.io/instance: my-app
+         app.kubernetes.io/instance: internal-chart-example
          app.kubernetes.io/managed-by: Helm
          app.kubernetes.io/name: myApp
 @@ skipped 12 lines (25 -> 36) @@
@@ -57,7 +58,7 @@ Modified (1):
  kind: Service
  metadata:
    labels:
-     app.kubernetes.io/instance: my-app
+     app.kubernetes.io/instance: internal-chart-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
@@ -72,7 +73,7 @@ Modified (1):
      protocol: TCP
      targetPort: http
    selector:
-     app.kubernetes.io/instance: my-app
+     app.kubernetes.io/instance: internal-chart-example
      app.kubernetes.io/name: myApp
 ```
 #### ServiceAccount: super-app-name → new-app-name (default)
@@ -82,7 +83,7 @@ Modified (1):
  kind: ServiceAccount
  metadata:
    labels:
-     app.kubernetes.io/instance: my-app
+     app.kubernetes.io/instance: internal-chart-example
      app.kubernetes.io/managed-by: Helm
      app.kubernetes.io/name: myApp
      app.kubernetes.io/version: 1.16.0
@@ -94,4 +95,4 @@ Modified (1):
 </details>
 
 _Stats_:
-[Applications: 24], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 46], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

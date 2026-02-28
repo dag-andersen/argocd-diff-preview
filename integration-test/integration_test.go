@@ -284,7 +284,7 @@ var testCases = []TestCase{
 		BaseBranch:      "integration-test/branch-1/base",
 		Suffix:          "-invalid-token",
 		ArgocdAuthToken: "abc",
-		FilesChanged:    "examples/helm/applications/nginx.yaml",
+		FilesChanged:    "examples/external-chart/nginx.yaml",
 		ExpectFailure:   true,
 	},
 }

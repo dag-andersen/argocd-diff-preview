@@ -2,6 +2,7 @@ package argoapplication
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -60,7 +61,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
-	log.Debug().Msgf("🤖 Converted ApplicationSets to Applications in %s", time.Since(startTime).Round(time.Second))
+	log.Debug().Msgf("Converted ApplicationSets to Applications in %s", time.Since(startTime).Round(time.Second))
 
 	return baseApps, targetApps, time.Since(startTime), nil
 }
@@ -179,6 +180,18 @@ type AppSetConversionResult struct {
 	argoResource               []ArgoResource
 }
 
+// appSetGenerateResult holds the output of a single ApplicationSet generation call.
+type appSetGenerateResult struct {
+	index int            // original index in the onlyAppSets slice (for stable ordering)
+	apps  []ArgoResource // generated Applications from this ApplicationSet
+	err   error
+}
+
+// maxAppSetConcurrency is the maximum number of ApplicationSet generation
+// calls that run in parallel. Each call hits the ArgoCD API/CLI, so we
+// cap concurrency to avoid overwhelming the server.
+const maxAppSetConcurrency = 5
+
 func convertAppSetsToApps(
 	argocd *argocd.ArgoCDInstallation,
 	appSets []ArgoResource,
@@ -186,10 +199,6 @@ func convertAppSetsToApps(
 	tempFolder string,
 	debug bool,
 ) (*AppSetConversionResult, error) {
-	var appsNew []ArgoResource
-	appSetsProcessedCount := 0
-	generatedApplicationsCounter := 0
-	originalApplicationsCounter := 0
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
 
@@ -199,83 +208,132 @@ func convertAppSetsToApps(
 		}
 	}
 
-	isFirstAppSet := true
-
-	for _, appSet := range appSets {
-		// Skip non-ApplicationSets
-		if appSet.Kind != ApplicationSet {
-			appsNew = append(appsNew, appSet)
-			originalApplicationsCounter++
-			continue
+	// Separate plain Applications from ApplicationSets so we only
+	// parallelise the expensive generation calls.
+	var plainApps []ArgoResource
+	var onlyAppSets []ArgoResource
+	for _, res := range appSets {
+		if res.Kind != ApplicationSet {
+			plainApps = append(plainApps, res)
+		} else {
+			onlyAppSets = append(onlyAppSets, res)
 		}
+	}
 
-		appSetsProcessedCount++
+	// Nothing to generate – return early.
+	if len(onlyAppSets) == 0 {
+		return &AppSetConversionResult{
+			appSetsProcessedCount:      0,
+			originalApplicationsCount:  len(plainApps),
+			generatedApplicationsCount: 0,
+			argoResource:               plainApps,
+		}, nil
+	}
 
-		// Set the refresh annotation only on the first ApplicationSet to trigger
-		// ArgoCD to pull from git. Subsequent ApplicationSets will use the cached data.
-		if isFirstAppSet {
-			appSet.SetApplicationSetRefreshAnnotation()
-			isFirstAppSet = false
+	// --- parallel generation ------------------------------------------------
+
+	sem := make(chan struct{}, maxAppSetConcurrency)
+	results := make(chan appSetGenerateResult, len(onlyAppSets))
+	var wg sync.WaitGroup
+
+	for i, appSet := range onlyAppSets {
+		wg.Add(1)
+		sem <- struct{}{} // acquire semaphore slot
+		go func(i int, appSet ArgoResource) {
+			defer wg.Done()
+			defer func() { <-sem }() // release semaphore slot
+
+			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder)
+			results <- appSetGenerateResult{index: i, apps: apps, err: err}
+		}(i, appSet)
+	}
+
+	// Close results channel once all goroutines finish.
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// --- collect results (preserve original ordering) -------------------------
+
+	generatedApplicationsCount := 0
+	// Collect results into an indexed slice so the final order matches
+	// the original onlyAppSets slice, regardless of goroutine scheduling.
+	orderedResults := make([][]ArgoResource, len(onlyAppSets))
+
+	for res := range results {
+		if res.err != nil {
+			return nil, res.err
 		}
+		generatedApplicationsCount += len(res.apps)
+		orderedResults[res.index] = res.apps
+	}
 
-		// Generate applications using argocd appset generate
-		retryCount := 5
-		generatedApps, err := argocd.AppsetGenerateWithRetry(appSet.Yaml, tempFolder, retryCount)
-		if err != nil {
-			log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
-			return nil, err
-		}
-
-		// check if output is empty
-		if len(generatedApps) == 0 {
-			log.Warn().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("⚠️ ApplicationSet generated empty output")
-			continue
-		}
-
-		localGeneratedAppsCounter := 0
-
-		// Convert each document to ArgoResource
-		for _, doc := range generatedApps {
-			kind := doc.GetKind()
-			if kind == "" {
-				log.Error().
-					Str(appSet.Kind.ShortName(), appSet.GetLongName()).
-					Msg("❌ Output from ApplicationSet contains no kind")
-				continue
-			}
-			if kind != "Application" {
-				log.Error().
-					Str(appSet.Kind.ShortName(), appSet.GetLongName()).
-					Msg("❌ Output from ApplicationSet contains non-Application resources")
-				continue
-			}
-
-			name := doc.GetName()
-			if name == "" {
-				log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Generated Application missing name")
-				continue
-			}
-
-			// Create a deep copy of the YAML node to avoid reference issues
-			docCopy := doc.DeepCopy()
-
-			app := NewArgoResource(docCopy, Application, name, name, appSet.FileName, branch.Type())
-
-			localGeneratedAppsCounter++
-			generatedApplicationsCounter++
-			appsNew = append(appsNew, *app)
-		}
-
-		log.Debug().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf(
-			"Generated %d Applications from ApplicationSet",
-			localGeneratedAppsCounter,
-		)
+	appsNew := make([]ArgoResource, 0, len(plainApps)+generatedApplicationsCount)
+	appsNew = append(appsNew, plainApps...)
+	for _, apps := range orderedResults {
+		appsNew = append(appsNew, apps...)
 	}
 
 	return &AppSetConversionResult{
-		appSetsProcessedCount:      appSetsProcessedCount,
-		originalApplicationsCount:  originalApplicationsCounter,
-		generatedApplicationsCount: generatedApplicationsCounter,
+		appSetsProcessedCount:      len(onlyAppSets),
+		originalApplicationsCount:  len(plainApps),
+		generatedApplicationsCount: generatedApplicationsCount,
 		argoResource:               appsNew,
 	}, nil
+}
+
+// generateAppsFromAppSet runs a single ApplicationSet through argocd appset
+// generate (with retries) and converts the output into ArgoResource values.
+func generateAppsFromAppSet(
+	argocd *argocd.ArgoCDInstallation,
+	appSet ArgoResource,
+	branch *git.Branch,
+	tempFolder string,
+) ([]ArgoResource, error) {
+	retryCount := 5
+	generatedApps, err := argocd.AppsetGenerateWithRetry(appSet.Yaml, tempFolder, retryCount)
+	if err != nil {
+		log.Error().Err(err).Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Failed to generate applications from ApplicationSet")
+		return nil, err
+	}
+
+	if len(generatedApps) == 0 {
+		log.Warn().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf("⚠️ ApplicationSet generated empty output")
+		return nil, nil
+	}
+
+	var apps []ArgoResource
+	for _, doc := range generatedApps {
+		kind := doc.GetKind()
+		if kind == "" {
+			log.Error().
+				Str(appSet.Kind.ShortName(), appSet.GetLongName()).
+				Msg("❌ Output from ApplicationSet contains no kind")
+			continue
+		}
+		if kind != "Application" {
+			log.Error().
+				Str(appSet.Kind.ShortName(), appSet.GetLongName()).
+				Msg("❌ Output from ApplicationSet contains non-Application resources")
+			continue
+		}
+
+		name := doc.GetName()
+		if name == "" {
+			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Generated Application missing name")
+			continue
+		}
+
+		docCopy := doc.DeepCopy()
+		app := NewArgoResource(docCopy, Application, name, name, appSet.FileName, branch.Type())
+		apps = append(apps, *app)
+	}
+
+	log.Debug().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf(
+		"Generated %d Applications from ApplicationSet",
+		len(apps),
+	)
+
+	return apps, nil
 }

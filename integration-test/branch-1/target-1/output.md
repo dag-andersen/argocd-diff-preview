@@ -5,7 +5,8 @@ Summary:
 Deleted (1):
 - folder2 (-19)
 
-Modified (1):
+Modified (2):
+± multi-source-app (+2|-2)
 ± nginx-ingress (+1|-1)
 ```
 
@@ -38,7 +39,7 @@ Modified (1):
 </details>
 
 <details>
-<summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
+<summary>multi-source-app (examples/multi-source/app.yaml)</summary>
 <br>
 
 #### Deployment: nginx-ingress-ingress-nginx-controller (default)
@@ -55,4 +56,4 @@ Modified (1):
 </details>
 
 _Stats_:
-[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

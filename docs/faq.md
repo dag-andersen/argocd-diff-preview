@@ -12,7 +12,7 @@
   Yes, no issues reported
 
 - **Cluster generator**:
-  Yes, but you have to add the ClusterSecrets to the `secrets` folder. Similar to how the secrets are provided [here](./getting-started/github-actions-workflow.md#private-repositories-and-helm-charts)
+  Yes, but you have to add the ClusterSecrets to the `secrets` folder. Read more [here](./cluster-generator.md)
 
 - **Git generator**:
   Yes, no issues reported

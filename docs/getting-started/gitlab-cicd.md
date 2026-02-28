@@ -34,7 +34,7 @@ diff:
         -v $(pwd)/target-branch:/target-branch \
         -e TARGET_BRANCH=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME} \
         -e REPO=${CI_MERGE_REQUEST_PROJECT_PATH} \
-        dagandersen/argocd-diff-preview:v0.1.25
+        dagandersen/argocd-diff-preview:v0.1.26
     - |
       jq --null-input --rawfile msg $(pwd)/output/diff.md '{body: $msg}' > pr_comment.json
       NOTE_ID=$(curl --silent --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
@@ -97,8 +97,18 @@ In the simple code example above, we do not provide the cluster with any credent
         -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
         -e TARGET_BRANCH=${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME} \
         -e REPO=${CI_MERGE_REQUEST_PROJECT_PATH} \
-        dagandersen/argocd-diff-preview:v0.1.25
+        dagandersen/argocd-diff-preview:v0.1.26
 
 ```
 
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
+
+!!! tip "Extracting secrets from an existing Argo CD installation"
+    If you already have repository secrets in an existing Argo CD installation, you can extract them directly instead of writing them by hand:
+
+    ```bash
+    kubectl get secrets -n argocd --context <your-context> \
+      -l 'argocd.argoproj.io/secret-type in (repository,repo-creds)' -o json \
+      | jq -r '.items[] | del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.annotations, .metadata.ownerReferences) | "---", (. | @json)' \
+      | yq -P > secrets/repo-secrets.yaml
+    ```

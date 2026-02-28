@@ -5,7 +5,8 @@ Summary:
 Deleted (1):
 - folder2
 
-Modified (1):
+Modified (2):
+± multi-source-app (+2|-2)
 ± nginx-ingress (+1|-1)
 ```
 
@@ -18,7 +19,7 @@ _Diff hidden because `--hide-deleted-app-diff` is enabled_
 </details>
 
 <details>
-<summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
+<summary>multi-source-app [<a href="https://argocd.example.com/applications/multi-source-app">link</a>] (examples/multi-source/app.yaml)</summary>
 <br>
 
 #### Deployment: nginx-ingress-ingress-nginx-controller (default)
@@ -49,4 +50,4 @@ _Diff hidden because `--hide-deleted-app-diff` is enabled_
 </details>
 
 _Stats_:
-[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

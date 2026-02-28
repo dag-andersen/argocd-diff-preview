@@ -58,24 +58,27 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Modified (1):
-± my-app (+5|-5)</pre>
+<pre>Total: 1 files changed
+
+Modified (1):
+± internal-chart-example (+5|-5)</pre>
 
 <div class="diffs">
 <details>
 <summary>
-my-app (examples/helm/applications/my-app.yaml)
+internal-chart-example (examples/internal-chart/app.yaml)
 </summary>
 
 <h4 class="resource_header">Deployment: super-app-name → new-app-name (default)</h4>
 <div class="diff_container">
 <table>
-
+	
+	<tr class="comment_line"><td><pre>@@ Application modified: internal-chart-example (examples/internal-chart/app.yaml) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>   labels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: my-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/version: 1.16.0</pre></td></tr>
@@ -88,12 +91,12 @@ my-app (examples/helm/applications/my-app.yaml)
 	<tr class="added_line"><td><pre>+  replicas: 5</pre></td></tr>
 	<tr class="normal_line"><td><pre>   selector:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     matchLabels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>       app.kubernetes.io/instance: my-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>       app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
 	<tr class="normal_line"><td><pre>       app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       labels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>         app.kubernetes.io/instance: my-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>         app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
 	<tr class="normal_line"><td><pre>         app.kubernetes.io/managed-by: Helm</pre></td></tr>
 	<tr class="normal_line"><td><pre>         app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="comment_line"><td><pre>@@ skipped 12 lines (25 -&gt; 36) @@</pre></td></tr>
@@ -120,7 +123,7 @@ my-app (examples/helm/applications/my-app.yaml)
 	<tr class="normal_line"><td><pre> kind: Service</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>   labels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: my-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/version: 1.16.0</pre></td></tr>
@@ -135,7 +138,7 @@ my-app (examples/helm/applications/my-app.yaml)
 	<tr class="normal_line"><td><pre>     protocol: TCP</pre></td></tr>
 	<tr class="normal_line"><td><pre>     targetPort: http</pre></td></tr>
 	<tr class="normal_line"><td><pre>   selector:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: my-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 </table>
 </div>
@@ -149,7 +152,7 @@ my-app (examples/helm/applications/my-app.yaml)
 	<tr class="normal_line"><td><pre> kind: ServiceAccount</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>   labels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: my-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/version: 1.16.0</pre></td></tr>
@@ -164,7 +167,7 @@ my-app (examples/helm/applications/my-app.yaml)
 </div>
 
 <pre>_Stats_:
-[Applications: 24], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 46], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>
