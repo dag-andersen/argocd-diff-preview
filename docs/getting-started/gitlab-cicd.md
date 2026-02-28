@@ -102,3 +102,13 @@ In the simple code example above, we do not provide the cluster with any credent
 ```
 
 For more info, see the [Argo CD docs](https://argo-cd.readthedocs.io/en/stable/operator-manual/argocd-repo-creds-yaml/)
+
+!!! tip "Extracting secrets from an existing Argo CD installation"
+    If you already have repository secrets in an existing Argo CD installation, you can extract them directly instead of writing them by hand:
+
+    ```bash
+    kubectl get secrets -n argocd --context <your-context> \
+      -l 'argocd.argoproj.io/secret-type in (repository,repo-creds)' -o json \
+      | jq -r '.items[] | del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.annotations, .metadata.ownerReferences) | "---", (. | @json)' \
+      | yq -P > secrets/repo-secrets.yaml
+    ```

@@ -8,7 +8,7 @@ The tool will apply these secrets to the local cluster before the rendering proc
 
 You do **not** need to provide valid connection credentials (like bearer tokens or TLS certs) for the tool to work, because `argocd-diff-preview` only *renders* the manifests locally; it never actually connects to the target clusters to deploy anything. Dummy server URLs and names are sufficient.
 
-```yaml title="secrets/my-clusters.yaml" hl_lines="7 21"
+```yaml title="secrets/my-clusters.yaml" hl_lines="7 20"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -21,7 +21,6 @@ type: Opaque
 stringData:
   name: staging-cluster
   server: https://10.0.0.1
-  config: dummy-string
 ---
 apiVersion: v1
 kind: Secret
@@ -35,7 +34,6 @@ type: Opaque
 stringData:
   name: production-cluster
   server: https://10.0.0.2
-  config: dummy-string
 ```
 
 This means that if we have an `ApplicationSet` that uses the Cluster Generator, Argo CD will correctly generate the Applications based on the dummy secrets:
@@ -64,6 +62,19 @@ spec:
         namespace: guestbook
 ```
 
+!!! note "The `in-cluster` cluster"
+    Argo CD always registers the local cluster as `in-cluster` (`https://kubernetes.default.svc`). When using `clusters: {}` (target all clusters), the ApplicationSet controller will also generate an Application for `in-cluster` in addition to the clusters defined in your secrets. This is expected behaviour.
+
+!!! tip "Extracting secrets from an existing Argo CD installation"
+    If you already have clusters registered in Argo CD, you can extract the secrets directly instead of writing them by hand. `.data.config` is stripped since it contains real credentials (tokens, TLS certs) that are not needed by `argocd-diff-preview`:
+
+    ```bash
+    kubectl get secrets -n argocd --context <your-context> \
+      -l argocd.argoproj.io/secret-type=cluster -o json \
+      | jq -r '.items[] | del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.annotations, .metadata.ownerReferences, .data.config) | "---", (. | @json)' \
+      | yq -P > secrets/cluster-secrets.yaml
+    ```
+
 ---
 
 ## Mounting the Secrets in GitHub Actions
@@ -72,12 +83,14 @@ You need to mount the folder containing these secrets into the Docker container,
 
 When the tool starts, it will run `kubectl apply -f /secrets` to apply the cluster secrets to the `argocd` namespace. The `ApplicationSet` controller will then discover them and successfully generate the applications.
 
-```yaml title=".github/workflows/generate-diff.yml" hl_lines="32"
+```yaml title=".github/workflows/generate-diff.yml" hl_lines="36"
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate Diff
+      ...
+
+      - name: Prepare secrets
         run: |
           # 1. Create the secrets directory
           mkdir -p secrets
@@ -95,9 +108,10 @@ jobs:
           stringData:
             name: staging-cluster
             server: https://10.0.0.1
-            config: dummy-string
           EOF
-          
+
+      - name: Generate Diff
+        run: |
           # 3. Mount the secrets directory when running the tool
           docker run \
             --network=host \

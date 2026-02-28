@@ -95,6 +95,16 @@ In the simple code examples above, we do not provide the cluster with any creden
           dagandersen/argocd-diff-preview:v0.1.25
 ```
 
+!!! tip "Extracting secrets from an existing Argo CD installation"
+    If you already have repository secrets in an existing Argo CD installation, you can extract them directly instead of writing them by hand:
+
+    ```bash
+    kubectl get secrets -n argocd --context <your-context> \
+      -l 'argocd.argoproj.io/secret-type in (repository,repo-creds)' -o json \
+      | jq -r '.items[] | del(.metadata.creationTimestamp, .metadata.uid, .metadata.resourceVersion, .metadata.annotations, .metadata.ownerReferences) | "---", (. | @json)' \
+      | yq -P > secrets/repo-secrets.yaml
+    ```
+
 If your ArgoCD Applications use SSH to access the private repositories, then you need to configure the secret above using SSH as well.
 
 ```yaml title=".github/workflows/generate-diff.yml" linenums="24"
