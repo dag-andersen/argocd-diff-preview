@@ -17,4 +17,4 @@ spec:
         - name: backend
           image: my-org/backend:1.0.0
           ports:
-            - containerPort: 8080
+            - containerPort: 80
