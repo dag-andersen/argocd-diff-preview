@@ -95,6 +95,7 @@ jobs:
           stringData:
             name: staging-cluster
             server: https://10.0.0.1
+            config: dummy-string
           EOF
           
           # 3. Mount the secrets directory when running the tool
