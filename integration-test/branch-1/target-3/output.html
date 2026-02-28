@@ -48,12 +48,13 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Total: 2 files changed
+<pre>Total: 3 files changed
 
 Deleted (1):
 - folder2
 
-Modified (1):
+Modified (2):
+± multi-source-app (+2|-2)
 ± nginx-ingress (+1|-1)</pre>
 
 <div class="diffs">
@@ -72,12 +73,58 @@ folder2 [<a href="https://argocd.example.com/applications/folder2">link</a>] (ex
 
 <details>
 <summary>
-nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)
+multi-source-app [<a href="https://argocd.example.com/applications/multi-source-app">link</a>] (examples/multi-source/app.yaml)
 </summary>
 <div class="diff_container">
 <table>
 	
-	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@</pre></td></tr>
+	<tr class="comment_line"><td><pre>@@ Application modified: multi-source-app (examples/multi-source/app.yaml) @@</pre></td></tr>
+	<tr class="normal_line"><td><pre>       app: backend</pre></td></tr>
+	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       labels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         app: backend</pre></td></tr>
+	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       containers:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       - image: my-org/backend:1.0.0</pre></td></tr>
+	<tr class="normal_line"><td><pre>         name: backend</pre></td></tr>
+	<tr class="normal_line"><td><pre>         ports:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - containerPort: 8080</pre></td></tr>
+	<tr class="added_line"><td><pre>+        - containerPort: 80</pre></td></tr>
+	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: frontend</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+	<tr class="normal_line"><td><pre> spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   replicas: 2</pre></td></tr>
+	<tr class="normal_line"><td><pre>   selector:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     matchLabels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       app: frontend</pre></td></tr>
+	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       labels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         app: frontend</pre></td></tr>
+	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       containers:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      - image: nginx:1.25</pre></td></tr>
+	<tr class="added_line"><td><pre>+      - image: nginx:1.26</pre></td></tr>
+	<tr class="normal_line"><td><pre>         name: frontend</pre></td></tr>
+	<tr class="normal_line"><td><pre>         ports:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - containerPort: 80</pre></td></tr>
+</table>
+</div>
+</details>
+
+<details>
+<summary>
+nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/external-chart/nginx.yaml)
+</summary>
+<div class="diff_container">
+<table>
+	
+	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/external-chart/nginx.yaml) @@</pre></td></tr>
 	<tr class="normal_line"><td><pre>         - name: POD_NAME</pre></td></tr>
 	<tr class="normal_line"><td><pre>           valueFrom:</pre></td></tr>
 	<tr class="normal_line"><td><pre>             fieldRef:</pre></td></tr>
@@ -106,7 +153,7 @@ nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">l
 </div>
 
 <pre>_Stats_:
-[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>

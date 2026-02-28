@@ -2,12 +2,13 @@
 
 Summary:
 ```yaml
-Total: 2 files changed
+Total: 3 files changed
 
 Deleted (1):
 - folder2
 
-Modified (1):
+Modified (2):
+± multi-source-app (+2|-2)
 ± nginx-ingress (+1|-1)
 ```
 
@@ -23,11 +24,55 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
 </details>
 
 <details>
-<summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/helm/applications/nginx.yaml)</summary>
+<summary>multi-source-app [<a href="https://argocd.example.com/applications/multi-source-app">link</a>] (examples/multi-source/app.yaml)</summary>
 <br>
 
 ```diff
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+@@ Application modified: multi-source-app (examples/multi-source/app.yaml) @@
+       app: backend
+   template:
+     metadata:
+       labels:
+         app: backend
+     spec:
+       containers:
+       - image: my-org/backend:1.0.0
+         name: backend
+         ports:
+-        - containerPort: 8080
++        - containerPort: 80
+ ---
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: frontend
+   namespace: default
+ spec:
+   replicas: 2
+   selector:
+     matchLabels:
+       app: frontend
+   template:
+     metadata:
+       labels:
+         app: frontend
+     spec:
+       containers:
+-      - image: nginx:1.25
++      - image: nginx:1.26
+         name: frontend
+         ports:
+         - containerPort: 80
+```
+
+</details>
+
+<details>
+<summary>nginx-ingress [<a href="https://argocd.example.com/applications/nginx-ingress">link</a>] (examples/external-chart/nginx.yaml)</summary>
+<br>
+
+```diff
+@@ Application modified: nginx-ingress (examples/external-chart/nginx.yaml) @@
          - name: POD_NAME
            valueFrom:
              fieldRef:
@@ -55,4 +100,4 @@ Diff content omitted because '--hide-deleted-app-diff' is enabled.
 </details>
 
 _Stats_:
-[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

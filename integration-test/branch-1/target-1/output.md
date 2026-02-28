@@ -2,12 +2,13 @@
 
 Summary:
 ```yaml
-Total: 2 files changed
+Total: 3 files changed
 
 Deleted (1):
 - folder2 (-19)
 
-Modified (1):
+Modified (2):
+± multi-source-app (+2|-2)
 ± nginx-ingress (+1|-1)
 ```
 
@@ -41,11 +42,38 @@ Modified (1):
 </details>
 
 <details>
-<summary>nginx-ingress (examples/helm/applications/nginx.yaml)</summary>
+<summary>multi-source-app (examples/multi-source/app.yaml)</summary>
 <br>
 
 ```diff
-@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml) @@
+@@ Application modified: multi-source-app (examples/multi-source/app.yaml) @@
+       - image: my-org/backend:1.0.0
+         name: backend
+         ports:
+-        - containerPort: 8080
++        - containerPort: 80
+ ---
+ apiVersion: apps/v1
+ kind: Deployment
+@@ skipped 11 lines (24 -> 34) @@
+         app: frontend
+     spec:
+       containers:
+-      - image: nginx:1.25
++      - image: nginx:1.26
+         name: frontend
+         ports:
+         - containerPort: 80
+```
+
+</details>
+
+<details>
+<summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
+<br>
+
+```diff
+@@ Application modified: nginx-ingress (examples/external-chart/nginx.yaml) @@
                fieldPath: metadata.namespace
          - name: LD_PRELOAD
            value: /usr/local/lib/libmimalloc.so
@@ -59,4 +87,4 @@ Modified (1):
 </details>
 
 _Stats_:
-[Applications: 25], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
