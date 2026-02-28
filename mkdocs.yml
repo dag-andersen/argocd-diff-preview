@@ -35,6 +35,7 @@ nav:
   - Lockdown Mode: reusing-clusters/lockdown-mode.md
   - Openshift: reusing-clusters/openshift.md
 - generated-applications.md
+- Cluster Generator: cluster-generator.md
 - Multi-repo: multi-repo.md
 - application-selection.md
 - Rendering Methods: rendering-methods.md
