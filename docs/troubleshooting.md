@@ -14,3 +14,6 @@ argocd-diff-preview --disable-client-throttling ...
 
 This can improve performance when the cluster's APF configuration allows higher request rates than the client-side defaults.
 
+## Applications being empty
+
+If you are experiencing issues with Argo CD applications being marked as empty, try running the tool with `--render-method=server-api` to see if that resolves the issue. Otherwise please open an issue with details about your cluster setup and any error/warning messages you are seeing.
