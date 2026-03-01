@@ -8,8 +8,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// addApplicationPrefix prefixes the application name with the branch name and a unique ID
-func addApplicationPrefix(a *argoapplication.ArgoResource, prefix string) error {
+// updateYamlName prefixes the application name with the branch name and a unique ID
+// The ID may also contain a -1, -2 suffix. This will also be added to the k8s yaml name.
+func updateYamlName(a *argoapplication.ArgoResource, prefix string) error {
 	if a.Branch == "" {
 		log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ Can't prefix application name with prefix because branch is empty")
 		return nil

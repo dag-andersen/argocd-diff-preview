@@ -44,10 +44,7 @@ func UniqueIds(apps []ArgoResource, branch *git.Branch) []ArgoResource {
 				// Create a copy of the app
 				newApp := app
 				newApp.Id = newId
-
-				// Update the name in the YAML
-				newApp.Yaml.SetName(newId)
-				log.Debug().Str("branch", branch.Name).Str(newApp.Kind.ShortName(), newApp.GetLongName()).Msgf("Updated name in yaml to: %s", newId)
+				log.Debug().Str("branch", branch.Name).Str(newApp.Kind.ShortName(), newApp.GetLongName()).Msgf("Updated Application ID to: %s", newId)
 
 				newApps = append(newApps, newApp)
 			}

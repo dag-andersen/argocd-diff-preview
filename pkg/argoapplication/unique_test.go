@@ -98,10 +98,6 @@ func TestUniqueNames(t *testing.T) {
 			// Check each app
 			for i := range got {
 				assert.Equal(t, tt.want[i].Id, got[i].Id, "App %d: Expected name %s, got %s", i, tt.want[i].Id, got[i].Id)
-
-				// Check YAML name matches
-				gotName := got[i].Yaml.GetName()
-				assert.Equal(t, got[i].Id, gotName, "App %d: YAML name %s doesn't match struct name %s", i, gotName, got[i].Id)
 			}
 
 			// Check uniqueness
