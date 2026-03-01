@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± my-app (+1|-1)
 ```
@@ -12,8 +10,8 @@ Modified (1):
 <summary>my-app (examples/helm-kustomize-postrender/application.yaml)</summary>
 <br>
 
+#### Deployment: my-app (default)
 ```diff
-@@ Application modified: my-app (examples/helm-kustomize-postrender/application.yaml) @@
    template:
      metadata:
        labels:
@@ -27,7 +25,6 @@ Modified (1):
 -        - containerPort: 80
 +        - containerPort: 8080
 ```
-
 </details>
 
 _Stats_:
