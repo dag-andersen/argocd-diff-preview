@@ -61,6 +61,7 @@ type TestCase struct {
 	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
 	RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global flag
 	DisableClusterRoles        string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
+	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
@@ -257,6 +258,15 @@ var testCases = []TestCase{
 		Name:         "branch-15/target",
 		TargetBranch: "integration-test/branch-15/target",
 		BaseBranch:   "integration-test/branch-15/base",
+	},
+	{
+		Name:                   "branch-16/target",
+		TargetBranch:           "integration-test/branch-16/target",
+		BaseBranch:             "integration-test/branch-16/base",
+		AutoDetectFilesChanged: "true",
+		RenderMethod:           "repo-server-api",
+		ArgocdConfigDir:        "plugin-test",
+		CreateCluster:          "true",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
@@ -772,9 +782,12 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		"-v", fmt.Sprintf("%s/kind-config:/kind-config", repoRoot),
 	}
 
-	// When using API mode or DisableClusterRoles is set, mount only the values.yaml file
+	// When using a custom ArgoCD config directory, mount the entire directory.
+	// Otherwise, when using API mode or DisableClusterRoles is set, mount only the values.yaml file
 	// (which sets createClusterRoles: false) into the default argocd-config path in the container.
-	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
+	if tc.ArgocdConfigDir != "" {
+		args = append(args, "-v", fmt.Sprintf("%s/integration-test/%s:/argocd-config", repoRoot, tc.ArgocdConfigDir))
+	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
 		args = append(args, "-v", fmt.Sprintf("%s/integration-test/no-cluster-roles/values.yaml:/argocd-config/values.yaml", repoRoot))
 	}
 
@@ -941,8 +954,11 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),
 	// pass --argocd-config-dir pointing at the no-cluster-roles directory (createClusterRoles: false).
+	// If ArgocdConfigDir is explicitly set, use that directory instead.
 	// This avoids mutating the shared argocd-config/values.yaml on disk.
-	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
+	if tc.ArgocdConfigDir != "" {
+		args = append(args, "--argocd-config-dir", fmt.Sprintf("./integration-test/%s", tc.ArgocdConfigDir))
+	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
 		args = append(args, "--argocd-config-dir", "./integration-test/no-cluster-roles")
 	}
 
