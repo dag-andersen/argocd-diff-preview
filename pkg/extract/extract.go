@@ -237,9 +237,9 @@ func getResourcesFromApp(
 	// Store ID (kubernetes resource name) before we add a prefix and hash
 	uniqueIdBeforeModifications := app.Id
 
-	err := addApplicationPrefix(&app, prefix)
+	err := updateYamlName(&app, prefix)
 	if err != nil {
-		return ExtractedApp{}, "", fmt.Errorf("failed to prefix application name with prefix: %w", err)
+		return ExtractedApp{}, "", fmt.Errorf("failed to prefix application name with '%s': %w", prefix, err)
 	}
 
 	// After patching the application name, we can get the k8s resource name

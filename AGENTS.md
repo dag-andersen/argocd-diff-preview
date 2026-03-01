@@ -1,6 +1,9 @@
 # AGENTS.md - Guidelines for AI Coding Agents
 
-ArgoCD Diff Preview is a Go CLI tool that generates diffs between Argo CD application manifests across Git branches. It creates ephemeral Kubernetes clusters (kind/k3d/minikube), deploys Argo CD, and renders application manifests to show what changes a PR would introduce.
+ArgoCD Diff Preview is a Go CLI tool that generates diffs between Argo CD application manifests across Git branches.
+It uses Argo CD to do the rendering.
+The applications are applied to the cluster. But never synced, so the tracked resources are never actually created in the cluster.
+This allows us to get the rendered manifests with all the transformations applied, without actually creating any resources in the cluster.
 
 ## Build Commands
 
@@ -37,40 +40,11 @@ cd integration-test && TEST_CASE="branch-1/target-1" go test -v -timeout 10m -ru
 
 # Update expected outputs (when test output changes intentionally)
 make update-integration-tests    # Update with Go binary
-make update-integration-tests-docker  # Update with Docker
 
 # NOTE FOR AI AGENTS: Integration tests produce a LOT of output (cluster creation, 
 # ArgoCD deployment, etc). Always pipe to `tail -50` or similar to avoid output overflow:
 make update-integration-tests 2>&1 | tail -50
 make run-integration-tests-go 2>&1 | tail -50
-
-# Pre-release check (lint + unit + integration)
-make check-release
-```
-
-## Linting
-
-```bash
-make run-lint                    # Or: golangci-lint run
-```
-
-Enabled linters: `errcheck`, `unused`, `ineffassign`, `staticcheck`, `modernize`
-
-## Code Style
-
-### Error Handling
-
-```go
-// Wrap errors with context
-if err != nil {
-    return fmt.Errorf("failed to create namespace: %w", err)
-}
-
-// Log before returning
-if err != nil {
-    log.Error().Err(err).Msg("❌ Failed to get ConfigMaps")
-    return fmt.Errorf("failed to get ConfigMaps: %w", err)
-}
 ```
 
 ### Commit Messages and PR Titles
@@ -81,7 +55,7 @@ Prefixes:
 - `Feat` - New features or enhancements
 - `Fix` - Bug fixes
 - `Docs` - Documentation changes
-- `Test` - Test additions or changes
+- `Tests` - Test additions or changes
 - `Chore` - Maintenance, refactoring, dependencies
 
 ```
@@ -89,27 +63,18 @@ Prefixes:
 Feat | Add support for ApplicationSets
 Fix | Resolve namespace sorting in diff output
 Docs | Update lockdown mode configuration guide
-Test | Add integration tests for multi-app scenarios
+Tests | Add integration tests for multi-app scenarios
 Chore | Update ArgoCD dependency to v3.0
 ```
 
 **Do NOT add issue numbers in parentheses to commit messages or PR titles.** The `(#123)` format is what GitHub automatically adds when merging/squashing PRs (and it refers to the PR number, not the issue).
-```
-
-GitHub will automatically link the issue and close it when the PR is merged.
 
 ## Project Structure
 
 ```
 argocd-diff-preview/
 ├── cmd/               # CLI entry point (main.go, options.go)
-├── pkg/               # Core logic
-│   ├── argocd/        # Argo CD installation
-│   ├── diff/          # Diff generation
-│   ├── extract/       # Resource extraction
-│   ├── cluster/       # Cluster provider interface
-│   ├── kind/, k3d/, minikube/  # Cluster implementations
-│   └── git/, utils/
+├── pkg/               # Core go logic
 ├── integration-test/  # Integration tests and expected outputs
 ├── docs/              # MkDocs documentation
 └── examples/          # Test fixtures
@@ -117,7 +82,9 @@ argocd-diff-preview/
 
 ## Main Challenges when building a tool like this
 
-- Naming collections of Argo CD Applications. A repository can contain multiple applications with the same name. We ALWAYS need to make sure the names are unique.
+- A repository can contain multiple applications and applications with the same name. We ALWAYS need to make sure the names are unique.
+- We can not make any assumption of how the code i structured and how many applications are stored in the same file.
+
 
 ## Key Dependencies
 
@@ -125,10 +92,4 @@ argocd-diff-preview/
 - `github.com/spf13/viper` - Configuration
 - `github.com/rs/zerolog` - Structured logging
 - `github.com/argoproj/argo-cd/v3` - Argo CD types
-- `helm.sh/helm/v3` - Helm chart handling
 - `k8s.io/client-go` - Kubernetes client
-
-## Prerequisites
-
-- Go 1.21+, Docker, Git, Make
-- For Go mode: kind, kubectl, Helm, Argo CD CLI

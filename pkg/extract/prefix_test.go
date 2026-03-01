@@ -89,7 +89,7 @@ func TestAddApplicationPrefix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			originalYamlName := tt.app.Yaml.GetName()
 
-			err := addApplicationPrefix(tt.app, tt.prefix)
+			err := updateYamlName(tt.app, tt.prefix)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -141,7 +141,7 @@ func TestBranchShortNames(t *testing.T) {
 			app := createTestArgoResource("test-app", "test-app", "test.yaml", tt.branch)
 			prefix := "pr123"
 
-			err := addApplicationPrefix(app, prefix)
+			err := updateYamlName(app, prefix)
 			assert.NoError(t, err)
 
 			expectedPrefix := prefix + "-" + tt.expectedShortName + "-"
