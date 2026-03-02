@@ -27,7 +27,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 )
 
 // RepoCreds is a pre-fetched snapshot of all repository credentials registered
@@ -58,7 +58,7 @@ type RepoCreds struct {
 // FetchRepoCreds connects to the cluster via the ArgoCD DB layer and fetches
 // all repository and credential information registered under the given
 // ArgoCD namespace. The returned RepoCreds is safe for concurrent read access.
-func FetchRepoCreds(ctx context.Context, k8sClient *utils.K8sClient, namespace string) (*RepoCreds, error) {
+func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string) (*RepoCreds, error) {
 	// The ArgoCD DB requires a typed kubernetes.Interface.  Our K8sClient
 	// exposes the underlying *rest.Config so we can build one on demand.
 	typedClient, err := kubernetes.NewForConfig(k8sClient.GetConfig())

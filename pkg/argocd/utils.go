@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/rs/zerolog/log"
 )
 
 // ApplySecretsFromFolder applies all secret manifests from a folder using the Kubernetes API
-func ApplySecretsFromFolder(client *utils.K8sClient, secretsFolder string, namespace string) error {
+func ApplySecretsFromFolder(client *k8s.Client, secretsFolder string, namespace string) error {
 	// Check if folder exists
 	if _, err := os.Stat(secretsFolder); os.IsNotExist(err) {
 		log.Info().Msgf("🤷 No secrets folder found at %s", secretsFolder)

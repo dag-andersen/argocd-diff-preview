@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 
 	"github.com/rs/zerolog/log"
 
@@ -65,7 +65,7 @@ func CreateCluster(clusterName string, kindOptions string, internal bool) (time.
 			return time.Since(start), fmt.Errorf("failed to get cluster kubeconfig: %s", output)
 		}
 
-		kubeconfigPath, _ := utils.GetKubeConfigPath()
+		kubeconfigPath, _ := k8s.GetKubeConfigPath()
 		err = os.WriteFile(kubeconfigPath, []byte(output), 0644)
 		if err != nil {
 			return time.Since(start), fmt.Errorf("failed to write cluster kubeconfig: %s", kubeconfigPath)
