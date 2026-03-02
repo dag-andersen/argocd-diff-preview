@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -17,7 +18,7 @@ import (
 
 // CLIOperations implements the Operations interface using the ArgoCD CLI.
 type CLIOperations struct {
-	k8sClient    *utils.K8sClient
+	k8sClient    *k8s.Client
 	namespace    string
 	loginOptions string
 	authToken    string // When set, used as ARGOCD_AUTH_TOKEN env var for CLI commands

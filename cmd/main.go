@@ -12,6 +12,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/reposerverextract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
@@ -173,7 +174,7 @@ func run(cfg *Config) error {
 	}()
 
 	// create k8s client
-	k8sClient, err := utils.NewK8sClient(cfg.DisableClientThrottling)
+	k8sClient, err := k8s.NewClient(cfg.DisableClientThrottling)
 	if err != nil {
 		log.Error().Err(err).Msgf("❌ Failed to create k8s client")
 		return err
@@ -228,6 +229,14 @@ func run(cfg *Config) error {
 		}
 		argocdInstallationDuration = duration
 	}
+
+	// Start background crash watcher for ArgoCD pods
+	stopCrashWatcher := k8sClient.WatchForContainerRestarts(
+		cfg.ArgocdNamespace,
+		"app.kubernetes.io/part-of=argocd",
+		5*time.Second,
+	)
+	defer close(stopCrashWatcher)
 
 	// Generate applications from ApplicationSets
 	baseApps, targetApps, convertAppSetsToAppsDuration, err := argoapplication.ConvertAppSetsToAppsInBothBranches(

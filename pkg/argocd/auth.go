@@ -3,12 +3,12 @@ package argocd
 import (
 	"fmt"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/rs/zerolog/log"
 )
 
 // getInitialPassword retrieves the initial admin password from Kubernetes secret
-func getInitialPassword(k8sClient *utils.K8sClient, namespace string) (string, error) {
+func getInitialPassword(k8sClient *k8s.Client, namespace string) (string, error) {
 	var err error
 	var err_fallback error
 	secret, err := k8sClient.GetSecretValue(namespace, "argocd-initial-admin-secret", "password")

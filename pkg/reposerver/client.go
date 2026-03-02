@@ -13,7 +13,7 @@ import (
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
 	"github.com/argoproj/argo-cd/v3/util/tgzstream"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -44,7 +44,7 @@ const (
 // It manages an optional port-forward to the repo server so that the caller
 // does not need to worry about cluster networking.
 type Client struct {
-	k8sClient *utils.K8sClient
+	k8sClient *k8s.Client
 	namespace string
 
 	// address is the host:port of the repo server (may be a port-forwarded local address).
@@ -64,7 +64,7 @@ type Client struct {
 //
 // namespace is the Kubernetes namespace where Argo CD is installed.
 // k8sClient is used to establish the port-forward.
-func NewClient(k8sClient *utils.K8sClient, namespace string) *Client {
+func NewClient(k8sClient *k8s.Client, namespace string) *Client {
 	return &Client{
 		k8sClient:          k8sClient,
 		namespace:          namespace,
