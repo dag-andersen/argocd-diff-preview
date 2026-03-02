@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -33,7 +33,7 @@ var (
 )
 
 type ArgoCDInstallation struct {
-	K8sClient         *utils.K8sClient
+	K8sClient         *k8s.Client
 	Namespace         string
 	Version           string
 	ConfigPath        string
@@ -46,7 +46,7 @@ type ArgoCDInstallation struct {
 	operations        Operations // CLI or API implementation
 }
 
-func New(client *utils.K8sClient, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string, configPath string) *ArgoCDInstallation {
+func New(client *k8s.Client, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string, configPath string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:         client,
 		Namespace:         namespace,

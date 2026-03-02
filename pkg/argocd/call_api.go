@@ -14,14 +14,14 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/argoproj/argo-cd/v3/reposerver/apiclient"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // APIOperations implements the Operations interface using the ArgoCD HTTP API.
 type APIOperations struct {
-	k8sClient  *utils.K8sClient
+	k8sClient  *k8s.Client
 	namespace  string
 	connection *apiConnection
 }
