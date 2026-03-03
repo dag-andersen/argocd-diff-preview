@@ -94,4 +94,4 @@ Modified (1):
 </details>
 
 _Stats_:
-[Applications: 46], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 36], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

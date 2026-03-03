@@ -36,4 +36,4 @@ Modified (1):
 </details>
 
 _Stats_:
-[Applications: 40], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 30], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

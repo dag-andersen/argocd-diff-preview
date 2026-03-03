@@ -81,4 +81,4 @@ Modified (2):
 </details>
 
 _Stats_:
-[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 39], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

@@ -144,7 +144,7 @@ func run(cfg *Config) error {
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged, cfg.WatchIfNoWatchPatternFound); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
@@ -271,7 +271,7 @@ func run(cfg *Config) error {
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged, cfg.WatchIfNoWatchPatternFound); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
