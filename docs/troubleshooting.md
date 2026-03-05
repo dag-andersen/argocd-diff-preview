@@ -17,3 +17,13 @@ This can improve performance when the cluster's APF configuration allows higher 
 ## Applications being empty
 
 If you are experiencing issues with Argo CD applications being marked as empty, try running the tool with `--render-method=server-api` to see if that resolves the issue. Otherwise please open an issue with details about your cluster setup and any error/warning messages you are seeing.
+
+## Stale cache issues when connecting to an existing Argo CD instance
+
+When connecting to an existing Argo CD instance, Argo CD caches git references to improve performance. However, if the cache becomes stale (for example, if branches are updated or new commits are pushed), you may see errors like:
+
+```
+unable to resolve git revision : unable to resolve 'refs/pull/833/merge' to a commit SHA
+```
+
+To avoid this issue, use commit SHAs instead of branch names when specifying revisions. Please refer to the [Branch Names vs Commit SHAs](reusing-clusters/branch-vs-sha.md) guide for more details on why this happens and how to configure your workflow correctly.
