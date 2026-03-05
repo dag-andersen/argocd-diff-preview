@@ -24,4 +24,3 @@ The `repo-server-api` method is an experimental fast-path that bypasses the clus
 - **How it works:** It connects directly to the Argo CD `repo-server` component via gRPC, asking it to generate the manifests synchronously. 
 - **Characteristics:** The fastest method available. No cluster-side Application objects are created, and no polling of the reconciliation loop is needed. 
 - **Lockdown mode:** Compatible with [lockdown mode](reusing-clusters/lockdown-mode.md) (namespace-scoped Argo CD).
-- **Limitations:** Currently supports only a **single content source** per Application. If your Application uses `spec.sources` with multiple sources that *each produce manifests*, this method will fail and prompt you to switch to `cli` or `server-api`. *(Note: Using multiple `ref` sources used purely for values files alongside a single content source is fully supported).*
