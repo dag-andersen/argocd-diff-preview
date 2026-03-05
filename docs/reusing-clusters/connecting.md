@@ -108,3 +108,7 @@ You can check this by running `kubectl config view --minify -o jsonpath='{.users
 These plugins/binaries are **not** available inside the Docker image, so you'll need to run `argocd-diff-preview` as a standalone binary.
 
 You can find installation instructions in the [docs](../getting-started/installation.md#__tabbed_1_2).
+
+## Branch Names vs Commit SHAs
+
+When connecting to an existing Argo CD instance, it's important to understand the difference between using branch names and commit SHAs. Please refer to the [Branch Names vs Commit SHAs](branch-vs-sha.md) guide for detailed information on cache behavior and best practices.
