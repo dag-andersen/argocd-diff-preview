@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
@@ -356,16 +357,16 @@ func run(cfg *Config) error {
 		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
-	// Write per-app manifest files if requested
-	if cfg.WritePerAppManifests {
+	// Write manifest files if requested
+	if cfg.OutputAppManifests || cfg.OutputBranchManifests {
 		writeStart := time.Now()
-		if err := writePerAppManifests(cfg.OutputFolder, baseBranch, baseManifests, cfg.IgnoreResourceRules); err != nil {
+		if err := writeManifests(cfg.OutputFolder, baseBranch, baseManifests, cfg.IgnoreResourceRules, cfg.OutputAppManifests, cfg.OutputBranchManifests); err != nil {
 			return err
 		}
-		if err := writePerAppManifests(cfg.OutputFolder, targetBranch, targetManifests, cfg.IgnoreResourceRules); err != nil {
+		if err := writeManifests(cfg.OutputFolder, targetBranch, targetManifests, cfg.IgnoreResourceRules, cfg.OutputAppManifests, cfg.OutputBranchManifests); err != nil {
 			return err
 		}
-		log.Info().Msgf("💾 Writing per-app manifests to '%s' took %s", cfg.OutputFolder, time.Since(writeStart).Round(time.Millisecond))
+		log.Info().Msgf("💾 Writing manifests to '%s' took %s", cfg.OutputFolder, time.Since(writeStart).Round(time.Millisecond))
 	}
 
 	// Generate diff
@@ -402,35 +403,58 @@ func run(cfg *Config) error {
 	return nil
 }
 
-// writePerAppManifests writes individual manifest files per application to a branch-specific folder.
-// This replicates the old behavior where per-app files were written to output/base/ and output/target/.
-func writePerAppManifests(
+// writeManifests flattens apps once and writes manifest files based on the enabled options.
+// If perApp is true, each app is written to its own file under <outputFolder>/<branchType>/.
+// If perBranch is true, all apps are concatenated into <outputFolder>/<branchType>-branch.yaml.
+func writeManifests(
 	outputFolder string,
 	branch *git.Branch,
 	apps []extract.ExtractedApp,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	perApp bool,
+	perBranch bool,
 ) error {
-	folder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
-
-	if err := utils.CreateFolder(folder, true); err != nil {
-		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
+	perAppFolder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
+	if perApp {
+		if err := utils.CreateFolder(perAppFolder, true); err != nil {
+			return fmt.Errorf("failed to create folder: %s: %w", perAppFolder, err)
+		}
 	}
+
+	var branchManifests []string
 
 	for _, app := range apps {
 		content, err := app.FlattenToString(ignoreResourceRules)
 		if err != nil {
 			return fmt.Errorf("failed to flatten app %s: %w", app.Name, err)
 		}
-		if content == "" {
-			continue
+
+		if perApp {
+			// Always write the file, even if content is empty, so the user can see that
+			// an application existed but had no rendered output.
+			filePath := fmt.Sprintf("%s/%s", perAppFolder, app.Id)
+			if err := utils.WriteFile(filePath, content); err != nil {
+				return fmt.Errorf("failed to write manifest for app %s: %w", app.Name, err)
+			}
 		}
 
-		filePath := fmt.Sprintf("%s/%s", folder, app.Id)
-		if err := utils.WriteFile(filePath, content); err != nil {
-			return fmt.Errorf("failed to write manifest for app %s: %w", app.Name, err)
+		if perBranch && content != "" {
+			branchManifests = append(branchManifests, content)
 		}
 	}
 
-	log.Debug().Msgf("Wrote %d per-app manifest files to %s", len(apps), folder)
+	if perApp {
+		log.Debug().Msgf("Wrote %d per-app manifest files to %s", len(apps), perAppFolder)
+	}
+
+	if perBranch {
+		branchFilePath := fmt.Sprintf("%s/%s-branch.yaml", outputFolder, branch.Type())
+		combined := strings.Join(branchManifests, "---\n")
+		if err := utils.WriteFile(branchFilePath, combined); err != nil {
+			return fmt.Errorf("failed to write branch manifests to %s: %w", branchFilePath, err)
+		}
+		log.Debug().Msgf("Wrote %d app manifests to %s", len(branchManifests), branchFilePath)
+	}
+
 	return nil
 }

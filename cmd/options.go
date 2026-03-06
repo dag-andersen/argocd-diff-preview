@@ -80,7 +80,8 @@ var (
 	DefaultConcurrency                = uint(40)
 	DefaultRenderMethod               = "server-api"
 	DefaultArgocdConfigPath           = "./argocd-config"
-	DefaultWritePerAppManifests       = false
+	DefaultOutputAppManifests         = false
+	DefaultOutputBranchManifests      = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -127,7 +128,8 @@ type RawOptions struct {
 	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
 	ArgocdUIURL                string `mapstructure:"argocd-ui-url"`
 	Concurrency                uint   `mapstructure:"concurrency"`
-	WritePerAppManifests       bool   `mapstructure:"write-per-app-manifests"`
+	OutputAppManifests         bool   `mapstructure:"output-app-manifests"`
+	OutputBranchManifests      bool   `mapstructure:"output-branch-manifests"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -169,7 +171,8 @@ type Config struct {
 	RenderMethod               RenderMethod
 	ArgocdUIURL                string
 	Concurrency                uint
-	WritePerAppManifests       bool
+	OutputAppManifests         bool
+	OutputBranchManifests      bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -263,7 +266,8 @@ func Parse() *Config {
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 	viper.SetDefault("concurrency", DefaultConcurrency)
 	viper.SetDefault("argocd-config-dir", DefaultArgocdConfigPath)
-	viper.SetDefault("write-per-app-manifests", DefaultWritePerAppManifests)
+	viper.SetDefault("output-app-manifests", DefaultOutputAppManifests)
+	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -319,7 +323,8 @@ func Parse() *Config {
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
-	rootCmd.Flags().Bool("write-per-app-manifests", DefaultWritePerAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
+	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
+	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -403,7 +408,8 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		DisableClientThrottling:    o.DisableClientThrottling,
 		ArgocdUIURL:                o.ArgocdUIURL,
 		Concurrency:                o.Concurrency,
-		WritePerAppManifests:       o.WritePerAppManifests,
+		OutputAppManifests:         o.OutputAppManifests,
+		OutputBranchManifests:      o.OutputBranchManifests,
 	}
 
 	var err error
@@ -720,7 +726,10 @@ func (o *Config) LogConfig() {
 	if o.Concurrency != DefaultConcurrency {
 		log.Info().Msgf("✨ - concurrency: %d", o.Concurrency)
 	}
-	if o.WritePerAppManifests {
-		log.Info().Msgf("✨ - write-per-app-manifests: %t", o.WritePerAppManifests)
+	if o.OutputAppManifests {
+		log.Info().Msgf("✨ - output-app-manifests: %t", o.OutputAppManifests)
+	}
+	if o.OutputBranchManifests {
+		log.Info().Msgf("✨ - output-branch-manifests: %t", o.OutputBranchManifests)
 	}
 }
