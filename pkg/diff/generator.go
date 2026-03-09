@@ -41,6 +41,7 @@ func GenerateDiff(
 	statsInfo StatsInfo,
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
+	summaryThreshold uint,
 ) error {
 
 	maxDiffMessageCharCount := maxCharCount
@@ -59,7 +60,7 @@ func GenerateDiff(
 	// Generate diffs using go-git by creating temporary git repos
 	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
 	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps, argocdUIURL)
+	inlineSummary, summaryDetails, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps, argocdUIURL, int(summaryThreshold))
 	if err != nil {
 		return fmt.Errorf("failed to generate diff: %w", err)
 	}
@@ -67,11 +68,12 @@ func GenerateDiff(
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
 	MarkdownOutput := MarkdownOutput{
-		title:         title,
-		summary:       summary,
-		sections:      markdownFileSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
+		title:          title,
+		summary:        inlineSummary,
+		summaryDetails: summaryDetails,
+		sections:       markdownFileSections,
+		statsInfo:      statsInfo,
+		selectionInfo:  selectionInfo,
 	}
 	markdown := MarkdownOutput.printDiff(maxDiffMessageCharCount)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
@@ -85,7 +87,7 @@ func GenerateDiff(
 	log.Debug().Msg("Creating html output")
 	HTMLOutput := HTMLOutput{
 		title:         title,
-		summary:       summary,
+		summary:       inlineSummary,
 		sections:      htmlFileSections,
 		statsInfo:     statsInfo,
 		selectionInfo: selectionInfo,
@@ -123,16 +125,17 @@ func generateGitDiff(
 	baseApps []AppInfo,
 	targetApps []AppInfo,
 	argocdUIURL string,
-) (string, []MarkdownSection, []HTMLSection, error) {
+	summaryThreshold int,
+) (string, string, []MarkdownSection, []HTMLSection, error) {
 
 	// Write base manifests to disk
 	if err := writeManifestsToDisk(baseApps, basePath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to write base manifests: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to write base manifests: %w", err)
 	}
 
 	// Write target manifests to disk
 	if err := writeManifestsToDisk(targetApps, targetPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to write target manifests: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to write target manifests: %w", err)
 	}
 
 	baseAppsMap := make(map[string]AppInfo)
@@ -148,7 +151,7 @@ func generateGitDiff(
 	// Create temporary directory for single Git repository
 	repoPath, err := os.MkdirTemp("", "diff-repo-*")
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to create temp dir for repo: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to create temp dir for repo: %w", err)
 	}
 	defer func() {
 		if err := os.RemoveAll(repoPath); err != nil {
@@ -159,22 +162,22 @@ func generateGitDiff(
 	// Initialize single Git repository
 	repo, err := git.PlainInit(repoPath, false)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to init repo: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to init repo: %w", err)
 	}
 
 	// Get worktree
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get worktree: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to get worktree: %w", err)
 	}
 
 	// Copy base files to repository and commit
 	if err := copyFilesToRepo(basePath, repoPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to copy base files: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to copy base files: %w", err)
 	}
 
 	if err := worktree.AddGlob("."); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to add base files to repo: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to add base files to repo: %w", err)
 	}
 
 	author := &object.Signature{
@@ -188,20 +191,20 @@ func generateGitDiff(
 		AllowEmptyCommits: true,
 	})
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to commit base state: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to commit base state: %w", err)
 	}
 
 	// Clear the working directory and copy target files
 	if err := clearWorkingDirectory(repoPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to clear working directory: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to clear working directory: %w", err)
 	}
 
 	if err := copyFilesToRepo(targetPath, repoPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to copy target files: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to copy target files: %w", err)
 	}
 
 	if err := worktree.AddGlob("."); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to add target files to repo: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to add target files to repo: %w", err)
 	}
 
 	targetCommitHash, err := worktree.Commit("Target state", &git.CommitOptions{
@@ -209,35 +212,35 @@ func generateGitDiff(
 		AllowEmptyCommits: true,
 	})
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to commit target state: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to commit target state: %w", err)
 	}
 
 	// Retrieve commits
 	baseCommit, err := repo.CommitObject(baseCommitHash)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get base commit: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to get base commit: %w", err)
 	}
 
 	targetCommit, err := repo.CommitObject(targetCommitHash)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get target commit: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to get target commit: %w", err)
 	}
 
 	// Get base and target trees
 	baseTree, err := baseCommit.Tree()
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get base tree: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to get base tree: %w", err)
 	}
 
 	targetTree, err := targetCommit.Tree()
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get target tree: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to get target tree: %w", err)
 	}
 
 	// Compute diff between trees
 	changes, err := baseTree.Diff(targetTree)
 	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to compute diff: %w", err)
+		return "", "", nil, nil, fmt.Errorf("failed to compute diff: %w", err)
 	}
 
 	// Keep track of file paths by change type
@@ -246,12 +249,12 @@ func generateGitDiff(
 	for _, change := range changes {
 		action, err := change.Action()
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to get change action: %w", err)
+			return "", "", nil, nil, fmt.Errorf("failed to get change action: %w", err)
 		}
 
 		from, to, err := change.Files()
 		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to get files: %w", err)
+			return "", "", nil, nil, fmt.Errorf("failed to get files: %w", err)
 		}
 
 		changeInfo := changeInfo{}
@@ -262,12 +265,12 @@ func generateGitDiff(
 			if to != nil {
 				blob, err := repo.BlobObject(to.Hash)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
 				}
 
 				content, err := getBlobContent(blob)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
 				}
 
 				changeInfo = formatNewFileDiff(content, diffContextLines, diffIgnore)
@@ -282,12 +285,12 @@ func generateGitDiff(
 			} else if from != nil {
 				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
 				}
 
 				content, err := getBlobContent(blob)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
 				}
 
 				changeInfo = formatDeletedFileDiff(content, diffContextLines, diffIgnore)
@@ -300,24 +303,24 @@ func generateGitDiff(
 			if from != nil {
 				blob, err := repo.BlobObject(from.Hash)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
 				}
 
 				oldContent, err = getBlobContent(blob)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
 				}
 			}
 
 			if to != nil {
 				blob, err := repo.BlobObject(to.Hash)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
 				}
 
 				newContent, err = getBlobContent(blob)
 				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
+					return "", "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
 				}
 			}
 
@@ -360,11 +363,10 @@ func generateGitDiff(
 	}
 
 	if len(changedFiles) == 0 {
-		return "No changes found", nil, nil, nil
+		return "No changes found", "", nil, nil, nil
 	}
 
-	// Build summary
-	summary := buildSummary(changedFiles)
+	inlineSummary, summaryDetails := buildSummary(changedFiles, summaryThreshold)
 
 	// Create arrays of formatted file sections
 	markdownFileSections := make([]MarkdownSection, 0, len(changedFiles))
@@ -381,7 +383,7 @@ func generateGitDiff(
 		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection(argocdUIURL))
 	}
 
-	return summary, markdownFileSections, htmlFileSections, nil
+	return inlineSummary, summaryDetails, markdownFileSections, htmlFileSections, nil
 }
 
 // getBlobContent reads the content of a Git blob
