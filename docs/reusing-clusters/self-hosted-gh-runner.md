@@ -201,13 +201,6 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
 
-      - name: Install Argo CD CLI
-        run: |
-          curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-          sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
-          rm argocd-linux-amd64
-          argocd version
-
       - name: Install argocd-diff-preview
         run: |
           curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v0.1.27/argocd-diff-preview-Linux-x86_64.tar.gz

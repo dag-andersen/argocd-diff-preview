@@ -43,7 +43,7 @@
       - [Docker](https://docs.docker.com/get-docker/)
       - [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
       - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation) OR [minikube](https://minikube.sigs.k8s.io/docs/start/)
-      - [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/)
+      - [Argo CD CLI](https://argo-cd.readthedocs.io/en/stable/cli_installation/) (only required if using `--render-method=cli`)
 
     ## Find the correct binary for your operating system
 
