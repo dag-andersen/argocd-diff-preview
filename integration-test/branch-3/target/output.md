@@ -10,7 +10,7 @@ Modified (1):
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
-#### Deployment: staging-myapp (default)
+#### Deployment: default/staging-myapp
 ```diff
  apiVersion: apps/v1
  kind: Deployment

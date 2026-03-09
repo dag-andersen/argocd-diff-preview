@@ -10,7 +10,7 @@ Modified (1):
 <summary>internal-chart-example (examples/internal-chart/app.yaml)</summary>
 <br>
 
-#### Deployment: super-app-name → new-app-name (default)
+#### Deployment: default/super-app-name → default/new-app-name
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -51,7 +51,7 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
 ```
-#### Service: super-app-name → new-app-name (default)
+#### Service: default/super-app-name → default/new-app-name
 ```diff
  apiVersion: v1
  kind: Service
@@ -75,7 +75,7 @@ Modified (1):
      app.kubernetes.io/instance: internal-chart-example
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount: super-app-name → new-app-name (default)
+#### ServiceAccount: default/super-app-name → default/new-app-name
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true

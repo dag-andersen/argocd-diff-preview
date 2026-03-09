@@ -1706,7 +1706,7 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 		t.Error("expected resource to be marked as skipped")
 	}
 	// CRDs are cluster-scoped (no namespace), so header should be Kind: Name without parens
-	expectedHeader := "CustomResourceDefinition: apps.example.com"
+	expectedHeader := "CustomResourceDefinition: apps.example.com" // cluster-scoped, no namespace
 	if result[0].Header() != expectedHeader {
 		t.Errorf("expected header %q, got %q", expectedHeader, result[0].Header())
 	}
@@ -1862,7 +1862,7 @@ func TestResourceDiff_Header(t *testing.T) {
 			diff: ResourceDiff{
 				Kind: "Deployment", Name: "my-app", Namespace: "default",
 			},
-			expected: "Deployment: my-app (default)",
+			expected: "Deployment: default/my-app",
 		},
 		{
 			name: "cluster-scoped resource (no namespace)",
@@ -1877,7 +1877,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Kind: "StatefulSet", OldKind: "Deployment",
 				Name: "my-app", Namespace: "default",
 			},
-			expected: "Deployment → StatefulSet: my-app (default)",
+			expected: "Deployment → StatefulSet: default/my-app",
 		},
 		{
 			name: "name change",
@@ -1886,7 +1886,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Name: "new-name", OldName: "old-name",
 				Namespace: "default",
 			},
-			expected: "Deployment: old-name → new-name (default)",
+			expected: "Deployment: default/old-name → default/new-name",
 		},
 		{
 			name: "namespace change",
@@ -1894,7 +1894,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Kind: "Deployment", Name: "my-app",
 				Namespace: "production", OldNamespace: "staging",
 			},
-			expected: "Deployment: my-app (staging → production)",
+			expected: "Deployment: staging/my-app → production/my-app",
 		},
 		{
 			name: "kind and name change",
@@ -1903,7 +1903,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Name: "new-app", OldName: "old-app",
 				Namespace: "default",
 			},
-			expected: "Deployment → StatefulSet: old-app → new-app (default)",
+			expected: "Deployment → StatefulSet: default/old-app → default/new-app",
 		},
 		{
 			name: "all three change",
@@ -1912,7 +1912,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Name: "new-app", OldName: "old-app",
 				Namespace: "prod", OldNamespace: "dev",
 			},
-			expected: "Deployment → StatefulSet: old-app → new-app (dev → prod)",
+			expected: "Deployment → StatefulSet: dev/old-app → prod/new-app",
 		},
 		{
 			name: "old kind same as new kind (no arrow)",
@@ -1920,7 +1920,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Kind: "Deployment", OldKind: "Deployment",
 				Name: "my-app", Namespace: "default",
 			},
-			expected: "Deployment: my-app (default)",
+			expected: "Deployment: default/my-app",
 		},
 		{
 			name: "old name same as new name (no arrow)",
@@ -1929,7 +1929,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Name: "my-app", OldName: "my-app",
 				Namespace: "default",
 			},
-			expected: "Deployment: my-app (default)",
+			expected: "Deployment: default/my-app",
 		},
 		{
 			name: "old namespace same as new namespace (no arrow)",
@@ -1937,7 +1937,7 @@ func TestResourceDiff_Header(t *testing.T) {
 				Kind: "Deployment", Name: "my-app",
 				Namespace: "default", OldNamespace: "default",
 			},
-			expected: "Deployment: my-app (default)",
+			expected: "Deployment: default/my-app",
 		},
 	}
 

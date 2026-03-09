@@ -104,10 +104,10 @@ var testCases = []TestCase{
 		BaseBranch:   "integration-test/branch-3/base",
 	},
 	{
-		Name:                       "branch-4/target",
-		TargetBranch:               "integration-test/branch-4/target",
-		BaseBranch:                 "integration-test/branch-4/base",
-		Title:                      "integration-test/branch-4",
+		Name:         "branch-4/target",
+		TargetBranch: "integration-test/branch-4/target",
+		BaseBranch:   "integration-test/branch-4/base",
+		Title:        "integration-test/branch-4",
 	},
 	{
 		Name:                       "branch-5/target-1",
@@ -396,8 +396,8 @@ func TestIntegration(t *testing.T) {
 			}
 		}
 
-		// Create cluster if: every 8th test, no cluster exists, or test explicitly requires it
-		createCluster := testsSinceClusterCreation >= 8 || !clusterExists || tc.CreateCluster == "true"
+		// Create cluster if: every 15th test, no cluster exists, or test explicitly requires it
+		createCluster := testsSinceClusterCreation >= 15 || !clusterExists || tc.CreateCluster == "true"
 		if createCluster {
 			testsSinceClusterCreation = 0
 		}

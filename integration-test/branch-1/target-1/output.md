@@ -42,7 +42,7 @@ Modified (2):
 <summary>multi-source-app (examples/multi-source/app.yaml)</summary>
 <br>
 
-#### Deployment: backend (default)
+#### Deployment: default/backend
 ```diff
        - image: my-org/backend:1.0.0
          name: backend
@@ -50,7 +50,7 @@ Modified (2):
 -        - containerPort: 8080
 +        - containerPort: 80
 ```
-#### Deployment: frontend (default)
+#### Deployment: default/frontend
 ```diff
          app: frontend
      spec:
@@ -67,7 +67,7 @@ Modified (2):
 <summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
 <br>
 
-#### Deployment: nginx-ingress-ingress-nginx-controller (default)
+#### Deployment: default/nginx-ingress-ingress-nginx-controller
 ```diff
                fieldPath: metadata.namespace
          - name: LD_PRELOAD

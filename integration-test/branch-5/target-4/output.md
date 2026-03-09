@@ -10,7 +10,7 @@ Modified (1):
 <summary>my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">link</a>] (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
-#### Deployment: super-app-name → experiment (default)
+#### Deployment: default/super-app-name → default/experiment
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -47,7 +47,7 @@ Modified (1):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
 ```
-#### Service: super-app-name → experiment (default)
+#### Service: default/super-app-name → default/experiment
 ```diff
  apiVersion: v1
  kind: Service
@@ -71,7 +71,7 @@ Modified (1):
      app.kubernetes.io/instance: my-app-labels
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount: super-app-name → experiment (default)
+#### ServiceAccount: default/super-app-name → default/experiment
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true

@@ -28,10 +28,11 @@ type ResourceDiff struct {
 }
 
 // Header returns a display header for the resource.
-// Format: "Kind: Name (Namespace)" with arrows for changes:
-//   - Kind change:      "OldKind → NewKind: Name (Namespace)"
-//   - Name change:      "Kind: OldName → NewName (Namespace)"
-//   - Namespace change: "Kind: Name (OldNs → NewNs)"
+// Format: "Kind: namespace/Name" with arrows for changes:
+//   - Kind change:      "OldKind → NewKind: namespace/Name"
+//   - Name change:      "Kind: namespace/OldName → namespace/NewName"
+//   - Namespace change: "Kind: oldNs/Name → newNs/Name"
+//   - Cluster-scoped:   "Kind: Name" (no namespace prefix)
 func (r *ResourceDiff) Header() string {
 	// Kind part
 	kindStr := r.Kind
@@ -39,24 +40,30 @@ func (r *ResourceDiff) Header() string {
 		kindStr = fmt.Sprintf("%s → %s", r.OldKind, r.Kind)
 	}
 
-	// Name part
-	nameStr := r.Name
-	if r.OldName != "" && r.OldName != r.Name {
-		nameStr = fmt.Sprintf("%s → %s", r.OldName, r.Name)
+	// Namespace/Name part — expressed as "namespace/name" or just "name" if cluster-scoped
+	nsChanged := r.OldNamespace != "" && r.OldNamespace != r.Namespace
+	nameChanged := r.OldName != "" && r.OldName != r.Name
+
+	qualifiedName := func(ns, name string) string {
+		if ns == "" {
+			return name
+		}
+		return fmt.Sprintf("%s/%s", ns, name)
 	}
 
-	header := fmt.Sprintf("%s: %s", kindStr, nameStr)
-
-	// Namespace part
-	nsStr := r.Namespace
-	if r.OldNamespace != "" && r.OldNamespace != r.Namespace {
-		nsStr = fmt.Sprintf("%s → %s", r.OldNamespace, r.Namespace)
+	oldNs := r.OldNamespace
+	if oldNs == "" {
+		oldNs = r.Namespace
+	}
+	oldName := r.OldName
+	if oldName == "" {
+		oldName = r.Name
 	}
 
-	if nsStr != "" {
-		return fmt.Sprintf("%s (%s)", header, nsStr)
+	if nsChanged || nameChanged {
+		return fmt.Sprintf("%s: %s → %s", kindStr, qualifiedName(oldNs, oldName), qualifiedName(r.Namespace, r.Name))
 	}
-	return header
+	return fmt.Sprintf("%s: %s", kindStr, qualifiedName(r.Namespace, r.Name))
 }
 
 // AppDiff represents the diff output for a single application pair
