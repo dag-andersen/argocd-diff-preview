@@ -43,7 +43,7 @@ data:
 	baseApps := []AppInfo{} // No base apps - this is a new file
 	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
 
-	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	_, _, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "", 0)
 	if err != nil {
 		t.Fatalf("generateGitDiff failed: %v", err)
 	}
@@ -125,7 +125,7 @@ spec:
 	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
 	targetApps := []AppInfo{} // App is deleted
 
-	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	_, _, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "", 0)
 	if err != nil {
 		t.Fatalf("generateGitDiff failed: %v", err)
 	}
@@ -216,7 +216,7 @@ spec:
 	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
 	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
 
-	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
+	_, _, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "", 0)
 	if err != nil {
 		t.Fatalf("generateGitDiff failed: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
 		},
 	}
 
-	summary, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil, "")
+	summary, _, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil, "", 0)
 	if err != nil {
 		t.Fatalf("generateGitDiff failed: %v", err)
 	}
@@ -356,8 +356,8 @@ spec:
 
 		hideDeletedAppDiff := false
 
-		summary, markdownSections, htmlSections, err := generateGitDiff(
-			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "",
+		summary, _, markdownSections, htmlSections, err := generateGitDiff(
+			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "", 0,
 		)
 
 		if err != nil {
@@ -401,8 +401,8 @@ spec:
 
 	t.Run("hideDeletedAppDiff=true hides diff content for deleted apps", func(t *testing.T) {
 		hideDeletedAppDiff := true
-		summary, markdownSections, htmlSections, err := generateGitDiff(
-			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "",
+		summary, _, markdownSections, htmlSections, err := generateGitDiff(
+			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "", 0,
 		)
 
 		if err != nil {

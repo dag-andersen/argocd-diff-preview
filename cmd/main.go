@@ -407,6 +407,7 @@ func run(cfg *Config) error {
 		statsInfo,
 		selectionInfo,
 		cfg.ArgocdUIURL,
+		cfg.SummaryThreshold,
 	); err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err

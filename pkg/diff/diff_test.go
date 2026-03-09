@@ -307,8 +307,8 @@ spec:
 	}
 
 	// Run the diff generation
-	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, false, baseApps, targetApps, "",
+	summary, _, markdownSections, htmlSections, err := generateGitDiff(
+		basePath, targetPath, nil, 3, false, baseApps, targetApps, "", 0,
 	)
 
 	if err != nil {
@@ -430,8 +430,8 @@ spec:
 	}
 
 	// Run the diff generation
-	summary, markdownSections, htmlSections, err := generateGitDiff(
-		basePath, targetPath, nil, 3, false, baseApps, targetApps, "",
+	summary, _, markdownSections, htmlSections, err := generateGitDiff(
+		basePath, targetPath, nil, 3, false, baseApps, targetApps, "", 0,
 	)
 
 	if err != nil {

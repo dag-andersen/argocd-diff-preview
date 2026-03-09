@@ -57,6 +57,7 @@ var (
 	DefaultKindInternal               = false
 	DefaultK3dOptions                 = ""
 	DefaultMaxDiffLength              = uint(65536)
+	DefaultSummaryThreshold           = uint(20)
 	DefaultArgocdNamespace            = "argocd"
 	DefaultArgocdChartVersion         = "latest"
 	DefaultArgocdChartName            = "argo"
@@ -103,6 +104,7 @@ type RawOptions struct {
 	KindInternal               bool   `mapstructure:"kind-internal"`
 	K3dOptions                 string `mapstructure:"k3d-options"`
 	MaxDiffLength              uint   `mapstructure:"max-diff-length"`
+	SummaryThreshold           uint   `mapstructure:"summary-threshold"`
 	Selector                   string `mapstructure:"selector"`
 	FilesChanged               string `mapstructure:"files-changed"`
 	IgnoreInvalidWatchPattern  bool   `mapstructure:"ignore-invalid-watch-pattern"`
@@ -149,6 +151,7 @@ type Config struct {
 	KindInternal               bool
 	K3dOptions                 string
 	MaxDiffLength              uint
+	SummaryThreshold           uint
 	IgnoreInvalidWatchPattern  bool
 	WatchIfNoWatchPatternFound bool
 	AutoDetectFilesChanged     bool
@@ -245,6 +248,7 @@ func Parse() *Config {
 	viper.SetDefault("cluster", DefaultCluster)
 	viper.SetDefault("cluster-name", DefaultClusterName)
 	viper.SetDefault("max-diff-length", DefaultMaxDiffLength)
+	viper.SetDefault("summary-threshold", DefaultSummaryThreshold)
 	viper.SetDefault("argocd-namespace", DefaultArgocdNamespace)
 	viper.SetDefault("argocd-chart-version", DefaultArgocdChartVersion)
 	viper.SetDefault("argocd-chart-name", DefaultArgocdChartName)
@@ -310,6 +314,7 @@ func Parse() *Config {
 
 	// Other options
 	rootCmd.Flags().String("max-diff-length", fmt.Sprintf("%d", DefaultMaxDiffLength), "Max diff message character count")
+	rootCmd.Flags().Uint("summary-threshold", DefaultSummaryThreshold, "Collapse changed files list in summary when total exceeds this value (0 = always show inline)")
 	rootCmd.Flags().StringP("selector", "l", "", "Label selector to filter on (e.g. key1=value1,key2=value2)")
 	rootCmd.Flags().String("files-changed", "", "List of files changed between branches (comma, space or newline separated)")
 	rootCmd.Flags().Bool("auto-detect-files-changed", DefaultAutoDetectFilesChanged, "Auto detect files changed between branches")
@@ -383,6 +388,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		KindInternal:               o.KindInternal,
 		K3dOptions:                 o.K3dOptions,
 		MaxDiffLength:              o.MaxDiffLength,
+		SummaryThreshold:           o.SummaryThreshold,
 		IgnoreInvalidWatchPattern:  o.IgnoreInvalidWatchPattern,
 		WatchIfNoWatchPatternFound: o.WatchIfNoWatchPatternFound,
 		AutoDetectFilesChanged:     o.AutoDetectFilesChanged,
@@ -658,6 +664,9 @@ func (o *Config) LogConfig() {
 	}
 	if o.MaxDiffLength != DefaultMaxDiffLength {
 		log.Info().Msgf("✨ - max-diff-length: %d", o.MaxDiffLength)
+	}
+	if o.SummaryThreshold != DefaultSummaryThreshold {
+		log.Info().Msgf("✨ - summary-threshold: %d", o.SummaryThreshold)
 	}
 	if len(o.FilesChanged) > 0 {
 		log.Info().Msgf("✨ - files-changed: %v", o.FilesChanged)

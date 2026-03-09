@@ -75,11 +75,12 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 }
 
 type MarkdownOutput struct {
-	title         string
-	summary       string
-	sections      []MarkdownSection
-	statsInfo     StatsInfo
-	selectionInfo SelectionInfo
+	title          string
+	summary        string
+	summaryDetails string
+	sections       []MarkdownSection
+	statsInfo      StatsInfo
+	selectionInfo  SelectionInfo
 }
 
 const markdownTemplate = `
@@ -137,12 +138,16 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 		sectionsDiff.WriteString(warningMessage)
 	}
 
-	if sectionsDiff.Len() == 0 {
-		sectionsDiff.WriteString("No changes found")
+	appDiffs := strings.TrimSpace(sectionsDiff.String())
+	if appDiffs == "" {
+		appDiffs = "No changes found"
+	}
+	if m.summaryDetails != "" {
+		appDiffs = strings.TrimSpace(m.summaryDetails) + "\n\n" + appDiffs
 	}
 
 	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())
-	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
+	output = strings.ReplaceAll(output, "%app_diffs%", appDiffs)
 
 	output = strings.TrimSpace(output) + "\n"
 
