@@ -13,6 +13,7 @@ use_argocd_api ?= false
 debug ?= false
 argocd_ui_url ?= ""
 render_method ?= ""
+output_app_manifests ?= false
 
 GO_TEST_FLAGS ?=
 
@@ -51,6 +52,7 @@ run-with-go: go-build pull-repository
 		--redirect-target-revisions="HEAD" \
 		--render-method="$(render_method)" \
 		--argocd-ui-url="${argocd_ui_url}" \
+		--output-app-manifests="$(output_app_manifests)" \
 		--debug="$(debug)"
 
 run-with-docker: pull-repository docker-build

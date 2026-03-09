@@ -145,7 +145,7 @@ func run(cfg *Config) error {
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged, cfg.WatchIfNoWatchPatternFound); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
@@ -272,7 +272,7 @@ func run(cfg *Config) error {
 			return err
 		}
 
-		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged); err != nil {
+		if err := diff.WriteNoAppsFoundMessage(cfg.Title, cfg.OutputFolder, selectors, filesChanged, cfg.WatchIfNoWatchPatternFound); err != nil {
 			log.Error().Msgf("❌ Failed to write no apps found message")
 			return err
 		}
@@ -348,41 +348,6 @@ func run(cfg *Config) error {
 		return err
 	}
 
-	baseAppInfos, err := convertExtractedAppsToAppInfos(baseManifests, cfg.IgnoreResourceRules)
-	if err != nil {
-		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
-		return err
-	}
-	targetAppInfos, err := convertExtractedAppsToAppInfos(targetManifests, cfg.IgnoreResourceRules)
-	if err != nil {
-		log.Error().Msg("❌ Failed to convert extracted apps to yaml")
-		return err
-	}
-
-	// Print manifests output
-	{
-		var baseAppCombinedYaml []string
-		var targetAppCombinedYaml []string
-		for _, app := range baseAppInfos {
-			if app.FileContent != "" {
-				baseAppCombinedYaml = append(baseAppCombinedYaml, app.FileContent)
-			}
-		}
-		for _, app := range targetAppInfos {
-			if app.FileContent != "" {
-				targetAppCombinedYaml = append(targetAppCombinedYaml, app.FileContent)
-			}
-		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", cfg.OutputFolder, baseBranch.FolderName()), strings.Join(baseAppCombinedYaml, "\n---\n")); err != nil {
-			log.Error().Msg("❌ Failed to write base manifests")
-			return err
-		}
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s.yaml", cfg.OutputFolder, targetBranch.FolderName()), strings.Join(targetAppCombinedYaml, "\n---\n")); err != nil {
-			log.Error().Msg("❌ Failed to write target manifests")
-			return err
-		}
-	}
-
 	// Create info box for storing run time information
 	statsInfo := diff.StatsInfo{
 		FullDuration:               time.Since(startTime),
@@ -392,14 +357,26 @@ func run(cfg *Config) error {
 		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
 	}
 
-	// Generate diff between base and target branches
-	if err := diff.GenerateDiff(
+	// Write manifest files if requested
+	if cfg.OutputAppManifests || cfg.OutputBranchManifests {
+		writeStart := time.Now()
+		if err := writeManifests(cfg.OutputFolder, baseBranch, baseManifests, cfg.IgnoreResourceRules, cfg.OutputAppManifests, cfg.OutputBranchManifests); err != nil {
+			return err
+		}
+		if err := writeManifests(cfg.OutputFolder, targetBranch, targetManifests, cfg.IgnoreResourceRules, cfg.OutputAppManifests, cfg.OutputBranchManifests); err != nil {
+			return err
+		}
+		log.Info().Msgf("💾 Writing manifests to '%s' took %s", cfg.OutputFolder, time.Since(writeStart).Round(time.Millisecond))
+	}
+
+	// Generate diff
+	previewDuration, err := diff.GeneratePreview(
 		cfg.Title,
 		cfg.OutputFolder,
 		baseBranch,
 		targetBranch,
-		baseAppInfos,
-		targetAppInfos,
+		baseManifests,
+		targetManifests,
 		&cfg.DiffIgnore,
 		cfg.LineCount,
 		cfg.MaxDiffLength,
@@ -407,9 +384,18 @@ func run(cfg *Config) error {
 		statsInfo,
 		selectionInfo,
 		cfg.ArgocdUIURL,
-	); err != nil {
+		cfg.IgnoreResourceRules,
+	)
+	if err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
 		return err
+	}
+
+	// if preview took more than 5 seconds, log the duration
+	if previewDuration > 5*time.Second {
+		log.Info().Msgf("🔮 Diff generation took %s", previewDuration.Round(time.Millisecond))
+	} else {
+		log.Debug().Msgf("Diff generation took %s", previewDuration.Round(time.Millisecond))
 	}
 
 	log.Info().Msgf("⏰ Run time stats: %s", statsInfo.Stats())
@@ -417,20 +403,58 @@ func run(cfg *Config) error {
 	return nil
 }
 
-// convertExtractedAppsToAppInfos converts a list of ExtractedApp to a list of AppInfo
-func convertExtractedAppsToAppInfos(extractedApps []extract.ExtractedApp, ignoreResourceRules []resource_filter.IgnoreResourceRule) ([]diff.AppInfo, error) {
-	appInfos := make([]diff.AppInfo, len(extractedApps))
-	for i, extractedApp := range extractedApps {
-		manifestString, err := extractedApp.FlattenToString(ignoreResourceRules)
-		if err != nil {
-			return nil, err
-		}
-		appInfos[i] = diff.AppInfo{
-			Id:          extractedApp.Id,
-			Name:        extractedApp.Name,
-			SourcePath:  extractedApp.SourcePath,
-			FileContent: manifestString,
+// writeManifests flattens apps once and writes manifest files based on the enabled options.
+// If perApp is true, each app is written to its own file under <outputFolder>/<branchType>/.
+// If perBranch is true, all apps are concatenated into <outputFolder>/<branchType>-branch.yaml.
+func writeManifests(
+	outputFolder string,
+	branch *git.Branch,
+	apps []extract.ExtractedApp,
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	perApp bool,
+	perBranch bool,
+) error {
+	perAppFolder := fmt.Sprintf("%s/%s", outputFolder, branch.Type())
+	if perApp {
+		if err := utils.CreateFolder(perAppFolder, true); err != nil {
+			return fmt.Errorf("failed to create folder: %s: %w", perAppFolder, err)
 		}
 	}
-	return appInfos, nil
+
+	var branchManifests []string
+
+	for _, app := range apps {
+		content, err := app.FlattenToString(ignoreResourceRules)
+		if err != nil {
+			return fmt.Errorf("failed to flatten app %s: %w", app.Name, err)
+		}
+
+		if perApp {
+			// Always write the file, even if content is empty, so the user can see that
+			// an application existed but had no rendered output.
+			filePath := fmt.Sprintf("%s/%s", perAppFolder, app.Id)
+			if err := utils.WriteFile(filePath, content); err != nil {
+				return fmt.Errorf("failed to write manifest for app %s: %w", app.Name, err)
+			}
+		}
+
+		if perBranch && content != "" {
+			branchManifests = append(branchManifests, content)
+		}
+	}
+
+	if perApp {
+		log.Debug().Msgf("Wrote %d per-app manifest files to %s", len(apps), perAppFolder)
+	}
+
+	if perBranch {
+		branchFilePath := fmt.Sprintf("%s/%s-branch.yaml", outputFolder, branch.Type())
+		combined := strings.Join(branchManifests, "---\n")
+		if err := utils.WriteFile(branchFilePath, combined); err != nil {
+			return fmt.Errorf("failed to write branch manifests to %s: %w", branchFilePath, err)
+		}
+		log.Debug().Msgf("Wrote %d app manifests to %s", len(branchManifests), branchFilePath)
+	}
+
+	return nil
 }

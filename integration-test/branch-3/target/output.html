@@ -37,6 +37,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -49,9 +59,7 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Total: 1 files changed
-
-Modified (1):
+<pre>Modified (1):
 ± my-service-staging (+1|-1)</pre>
 
 <div class="diffs">
@@ -59,10 +67,11 @@ Modified (1):
 <summary>
 my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: staging-myapp (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -85,11 +94,12 @@ my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 	<tr class="normal_line"><td><pre>       - image: dag-andersen/myapp:latest</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 
 <pre>_Stats_:
-[Applications: 40], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 30], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>

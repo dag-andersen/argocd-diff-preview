@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 2 files changed
-
 Deleted (1):
 - folder2 (-19)
 
@@ -15,8 +13,8 @@ Modified (1):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
+#### Deployment: deploy-from-folder-two
 ```diff
-@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -37,15 +35,14 @@ Modified (1):
 -        ports:
 -        - containerPort: 80
 ```
-
 </details>
 
 <details>
 <summary>multi-source-app (examples/multi-source/app.yaml)</summary>
 <br>
 
+#### Deployment: backend (default)
 ```diff
-@@ Application modified: multi-source-app (examples/multi-source/app.yaml) @@
        app: backend
    template:
      metadata:
@@ -58,19 +55,8 @@ Modified (1):
          ports:
 -        - containerPort: 8080
 +        - containerPort: 80
- ---
- apiVersion: apps/v1
- kind: Deployment
- metadata:
-   name: frontend
-   namespace: default
- spec:
-   replicas: 2
-   selector:
-     matchLabels:
 ```
-
 </details>
 
 _Stats_:
-[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 39], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

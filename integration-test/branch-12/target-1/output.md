@@ -2,18 +2,16 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
-± argocd-helm-chart (+2436|-64)
+± argocd-helm-chart (+2434|-62)
 ```
 
 <details>
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
+#### Deployment: argocd-helm-chart-applicationset-controller (argocd)
 ```diff
-@@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@
              configMapKeyRef:
                key: applicationsetcontroller.log.format
                name: argocd-cmd-params-cm
@@ -161,17 +159,9 @@ Modified (1):
 +          name: argocd-cmd-params-cm
 +          optional: true
 +        name: argocd-cmd-params-cm
- ---
- apiVersion: apps/v1
- kind: Deployment
- metadata:
-   labels:
-     app.kubernetes.io/component: dex-server
-     app.kubernetes.io/instance: argocd-helm-chart
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: argocd-dex-server
-     app.kubernetes.io/part-of: argocd
-@@ skipped 34 lines (307 -> 340) @@
+```
+#### Deployment: argocd-helm-chart-dex-server (argocd)
+```diff
                  matchLabels:
                    app.kubernetes.io/name: argocd-dex-server
                topologyKey: kubernetes.io/hostname
@@ -221,7 +211,7 @@ Modified (1):
            name: grpc
            protocol: TCP
          - containerPort: 5558
-@@ skipped 16 lines (390 -> 405) @@
+@@ skipped 16 lines (92 -> 107) @@
            name: dexconfig
          - mountPath: /tls
            name: argocd-dex-server-tls
@@ -263,7 +253,9 @@ Modified (1):
        - name: argocd-dex-server-tls
          secret:
            items:
-@@ skipped 52 lines (447 -> 498) @@
+```
+#### Deployment: argocd-helm-chart-notifications-controller (argocd)
+```diff
                labelSelector:
                  matchLabels:
                    app.kubernetes.io/name: argocd-notifications-controller
@@ -353,7 +345,9 @@ Modified (1):
          secret:
            items:
            - key: tls.crt
-@@ skipped 55 lines (588 -> 642) @@
+```
+#### Deployment: argocd-helm-chart-redis (argocd)
+```diff
          - ""
          - --appendonly
          - "no"
@@ -395,9 +389,9 @@ Modified (1):
        volumes:
        - configMap:
            defaultMode: 493
-@@ skipped 67 lines (684 -> 750) @@
-         - name: ARGOCD_REPO_SERVER_LOGFORMAT
-           valueFrom:
+```
+#### Deployment: argocd-helm-chart-repo-server (argocd)
+```diff
              configMapKeyRef:
                key: reposerver.log.format
                name: argocd-cmd-params-cm
@@ -406,14 +400,14 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: reposerver.log.level
-+              name: argocd-cmd-params-cm
-+              optional: true
+               name: argocd-cmd-params-cm
+               optional: true
 +        - name: ARGOCD_LOG_FORMAT_TIMESTAMP
 +          valueFrom:
 +            configMapKeyRef:
 +              key: log.format.timestamp
-               name: argocd-cmd-params-cm
-               optional: true
++              name: argocd-cmd-params-cm
++              optional: true
          - name: ARGOCD_REPO_SERVER_PARALLELISM_LIMIT
            valueFrom:
              configMapKeyRef:
@@ -422,7 +416,9 @@ Modified (1):
                optional: true
          - name: ARGOCD_REPO_SERVER_LISTEN_ADDRESS
            valueFrom:
-@@ skipped 59 lines (777 -> 835) @@
+             configMapKeyRef:
+               key: reposerver.listen.address
+@@ skipped 57 lines (92 -> 148) @@
            valueFrom:
              secretKeyRef:
                key: redis-username
@@ -445,7 +441,7 @@ Modified (1):
            valueFrom:
              secretKeyRef:
                key: redis-sentinel-password
-@@ skipped 16 lines (858 -> 873) @@
+@@ skipped 16 lines (171 -> 186) @@
              configMapKeyRef:
                key: otlp.insecure
                name: argocd-cmd-params-cm
@@ -490,7 +486,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: reposerver.streamed.manifest.max.tar.size
-@@ skipped 28 lines (918 -> 945) @@
+@@ skipped 28 lines (231 -> 258) @@
              configMapKeyRef:
                key: reposerver.git.lsremote.parallelism.limit
                name: argocd-cmd-params-cm
@@ -549,7 +545,7 @@ Modified (1):
            periodSeconds: 10
            successThreshold: 1
            timeoutSeconds: 1
-@@ skipped 41 lines (1004 -> 1044) @@
+@@ skipped 41 lines (317 -> 357) @@
            name: plugins
          - mountPath: /tmp
            name: tmp
@@ -589,7 +585,9 @@ Modified (1):
        - emptyDir: {}
          name: var-files
        - emptyDir: {}
-@@ skipped 198 lines (1084 -> 1281) @@
+```
+#### Deployment: argocd-helm-chart-server (argocd)
+```diff
              configMapKeyRef:
                key: server.connection.status.cache.expiration
                name: argocd-cmd-params-cm
@@ -616,7 +614,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: server.app.state.cache.expiration
-@@ skipped 21 lines (1308 -> 1328) @@
+@@ skipped 21 lines (200 -> 220) @@
            valueFrom:
              secretKeyRef:
                key: redis-username
@@ -639,9 +637,7 @@ Modified (1):
            valueFrom:
              secretKeyRef:
                key: redis-sentinel-password
-@@ skipped 32 lines (1351 -> 1382) @@
-         - name: ARGOCD_SERVER_OTLP_INSECURE
-           valueFrom:
+@@ skipped 34 lines (243 -> 276) @@
              configMapKeyRef:
                key: otlp.insecure
                name: argocd-cmd-params-cm
@@ -650,14 +646,14 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: otlp.headers
-+              name: argocd-cmd-params-cm
-+              optional: true
+               name: argocd-cmd-params-cm
+               optional: true
 +        - name: ARGOCD_SERVER_OTLP_ATTRS
 +          valueFrom:
 +            configMapKeyRef:
 +              key: otlp.attrs
-               name: argocd-cmd-params-cm
-               optional: true
++              name: argocd-cmd-params-cm
++              optional: true
          - name: ARGOCD_APPLICATION_NAMESPACES
            valueFrom:
              configMapKeyRef:
@@ -666,7 +662,9 @@ Modified (1):
                optional: true
          - name: ARGOCD_SERVER_ENABLE_PROXY_EXTENSION
            valueFrom:
-@@ skipped 42 lines (1409 -> 1450) @@
+             configMapKeyRef:
+               key: server.enable.proxy.extension
+@@ skipped 40 lines (303 -> 342) @@
              configMapKeyRef:
                key: applicationsetcontroller.allowed.scm.providers
                name: argocd-cmd-params-cm
@@ -707,7 +705,7 @@ Modified (1):
            periodSeconds: 10
            successThreshold: 1
            timeoutSeconds: 1
-@@ skipped 35 lines (1491 -> 1525) @@
+@@ skipped 35 lines (383 -> 417) @@
            name: argocd-dex-server-tls
          - mountPath: /home/argocd
            name: plugins-home
@@ -730,7 +728,9 @@ Modified (1):
        - configMap:
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
-@@ skipped 145 lines (1548 -> 1692) @@
+```
+#### StatefulSet: argocd-helm-chart-application-controller (argocd)
+```diff
              configMapKeyRef:
                key: controller.log.format
                name: argocd-cmd-params-cm
@@ -757,7 +757,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: controller.self.heal.timeout.seconds
-@@ skipped 10 lines (1719 -> 1728) @@
+@@ skipped 10 lines (136 -> 145) @@
              configMapKeyRef:
                key: controller.self.heal.backoff.factor
                name: argocd-cmd-params-cm
@@ -796,7 +796,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: controller.repo.server.strict.tls
-@@ skipped 33 lines (1767 -> 1799) @@
+@@ skipped 33 lines (184 -> 216) @@
            valueFrom:
              secretKeyRef:
                key: redis-username
@@ -819,7 +819,7 @@ Modified (1):
            valueFrom:
              secretKeyRef:
                key: redis-sentinel-password
-@@ skipped 16 lines (1822 -> 1837) @@
+@@ skipped 16 lines (239 -> 254) @@
              configMapKeyRef:
                key: otlp.insecure
                name: argocd-cmd-params-cm
@@ -846,7 +846,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: controller.sharding.algorithm
-@@ skipped 22 lines (1864 -> 1885) @@
+@@ skipped 22 lines (281 -> 302) @@
              configMapKeyRef:
                key: controller.diff.server.side
                name: argocd-cmd-params-cm
@@ -895,7 +895,7 @@ Modified (1):
            failureThreshold: 3
            httpGet:
              path: /healthz
-@@ skipped 12 lines (1934 -> 1945) @@
+@@ skipped 12 lines (351 -> 362) @@
            runAsNonRoot: true
            seccompProfile:
              type: RuntimeDefault
@@ -929,7 +929,9 @@ Modified (1):
            - key: ca.crt
              path: ca.crt
            optional: true
-@@ skipped 99 lines (1979 -> 2077) @@
+```
+#### ClusterRole: argocd-helm-chart-server
+```diff
    name: argocd-helm-chart-server
  rules:
  - apiGroups:
@@ -951,7 +953,9 @@ Modified (1):
  - apiGroups:
    - ""
    resources:
-@@ skipped 115 lines (2099 -> 2213) @@
+```
+#### Role: argocd-helm-chart-application-controller (argocd)
+```diff
    - secrets
    - configmaps
    verbs:
@@ -973,7 +977,9 @@ Modified (1):
    - patch
    - delete
  - apiGroups:
-@@ skipped 96 lines (2235 -> 2330) @@
+```
+#### Role: argocd-helm-chart-applicationset-controller (argocd)
+```diff
    verbs:
    - get
    - list
@@ -998,23 +1004,9 @@ Modified (1):
    - update
 -  - watch
 +  - create
- ---
- apiVersion: rbac.authorization.k8s.io/v1
- kind: Role
- metadata:
-   labels:
-     app.kubernetes.io/component: dex-server
-     app.kubernetes.io/instance: argocd-helm-chart
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: argocd-dex-server
-     app.kubernetes.io/part-of: argocd
-@@ skipped 275 lines (2365 -> 2639) @@
-   name: argocd-helm-chart-server
- subjects:
- - kind: ServiceAccount
-   name: argocd-server
-   namespace: argocd
- ---
+```
+#### ConfigMap: argocd-cm (argocd)
+```diff
  apiVersion: v1
  data:
    admin.enabled: "true"
@@ -1125,15 +1117,9 @@ Modified (1):
      app.kubernetes.io/component: server
      app.kubernetes.io/instance: argocd-helm-chart
      app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: argocd-cm
-     app.kubernetes.io/part-of: argocd
--    app.kubernetes.io/version: v2.13.1
--    helm.sh/chart: argo-cd-7.7.7
-+    app.kubernetes.io/version: v3.2.0
-+    helm.sh/chart: argo-cd-9.1.4
-   name: argocd-cm
-   namespace: argocd
- ---
+```
+#### ConfigMap: argocd-cmd-params-cm (argocd)
+```diff
  apiVersion: v1
  data:
 -  application.namespaces: ""
@@ -1185,7 +1171,9 @@ Modified (1):
      app.kubernetes.io/part-of: argocd
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
-@@ skipped 524 lines (2816 -> 3339) @@
+```
+#### CustomResourceDefinition: applications.argoproj.io
+```diff
                        maxDuration:
                          description: MaxDuration is the maximum amount of time allowed
                            for the backoff strategy
@@ -1210,7 +1198,7 @@ Modified (1):
                      format: int64
                      type: integer
                    dryRun:
-@@ skipped 178 lines (3364 -> 3541) @@
+@@ skipped 178 lines (128 -> 305) @@
                                (Helm's --pass-credentials)
                              type: boolean
                            releaseName:
@@ -1239,7 +1227,7 @@ Modified (1):
                              description: Values specifies Helm values to be passed
                                to helm template, typically defined as a block. ValuesObject
                                takes precedence over Values, so use one or the other.
-@@ skipped 43 lines (3570 -> 3612) @@
+@@ skipped 43 lines (334 -> 376) @@
                              type: array
                            forceCommonAnnotations:
                              description: ForceCommonAnnotations specifies whether
@@ -1282,7 +1270,7 @@ Modified (1):
                              type: string
                            nameSuffix:
                              description: NameSuffix is a suffix appended to resources
-@@ skipped 51 lines (3655 -> 3705) @@
+@@ skipped 51 lines (419 -> 469) @@
                                required:
                                - count
                                - name
@@ -1307,7 +1295,7 @@ Modified (1):
                          properties:
                            env:
                              description: Env is a list of environment variable entries
-@@ skipped 199 lines (3730 -> 3928) @@
+@@ skipped 199 lines (494 -> 692) @@
                                  domains (Helm's --pass-credentials)
                                type: boolean
                              releaseName:
@@ -1336,7 +1324,7 @@ Modified (1):
                                description: Values specifies Helm values to be passed
                                  to helm template, typically defined as a block. ValuesObject
                                  takes precedence over Values, so use one or the other.
-@@ skipped 45 lines (3957 -> 4001) @@
+@@ skipped 45 lines (721 -> 765) @@
                              forceCommonAnnotations:
                                description: ForceCommonAnnotations specifies whether
                                  to force applying common annotations to resources
@@ -1379,7 +1367,7 @@ Modified (1):
                                type: string
                              nameSuffix:
                                description: NameSuffix is a suffix appended to resources
-@@ skipped 51 lines (4044 -> 4094) @@
+@@ skipped 51 lines (808 -> 858) @@
                                  required:
                                  - count
                                  - name
@@ -1404,7 +1392,7 @@ Modified (1):
                            properties:
                              env:
                                description: Env is a list of environment variable entries
-@@ skipped 312 lines (4119 -> 4430) @@
+@@ skipped 312 lines (883 -> 1194) @@
                            (Helm's --pass-credentials)
                          type: boolean
                        releaseName:
@@ -1433,7 +1421,7 @@ Modified (1):
                          description: Values specifies Helm values to be passed to
                            helm template, typically defined as a block. ValuesObject
                            takes precedence over Values, so use one or the other.
-@@ skipped 42 lines (4459 -> 4500) @@
+@@ skipped 42 lines (1223 -> 1264) @@
                            type: string
                          type: array
                        forceCommonAnnotations:
@@ -1476,7 +1464,7 @@ Modified (1):
                          type: string
                        nameSuffix:
                          description: NameSuffix is a suffix appended to resources
-@@ skipped 51 lines (4543 -> 4593) @@
+@@ skipped 51 lines (1307 -> 1357) @@
                            required:
                            - count
                            - name
@@ -1501,7 +1489,7 @@ Modified (1):
                        env:
                          description: Env is a list of environment variable entries
                          items:
-@@ skipped 46 lines (4618 -> 4663) @@
+@@ skipped 46 lines (1382 -> 1427) @@
                      type: string
                    targetRevision:
                      description: |-
@@ -1584,7 +1572,7 @@ Modified (1):
                      chart:
                        description: Chart is a Helm chart name, and must be specified
                          for applications sourced from a Helm repo.
-@@ skipped 125 lines (4746 -> 4870) @@
+@@ skipped 125 lines (1510 -> 1634) @@
                              (Helm's --pass-credentials)
                            type: boolean
                          releaseName:
@@ -1613,7 +1601,7 @@ Modified (1):
                            description: Values specifies Helm values to be passed to
                              helm template, typically defined as a block. ValuesObject
                              takes precedence over Values, so use one or the other.
-@@ skipped 43 lines (4899 -> 4941) @@
+@@ skipped 43 lines (1663 -> 1705) @@
                            type: array
                          forceCommonAnnotations:
                            description: ForceCommonAnnotations specifies whether to
@@ -1633,10 +1621,20 @@ Modified (1):
                            description: Images is a list of Kustomize image override
                              specifications
                            items:
-                             description: KustomizeImage represents a Kustomi
-🚨 Diff is too long
+                             description: KustomizeImage represents a Kustomize image
+                               definition in the format [old_image_name=]<image_name>:<image_tag>
+                             type: string
+                           type: array
+                         kubeVersion:
+                           description: |-
+                             KubeVersion specifies the Kubernetes API version to pass to Helm when templating manifests. By default, Argo CD
+                             uses the Kubernetes version of the target cluster.
+                           type: string
++                        labelIncludeTemplates:
++                          description: LabelIncludeTemplates specifie
 ```
 
+🚨 Diff is too long
 </details>
 
 ⚠️⚠️⚠️ Diff exceeds max length of 65536 characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag

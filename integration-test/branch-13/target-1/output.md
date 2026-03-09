@@ -2,18 +2,16 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Added (1):
-+ ignore-annotation-example (+81)
++ ignore-annotation-example (+79)
 ```
 
 <details>
 <summary>ignore-annotation-example (examples/ignore-annotation/app.yaml)</summary>
 <br>
 
+#### Deployment: super-app-name (default)
 ```diff
-@@ Application added: ignore-annotation-example (examples/ignore-annotation/app.yaml) @@
 +apiVersion: apps/v1
 +kind: Deployment
 +metadata:
@@ -60,7 +58,9 @@ Added (1):
 +        securityContext: {}
 +      securityContext: {}
 +      serviceAccountName: super-app-name
-+---
+```
+#### Service: super-app-name (default)
+```diff
 +apiVersion: v1
 +kind: Service
 +metadata:
@@ -82,7 +82,9 @@ Added (1):
 +    app.kubernetes.io/instance: ignore-annotation-example
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
-+---
+```
+#### ServiceAccount: super-app-name (default)
+```diff
 +apiVersion: v1
 +automountServiceAccountToken: true
 +kind: ServiceAccount
@@ -96,12 +98,11 @@ Added (1):
 +  name: super-app-name
 +  namespace: default
 ```
-
 </details>
 
 _Skipped resources_: 
-- Applications: `2` (base) -> `3` (target)
-- ApplicationSets: `1` (base) -> `0` (target)
+- Applications: `5` (base) -> `6` (target)
+- ApplicationSets: `2` (base) -> `1` (target)
 
 _Stats_:
-[Applications: 41], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 31], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

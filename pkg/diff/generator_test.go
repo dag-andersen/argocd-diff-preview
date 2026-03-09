@@ -1,462 +1,291 @@
 package diff
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
 )
 
-// TestGenerateGitDiff_NewFileWithMultipleResources tests how a new file with multiple
-// YAML resources (separated by ---) is handled in the diff output.
-// Currently, all resources are shown in a single diff block.
-func TestGenerateGitDiff_NewFileWithMultipleResources(t *testing.T) {
-	tempDir := t.TempDir()
-	basePath := filepath.Join(tempDir, "base")
-	targetPath := filepath.Join(tempDir, "target")
+// Tests for buildMatchingSummary
 
-	// New file with 3 resources separated by ---
-	targetContent := `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  replicas: 1
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  type: ClusterIP
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: my-app-config
-  namespace: default
-data:
-  key: value`
-
-	baseApps := []AppInfo{} // No base apps - this is a new file
-	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
-
-	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
-	if err != nil {
-		t.Fatalf("generateGitDiff failed: %v", err)
-	}
-
-	if len(markdownSections) != 1 {
-		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
-	}
-
-	section := markdownSections[0]
-
-	// Verify section metadata
-	if section.appName != "my-app" {
-		t.Errorf("expected appName 'my-app', got %q", section.appName)
-	}
-	if section.filePath != "/path/app" {
-		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
-	}
-
-	expectedComment := "@@ Application added: my-app (/path/app) @@\n"
-	if section.comment != expectedComment {
-		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
-	}
-
-	// Current behavior: all resources in one block, each line prefixed with +
-	expectedContent := `+apiVersion: apps/v1
-+kind: Deployment
-+metadata:
-+  name: my-app
-+  namespace: default
-+spec:
-+  replicas: 1
-+---
-+apiVersion: v1
-+kind: Service
-+metadata:
-+  name: my-app
-+  namespace: default
-+spec:
-+  type: ClusterIP
-+---
-+apiVersion: v1
-+kind: ConfigMap
-+metadata:
-+  name: my-app-config
-+  namespace: default
-+data:
-+  key: value
-`
-
-	if section.content != expectedContent {
-		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+func TestBuildMatchingSummary_NoDiffs(t *testing.T) {
+	result := buildSummary(nil)
+	if result != "No changes found" {
+		t.Errorf("expected 'No changes found', got %q", result)
 	}
 }
 
-// TestGenerateGitDiff_DeletedFileWithMultipleResources tests that a deleted file
-// with multiple YAML resources produces the correct diff output.
-func TestGenerateGitDiff_DeletedFileWithMultipleResources(t *testing.T) {
-	tempDir := t.TempDir()
-	basePath := filepath.Join(tempDir, "base")
-	targetPath := filepath.Join(tempDir, "target")
-
-	// File with 2 resources that will be deleted
-	baseContent := `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  replicas: 1
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  type: ClusterIP`
-
-	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
-	targetApps := []AppInfo{} // App is deleted
-
-	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
-	if err != nil {
-		t.Fatalf("generateGitDiff failed: %v", err)
-	}
-
-	if len(markdownSections) != 1 {
-		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
-	}
-
-	section := markdownSections[0]
-
-	// Verify section metadata
-	if section.appName != "my-app" {
-		t.Errorf("expected appName 'my-app', got %q", section.appName)
-	}
-	if section.filePath != "/path/app" {
-		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
-	}
-
-	expectedComment := "@@ Application deleted: my-app (/path/app) @@\n"
-	if section.comment != expectedComment {
-		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
-	}
-
-	// Current behavior: all resources in one block, each line prefixed with -
-	// Note: The YAML separator --- also gets a - prefix, appearing as ----
-	expectedContent := `-apiVersion: apps/v1
--kind: Deployment
--metadata:
--  name: my-app
--  namespace: default
--spec:
--  replicas: 1
-----
--apiVersion: v1
--kind: Service
--metadata:
--  name: my-app
--  namespace: default
--spec:
--  type: ClusterIP
-`
-
-	if section.content != expectedContent {
-		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+func TestBuildMatchingSummary_EmptySlice(t *testing.T) {
+	result := buildSummary([]matching.AppDiff{})
+	if result != "No changes found" {
+		t.Errorf("expected 'No changes found', got %q", result)
 	}
 }
 
-// TestGenerateGitDiff_ModifiedFileWithMultipleResources tests modifications to a file
-// containing multiple YAML resources.
-func TestGenerateGitDiff_ModifiedFileWithMultipleResources(t *testing.T) {
-	tempDir := t.TempDir()
-	basePath := filepath.Join(tempDir, "base")
-	targetPath := filepath.Join(tempDir, "target")
-
-	baseContent := `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  replicas: 1
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  type: ClusterIP`
-
-	// Only change the replicas in the Deployment
-	targetContent := `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  replicas: 3
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-app
-  namespace: default
-spec:
-  type: ClusterIP`
-
-	baseApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: baseContent}}
-	targetApps := []AppInfo{{Id: "app.yaml", Name: "my-app", SourcePath: "/path/app", FileContent: targetContent}}
-
-	_, markdownSections, _, err := generateGitDiff(basePath, targetPath, nil, 10, false, baseApps, targetApps, "")
-	if err != nil {
-		t.Fatalf("generateGitDiff failed: %v", err)
+func TestBuildMatchingSummary_OnlyAdded(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{NewName: "app-1", Action: matching.ActionAdded, AddedLines: 10},
+		{NewName: "app-2", Action: matching.ActionAdded, AddedLines: 5},
 	}
 
-	if len(markdownSections) != 1 {
-		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
+	result := buildSummary(diffs)
+
+	if !strings.Contains(result, "Added (2):") {
+		t.Errorf("expected 'Added (2):', got:\n%s", result)
 	}
-
-	section := markdownSections[0]
-
-	// Verify section metadata
-	if section.appName != "my-app" {
-		t.Errorf("expected appName 'my-app', got %q", section.appName)
+	if !strings.Contains(result, "+ app-1 (+10)") {
+		t.Errorf("expected '+ app-1 (+10)', got:\n%s", result)
 	}
-	if section.filePath != "/path/app" {
-		t.Errorf("expected filePath '/path/app', got %q", section.filePath)
+	if !strings.Contains(result, "+ app-2 (+5)") {
+		t.Errorf("expected '+ app-2 (+5)', got:\n%s", result)
 	}
-
-	expectedComment := "@@ Application modified: my-app (/path/app) @@\n"
-	if section.comment != expectedComment {
-		t.Errorf("expected comment %q, got %q", expectedComment, section.comment)
+	// Should NOT contain Deleted or Modified sections
+	if strings.Contains(result, "Deleted") {
+		t.Errorf("should not contain 'Deleted', got:\n%s", result)
 	}
-
-	// Current behavior: unified diff showing context lines with space prefix,
-	// removed lines with - prefix, and added lines with + prefix
-	expectedContent := ` apiVersion: apps/v1
- kind: Deployment
- metadata:
-   name: my-app
-   namespace: default
- spec:
--  replicas: 1
-+  replicas: 3
- ---
- apiVersion: v1
- kind: Service
- metadata:
-   name: my-app
-   namespace: default
- spec:
-   type: ClusterIP
-`
-
-	if section.content != expectedContent {
-		t.Errorf("content mismatch.\n\nExpected:\n%s\n\nActual:\n%s", expectedContent, section.content)
+	if strings.Contains(result, "Modified") {
+		t.Errorf("should not contain 'Modified', got:\n%s", result)
 	}
 }
 
-func TestGenerateGitDiff_HideDeletedAppDiffMessage(t *testing.T) {
-	tempDir := t.TempDir()
-	basePath := filepath.Join(tempDir, "base")
-	targetPath := filepath.Join(tempDir, "target")
-
-	baseApps := []AppInfo{
-		{
-			Id:          "app.yaml",
-			Name:        "app",
-			SourcePath:  "/path/app",
-			FileContent: "kind: ConfigMap\nmetadata:\n  name: app\n",
-		},
+func TestBuildMatchingSummary_OnlyDeleted(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{OldName: "app-1", Action: matching.ActionDeleted, DeletedLines: 15},
 	}
 
-	summary, markdownSections, htmlSections, err := generateGitDiff(basePath, targetPath, nil, 3, true, baseApps, nil, "")
-	if err != nil {
-		t.Fatalf("generateGitDiff failed: %v", err)
+	result := buildSummary(diffs)
+
+	if !strings.Contains(result, "Deleted (1):") {
+		t.Errorf("expected 'Deleted (1):', got:\n%s", result)
 	}
-	if summary == "No changes found" {
-		t.Fatalf("expected changes for deleted app, got %q", summary)
-	}
-	if len(markdownSections) != 1 {
-		t.Fatalf("expected 1 markdown section, got %d", len(markdownSections))
-	}
-	if len(htmlSections) != 1 {
-		t.Fatalf("expected 1 html section, got %d", len(htmlSections))
-	}
-	if markdownSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("markdown content = %q, want %q", markdownSections[0].content, deletedAppDiffHiddenMessage)
-	}
-	if htmlSections[0].content != deletedAppDiffHiddenMessage {
-		t.Fatalf("html content = %q, want %q", htmlSections[0].content, deletedAppDiffHiddenMessage)
+	if !strings.Contains(result, "- app-1 (-15)") {
+		t.Errorf("expected '- app-1 (-15)', got:\n%s", result)
 	}
 }
 
-// TestGenerateGitDiff_HideDeletedAppDiff tests the hideDeletedAppDiff parameter behavior
-func TestGenerateGitDiff_HideDeletedAppDiff(t *testing.T) {
-	// Create temporary directory for test
-	tempDir, err := os.MkdirTemp("", "diff-test-hide-deleted-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	basePath := filepath.Join(tempDir, "base")
-	targetPath := filepath.Join(tempDir, "target")
-
-	appContent := `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: test-app
-spec:
-  replicas: 1`
-
-	modifiedContent := `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: test-app
-spec:
-  replicas: 2`
-
-	// Base apps: has both app-to-delete and app-to-modify
-	baseApps := []AppInfo{
-		{
-			Id:          "deleted-app.yaml",
-			Name:        "app-to-delete",
-			SourcePath:  "/path/to/deleted",
-			FileContent: appContent,
-		},
-		{
-			Id:          "modified-app.yaml",
-			Name:        "app-to-modify",
-			SourcePath:  "/path/to/modified",
-			FileContent: appContent,
-		},
+func TestBuildMatchingSummary_OnlyModified(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{OldName: "app-1", NewName: "app-1", Action: matching.ActionModified, AddedLines: 3, DeletedLines: 2},
 	}
 
-	// Target apps: only has app-to-modify (app-to-delete is deleted)
-	targetApps := []AppInfo{
+	result := buildSummary(diffs)
+
+	if !strings.Contains(result, "Modified (1):") {
+		t.Errorf("expected 'Modified (1):', got:\n%s", result)
+	}
+	if !strings.Contains(result, "± app-1 (+3|-2)") {
+		t.Errorf("expected '± app-1 (+3|-2)', got:\n%s", result)
+	}
+}
+
+func TestBuildMatchingSummary_MixedActions(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{OldName: "deleted-app", Action: matching.ActionDeleted, DeletedLines: 20},
+		{OldName: "mod-app", NewName: "mod-app", Action: matching.ActionModified, AddedLines: 5, DeletedLines: 3},
+		{NewName: "new-app", Action: matching.ActionAdded, AddedLines: 12},
+	}
+
+	result := buildSummary(diffs)
+
+	if !strings.Contains(result, "Added (1):") {
+		t.Errorf("expected 'Added (1):', got:\n%s", result)
+	}
+	if !strings.Contains(result, "Deleted (1):") {
+		t.Errorf("expected 'Deleted (1):', got:\n%s", result)
+	}
+	if !strings.Contains(result, "Modified (1):") {
+		t.Errorf("expected 'Modified (1):', got:\n%s", result)
+	}
+}
+
+func TestBuildMatchingSummary_RenamedApp(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{OldName: "old-name", NewName: "new-name", Action: matching.ActionModified, AddedLines: 1},
+	}
+
+	result := buildSummary(diffs)
+
+	// PrettyName for renamed app should show "old-name -> new-name"
+	if !strings.Contains(result, "± old-name -> new-name") {
+		t.Errorf("expected renamed app in summary, got:\n%s", result)
+	}
+}
+
+func TestBuildMatchingSummary_NoChangeStats(t *testing.T) {
+	// An app with 0 added and 0 deleted lines should show no stats
+	diffs := []matching.AppDiff{
+		{OldName: "app-1", NewName: "app-1", Action: matching.ActionModified},
+	}
+
+	result := buildSummary(diffs)
+
+	// ChangeStats() returns "" when both are 0, so just the name
+	if !strings.Contains(result, "± app-1\n") {
+		t.Errorf("expected 'app-1' without stats, got:\n%s", result)
+	}
+}
+
+// Tests for buildAppURLFromDiff
+
+func TestBuildAppURLFromDiff(t *testing.T) {
+	tests := []struct {
+		name     string
+		diff     matching.AppDiff
+		baseURL  string
+		expected string
+	}{
 		{
-			Id:          "modified-app.yaml",
-			Name:        "app-to-modify",
-			SourcePath:  "/path/to/modified",
-			FileContent: modifiedContent,
+			name:     "empty base URL",
+			diff:     matching.AppDiff{OldName: "my-app", NewName: "my-app"},
+			baseURL:  "",
+			expected: "",
+		},
+		{
+			name:     "prefers old name",
+			diff:     matching.AppDiff{OldName: "old-app", NewName: "new-app"},
+			baseURL:  "https://argocd.example.com",
+			expected: "https://argocd.example.com/applications/old-app",
+		},
+		{
+			name:     "falls back to new name when no old name",
+			diff:     matching.AppDiff{NewName: "new-app"},
+			baseURL:  "https://argocd.example.com",
+			expected: "https://argocd.example.com/applications/new-app",
+		},
+		{
+			name:     "both names empty",
+			diff:     matching.AppDiff{},
+			baseURL:  "https://argocd.example.com",
+			expected: "",
+		},
+		{
+			name:     "trailing slash in base URL",
+			diff:     matching.AppDiff{OldName: "my-app"},
+			baseURL:  "https://argocd.example.com/",
+			expected: "https://argocd.example.com/applications/my-app",
+		},
+		{
+			name:     "multiple trailing slashes in base URL",
+			diff:     matching.AppDiff{OldName: "my-app"},
+			baseURL:  "https://argocd.example.com///",
+			expected: "https://argocd.example.com/applications/my-app",
 		},
 	}
 
-	t.Run("hideDeletedAppDiff=false shows full diff for deleted apps", func(t *testing.T) {
-
-		hideDeletedAppDiff := false
-
-		summary, markdownSections, htmlSections, err := generateGitDiff(
-			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "",
-		)
-
-		if err != nil {
-			t.Fatalf("generateGitDiff failed: %v", err)
-		}
-
-		// Should have 2 sections: one deleted, one modified
-		if len(markdownSections) != 2 {
-			t.Errorf("Expected 2 sections, got %d", len(markdownSections))
-		}
-		if len(htmlSections) != 2 {
-			t.Errorf("Expected 2 HTML sections, got %d", len(htmlSections))
-		}
-
-		// Summary should mention both deleted and modified
-		if !strings.Contains(summary, "Deleted") {
-			t.Errorf("Summary should contain 'Deleted', got: %s", summary)
-		}
-		if !strings.Contains(summary, "Modified") {
-			t.Errorf("Summary should contain 'Modified', got: %s", summary)
-		}
-
-		// Find the deleted app section and verify it has diff content
-		foundDeletedWithContent := false
-		for _, section := range markdownSections {
-			sectionContent, _ := section.build(10000)
-			if strings.Contains(sectionContent, "app-to-delete") {
-				if strings.Contains(sectionContent, "Application deleted") {
-					// Should have actual diff content (minus lines showing the deleted content)
-					if strings.Contains(sectionContent, "- apiVersion:") || strings.Contains(sectionContent, "-apiVersion:") {
-						foundDeletedWithContent = true
-					}
-				}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := buildAppURLFromDiff(tc.diff, tc.baseURL)
+			if result != tc.expected {
+				t.Errorf("buildAppURLFromDiff() = %q, want %q", result, tc.expected)
 			}
-		}
+		})
+	}
+}
 
-		if !foundDeletedWithContent {
-			t.Error("With hideDeletedAppDiff=false, deleted app should have diff content showing removed lines")
-		}
-	})
+// Tests for buildMatchingSections
 
-	t.Run("hideDeletedAppDiff=true hides diff content for deleted apps", func(t *testing.T) {
-		hideDeletedAppDiff := true
-		summary, markdownSections, htmlSections, err := generateGitDiff(
-			basePath, targetPath, nil, 3, hideDeletedAppDiff, baseApps, targetApps, "",
-		)
+func TestBuildMatchingSections_Empty(t *testing.T) {
+	md, html := buildMatchingSections(nil, "")
+	if len(md) != 0 {
+		t.Errorf("expected 0 markdown sections, got %d", len(md))
+	}
+	if len(html) != 0 {
+		t.Errorf("expected 0 html sections, got %d", len(html))
+	}
+}
 
-		if err != nil {
-			t.Fatalf("generateGitDiff failed: %v", err)
-		}
+func TestBuildMatchingSections_WithResources(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{
+			OldName:       "my-app",
+			NewName:       "my-app",
+			OldSourcePath: "/path/to/app",
+			NewSourcePath: "/path/to/app",
+			Action:        matching.ActionModified,
+			Resources: []matching.ResourceDiff{
+				{
+					Kind:      "Deployment",
+					Name:      "my-deploy",
+					Namespace: "default",
+					Content:   "-replicas: 1\n+replicas: 3\n",
+				},
+			},
+		},
+	}
 
-		// Should have 2 sections: one deleted (header only), one modified
-		if len(markdownSections) != 2 {
-			t.Errorf("Expected 2 sections, got %d", len(markdownSections))
-		}
-		if len(htmlSections) != 2 {
-			t.Errorf("Expected 2 HTML sections, got %d", len(htmlSections))
-		}
+	md, html := buildMatchingSections(diffs, "https://argocd.example.com")
 
-		// Summary should still mention both deleted and modified
-		if !strings.Contains(summary, "Deleted") {
-			t.Errorf("Summary should contain 'Deleted', got: %s", summary)
-		}
-		if !strings.Contains(summary, "Modified") {
-			t.Errorf("Summary should contain 'Modified', got: %s", summary)
-		}
+	if len(md) != 1 {
+		t.Fatalf("expected 1 markdown section, got %d", len(md))
+	}
+	if len(html) != 1 {
+		t.Fatalf("expected 1 html section, got %d", len(html))
+	}
 
-		// Find the deleted app section and verify it shows the hidden message instead of full diff
-		for _, section := range markdownSections {
-			sectionContent, _ := section.build(10000)
-			if strings.Contains(sectionContent, "app-to-delete") {
-				// Should have the deletion header
-				if !strings.Contains(sectionContent, "Application deleted") {
-					t.Error("Deleted app should have deletion header")
-				}
-				// Should have the hidden message
-				if !strings.Contains(sectionContent, deletedAppDiffHiddenMessage) {
-					t.Errorf("With hideDeletedAppDiff=true, deleted app should show hidden message, got: %s", sectionContent)
-				}
-				// Should NOT have actual diff content (no minus lines showing removed content)
-				if strings.Contains(sectionContent, "- apiVersion:") || strings.Contains(sectionContent, "-apiVersion:") {
-					t.Error("With hideDeletedAppDiff=true, deleted app should NOT have diff content showing removed lines")
-				}
-			}
-		}
+	// Check markdown section
+	if md[0].appName != "my-app" {
+		t.Errorf("expected appName='my-app', got %q", md[0].appName)
+	}
+	if md[0].filePath != "/path/to/app" {
+		t.Errorf("expected filePath='/path/to/app', got %q", md[0].filePath)
+	}
+	if md[0].appURL != "https://argocd.example.com/applications/my-app" {
+		t.Errorf("expected appURL with my-app, got %q", md[0].appURL)
+	}
+	if len(md[0].resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(md[0].resources))
+	}
+	if md[0].resources[0].Header != "Deployment: my-deploy (default)" {
+		t.Errorf("expected resource header, got %q", md[0].resources[0].Header)
+	}
 
-		// Verify modified app still has its diff content
-		foundModifiedWithContent := false
-		for _, section := range markdownSections {
-			sectionContent, _ := section.build(10000)
-			if strings.Contains(sectionContent, "app-to-modify") {
-				if strings.Contains(sectionContent, "replicas: 1") && strings.Contains(sectionContent, "replicas: 2") {
-					foundModifiedWithContent = true
-				}
-			}
-		}
+	// HTML section should mirror markdown
+	if html[0].appName != md[0].appName {
+		t.Errorf("html and markdown appName should match")
+	}
+	if html[0].appURL != md[0].appURL {
+		t.Errorf("html and markdown appURL should match")
+	}
+}
 
-		if !foundModifiedWithContent {
-			t.Error("Modified app should still have its diff content")
-		}
-	})
+func TestBuildMatchingSections_SkippedResource(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{
+			NewName:       "my-app",
+			NewSourcePath: "/path",
+			Action:        matching.ActionModified,
+			Resources: []matching.ResourceDiff{
+				{
+					Kind:      "Secret",
+					Name:      "my-secret",
+					Namespace: "default",
+					IsSkipped: true,
+				},
+			},
+		},
+	}
+
+	md, _ := buildMatchingSections(diffs, "")
+	if len(md) != 1 || len(md[0].resources) != 1 {
+		t.Fatalf("expected 1 section with 1 resource")
+	}
+	if !md[0].resources[0].IsSkipped {
+		t.Error("expected resource to be marked as skipped")
+	}
+}
+
+func TestBuildMatchingSections_NoURL(t *testing.T) {
+	diffs := []matching.AppDiff{
+		{
+			NewName:       "my-app",
+			NewSourcePath: "/path",
+			Action:        matching.ActionAdded,
+		},
+	}
+
+	md, _ := buildMatchingSections(diffs, "")
+	if md[0].appURL != "" {
+		t.Errorf("expected empty appURL when no argocdUIURL, got %q", md[0].appURL)
+	}
 }

@@ -37,6 +37,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -49,20 +59,19 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Total: 1 files changed
-
-Deleted (1):
-- nginx-ingress (-480)</pre>
+<pre>Deleted (1):
+- nginx-ingress (-470)</pre>
 
 <div class="diffs">
 <details>
 <summary>
 nginx-ingress (examples/external-chart/nginx.yaml)
 </summary>
+
+<h4 class="resource_header">ValidatingWebhookConfiguration: nginx-ingress-ingress-nginx-admission</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: admissionregistration.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ValidatingWebhookConfiguration</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -97,7 +106,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    resources:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    - ingresses</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  sideEffects: None</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment: nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -221,7 +236,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-      - name: webhook-cert</pre></td></tr>
 	<tr class="removed_line"><td><pre>-        secret:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-          secretName: nginx-ingress-ingress-nginx-admission</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">IngressClass: nginx</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: networking.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: IngressClass</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -236,7 +257,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  name: nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  controller: k8s.io/ingress-nginx</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ClusterRole: nginx-ingress-ingress-nginx</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ClusterRole</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -319,7 +346,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ClusterRoleBinding: nginx-ingress-ingress-nginx</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ClusterRoleBinding</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -339,7 +372,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-- kind: ServiceAccount</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Role: nginx-ingress-ingress-nginx (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Role</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -431,7 +470,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">RoleBinding: nginx-ingress-ingress-nginx (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: RoleBinding</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -453,7 +498,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-- kind: ServiceAccount</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ConfigMap: nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-data:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  allow-snippet-annotations: &#34;false&#34;</pre></td></tr>
@@ -469,7 +520,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-controller</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -503,7 +560,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: LoadBalancer</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: nginx-ingress-ingress-nginx-controller-admission (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -528,7 +591,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: ClusterIP</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount: nginx-ingress-ingress-nginx (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-automountServiceAccountToken: true</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ServiceAccount</pre></td></tr>
@@ -545,6 +614,7 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

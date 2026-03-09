@@ -27,8 +27,9 @@ func WriteNoAppsFoundMessage(
 	outputFolder string,
 	selectors []app_selector.Selector,
 	changedFiles []string,
+	watchIfNoWatchPatternFound bool,
 ) error {
-	message := getNoAppsFoundMessage(selectors, changedFiles)
+	message := getNoAppsFoundMessage(selectors, changedFiles, watchIfNoWatchPatternFound)
 	markdown := generateNoAppsFoundMarkdown(title, message)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
@@ -53,16 +54,16 @@ func generateNoAppsFoundMarkdown(title, message string) string {
 }
 
 // getNoAppsFoundMessage generates an appropriate message based on selectors and changed files
-func getNoAppsFoundMessage(selectors []app_selector.Selector, changedFiles []string) string {
+func getNoAppsFoundMessage(selectors []app_selector.Selector, changedFiles []string, watchIfNoWatchPatternFound bool) string {
 	switch {
-	case len(selectors) > 0 && len(changedFiles) > 0:
+	case len(selectors) > 0 && len(changedFiles) > 0 && !watchIfNoWatchPatternFound:
 		return fmt.Sprintf(
 			"Found no changed Applications that matched `%s` and watched these files: `%s`",
 			formatSelectors(selectors), formatChangedFiles(changedFiles),
 		)
 	case len(selectors) > 0:
 		return fmt.Sprintf("Found no changed Applications that matched `%s`", formatSelectors(selectors))
-	case len(changedFiles) > 0:
+	case len(changedFiles) > 0 && !watchIfNoWatchPatternFound:
 		return fmt.Sprintf("Found no changed Applications that watched these files: `%s`", formatChangedFiles(changedFiles))
 	default:
 		return "Found no Applications"

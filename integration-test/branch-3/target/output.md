@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± my-service-staging (+1|-1)
 ```
@@ -12,8 +10,8 @@ Modified (1):
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
+#### Deployment: staging-myapp (default)
 ```diff
-@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -35,8 +33,7 @@ Modified (1):
        containers:
        - image: dag-andersen/myapp:latest
 ```
-
 </details>
 
 _Stats_:
-[Applications: 40], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 30], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

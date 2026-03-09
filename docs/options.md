@@ -31,6 +31,8 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--kind-internal`                   | `KIND_INTERNAL`                   | `false` | Use the kind cluster's internal address in the kubeconfig (allows connecting to the cluster when running the CLI in a container) |
 | `--use-argocd-api`                  | `USE_ARGOCD_API`                  | `false` | Use Argo CD API instead of CLI (useful for namespace-scoped Argo CD installations)                                               |
 | `--version`, `-v`                   | -                                 | -       | Prints version information                                                                                                       |
+| `--output-app-manifests`            | `OUTPUT_APP_MANIFESTS`            | `false` | Write each application's manifests to its own file under `output/base/` and `output/target/`                                     |
+| `--output-branch-manifests`         | `OUTPUT_BRANCH_MANIFESTS`         | `false` | Write all application manifests per branch into a single file (`output/base-branch.yaml` and `output/target-branch.yaml`)        |
 
 ## Options
 

@@ -37,6 +37,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -49,9 +59,7 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Total: 7 files changed
-
-Modified (7):
+<pre>Modified (7):
 ± app1 (+1|-1)
 ± app1 (+1|-1)
 ± app2 (+1|-1)
@@ -65,10 +73,11 @@ Modified (7):
 <summary>
 app1 (examples/duplicate-names/app/app-set-1.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: app1 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -83,16 +92,18 @@ app1 (examples/duplicate-names/app/app-set-1.yaml)
 	<tr class="added_line"><td><pre>+        - containerPort: 8080</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app1 (examples/duplicate-names/app/app-set-2.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: app1 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -107,16 +118,18 @@ app1 (examples/duplicate-names/app/app-set-2.yaml)
 	<tr class="added_line"><td><pre>+        - containerPort: 8080</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app2 (examples/duplicate-names/app/app-set-1.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: app2 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -131,16 +144,18 @@ app2 (examples/duplicate-names/app/app-set-1.yaml)
 	<tr class="added_line"><td><pre>+        - containerPort: 8080</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app2 (examples/duplicate-names/app/app-set-2.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: app2 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>       app: myapp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
@@ -155,16 +170,18 @@ app2 (examples/duplicate-names/app/app-set-2.yaml)
 	<tr class="added_line"><td><pre>+        - containerPort: 8080</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: super-app-name (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -199,13 +216,13 @@ my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 	<tr class="normal_line"><td><pre>         imagePullPolicy: IfNotPresent</pre></td></tr>
 	<tr class="normal_line"><td><pre>         livenessProbe:</pre></td></tr>
 	<tr class="normal_line"><td><pre>           httpGet:</pre></td></tr>
-	<tr class="comment_line"><td><pre>@@ skipped 10 lines (34 -&gt; 43) @@</pre></td></tr>
-	<tr class="normal_line"><td><pre>             port: http</pre></td></tr>
-	<tr class="normal_line"><td><pre>         resources: {}</pre></td></tr>
-	<tr class="normal_line"><td><pre>         securityContext: {}</pre></td></tr>
-	<tr class="normal_line"><td><pre>       securityContext: {}</pre></td></tr>
-	<tr class="normal_line"><td><pre>       serviceAccountName: super-app-name</pre></td></tr>
-	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: Service</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
@@ -229,7 +246,13 @@ my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 	<tr class="added_line"><td><pre>+    app.kubernetes.io/instance: my-super-app</pre></td></tr>
 	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="normal_line"><td><pre>   type: ClusterIP</pre></td></tr>
-	<tr class="normal_line"><td><pre> ---</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
 	<tr class="normal_line"><td><pre> automountServiceAccountToken: true</pre></td></tr>
 	<tr class="normal_line"><td><pre> kind: ServiceAccount</pre></td></tr>
@@ -245,16 +268,18 @@ my-app -&gt; my-super-app (examples/helm/applications/my-app.yaml)
 	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: staging-myapp (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: my-service-staging (examples/kustomize/applications/my-service-staging.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       containers:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       - image: dag-andersen/myapp:latest</pre></td></tr>
@@ -267,28 +292,20 @@ my-service-staging (examples/kustomize/applications/my-service-staging.yaml)
 	<tr class="normal_line"><td><pre>           requests:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-            memory: 128Mi</pre></td></tr>
 	<tr class="added_line"><td><pre>+            memory: 64Mi</pre></td></tr>
-	<tr class="normal_line"><td><pre> ---</pre></td></tr>
-	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
-	<tr class="normal_line"><td><pre> kind: Service</pre></td></tr>
-	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
-	<tr class="normal_line"><td><pre>   labels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app: myapp</pre></td></tr>
-	<tr class="normal_line"><td><pre>   name: staging-myapp</pre></td></tr>
-	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
-	<tr class="normal_line"><td><pre> spec:</pre></td></tr>
-	<tr class="normal_line"><td><pre>   ports:</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 nginx-ingress (examples/helm/applications/nginx.yaml -&gt; examples/helm/applications/nginx-new-path.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: nginx-ingress-ingress-nginx-controller (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: nginx-ingress (examples/helm/applications/nginx.yaml -&gt; examples/helm/applications/nginx-new-path.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>         app.kubernetes.io/part-of: ingress-nginx</pre></td></tr>
 	<tr class="normal_line"><td><pre>         app.kubernetes.io/version: 1.10.0</pre></td></tr>
 	<tr class="normal_line"><td><pre>         helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
@@ -313,11 +330,12 @@ nginx-ingress (examples/helm/applications/nginx.yaml -&gt; examples/helm/applica
 	<tr class="normal_line"><td><pre>               fieldPath: metadata.name</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 
 <pre>_Stats_:
-[Applications: 36], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 34], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>

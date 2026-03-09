@@ -37,6 +37,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -49,28 +59,27 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Total: 9 files changed
-
-Deleted (9):
+<pre>Deleted (9):
 - app1 (-19)
 - app1 (-19)
 - app2 (-19)
 - app2 (-19)
 - custom-target-revision-example (-14)
-- my-app-set-dev (-81)
-- my-app-set-prod (-81)
-- my-app-set-staging (-81)
-- nginx-ingress (-480)</pre>
+- my-app-set-dev (-79)
+- my-app-set-prod (-79)
+- my-app-set-staging (-79)
+- nginx-ingress (-470)</pre>
 
 <div class="diffs">
 <details>
 <summary>
 app1 (examples/duplicate-names/app/app-set-1.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: app1 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -92,16 +101,18 @@ app1 (examples/duplicate-names/app/app-set-1.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app1 (examples/duplicate-names/app/app-set-2.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: app1 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -123,16 +134,18 @@ app1 (examples/duplicate-names/app/app-set-2.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app2 (examples/duplicate-names/app/app-set-1.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: app2 (examples/duplicate-names/app/app-set-1.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -154,16 +167,18 @@ app2 (examples/duplicate-names/app/app-set-1.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 app2 (examples/duplicate-names/app/app-set-2.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: deploy-from-folder-one</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: app2 (examples/duplicate-names/app/app-set-2.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -185,16 +200,18 @@ app2 (examples/duplicate-names/app/app-set-2.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 custom-target-revision-example (examples/custom-target-revision/app/app.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: my-deployment (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: custom-target-revision-example (examples/custom-target-revision/app/app.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -211,16 +228,18 @@ custom-target-revision-example (examples/custom-target-revision/app/app.yaml)
 	<tr class="removed_line"><td><pre>-        - containerPort: 80</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app-set-dev (examples/basic-appset/my-app-set.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: super-app-name (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: my-app-set-dev (examples/basic-appset/my-app-set.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -267,7 +286,13 @@ my-app-set-dev (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-        securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      serviceAccountName: super-app-name</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -289,7 +314,13 @@ my-app-set-dev (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: my-app-set-dev</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: ClusterIP</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-automountServiceAccountToken: true</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ServiceAccount</pre></td></tr>
@@ -304,16 +335,18 @@ my-app-set-dev (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app-set-prod (examples/basic-appset/my-app-set.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: super-app-name (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: my-app-set-prod (examples/basic-appset/my-app-set.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -360,7 +393,13 @@ my-app-set-prod (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-        securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      serviceAccountName: super-app-name</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -382,7 +421,13 @@ my-app-set-prod (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: my-app-set-prod</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: ClusterIP</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-automountServiceAccountToken: true</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ServiceAccount</pre></td></tr>
@@ -397,16 +442,18 @@ my-app-set-prod (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 my-app-set-staging (examples/basic-appset/my-app-set.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: super-app-name (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: my-app-set-staging (examples/basic-appset/my-app-set.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -453,7 +500,13 @@ my-app-set-staging (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-        securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      serviceAccountName: super-app-name</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -475,7 +528,13 @@ my-app-set-staging (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: my-app-set-staging</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: myApp</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: ClusterIP</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount: super-app-name (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-automountServiceAccountToken: true</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ServiceAccount</pre></td></tr>
@@ -490,16 +549,18 @@ my-app-set-staging (examples/basic-appset/my-app-set.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 
 <details>
 <summary>
 nginx-ingress (examples/external-chart/nginx.yaml)
 </summary>
+
+<h4 class="resource_header">ValidatingWebhookConfiguration: nginx-ingress-ingress-nginx-admission</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application deleted: nginx-ingress (examples/external-chart/nginx.yaml) @@</pre></td></tr>
+
 	<tr class="removed_line"><td><pre>-apiVersion: admissionregistration.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ValidatingWebhookConfiguration</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -534,7 +595,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    resources:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    - ingresses</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  sideEffects: None</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Deployment: nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: apps/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Deployment</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -658,7 +725,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-      - name: webhook-cert</pre></td></tr>
 	<tr class="removed_line"><td><pre>-        secret:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-          secretName: nginx-ingress-ingress-nginx-admission</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">IngressClass: nginx</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: networking.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: IngressClass</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -673,7 +746,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  name: nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-spec:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  controller: k8s.io/ingress-nginx</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ClusterRole: nginx-ingress-ingress-nginx</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ClusterRole</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -756,7 +835,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ClusterRoleBinding: nginx-ingress-ingress-nginx</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ClusterRoleBinding</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -776,7 +861,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-- kind: ServiceAccount</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Role: nginx-ingress-ingress-nginx (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Role</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -868,7 +959,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">RoleBinding: nginx-ingress-ingress-nginx (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: RoleBinding</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -890,7 +987,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-- kind: ServiceAccount</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ConfigMap: nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-data:</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  allow-snippet-annotations: &#34;false&#34;</pre></td></tr>
@@ -906,7 +1009,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    helm.sh/chart: ingress-nginx-4.10.0</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  name: nginx-ingress-ingress-nginx-controller</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: nginx-ingress-ingress-nginx-controller (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -940,7 +1049,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: LoadBalancer</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">Service: nginx-ingress-ingress-nginx-controller-admission (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: Service</pre></td></tr>
 	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
@@ -965,7 +1080,13 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/instance: nginx-ingress</pre></td></tr>
 	<tr class="removed_line"><td><pre>-    app.kubernetes.io/name: ingress-nginx</pre></td></tr>
 	<tr class="removed_line"><td><pre>-  type: ClusterIP</pre></td></tr>
-	<tr class="removed_line"><td><pre>----</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ServiceAccount: nginx-ingress-ingress-nginx (default)</h4>
+<div class="diff_container">
+<table>
+
 	<tr class="removed_line"><td><pre>-apiVersion: v1</pre></td></tr>
 	<tr class="removed_line"><td><pre>-automountServiceAccountToken: true</pre></td></tr>
 	<tr class="removed_line"><td><pre>-kind: ServiceAccount</pre></td></tr>
@@ -982,11 +1103,12 @@ nginx-ingress (examples/external-chart/nginx.yaml)
 	<tr class="removed_line"><td><pre>-  namespace: default</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 
 <pre>_Stats_:
-[Applications: 31], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 21], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>

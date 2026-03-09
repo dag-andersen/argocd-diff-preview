@@ -37,6 +37,16 @@ tr.removed_line {
 tr.comment_line {
 	background:rgb(197, 194, 194);
 }
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
 pre {
 	margin: 0;
 	padding-left: 15px;
@@ -49,9 +59,7 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Total: 1 files changed
-
-Modified (1):
+<pre>Modified (1):
 ± my-app (+1|-1)</pre>
 
 <div class="diffs">
@@ -59,10 +67,11 @@ Modified (1):
 <summary>
 my-app (examples/helm-kustomize-postrender/application.yaml)
 </summary>
+
+<h4 class="resource_header">Deployment: my-app (default)</h4>
 <div class="diff_container">
 <table>
-	
-	<tr class="comment_line"><td><pre>@@ Application modified: my-app (examples/helm-kustomize-postrender/application.yaml) @@</pre></td></tr>
+
 	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
 	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>       labels:</pre></td></tr>
@@ -77,6 +86,7 @@ my-app (examples/helm-kustomize-postrender/application.yaml)
 	<tr class="added_line"><td><pre>+        - containerPort: 8080</pre></td></tr>
 </table>
 </div>
+
 </details>
 </div>
 

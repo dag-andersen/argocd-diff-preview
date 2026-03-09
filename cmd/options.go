@@ -47,7 +47,7 @@ const (
 // defaults
 var (
 	DefaultTimeout                    = uint64(180)
-	DefaultLineCount                  = uint(7)
+	DefaultLineCount                  = uint(5)
 	DefaultBaseBranch                 = "main"
 	DefaultOutputFolder               = "./output"
 	DefaultSecretsFolder              = "./secrets"
@@ -66,21 +66,22 @@ var (
 	DefaultLogFormat                  = "human"
 	DefaultTitle                      = "Argo CD Diff Preview"
 	DefaultCreateCluster              = true
-	DefaultUseArgoCDApi               = false
 	DefaultKeepClusterAlive           = false
 	DefaultDryRun                     = false
-	DefaultAutoDetectFilesChanged     = false
-	DefaultWatchIfNoWatchPatternFound = false
+	DefaultAutoDetectFilesChanged     = true
+	DefaultWatchIfNoWatchPatternFound = true
 	DefaultIgnoreInvalidWatchPattern  = false
 	DefaultHideDeletedAppDiff         = false
 	DefaultIgnoreResourceRules        = ""
 	DefaultArgocdLoginOptions         = ""
-	DefaultDisableClientThrottling    = false
+	DefaultDisableClientThrottling    = true
 	DefaultArgocdAuthToken            = ""
 	DefaultArgocdUIURL                = ""
 	DefaultConcurrency                = uint(40)
-	DefaultRenderMethod               = ""
+	DefaultRenderMethod               = "server-api"
 	DefaultArgocdConfigPath           = "./argocd-config"
+	DefaultOutputAppManifests         = false
+	DefaultOutputBranchManifests      = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -118,7 +119,6 @@ type RawOptions struct {
 	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
 	ArgocdAuthToken            string `mapstructure:"argocd-auth-token"`
 	ArgocdConfigPath           string `mapstructure:"argocd-config-dir"`
-	UseArgoCDApi               bool   `mapstructure:"use-argocd-api"`
 	RenderMethod               string `mapstructure:"render-method"`
 	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
 	LogFormat                  string `mapstructure:"log-format"`
@@ -128,6 +128,8 @@ type RawOptions struct {
 	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
 	ArgocdUIURL                string `mapstructure:"argocd-ui-url"`
 	Concurrency                uint   `mapstructure:"concurrency"`
+	OutputAppManifests         bool   `mapstructure:"output-app-manifests"`
+	OutputBranchManifests      bool   `mapstructure:"output-branch-manifests"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -169,6 +171,8 @@ type Config struct {
 	RenderMethod               RenderMethod
 	ArgocdUIURL                string
 	Concurrency                uint
+	OutputAppManifests         bool
+	OutputBranchManifests      bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -253,7 +257,6 @@ func Parse() *Config {
 	viper.SetDefault("argocd-chart-repo-password", DefaultArgocdChartRepoPassword)
 	viper.SetDefault("argocd-login-options", DefaultArgocdLoginOptions)
 	viper.SetDefault("argocd-auth-token", DefaultArgocdAuthToken)
-	viper.SetDefault("use-argocd-api", DefaultUseArgoCDApi)
 	viper.SetDefault("render-method", DefaultRenderMethod)
 	viper.SetDefault("log-format", DefaultLogFormat)
 	viper.SetDefault("title", DefaultTitle)
@@ -263,6 +266,8 @@ func Parse() *Config {
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 	viper.SetDefault("concurrency", DefaultConcurrency)
 	viper.SetDefault("argocd-config-dir", DefaultArgocdConfigPath)
+	viper.SetDefault("output-app-manifests", DefaultOutputAppManifests)
+	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -297,7 +302,6 @@ func Parse() *Config {
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
-	rootCmd.Flags().Bool("use-argocd-api", DefaultUseArgoCDApi, "Use Argo CD API instead of CLI (deprecated: use --render-method instead)")
 	rootCmd.Flags().String("render-method", DefaultRenderMethod, "Render mode for Argo CD manifests. Options: cli, server-api, repo-server-api. Takes precedence over --use-argocd-api")
 	rootCmd.Flags().String("cluster", DefaultCluster, "Local cluster tool. Options: kind, minikube, k3d, auto")
 	rootCmd.Flags().String("cluster-name", DefaultClusterName, "Cluster name (only for kind & k3d)")
@@ -319,6 +323,8 @@ func Parse() *Config {
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
+	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
+	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -402,6 +408,8 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		DisableClientThrottling:    o.DisableClientThrottling,
 		ArgocdUIURL:                o.ArgocdUIURL,
 		Concurrency:                o.Concurrency,
+		OutputAppManifests:         o.OutputAppManifests,
+		OutputBranchManifests:      o.OutputBranchManifests,
 	}
 
 	var err error
@@ -505,25 +513,18 @@ func (o *RawOptions) parseRedirectRevisions() []string {
 }
 
 // parseRenderMethod resolves the effective RenderMethod.
-// --render-method takes precedence; if unset, falls back to --use-argocd-api.
+// --render-method takes precedence over --use-argocd-api.
 func (o *RawOptions) parseRenderMethod() (RenderMethod, error) {
-	if o.RenderMethod != "" {
-		switch RenderMethod(strings.ToLower(o.RenderMethod)) {
-		case RenderMethodCLI:
-			return RenderMethodCLI, nil
-		case RenderMethodServerAPI:
-			return RenderMethodServerAPI, nil
-		case RenderMethodRepoServerAPI:
-			return RenderMethodRepoServerAPI, nil
-		default:
-			return "", fmt.Errorf("unsupported render-method %q: must be one of cli, server-api, repo-server-api", o.RenderMethod)
-		}
-	}
-	// Fall back to legacy --use-argocd-api flag
-	if o.UseArgoCDApi {
+	switch RenderMethod(strings.ToLower(o.RenderMethod)) {
+	case RenderMethodCLI:
+		return RenderMethodCLI, nil
+	case RenderMethodServerAPI:
 		return RenderMethodServerAPI, nil
+	case RenderMethodRepoServerAPI:
+		return RenderMethodRepoServerAPI, nil
+	default:
+		return "", fmt.Errorf("unsupported render-method %q: must be one of cli, server-api, repo-server-api", o.RenderMethod)
 	}
-	return RenderMethodCLI, nil
 }
 
 // parseClusterType parses the cluster type and returns the appropriate cluster provider
@@ -623,7 +624,7 @@ func (o *Config) LogConfig() {
 				log.Info().Msgf("✨ - k3d-options: %s", o.K3dOptions)
 			}
 		}
-		if o.RenderMethod != RenderMethodCLI {
+		if o.RenderMethod != RenderMethod(DefaultRenderMethod) {
 			log.Info().Msgf("✨ - render-method: %s", o.RenderMethod)
 		}
 	}
@@ -724,5 +725,11 @@ func (o *Config) LogConfig() {
 	}
 	if o.Concurrency != DefaultConcurrency {
 		log.Info().Msgf("✨ - concurrency: %d", o.Concurrency)
+	}
+	if o.OutputAppManifests {
+		log.Info().Msgf("✨ - output-app-manifests: %t", o.OutputAppManifests)
+	}
+	if o.OutputBranchManifests {
+		log.Info().Msgf("✨ - output-branch-manifests: %t", o.OutputBranchManifests)
 	}
 }

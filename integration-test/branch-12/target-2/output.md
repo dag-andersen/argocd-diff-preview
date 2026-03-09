@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± argocd-helm-chart (+212|-48)
 ```
@@ -12,10 +10,8 @@ Modified (1):
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
+#### Deployment: argocd-helm-chart-applicationset-controller (argocd)
 ```diff
-@@ Application modified: argocd-helm-chart (examples/with-crds/applicaiton.yaml) @@
-         - name: ARGOCD_APPLICATIONSET_CONTROLLER_LOGFORMAT
-           valueFrom:
              configMapKeyRef:
                key: applicationsetcontroller.log.format
                name: argocd-cmd-params-cm
@@ -24,14 +20,14 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: applicationsetcontroller.log.level
-+              name: argocd-cmd-params-cm
-+              optional: true
+               name: argocd-cmd-params-cm
+               optional: true
 +        - name: ARGOCD_LOG_FORMAT_TIMESTAMP
 +          valueFrom:
 +            configMapKeyRef:
 +              key: log.format.timestamp
-               name: argocd-cmd-params-cm
-               optional: true
++              name: argocd-cmd-params-cm
++              optional: true
          - name: ARGOCD_APPLICATIONSET_CONTROLLER_DRY_RUN
            valueFrom:
              configMapKeyRef:
@@ -48,14 +44,14 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: applicationsetcontroller.enable.progressive.syncs
-               name: argocd-cmd-params-cm
-               optional: true
++              name: argocd-cmd-params-cm
++              optional: true
 +        - name: ARGOCD_APPLICATIONSET_CONTROLLER_TOKENREF_STRICT_MODE
 +          valueFrom:
 +            configMapKeyRef:
 +              key: applicationsetcontroller.enable.tokenref.strict.mode
-+              name: argocd-cmd-params-cm
-+              optional: true
+               name: argocd-cmd-params-cm
+               optional: true
          - name: ARGOCD_APPLICATIONSET_CONTROLLER_ENABLE_NEW_GIT_FILE_GLOBBING
            valueFrom:
              configMapKeyRef:
@@ -64,9 +60,7 @@ Modified (1):
                optional: true
          - name: ARGOCD_APPLICATIONSET_CONTROLLER_REPO_SERVER_PLAINTEXT
            valueFrom:
-             configMapKeyRef:
-               key: applicationsetcontroller.repo.server.plaintext
-@@ skipped 34 lines (153 -> 186) @@
+@@ skipped 36 lines (151 -> 186) @@
              configMapKeyRef:
                key: applicationsetcontroller.allowed.scm.providers
                name: argocd-cmd-params-cm
@@ -165,17 +159,9 @@ Modified (1):
 +          name: argocd-cmd-params-cm
 +          optional: true
 +        name: argocd-cmd-params-cm
- ---
- apiVersion: apps/v1
- kind: Deployment
- metadata:
-   labels:
-     app.kubernetes.io/component: dex-server
-     app.kubernetes.io/instance: argocd-helm-chart
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: argocd-dex-server
-     app.kubernetes.io/part-of: argocd
-@@ skipped 34 lines (307 -> 340) @@
+```
+#### Deployment: argocd-helm-chart-dex-server (argocd)
+```diff
                  matchLabels:
                    app.kubernetes.io/name: argocd-dex-server
                topologyKey: kubernetes.io/hostname
@@ -225,7 +211,7 @@ Modified (1):
            name: grpc
            protocol: TCP
          - containerPort: 5558
-@@ skipped 16 lines (390 -> 405) @@
+@@ skipped 16 lines (92 -> 107) @@
            name: dexconfig
          - mountPath: /tls
            name: argocd-dex-server-tls
@@ -267,7 +253,9 @@ Modified (1):
        - name: argocd-dex-server-tls
          secret:
            items:
-@@ skipped 52 lines (447 -> 498) @@
+```
+#### Deployment: argocd-helm-chart-notifications-controller (argocd)
+```diff
                labelSelector:
                  matchLabels:
                    app.kubernetes.io/name: argocd-notifications-controller
@@ -357,7 +345,9 @@ Modified (1):
          secret:
            items:
            - key: tls.crt
-@@ skipped 55 lines (588 -> 642) @@
+```
+#### Deployment: argocd-helm-chart-redis (argocd)
+```diff
          - ""
          - --appendonly
          - "no"
@@ -399,9 +389,9 @@ Modified (1):
        volumes:
        - configMap:
            defaultMode: 493
-@@ skipped 67 lines (684 -> 750) @@
-         - name: ARGOCD_REPO_SERVER_LOGFORMAT
-           valueFrom:
+```
+#### Deployment: argocd-helm-chart-repo-server (argocd)
+```diff
              configMapKeyRef:
                key: reposerver.log.format
                name: argocd-cmd-params-cm
@@ -410,14 +400,14 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: reposerver.log.level
-+              name: argocd-cmd-params-cm
-+              optional: true
+               name: argocd-cmd-params-cm
+               optional: true
 +        - name: ARGOCD_LOG_FORMAT_TIMESTAMP
 +          valueFrom:
 +            configMapKeyRef:
 +              key: log.format.timestamp
-               name: argocd-cmd-params-cm
-               optional: true
++              name: argocd-cmd-params-cm
++              optional: true
          - name: ARGOCD_REPO_SERVER_PARALLELISM_LIMIT
            valueFrom:
              configMapKeyRef:
@@ -426,7 +416,9 @@ Modified (1):
                optional: true
          - name: ARGOCD_REPO_SERVER_LISTEN_ADDRESS
            valueFrom:
-@@ skipped 59 lines (777 -> 835) @@
+             configMapKeyRef:
+               key: reposerver.listen.address
+@@ skipped 57 lines (92 -> 148) @@
            valueFrom:
              secretKeyRef:
                key: redis-username
@@ -449,9 +441,7 @@ Modified (1):
            valueFrom:
              secretKeyRef:
                key: redis-sentinel-password
-@@ skipped 14 lines (858 -> 871) @@
-         - name: ARGOCD_REPO_SERVER_OTLP_INSECURE
-           valueFrom:
+@@ skipped 16 lines (171 -> 186) @@
              configMapKeyRef:
                key: otlp.insecure
                name: argocd-cmd-params-cm
@@ -460,14 +450,14 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: otlp.headers
-+              name: argocd-cmd-params-cm
-+              optional: true
+               name: argocd-cmd-params-cm
+               optional: true
 +        - name: ARGOCD_REPO_SERVER_OTLP_ATTRS
 +          valueFrom:
 +            configMapKeyRef:
 +              key: otlp.attrs
-               name: argocd-cmd-params-cm
-               optional: true
++              name: argocd-cmd-params-cm
++              optional: true
          - name: ARGOCD_REPO_SERVER_MAX_COMBINED_DIRECTORY_MANIFESTS_SIZE
            valueFrom:
              configMapKeyRef:
@@ -496,7 +486,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: reposerver.streamed.manifest.max.tar.size
-@@ skipped 28 lines (918 -> 945) @@
+@@ skipped 28 lines (231 -> 258) @@
              configMapKeyRef:
                key: reposerver.git.lsremote.parallelism.limit
                name: argocd-cmd-params-cm
@@ -555,7 +545,7 @@ Modified (1):
            periodSeconds: 10
            successThreshold: 1
            timeoutSeconds: 1
-@@ skipped 41 lines (1004 -> 1044) @@
+@@ skipped 41 lines (317 -> 357) @@
            name: plugins
          - mountPath: /tmp
            name: tmp
@@ -595,7 +585,9 @@ Modified (1):
        - emptyDir: {}
          name: var-files
        - emptyDir: {}
-@@ skipped 198 lines (1084 -> 1281) @@
+```
+#### Deployment: argocd-helm-chart-server (argocd)
+```diff
              configMapKeyRef:
                key: server.connection.status.cache.expiration
                name: argocd-cmd-params-cm
@@ -622,7 +614,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: server.app.state.cache.expiration
-@@ skipped 21 lines (1308 -> 1328) @@
+@@ skipped 21 lines (200 -> 220) @@
            valueFrom:
              secretKeyRef:
                key: redis-username
@@ -645,7 +637,7 @@ Modified (1):
            valueFrom:
              secretKeyRef:
                key: redis-sentinel-password
-@@ skipped 34 lines (1351 -> 1384) @@
+@@ skipped 34 lines (243 -> 276) @@
              configMapKeyRef:
                key: otlp.insecure
                name: argocd-cmd-params-cm
@@ -672,7 +664,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: server.enable.proxy.extension
-@@ skipped 40 lines (1411 -> 1450) @@
+@@ skipped 40 lines (303 -> 342) @@
              configMapKeyRef:
                key: applicationsetcontroller.allowed.scm.providers
                name: argocd-cmd-params-cm
@@ -713,7 +705,7 @@ Modified (1):
            periodSeconds: 10
            successThreshold: 1
            timeoutSeconds: 1
-@@ skipped 35 lines (1491 -> 1525) @@
+@@ skipped 35 lines (383 -> 417) @@
            name: argocd-dex-server-tls
          - mountPath: /home/argocd
            name: plugins-home
@@ -736,7 +728,9 @@ Modified (1):
        - configMap:
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
-@@ skipped 145 lines (1548 -> 1692) @@
+```
+#### StatefulSet: argocd-helm-chart-application-controller (argocd)
+```diff
              configMapKeyRef:
                key: controller.log.format
                name: argocd-cmd-params-cm
@@ -763,7 +757,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: controller.self.heal.timeout.seconds
-@@ skipped 10 lines (1719 -> 1728) @@
+@@ skipped 10 lines (136 -> 145) @@
              configMapKeyRef:
                key: controller.self.heal.backoff.factor
                name: argocd-cmd-params-cm
@@ -802,7 +796,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: controller.repo.server.strict.tls
-@@ skipped 33 lines (1767 -> 1799) @@
+@@ skipped 33 lines (184 -> 216) @@
            valueFrom:
              secretKeyRef:
                key: redis-username
@@ -825,7 +819,7 @@ Modified (1):
            valueFrom:
              secretKeyRef:
                key: redis-sentinel-password
-@@ skipped 16 lines (1822 -> 1837) @@
+@@ skipped 16 lines (239 -> 254) @@
              configMapKeyRef:
                key: otlp.insecure
                name: argocd-cmd-params-cm
@@ -852,7 +846,7 @@ Modified (1):
            valueFrom:
              configMapKeyRef:
                key: controller.sharding.algorithm
-@@ skipped 22 lines (1864 -> 1885) @@
+@@ skipped 22 lines (281 -> 302) @@
              configMapKeyRef:
                key: controller.diff.server.side
                name: argocd-cmd-params-cm
@@ -901,7 +895,7 @@ Modified (1):
            failureThreshold: 3
            httpGet:
              path: /healthz
-@@ skipped 12 lines (1934 -> 1945) @@
+@@ skipped 12 lines (351 -> 362) @@
            runAsNonRoot: true
            seccompProfile:
              type: RuntimeDefault
@@ -935,7 +929,9 @@ Modified (1):
            - key: ca.crt
              path: ca.crt
            optional: true
-@@ skipped 99 lines (1979 -> 2077) @@
+```
+#### ClusterRole: argocd-helm-chart-server
+```diff
    name: argocd-helm-chart-server
  rules:
  - apiGroups:
@@ -957,7 +953,9 @@ Modified (1):
  - apiGroups:
    - ""
    resources:
-@@ skipped 115 lines (2099 -> 2213) @@
+```
+#### Role: argocd-helm-chart-application-controller (argocd)
+```diff
    - secrets
    - configmaps
    verbs:
@@ -979,7 +977,9 @@ Modified (1):
    - patch
    - delete
  - apiGroups:
-@@ skipped 96 lines (2235 -> 2330) @@
+```
+#### Role: argocd-helm-chart-applicationset-controller (argocd)
+```diff
    verbs:
    - get
    - list
@@ -1004,25 +1004,13 @@ Modified (1):
    - update
 -  - watch
 +  - create
- ---
- apiVersion: rbac.authorization.k8s.io/v1
- kind: Role
- metadata:
-   labels:
-     app.kubernetes.io/component: dex-server
-     app.kubernetes.io/instance: argocd-helm-chart
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: argocd-dex-server
-     app.kubernetes.io/part-of: argocd
-@@ skipped 275 lines (2365 -> 2639) @@
-   name: argocd-helm-chart-server
- subjects:
- - kind: ServiceAccount
-   name: argocd-server
-   namespace: argocd
- ---
- Skipped Resource: [ApiVersion: v1, Kind: ConfigMap, Name: argocd-cm]
- ---
+```
+#### ConfigMap: argocd-cm (argocd)
+
+_Skipped_
+
+#### ConfigMap: argocd-cmd-params-cm (argocd)
+```diff
  apiVersion: v1
  data:
 -  application.namespaces: ""
@@ -1075,6 +1063,17 @@ Modified (1):
 -    app.kubernetes.io/version: v2.13.1
 -    helm.sh/chart: argo-cd-7.7.7
 ```
+#### CustomResourceDefinition: applications.argoproj.io
+
+_Skipped_
+
+#### CustomResourceDefinition: applicationsets.argoproj.io
+
+_Skipped_
+
+#### CustomResourceDefinition: appprojects.argoproj.io
+
+_Skipped_
 
 </details>
 

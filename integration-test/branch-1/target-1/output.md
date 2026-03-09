@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 3 files changed
-
 Deleted (1):
 - folder2 (-19)
 
@@ -16,8 +14,8 @@ Modified (2):
 <summary>folder2 (examples/git-generator/app/app-set.yaml)</summary>
 <br>
 
+#### Deployment: deploy-from-folder-two
 ```diff
-@@ Application deleted: folder2 (examples/git-generator/app/app-set.yaml) @@
 -apiVersion: apps/v1
 -kind: Deployment
 -metadata:
@@ -38,24 +36,22 @@ Modified (2):
 -        ports:
 -        - containerPort: 80
 ```
-
 </details>
 
 <details>
 <summary>multi-source-app (examples/multi-source/app.yaml)</summary>
 <br>
 
+#### Deployment: backend (default)
 ```diff
-@@ Application modified: multi-source-app (examples/multi-source/app.yaml) @@
        - image: my-org/backend:1.0.0
          name: backend
          ports:
 -        - containerPort: 8080
 +        - containerPort: 80
- ---
- apiVersion: apps/v1
- kind: Deployment
-@@ skipped 11 lines (24 -> 34) @@
+```
+#### Deployment: frontend (default)
+```diff
          app: frontend
      spec:
        containers:
@@ -65,15 +61,14 @@ Modified (2):
          ports:
          - containerPort: 80
 ```
-
 </details>
 
 <details>
 <summary>nginx-ingress (examples/external-chart/nginx.yaml)</summary>
 <br>
 
+#### Deployment: nginx-ingress-ingress-nginx-controller (default)
 ```diff
-@@ Application modified: nginx-ingress (examples/external-chart/nginx.yaml) @@
                fieldPath: metadata.namespace
          - name: LD_PRELOAD
            value: /usr/local/lib/libmimalloc.so
@@ -83,8 +78,7 @@ Modified (2):
          lifecycle:
            preStop:
 ```
-
 </details>
 
 _Stats_:
-[Applications: 47], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 39], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

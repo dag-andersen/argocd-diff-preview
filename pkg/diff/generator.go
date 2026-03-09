@@ -1,39 +1,27 @@
 package diff
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
-
-	"github.com/go-git/go-git/v5/utils/merkletrie"
-	"github.com/rs/zerolog/log"
-
+	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
+	"github.com/rs/zerolog/log"
 )
 
-const deletedAppDiffHiddenMessage = "Diff content omitted because '--hide-deleted-app-diff' is enabled."
-
-type AppInfo struct {
-	Id          string
-	Name        string
-	SourcePath  string
-	FileContent string
-}
-
-// GenerateDiff generates a diff between base and target branches
-func GenerateDiff(
+// GeneratePreview generates a diff using similarity-based matching instead of ID-based matching.
+// This correctly handles cases where apps or resources are renamed.
+func GeneratePreview(
 	title string,
 	outputFolder string,
 	baseBranch *gitt.Branch,
 	targetBranch *gitt.Branch,
-	baseApps []AppInfo,
-	targetApps []AppInfo,
+	baseManifests []extract.ExtractedApp,
+	targetManifests []extract.ExtractedApp,
 	diffIgnoreRegex *string,
 	lineCount uint,
 	maxCharCount uint,
@@ -41,8 +29,9 @@ func GenerateDiff(
 	statsInfo StatsInfo,
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
-) error {
-
+	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+) (time.Duration, error) {
+	startTime := time.Now()
 	maxDiffMessageCharCount := maxCharCount
 	if maxDiffMessageCharCount <= 0 {
 		maxDiffMessageCharCount = 65536
@@ -53,401 +42,186 @@ func GenerateDiff(
 
 	// Set default context line count if not provided
 	if lineCount <= 0 {
-		lineCount = 3 // Default to 3 context lines if not specified
+		lineCount = 3
 	}
 
-	// Generate diffs using go-git by creating temporary git repos
-	basePath := fmt.Sprintf("%s/%s", outputFolder, baseBranch.Type())
-	targetPath := fmt.Sprintf("%s/%s", outputFolder, targetBranch.Type())
-	summary, markdownFileSections, htmlFileSections, err := generateGitDiff(basePath, targetPath, diffIgnoreRegex, lineCount, hideDeletedAppDiff, baseApps, targetApps, argocdUIURL)
+	// Generate diffs using the matching package
+	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules)
 	if err != nil {
-		return fmt.Errorf("failed to generate diff: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to generate matching diffs: %w", err)
 	}
+
+	// Handle hideDeletedAppDiff option
+	if hideDeletedAppDiff {
+		for i := range appDiffs {
+			if appDiffs[i].Action == matching.ActionDeleted {
+				appDiffs[i].Resources = nil
+				appDiffs[i].AddedLines = 0
+				appDiffs[i].DeletedLines = 0
+				appDiffs[i].EmptyReason = matching.EmptyReasonHiddenDiff
+			}
+		}
+	}
+
+	// Build summary
+	summary := buildSummary(appDiffs)
+
+	// Convert to markdown/HTML sections
+	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
 
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
-	MarkdownOutput := MarkdownOutput{
+	markdownOutput := MarkdownOutput{
 		title:         title,
 		summary:       summary,
-		sections:      markdownFileSections,
+		sections:      markdownSections,
 		statsInfo:     statsInfo,
 		selectionInfo: selectionInfo,
 	}
-	markdown := MarkdownOutput.printDiff(maxDiffMessageCharCount)
+	markdown := markdownOutput.printDiff(maxDiffMessageCharCount)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
 	log.Debug().Msgf("Writing markdown output to %s", markdownPath)
 	if err := utils.WriteFile(markdownPath, markdown); err != nil {
-		return fmt.Errorf("failed to write markdown: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to write markdown: %w", err)
 	}
 	log.Debug().Msgf("Wrote markdown output to %s", markdownPath)
 
 	// HTML
 	log.Debug().Msg("Creating html output")
-	HTMLOutput := HTMLOutput{
+	htmlOutput := HTMLOutput{
 		title:         title,
 		summary:       summary,
-		sections:      htmlFileSections,
+		sections:      htmlSections,
 		statsInfo:     statsInfo,
 		selectionInfo: selectionInfo,
 	}
-	htmlDiff := HTMLOutput.printDiff()
+	htmlDiff := htmlOutput.printDiff()
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
 	log.Debug().Msgf("Writing html output to %s", htmlPath)
 	if err := utils.WriteFile(htmlPath, htmlDiff); err != nil {
-		return fmt.Errorf("failed to write html: %w", err)
+		return time.Since(startTime), fmt.Errorf("failed to write html: %w", err)
 	}
 	log.Debug().Msgf("Wrote html output to %s", htmlPath)
 
 	log.Info().Msgf("🙏 Please check the %s and %s files for differences", markdownPath, htmlPath)
-	return nil
+
+	return time.Since(startTime), nil
 }
 
-func writeManifestsToDisk(apps []AppInfo, folder string) error {
-	if err := utils.CreateFolder(folder, true); err != nil {
-		return fmt.Errorf("failed to create folder: %s: %w", folder, err)
+// buildSummary builds a summary string from AppDiffs
+func buildSummary(diffs []matching.AppDiff) string {
+	if len(diffs) == 0 {
+		return "No changes found"
 	}
-	for _, app := range apps {
-		if err := utils.WriteFile(fmt.Sprintf("%s/%s", folder, app.Id), app.FileContent); err != nil {
-			return fmt.Errorf("failed to write manifest %s: %w", app.Id, err)
+
+	var summaryBuilder strings.Builder
+
+	addedCount := 0
+	deletedCount := 0
+	modifiedCount := 0
+
+	for _, d := range diffs {
+		switch d.Action {
+		case matching.ActionAdded:
+			addedCount++
+		case matching.ActionDeleted:
+			deletedCount++
+		case matching.ActionModified:
+			modifiedCount++
 		}
 	}
-	return nil
-}
 
-// generateGitDiff creates temporary Git repositories and uses go-git to generate a diff
-func generateGitDiff(
-	basePath, targetPath string,
-	diffIgnore *string,
-	diffContextLines uint,
-	hideDeletedAppDiff bool,
-	baseApps []AppInfo,
-	targetApps []AppInfo,
-	argocdUIURL string,
-) (string, []MarkdownSection, []HTMLSection, error) {
-
-	// Write base manifests to disk
-	if err := writeManifestsToDisk(baseApps, basePath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to write base manifests: %w", err)
-	}
-
-	// Write target manifests to disk
-	if err := writeManifestsToDisk(targetApps, targetPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to write target manifests: %w", err)
-	}
-
-	baseAppsMap := make(map[string]AppInfo)
-	for _, app := range baseApps {
-		baseAppsMap[app.Id] = app
-	}
-
-	targetAppsMap := make(map[string]AppInfo)
-	for _, app := range targetApps {
-		targetAppsMap[app.Id] = app
-	}
-
-	// Create temporary directory for single Git repository
-	repoPath, err := os.MkdirTemp("", "diff-repo-*")
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to create temp dir for repo: %w", err)
-	}
-	defer func() {
-		if err := os.RemoveAll(repoPath); err != nil {
-			log.Warn().Err(err).Msg("⚠️ Failed to remove temporary repo path")
-		}
-	}()
-
-	// Initialize single Git repository
-	repo, err := git.PlainInit(repoPath, false)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to init repo: %w", err)
-	}
-
-	// Get worktree
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	// Copy base files to repository and commit
-	if err := copyFilesToRepo(basePath, repoPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to copy base files: %w", err)
-	}
-
-	if err := worktree.AddGlob("."); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to add base files to repo: %w", err)
-	}
-
-	author := &object.Signature{
-		Name:  "ArgoCD Diff Preview",
-		Email: "noreply@example.com",
-		When:  time.Now(),
-	}
-
-	baseCommitHash, err := worktree.Commit("Base state", &git.CommitOptions{
-		Author:            author,
-		AllowEmptyCommits: true,
-	})
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to commit base state: %w", err)
-	}
-
-	// Clear the working directory and copy target files
-	if err := clearWorkingDirectory(repoPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to clear working directory: %w", err)
-	}
-
-	if err := copyFilesToRepo(targetPath, repoPath); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to copy target files: %w", err)
-	}
-
-	if err := worktree.AddGlob("."); err != nil {
-		return "", nil, nil, fmt.Errorf("failed to add target files to repo: %w", err)
-	}
-
-	targetCommitHash, err := worktree.Commit("Target state", &git.CommitOptions{
-		Author:            author,
-		AllowEmptyCommits: true,
-	})
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to commit target state: %w", err)
-	}
-
-	// Retrieve commits
-	baseCommit, err := repo.CommitObject(baseCommitHash)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get base commit: %w", err)
-	}
-
-	targetCommit, err := repo.CommitObject(targetCommitHash)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get target commit: %w", err)
-	}
-
-	// Get base and target trees
-	baseTree, err := baseCommit.Tree()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get base tree: %w", err)
-	}
-
-	targetTree, err := targetCommit.Tree()
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to get target tree: %w", err)
-	}
-
-	// Compute diff between trees
-	changes, err := baseTree.Diff(targetTree)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("failed to compute diff: %w", err)
-	}
-
-	// Keep track of file paths by change type
-	var changedFiles []Diff
-
-	for _, change := range changes {
-		action, err := change.Action()
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to get change action: %w", err)
-		}
-
-		from, to, err := change.Files()
-		if err != nil {
-			return "", nil, nil, fmt.Errorf("failed to get files: %w", err)
-		}
-
-		changeInfo := changeInfo{}
-
-		switch action {
-		case merkletrie.Insert:
-
-			if to != nil {
-				blob, err := repo.BlobObject(to.Hash)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
-				}
-
-				content, err := getBlobContent(blob)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
-				}
-
-				changeInfo = formatNewFileDiff(content, diffContextLines, diffIgnore)
+	if addedCount > 0 {
+		fmt.Fprintf(&summaryBuilder, "Added (%d):\n", addedCount)
+		for _, d := range diffs {
+			if d.Action == matching.ActionAdded {
+				fmt.Fprintf(&summaryBuilder, "+ %s%s\n", d.PrettyName(), d.ChangeStats())
 			}
-
-		case merkletrie.Delete:
-
-			// Skip generating diff content for deleted apps when hideDeletedAppDiff is enabled
-			// The header will still be shown, but not the full diff content
-			if hideDeletedAppDiff {
-				changeInfo.content = deletedAppDiffHiddenMessage
-			} else if from != nil {
-				blob, err := repo.BlobObject(from.Hash)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
-				}
-
-				content, err := getBlobContent(blob)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
-				}
-
-				changeInfo = formatDeletedFileDiff(content, diffContextLines, diffIgnore)
-			}
-
-		case merkletrie.Modify:
-
-			var oldContent, newContent string
-
-			if from != nil {
-				blob, err := repo.BlobObject(from.Hash)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get base blob: %w", err)
-				}
-
-				oldContent, err = getBlobContent(blob)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read base blob: %w", err)
-				}
-			}
-
-			if to != nil {
-				blob, err := repo.BlobObject(to.Hash)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to get target blob: %w", err)
-				}
-
-				newContent, err = getBlobContent(blob)
-				if err != nil {
-					return "", nil, nil, fmt.Errorf("failed to read target blob: %w", err)
-				}
-			}
-
-			changeInfo = formatModifiedFileDiff(oldContent, newContent, diffContextLines, diffIgnore)
 		}
-
-		toName := ""
-		fromName := ""
-		if to != nil {
-			toName = to.Name
-		}
-		if from != nil {
-			fromName = from.Name
-		}
-
-		diff := Diff{
-			newName:       targetAppsMap[toName].Name,
-			oldName:       baseAppsMap[fromName].Name,
-			newSourcePath: targetAppsMap[toName].SourcePath,
-			oldSourcePath: baseAppsMap[fromName].SourcePath,
-			action:        action,
-			changeInfo:    changeInfo,
-		}
-
-		// If the diff didn't change and the names are the same, skip it
-		if diff.changeInfo.content == "" && diff.oldName == diff.newName && diff.oldSourcePath == diff.newSourcePath {
-			continue
-		}
-
-		// print diff
-		log.Debug().
-			Str("newName", diff.newName).
-			Str("oldName", diff.oldName).
-			Str("newSourcePath", diff.newSourcePath).
-			Str("oldSourcePath", diff.oldSourcePath).
-			Str("action", diff.action.String()).
-			Msg("Found diff")
-
-		changedFiles = append(changedFiles, diff)
 	}
 
-	if len(changedFiles) == 0 {
-		return "No changes found", nil, nil, nil
-	}
-
-	// Build summary
-	summary := buildSummary(changedFiles)
-
-	// Create arrays of formatted file sections
-	markdownFileSections := make([]MarkdownSection, 0, len(changedFiles))
-	htmlFileSections := make([]HTMLSection, 0, len(changedFiles))
-	for _, diff := range changedFiles {
-
-		// skips empty diffs
-		if diff.changeInfo.content == "" {
-			continue
+	if deletedCount > 0 {
+		// Add a newline before Deleted section if there was an Added section
+		if summaryBuilder.Len() > 0 {
+			fmt.Fprintln(&summaryBuilder)
 		}
-
-		// Get source path for this file, or use empty string if not found
-		markdownFileSections = append(markdownFileSections, diff.buildMarkdownSection(argocdUIURL))
-		htmlFileSections = append(htmlFileSections, diff.buildHTMLSection(argocdUIURL))
+		fmt.Fprintf(&summaryBuilder, "Deleted (%d):\n", deletedCount)
+		for _, d := range diffs {
+			if d.Action == matching.ActionDeleted {
+				fmt.Fprintf(&summaryBuilder, "- %s%s\n", d.PrettyName(), d.ChangeStats())
+			}
+		}
 	}
 
-	return summary, markdownFileSections, htmlFileSections, nil
+	if modifiedCount > 0 {
+		// Add a newline before Modified section if there was an Added or Deleted section
+		if summaryBuilder.Len() > 0 {
+			fmt.Fprintln(&summaryBuilder)
+		}
+		fmt.Fprintf(&summaryBuilder, "Modified (%d):\n", modifiedCount)
+		for _, d := range diffs {
+			if d.Action == matching.ActionModified {
+				fmt.Fprintf(&summaryBuilder, "± %s%s\n", d.PrettyName(), d.ChangeStats())
+			}
+		}
+	}
+
+	return summaryBuilder.String()
 }
 
-// getBlobContent reads the content of a Git blob
-func getBlobContent(blob *object.Blob) (string, error) {
-	reader, err := blob.Reader()
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err := reader.Close(); err != nil {
-			log.Warn().Err(err).Msg("⚠️ Failed to close blob reader")
-		}
-	}()
+// buildMatchingSections converts AppDiffs to markdown and HTML sections
+func buildMatchingSections(diffs []matching.AppDiff, argocdUIURL string) ([]MarkdownSection, []HTMLSection) {
+	markdownSections := make([]MarkdownSection, 0, len(diffs))
+	htmlSections := make([]HTMLSection, 0, len(diffs))
 
-	buf := new(bytes.Buffer)
-	if _, err := buf.ReadFrom(reader); err != nil {
-		return "", err
+	for _, d := range diffs {
+		appURL := buildAppURLFromDiff(d, argocdUIURL)
+
+		// Convert matching.ResourceDiff → diff.ResourceSection
+		sections := make([]ResourceSection, len(d.Resources))
+		for i, r := range d.Resources {
+			sections[i] = ResourceSection{
+				Header:    r.Header(),
+				Content:   r.Content,
+				IsSkipped: r.IsSkipped,
+			}
+		}
+
+		markdownSections = append(markdownSections, MarkdownSection{
+			appName:     d.PrettyName(),
+			filePath:    d.PrettyPath(),
+			appURL:      appURL,
+			resources:   sections,
+			emptyReason: d.EmptyReason,
+		})
+
+		htmlSections = append(htmlSections, HTMLSection{
+			appName:     d.PrettyName(),
+			filePath:    d.PrettyPath(),
+			appURL:      appURL,
+			resources:   sections,
+			emptyReason: d.EmptyReason,
+		})
 	}
-	return buf.String(), nil
+
+	return markdownSections, htmlSections
 }
 
-// copyFilesToRepo copies files from source directory to destination Git repository
-func copyFilesToRepo(srcDir, destDir string) error {
-	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		relPath, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return err
-		}
-
-		destPath := filepath.Join(destDir, relPath)
-
-		if info.IsDir() {
-			return os.MkdirAll(destPath, 0755)
-		}
-
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		return os.WriteFile(destPath, data, 0644)
-	})
-}
-
-// clearWorkingDirectory removes all files and directories from the given path, but keeps the directory itself
-func clearWorkingDirectory(path string) error {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return err
+// buildAppURLFromDiff builds the ArgoCD UI URL for an app diff
+func buildAppURLFromDiff(d matching.AppDiff, argocdUIURL string) string {
+	if argocdUIURL == "" {
+		return ""
 	}
 
-	for _, entry := range entries {
-		// Skip .git directory to preserve Git repository structure
-		if entry.Name() == ".git" {
-			continue
-		}
-
-		entryPath := filepath.Join(path, entry.Name())
-		if err := os.RemoveAll(entryPath); err != nil {
-			return err
-		}
+	appName := d.OldName
+	if appName == "" {
+		appName = d.NewName
 	}
 
-	return nil
+	if appName == "" {
+		return ""
+	}
+
+	baseURL := strings.TrimRight(argocdUIURL, "/")
+	return fmt.Sprintf("%s/applications/%s", baseURL, appName)
 }

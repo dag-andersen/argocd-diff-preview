@@ -15,30 +15,34 @@ func TestGetNoAppsFoundMessage(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		selectors    []app_selector.Selector
-		changedFiles []string
-		expected     string
+		name                       string
+		selectors                  []app_selector.Selector
+		changedFiles               []string
+		watchIfNoWatchPatternFound bool
+		expected                   string
 	}{
 		{
-			name:         "No selectors and no changed files",
-			selectors:    nil,
-			changedFiles: nil,
-			expected:     "Found no Applications",
+			name:                       "No selectors and no changed files",
+			selectors:                  nil,
+			changedFiles:               nil,
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no Applications",
 		},
 		{
-			name:         "Empty selectors and empty changed files",
-			selectors:    []app_selector.Selector{},
-			changedFiles: []string{},
-			expected:     "Found no Applications",
+			name:                       "Empty selectors and empty changed files",
+			selectors:                  []app_selector.Selector{},
+			changedFiles:               []string{},
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no Applications",
 		},
 		{
 			name: "Only selectors (single)",
 			selectors: []app_selector.Selector{
 				makeSelector("app", "myapp", app_selector.Eq),
 			},
-			changedFiles: nil,
-			expected:     "Found no changed Applications that matched `app=myapp`",
+			changedFiles:               nil,
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no changed Applications that matched `app=myapp`",
 		},
 		{
 			name: "Only selectors (multiple)",
@@ -46,34 +50,54 @@ func TestGetNoAppsFoundMessage(t *testing.T) {
 				makeSelector("app", "myapp", app_selector.Eq),
 				makeSelector("env", "prod", app_selector.Ne),
 			},
-			changedFiles: nil,
-			expected:     "Found no changed Applications that matched `app=myapp, env!=prod`",
+			changedFiles:               nil,
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no changed Applications that matched `app=myapp, env!=prod`",
 		},
 		{
-			name:         "Only changed files (single)",
-			selectors:    nil,
-			changedFiles: []string{"path/to/file.yaml"},
-			expected:     "Found no changed Applications that watched these files: `path/to/file.yaml`",
+			name:                       "Only changed files (single)",
+			selectors:                  nil,
+			changedFiles:               []string{"path/to/file.yaml"},
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no changed Applications that watched these files: `path/to/file.yaml`",
 		},
 		{
-			name:         "Only changed files (multiple)",
-			selectors:    nil,
-			changedFiles: []string{"path/to/file1.yaml", "path/to/file2.yaml", "another/file.yaml"},
-			expected:     "Found no changed Applications that watched these files: `path/to/file1.yaml`, `path/to/file2.yaml`, `another/file.yaml`",
+			name:                       "Only changed files (multiple)",
+			selectors:                  nil,
+			changedFiles:               []string{"path/to/file1.yaml", "path/to/file2.yaml", "another/file.yaml"},
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no changed Applications that watched these files: `path/to/file1.yaml`, `path/to/file2.yaml`, `another/file.yaml`",
 		},
 		{
 			name: "Both selectors and changed files",
 			selectors: []app_selector.Selector{
 				makeSelector("app", "myapp", app_selector.Eq),
 			},
-			changedFiles: []string{"path/to/file.yaml"},
-			expected:     "Found no changed Applications that matched `app=myapp` and watched these files: `path/to/file.yaml`",
+			changedFiles:               []string{"path/to/file.yaml"},
+			watchIfNoWatchPatternFound: false,
+			expected:                   "Found no changed Applications that matched `app=myapp` and watched these files: `path/to/file.yaml`",
+		},
+		{
+			name:                       "Changed files ignored when watchIfNoWatchPatternFound=true",
+			selectors:                  nil,
+			changedFiles:               []string{"path/to/file.yaml"},
+			watchIfNoWatchPatternFound: true,
+			expected:                   "Found no Applications",
+		},
+		{
+			name: "Selectors shown but changed files ignored when watchIfNoWatchPatternFound=true",
+			selectors: []app_selector.Selector{
+				makeSelector("app", "myapp", app_selector.Eq),
+			},
+			changedFiles:               []string{"path/to/file.yaml"},
+			watchIfNoWatchPatternFound: true,
+			expected:                   "Found no changed Applications that matched `app=myapp`",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := getNoAppsFoundMessage(tt.selectors, tt.changedFiles)
+			got := getNoAppsFoundMessage(tt.selectors, tt.changedFiles, tt.watchIfNoWatchPatternFound)
 			if got != tt.expected {
 				t.Errorf("getNoAppsFoundMessage() =\n%q\nwant:\n%q", got, tt.expected)
 			}
@@ -92,7 +116,7 @@ func TestGetNoAppsFoundMessage_TruncatesLongLists(t *testing.T) {
 			selectors[i] = makeSelector("app", "val"+string(rune('a'+i%26)), app_selector.Eq)
 		}
 
-		got := getNoAppsFoundMessage(selectors, nil)
+		got := getNoAppsFoundMessage(selectors, nil, false)
 
 		if !strings.Contains(got, "[5 more omitted]") {
 			t.Errorf("Should show '[5 more omitted]' for selectors, got: %s", got)
@@ -105,7 +129,7 @@ func TestGetNoAppsFoundMessage_TruncatesLongLists(t *testing.T) {
 			files[i] = "file" + string(rune('a'+i%26)) + ".yaml"
 		}
 
-		got := getNoAppsFoundMessage(nil, files)
+		got := getNoAppsFoundMessage(nil, files, false)
 
 		if !strings.Contains(got, "[5 more omitted]") {
 			t.Errorf("Should show '[5 more omitted]' for files, got: %s", got)
@@ -118,7 +142,7 @@ func TestGetNoAppsFoundMessage_TruncatesLongLists(t *testing.T) {
 			files[i] = "file" + string(rune('a'+i%26)) + ".yaml"
 		}
 
-		got := getNoAppsFoundMessage(nil, files)
+		got := getNoAppsFoundMessage(nil, files, false)
 
 		if strings.Contains(got, "more omitted") {
 			t.Errorf("Should not truncate at exactly maxChangedFilesToShow, got: %s", got)
@@ -235,17 +259,19 @@ func TestWriteNoAppsFoundMessage(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		title        string
-		selectors    []app_selector.Selector
-		changedFiles []string
-		wantContains []string
+		name                       string
+		title                      string
+		selectors                  []app_selector.Selector
+		changedFiles               []string
+		watchIfNoWatchPatternFound bool
+		wantContains               []string
 	}{
 		{
-			name:         "No apps found - no filters",
-			title:        "ArgoCD Diff",
-			selectors:    nil,
-			changedFiles: nil,
+			name:                       "No apps found - no filters",
+			title:                      "ArgoCD Diff",
+			selectors:                  nil,
+			changedFiles:               nil,
+			watchIfNoWatchPatternFound: false,
 			wantContains: []string{
 				"## ArgoCD Diff",
 				"Found no Applications",
@@ -257,20 +283,33 @@ func TestWriteNoAppsFoundMessage(t *testing.T) {
 			selectors: []app_selector.Selector{
 				makeSelector("app", "frontend", app_selector.Eq),
 			},
-			changedFiles: nil,
+			changedFiles:               nil,
+			watchIfNoWatchPatternFound: false,
 			wantContains: []string{
 				"## PR Preview",
 				"Found no changed Applications that matched `app=frontend`",
 			},
 		},
 		{
-			name:         "No apps found - with changed files",
-			title:        "Diff Report",
-			selectors:    nil,
-			changedFiles: []string{"apps/myapp/values.yaml"},
+			name:                       "No apps found - with changed files",
+			title:                      "Diff Report",
+			selectors:                  nil,
+			changedFiles:               []string{"apps/myapp/values.yaml"},
+			watchIfNoWatchPatternFound: false,
 			wantContains: []string{
 				"## Diff Report",
 				"Found no changed Applications that watched these files: `apps/myapp/values.yaml`",
+			},
+		},
+		{
+			name:                       "No apps found - changed files ignored when watchIfNoWatchPatternFound=true",
+			title:                      "Diff Report",
+			selectors:                  nil,
+			changedFiles:               []string{"apps/myapp/values.yaml"},
+			watchIfNoWatchPatternFound: true,
+			wantContains: []string{
+				"## Diff Report",
+				"Found no Applications",
 			},
 		},
 	}
@@ -283,7 +322,7 @@ func TestWriteNoAppsFoundMessage(t *testing.T) {
 			}
 			defer func() { _ = os.RemoveAll(tempDir) }()
 
-			err = WriteNoAppsFoundMessage(tt.title, tempDir, tt.selectors, tt.changedFiles)
+			err = WriteNoAppsFoundMessage(tt.title, tempDir, tt.selectors, tt.changedFiles, tt.watchIfNoWatchPatternFound)
 			if err != nil {
 				t.Fatalf("WriteNoAppsFoundMessage() error = %v", err)
 			}
@@ -315,7 +354,7 @@ func TestWriteNoAppsFoundMessage(t *testing.T) {
 }
 
 func TestWriteNoAppsFoundMessage_InvalidOutputFolder(t *testing.T) {
-	err := WriteNoAppsFoundMessage("Test", "/nonexistent/path/that/does/not/exist", nil, nil)
+	err := WriteNoAppsFoundMessage("Test", "/nonexistent/path/that/does/not/exist", nil, nil, false)
 	if err == nil {
 		t.Error("WriteNoAppsFoundMessage() should return error for invalid output folder")
 	}

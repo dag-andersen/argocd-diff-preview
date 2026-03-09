@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± internal-chart-example (+5|-5)
 ```
@@ -12,8 +10,8 @@ Modified (1):
 <summary>internal-chart-example (examples/internal-chart/app.yaml)</summary>
 <br>
 
+#### Deployment: super-app-name → new-app-name (default)
 ```diff
-@@ Application modified: internal-chart-example (examples/internal-chart/app.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -52,7 +50,9 @@ Modified (1):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
- ---
+```
+#### Service: super-app-name → new-app-name (default)
+```diff
  apiVersion: v1
  kind: Service
  metadata:
@@ -74,8 +74,9 @@ Modified (1):
    selector:
      app.kubernetes.io/instance: internal-chart-example
      app.kubernetes.io/name: myApp
-   type: ClusterIP
- ---
+```
+#### ServiceAccount: super-app-name → new-app-name (default)
+```diff
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -90,8 +91,7 @@ Modified (1):
 +  name: new-app-name
    namespace: default
 ```
-
 </details>
 
 _Stats_:
-[Applications: 46], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 36], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

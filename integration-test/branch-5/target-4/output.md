@@ -2,8 +2,6 @@
 
 Summary:
 ```yaml
-Total: 1 files changed
-
 Modified (1):
 ± my-app-labels (+4|-4)
 ```
@@ -12,8 +10,8 @@ Modified (1):
 <summary>my-app-labels [<a href="https://argocd.example.com/applications/my-app-labels">link</a>] (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
+#### Deployment: super-app-name → experiment (default)
 ```diff
-@@ Application modified: my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml) @@
  apiVersion: apps/v1
  kind: Deployment
  metadata:
@@ -48,7 +46,9 @@ Modified (1):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
- ---
+```
+#### Service: super-app-name → experiment (default)
+```diff
  apiVersion: v1
  kind: Service
  metadata:
@@ -70,8 +70,9 @@ Modified (1):
    selector:
      app.kubernetes.io/instance: my-app-labels
      app.kubernetes.io/name: myApp
-   type: ClusterIP
- ---
+```
+#### ServiceAccount: super-app-name → experiment (default)
+```diff
  apiVersion: v1
  automountServiceAccountToken: true
  kind: ServiceAccount
@@ -86,7 +87,6 @@ Modified (1):
 +  name: experiment
    namespace: default
 ```
-
 </details>
 
 _Stats_:
