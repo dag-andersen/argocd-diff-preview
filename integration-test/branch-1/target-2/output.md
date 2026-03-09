@@ -41,7 +41,7 @@ Modified (1):
 <summary>multi-source-app (examples/multi-source/app.yaml)</summary>
 <br>
 
-#### Deployment: backend (default)
+#### Deployment: default/backend
 ```diff
        app: backend
    template:

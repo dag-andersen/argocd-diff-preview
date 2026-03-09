@@ -10,7 +10,7 @@ Modified (1):
 <summary>my-app (examples/helm-kustomize-postrender/application.yaml)</summary>
 <br>
 
-#### Deployment: my-app (default)
+#### Deployment: default/my-app
 ```diff
    template:
      metadata:

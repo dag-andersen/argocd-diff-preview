@@ -10,7 +10,7 @@ Modified (1):
 <summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
 <br>
 
-#### Deployment: argocd-helm-chart-applicationset-controller (argocd)
+#### Deployment: argocd/argocd-helm-chart-applicationset-controller
 ```diff
              configMapKeyRef:
                key: applicationsetcontroller.log.format
@@ -160,7 +160,7 @@ Modified (1):
 +          optional: true
 +        name: argocd-cmd-params-cm
 ```
-#### Deployment: argocd-helm-chart-dex-server (argocd)
+#### Deployment: argocd/argocd-helm-chart-dex-server
 ```diff
                  matchLabels:
                    app.kubernetes.io/name: argocd-dex-server
@@ -254,7 +254,7 @@ Modified (1):
          secret:
            items:
 ```
-#### Deployment: argocd-helm-chart-notifications-controller (argocd)
+#### Deployment: argocd/argocd-helm-chart-notifications-controller
 ```diff
                labelSelector:
                  matchLabels:
@@ -346,7 +346,7 @@ Modified (1):
            items:
            - key: tls.crt
 ```
-#### Deployment: argocd-helm-chart-redis (argocd)
+#### Deployment: argocd/argocd-helm-chart-redis
 ```diff
          - ""
          - --appendonly
@@ -390,7 +390,7 @@ Modified (1):
        - configMap:
            defaultMode: 493
 ```
-#### Deployment: argocd-helm-chart-repo-server (argocd)
+#### Deployment: argocd/argocd-helm-chart-repo-server
 ```diff
              configMapKeyRef:
                key: reposerver.log.format
@@ -586,7 +586,7 @@ Modified (1):
          name: var-files
        - emptyDir: {}
 ```
-#### Deployment: argocd-helm-chart-server (argocd)
+#### Deployment: argocd/argocd-helm-chart-server
 ```diff
              configMapKeyRef:
                key: server.connection.status.cache.expiration
@@ -729,7 +729,7 @@ Modified (1):
            name: argocd-ssh-known-hosts-cm
          name: ssh-known-hosts
 ```
-#### StatefulSet: argocd-helm-chart-application-controller (argocd)
+#### StatefulSet: argocd/argocd-helm-chart-application-controller
 ```diff
              configMapKeyRef:
                key: controller.log.format
@@ -954,7 +954,7 @@ Modified (1):
    - ""
    resources:
 ```
-#### Role: argocd-helm-chart-application-controller (argocd)
+#### Role: argocd/argocd-helm-chart-application-controller
 ```diff
    - secrets
    - configmaps
@@ -978,7 +978,7 @@ Modified (1):
    - delete
  - apiGroups:
 ```
-#### Role: argocd-helm-chart-applicationset-controller (argocd)
+#### Role: argocd/argocd-helm-chart-applicationset-controller
 ```diff
    verbs:
    - get
@@ -1005,11 +1005,11 @@ Modified (1):
 -  - watch
 +  - create
 ```
-#### ConfigMap: argocd-cm (argocd)
+#### ConfigMap: argocd/argocd-cm
 
 _Skipped_
 
-#### ConfigMap: argocd-cmd-params-cm (argocd)
+#### ConfigMap: argocd/argocd-cmd-params-cm
 ```diff
  apiVersion: v1
  data:

@@ -236,7 +236,7 @@ func TestBuildMatchingSections_WithResources(t *testing.T) {
 	if len(md[0].resources) != 1 {
 		t.Fatalf("expected 1 resource, got %d", len(md[0].resources))
 	}
-	if md[0].resources[0].Header != "Deployment: my-deploy (default)" {
+	if md[0].resources[0].Header != "Deployment: default/my-deploy" {
 		t.Errorf("expected resource header, got %q", md[0].resources[0].Header)
 	}
 

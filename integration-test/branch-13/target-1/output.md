@@ -10,7 +10,7 @@ Added (1):
 <summary>ignore-annotation-example (examples/ignore-annotation/app.yaml)</summary>
 <br>
 
-#### Deployment: super-app-name (default)
+#### Deployment: default/super-app-name
 ```diff
 +apiVersion: apps/v1
 +kind: Deployment
@@ -59,7 +59,7 @@ Added (1):
 +      securityContext: {}
 +      serviceAccountName: super-app-name
 ```
-#### Service: super-app-name (default)
+#### Service: default/super-app-name
 ```diff
 +apiVersion: v1
 +kind: Service
@@ -83,7 +83,7 @@ Added (1):
 +    app.kubernetes.io/name: myApp
 +  type: ClusterIP
 ```
-#### ServiceAccount: super-app-name (default)
+#### ServiceAccount: default/super-app-name
 ```diff
 +apiVersion: v1
 +automountServiceAccountToken: true

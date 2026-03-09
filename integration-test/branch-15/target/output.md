@@ -10,7 +10,7 @@ Modified (1):
 <summary>order-change-example (examples/order-change/app/app-set.yaml)</summary>
 <br>
 
-#### Deployment → StatefulSet: order-change-example-deploy-1 → order-change-example-sfs-1 (default)
+#### Deployment → StatefulSet: default/order-change-example-deploy-1 → default/order-change-example-sfs-1
 ```diff
  apiVersion: apps/v1
 -kind: Deployment

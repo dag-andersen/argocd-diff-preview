@@ -11,7 +11,7 @@ Modified (2):
 <summary>my-app-labels (examples/helm/applications/label-selectors/my-app-labels.yaml)</summary>
 <br>
 
-#### Deployment: super-app-name → experiment (default)
+#### Deployment: default/super-app-name → default/experiment
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -48,7 +48,7 @@ Modified (2):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
 ```
-#### Service: super-app-name → experiment (default)
+#### Service: default/super-app-name → default/experiment
 ```diff
  apiVersion: v1
  kind: Service
@@ -72,7 +72,7 @@ Modified (2):
      app.kubernetes.io/instance: my-app-labels
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount: super-app-name → experiment (default)
+#### ServiceAccount: default/super-app-name → default/experiment
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true
@@ -94,7 +94,7 @@ Modified (2):
 <summary>my-app-watch-pattern-valid-regex (examples/helm/applications/watch-pattern/valid-regex.yaml)</summary>
 <br>
 
-#### Deployment: super-app-name → experiment (default)
+#### Deployment: default/super-app-name → default/experiment
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -131,7 +131,7 @@ Modified (2):
 -      serviceAccountName: super-app-name
 +      serviceAccountName: experiment
 ```
-#### Service: super-app-name → experiment (default)
+#### Service: default/super-app-name → default/experiment
 ```diff
  apiVersion: v1
  kind: Service
@@ -155,7 +155,7 @@ Modified (2):
      app.kubernetes.io/instance: my-app-watch-pattern-valid-regex
      app.kubernetes.io/name: myApp
 ```
-#### ServiceAccount: super-app-name → experiment (default)
+#### ServiceAccount: default/super-app-name → default/experiment
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true

@@ -100,7 +100,7 @@ Modified (7):
 <summary>my-app -> my-super-app (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
-#### Deployment: super-app-name (default)
+#### Deployment: default/super-app-name
 ```diff
  apiVersion: apps/v1
  kind: Deployment
@@ -137,7 +137,7 @@ Modified (7):
          livenessProbe:
            httpGet:
 ```
-#### Service: super-app-name (default)
+#### Service: default/super-app-name
 ```diff
  apiVersion: v1
  kind: Service
@@ -163,7 +163,7 @@ Modified (7):
      app.kubernetes.io/name: myApp
    type: ClusterIP
 ```
-#### ServiceAccount: super-app-name (default)
+#### ServiceAccount: default/super-app-name
 ```diff
  apiVersion: v1
  automountServiceAccountToken: true
@@ -185,7 +185,7 @@ Modified (7):
 <summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
-#### Deployment: staging-myapp (default)
+#### Deployment: default/staging-myapp
 ```diff
      spec:
        containers:
@@ -206,7 +206,7 @@ Modified (7):
 <summary>nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
 <br>
 
-#### Deployment: nginx-ingress-ingress-nginx-controller (default)
+#### Deployment: default/nginx-ingress-ingress-nginx-controller
 ```diff
          app.kubernetes.io/part-of: ingress-nginx
          app.kubernetes.io/version: 1.10.0
