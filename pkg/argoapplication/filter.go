@@ -27,19 +27,37 @@ type ApplicationSelectionOptions struct {
 	WatchIfNoWatchPatternFound bool
 }
 
+const maxFilesChangedDisplay = 20
+
+func formatFilesChanged(files []string) string {
+	if len(files) == 0 {
+		return ""
+	}
+	limit := min(len(files), maxFilesChangedDisplay)
+	result := fmt.Sprintf("'%s'", strings.Join(files[:limit], "', '"))
+	if len(files) > maxFilesChangedDisplay {
+		result += fmt.Sprintf(" [%d more omitted]", len(files)-maxFilesChangedDisplay)
+	}
+	return result
+}
+
 func (appSelectionOptions ApplicationSelectionOptions) LogRules() {
+
+	hasSelector := len(appSelectionOptions.Selector) > 0
+	onlySelectAppsWithWatchPatterns := len(appSelectionOptions.FilesChanged) > 0 && !appSelectionOptions.WatchIfNoWatchPatternFound
+
 	switch {
-	case len(appSelectionOptions.Selector) > 0 && len(appSelectionOptions.FilesChanged) > 0:
+	case hasSelector && onlySelectAppsWithWatchPatterns:
 		var selectorStrs []string
 		for _, s := range appSelectionOptions.Selector {
 			selectorStrs = append(selectorStrs, s.String())
 		}
 		log.Info().Msgf(
-			"🤖 Will only select Application[Sets] that match '%s' and watch these files: '%s'",
+			"🤖 Will only select Application[Sets] that match '%s' and watch these files: %s",
 			strings.Join(selectorStrs, ","),
-			strings.Join(appSelectionOptions.FilesChanged, "', '"),
+			formatFilesChanged(appSelectionOptions.FilesChanged),
 		)
-	case len(appSelectionOptions.Selector) > 0:
+	case hasSelector:
 		var selectorStrs []string
 		for _, s := range appSelectionOptions.Selector {
 			selectorStrs = append(selectorStrs, s.String())
@@ -48,10 +66,10 @@ func (appSelectionOptions ApplicationSelectionOptions) LogRules() {
 			"🤖 Will only select Application[Sets] that match '%s'",
 			strings.Join(selectorStrs, ","),
 		)
-	case len(appSelectionOptions.FilesChanged) > 0:
+	case onlySelectAppsWithWatchPatterns:
 		log.Info().Msgf(
-			"🤖 Will only select Application[Sets] that watch these files: '%s'",
-			strings.Join(appSelectionOptions.FilesChanged, "', '"),
+			"🤖 Will only select Application[Sets] that watch these files: %s",
+			formatFilesChanged(appSelectionOptions.FilesChanged),
 		)
 	}
 }
