@@ -163,7 +163,7 @@ kubectl apply -f /secrets
 
 ## Step 7: Generate Applications from ApplicationSets
 
-For each ApplicationSet found, it generates the applications using the Argo CD CLI:
+For each ApplicationSet found, it generates the applications using the Argo CD CLI (or API depending on the `--render-method`):
 
 ```bash
 argocd appset generate <app-set-name>
@@ -205,7 +205,7 @@ It practically just waits for the Application to look like this:
 
 ## Step 10: Extract rendered manifests
 
-Once applications are ready, the tool extracts the rendered manifests using the Argo CD CLI:
+Once applications are ready, the tool extracts the rendered manifests using the Argo CD CLI (or API depending on the `--render-method`):
 
 ```bash
 argocd app manifests <app-name>
@@ -240,9 +240,12 @@ The tool writes several files to the output folder (`./output/` by default):
 |------|-------------|
 | `./output/diff.md` | Markdown diff - ready to post as a PR comment |
 | `./output/diff.html` | HTML diff - visual side-by-side comparison |
-| `./output/base-branch.yaml` | Single manifest with all rendered resources from base branch |
-| `./output/target-branch.yaml` | Single manifest with all rendered resources from target branch |
-| `./output/base/<app-name>.yaml` | Individual manifests for each app rendered from base branch |
-| `./output/target/<app-name>.yaml` | Individual manifests for each app rendered from target branch |
+
+Optionally, you can also write rendered manifests to disk for debugging or downstream consumption:
+
+| Flag | Files | Description |
+|------|-------|-------------|
+| `--output-branch-manifests` | `./output/base-branch.yaml`, `./output/target-branch.yaml` | Single manifest with all rendered resources per branch |
+| `--output-app-manifests` | `./output/base/<app-name>.yaml`, `./output/target/<app-name>.yaml` | Individual manifests for each app per branch |
 
 The Markdown output is designed to be posted directly to your pull request using `gh pr comment` or equivalent.

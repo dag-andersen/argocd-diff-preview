@@ -133,13 +133,13 @@ Once you've added watch-pattern annotations to your applications, configure your
 
 #### Approach 1: Automatic Detection (Recommended)
 
-The simplest approach is to use the `--auto-detect-files-changed` flag. The tool will automatically determine which files changed in the pull request and match them against the watch-patterns.
+The simplest approach is to use the `--auto-detect-files-changed` flag (enabled by default). The tool will automatically determine which files changed in the pull request and match them against the watch-patterns.
 
 **Configuration options:**
 
-- `--auto-detect-files-changed=true` - Enables automatic file change detection
-- `--watch-if-no-watch-pattern-found=true` - Renders applications that don't have a watch-pattern annotation 
-- `--watch-if-no-watch-pattern-found=false` - Skips applications that don't have a watch-pattern annotation (default behavior)
+- `--auto-detect-files-changed=true` - Enables automatic file change detection (default behavior)
+- `--watch-if-no-watch-pattern-found=true` - Renders applications that don't have a watch-pattern annotation (default behavior)
+- `--watch-if-no-watch-pattern-found=false` - Skips applications that don't have a watch-pattern annotation
 
 **How it works:**
 - Applications with a `watch-pattern` annotation are rendered only if their patterns match changed files

@@ -68,7 +68,7 @@ An actual sync of an ArgCD application (that won't be triggered by `argocd-diff-
 
 **Background information**
 
-`argocd-diff-preview` will call `argocd app manifest` to retrieve the rendered manifests for comparison. For this to work, the ArgoCD application has to be created without errors. Without additional permissions, one will get the following example error for applications that have a target namespace different then the one of the namespace-scoped ArgoCD instance (which will be the case for all diffs):
+`argocd-diff-preview` will call the Argo CD server to retrieve the rendered manifests for comparison. For this to work, the ArgoCD application has to be created without errors. Without additional permissions, one will get the following example error for applications that have a target namespace different then the one of the namespace-scoped ArgoCD instance (which will be the case for all diffs):
 
 `Failed to load live state: namespace "default" for Service "kustomize-guestbook-ui" is not managed`
 
@@ -132,8 +132,8 @@ FROM registry.access.redhat.com/ubi10-minimal:latest
 RUN microdnf install -y curl git tar unzip && \
     rm -rf /var/cache/yum/*
 
-# argocd CLI
-# dependency of argocd-diff-preview
+# argocd CLI (optional)
+# only needed if using --render-method=cli
 RUN curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && \
     install -m 555 argocd-linux-amd64 /usr/local/bin/argocd && \
     rm argocd-linux-amd64 && \

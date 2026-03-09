@@ -6,17 +6,15 @@ If that doesn't help or you still have questions, please open an issue in the re
 
 ## Client-Side Throttling
 
-By default, the Kubernetes client uses client-side rate limiting (QPS: 20, Burst: 40) to avoid overwhelming the API server. If you're running against a cluster with [API Priority and Fairness (APF)](https://kubernetes.io/docs/concepts/cluster-administration/flow-control/) enabled (Kubernetes 1.20+), you can disable client-side throttling and let the server handle rate limiting instead:
+By default, client-side rate limiting is disabled, and the tool relies on [API Priority and Fairness (APF)](https://kubernetes.io/docs/concepts/cluster-administration/flow-control/) for server-side rate limiting (Kubernetes 1.20+). If you need to re-enable client-side throttling (QPS: 20, Burst: 40), you can do so with:
 
 ```bash
-argocd-diff-preview --disable-client-throttling ...
+argocd-diff-preview --disable-client-throttling=false ...
 ```
-
-This can improve performance when the cluster's APF configuration allows higher request rates than the client-side defaults.
 
 ## Applications being empty
 
-If you are experiencing issues with Argo CD applications being marked as empty, try running the tool with `--render-method=server-api` to see if that resolves the issue. Otherwise please open an issue with details about your cluster setup and any error/warning messages you are seeing.
+If you are experiencing issues with Argo CD applications being marked as empty, try running the tool with a different `--render-method` to see if that resolves the issue. See the [Rendering Methods](rendering-methods.md) page for the available options. Otherwise please open an issue with details about your cluster setup and any error/warning messages you are seeing.
 
 ## Stale cache issues when connecting to an existing Argo CD instance
 
