@@ -663,14 +663,18 @@ func (o *Config) LogConfig() {
 	if len(o.FilesChanged) > 0 {
 		log.Info().Msgf("✨ - files-changed: %v", o.FilesChanged)
 	} else if o.AutoDetectFilesChanged {
-		log.Info().Msgf("✨ - files-changed: auto-detected")
+		log.Info().Msgf("✨ - files-changed: <auto-detected>")
 	}
 	if len(o.FilesChanged) > 0 || o.AutoDetectFilesChanged {
-		if DefaultIgnoreInvalidWatchPattern != o.IgnoreInvalidWatchPattern {
-			log.Info().Msg("✨ --- Ignoring applications with invalid watch-pattern annotation")
+		if o.IgnoreInvalidWatchPattern {
+			log.Info().Msg("✨ --- Include applications with invalid watch-pattern annotation")
+		} else {
+			log.Info().Msg("✨ --- Fail on applications with invalid watch-pattern annotation")
 		}
-		if DefaultWatchIfNoWatchPatternFound != o.WatchIfNoWatchPatternFound {
-			log.Info().Msgf("✨ --- Rendering applications with no watch-pattern annotation")
+		if o.WatchIfNoWatchPatternFound {
+			log.Info().Msgf("✨ --- Include applications with no watch-pattern annotation")
+		} else {
+			log.Info().Msgf("✨ --- Skip applications with no watch-pattern annotation")
 		}
 	}
 	if len(o.Selectors) > 0 {
@@ -720,8 +724,8 @@ func (o *Config) LogConfig() {
 		}
 		log.Info().Msgf("✨ - ignore-resources: %s", strings.Join(ignoreResourceRuleStrings, ", "))
 	}
-	if o.DisableClientThrottling {
-		log.Info().Msgf("✨ - disable-client-throttling: %t (relying on API Priority and Fairness)", o.DisableClientThrottling)
+	if DefaultDisableClientThrottling != o.DisableClientThrottling {
+		log.Info().Msgf("✨ - disable-client-throttling: %t", o.DisableClientThrottling)
 	}
 	if o.Concurrency != DefaultConcurrency {
 		log.Info().Msgf("✨ - concurrency: %d", o.Concurrency)
