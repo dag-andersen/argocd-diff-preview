@@ -86,6 +86,21 @@ func getDirectoryHashes(dirPath string) (map[string]string, error) {
 			return nil
 		}
 
+		// filepath.Walk uses Lstat, so symlinks are not followed.
+		// If this entry is a symlink pointing to a directory, skip it.
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, statErr := os.Stat(path)
+			if statErr != nil {
+				// Broken symlink — skip silently
+				log.Debug().Str("path", path).Msg("🔗 Skipping broken symlink")
+				return nil
+			}
+			if target.IsDir() {
+				log.Debug().Str("path", path).Msg("🔗 Skipping symlink to directory")
+				return nil
+			}
+		}
+
 		// Get relative path
 		relPath, err := filepath.Rel(dirPath, path)
 		if err != nil {
