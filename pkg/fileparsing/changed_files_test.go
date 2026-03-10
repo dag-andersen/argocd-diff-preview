@@ -271,6 +271,77 @@ func TestListChangedFiles(t *testing.T) {
 	})
 }
 
+func TestListChangedFilesWithSymlinks(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "symlink_test_*")
+	require.NoError(t, err)
+	defer func() { _ = os.RemoveAll(tempDir) }()
+
+	dir1 := filepath.Join(tempDir, "dir1")
+	dir2 := filepath.Join(tempDir, "dir2")
+	require.NoError(t, os.MkdirAll(dir1, 0755))
+	require.NoError(t, os.MkdirAll(dir2, 0755))
+
+	t.Run("symlink to directory is ignored", func(t *testing.T) {
+		cleanDir(t, dir1)
+		cleanDir(t, dir2)
+
+		// Create a real subdirectory with a file in it
+		realSubDir := filepath.Join(tempDir, "real_subdir")
+		require.NoError(t, os.MkdirAll(realSubDir, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(realSubDir, "values.yaml"), []byte("key: value"), 0644))
+
+		// Both dirs have a symlink pointing to the same real directory
+		require.NoError(t, os.Symlink(realSubDir, filepath.Join(dir1, "preview")))
+		require.NoError(t, os.Symlink(realSubDir, filepath.Join(dir2, "preview")))
+
+		// Also add a regular file so we have at least one entry to compare
+		createTestFiles(t, dir1, map[string]string{"app.yaml": "same"})
+		createTestFiles(t, dir2, map[string]string{"app.yaml": "same"})
+
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
+		require.NoError(t, err)
+		assert.Empty(t, changedFiles, "Symlinked directories should be skipped and not cause an error")
+	})
+
+	t.Run("symlink to directory pointing to different targets still ignored", func(t *testing.T) {
+		cleanDir(t, dir1)
+		cleanDir(t, dir2)
+
+		realSubDir1 := filepath.Join(tempDir, "real_subdir1")
+		realSubDir2 := filepath.Join(tempDir, "real_subdir2")
+		require.NoError(t, os.MkdirAll(realSubDir1, 0755))
+		require.NoError(t, os.MkdirAll(realSubDir2, 0755))
+		require.NoError(t, os.WriteFile(filepath.Join(realSubDir1, "values.yaml"), []byte("key: value1"), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(realSubDir2, "values.yaml"), []byte("key: value2"), 0644))
+
+		// Each dir has a symlink to a different real directory
+		require.NoError(t, os.Symlink(realSubDir1, filepath.Join(dir1, "preview")))
+		require.NoError(t, os.Symlink(realSubDir2, filepath.Join(dir2, "preview")))
+
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
+		require.NoError(t, err)
+		// Symlink directories are skipped entirely, so no changes reported from them
+		assert.Empty(t, changedFiles, "Symlinked directories should be skipped even when pointing to different targets")
+	})
+
+	t.Run("symlink to file is hashed normally", func(t *testing.T) {
+		cleanDir(t, dir1)
+		cleanDir(t, dir2)
+
+		// Create a real file and a symlink to it in dir1
+		realFile := filepath.Join(tempDir, "real_file.yaml")
+		require.NoError(t, os.WriteFile(realFile, []byte("same content"), 0644))
+		require.NoError(t, os.Symlink(realFile, filepath.Join(dir1, "linked_file.yaml")))
+
+		// dir2 has the same symlink
+		require.NoError(t, os.Symlink(realFile, filepath.Join(dir2, "linked_file.yaml")))
+
+		changedFiles, _, err := ListChangedFiles(dir1, dir2)
+		require.NoError(t, err)
+		assert.Empty(t, changedFiles, "Symlinks to identical file content should not be reported as changed")
+	})
+}
+
 func TestListChangedFilesWithNonExistentDirectories(t *testing.T) {
 	t.Run("non-existent first directory", func(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "changed_files_test_*")
