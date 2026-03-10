@@ -351,7 +351,7 @@ func TestMatchApps_EmptyLists(t *testing.T) {
 
 func TestMatchApps_NearlyIdenticalAppSetApps(t *testing.T) {
 	// Simulates ApplicationSet-generated apps (prod, staging, dev) that produce
-	// nearly identical resources — differing only by the app.kubernetes.io/instance label.
+	// nearly identical resources - differing only by the app.kubernetes.io/instance label.
 	// These MUST be matched by name to avoid non-deterministic cross-matching.
 
 	makeAppSetResource := func(kind, name, namespace, instance string) unstructured.Unstructured {
@@ -937,7 +937,7 @@ func TestMatchResourcesOfSameKind_DuplicateNamespaceNameHandledCorrectly(t *test
 }
 
 func TestMatchResourcesOfSameKind_AllDuplicatesIdentical(t *testing.T) {
-	// All resources identical across base and target — nothing should appear in output
+	// All resources identical across base and target - nothing should appear in output
 	configMap := makeResource("v1", "ConfigMap", "default", "my-config", map[string]any{
 		"data": map[string]any{"key": "value"},
 	})
@@ -1494,7 +1494,7 @@ func TestBuildResourceDiffs_SkippedResource(t *testing.T) {
 }
 
 func TestBuildResourceDiffs_MixSkippedAndNormal(t *testing.T) {
-	// One resource is ignored, another is not — should see both in output
+	// One resource is ignored, another is not - should see both in output
 	deployBase := makeResource("apps/v1", "Deployment", "default", "my-deploy", map[string]any{
 		"spec": map[string]any{"replicas": int64(3)},
 	})
@@ -1595,7 +1595,7 @@ func TestBuildResourceDiffs_AllSkipped(t *testing.T) {
 		"data": map[string]any{"key": "value"},
 	})
 
-	// Added deployment + deleted configmap — both ignored
+	// Added deployment + deleted configmap - both ignored
 	resources := []ResourcePair{
 		{Base: nil, Target: &deploy},
 		{Base: &config, Target: nil},
@@ -1717,7 +1717,7 @@ func TestBuildResourceDiffs_CrossKindPairSkippedByBaseIgnoreRule(t *testing.T) {
 	// because they have high content similarity (cross-kind match from Phase 3/4).
 	// An ignore rule exists for Secret. Because resourceMatchesIgnoreRules uses OR
 	// logic (either side matching triggers skip), the entire pair is marked as skipped
-	// — even though the target ConfigMap does NOT match the ignore rule.
+	// - even though the target ConfigMap does NOT match the ignore rule.
 	//
 	// This test documents the current behavior. If this is ever changed to only check
 	// the target side (or require both sides to match), update this test accordingly.

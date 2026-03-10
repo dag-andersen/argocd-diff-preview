@@ -200,7 +200,7 @@ When running tests directly with `go test` (not via `make`), these flags are ava
 | `-update`         | Update expected output files with actual output (golden file mode)           |
 | `-docker`         | Use Docker image instead of Go binary                                        |
 | `-debug`          | Enable debug mode for the tool                                               |
-| `-create-cluster` | Force creation of a new cluster (deletes existing one) — for `TestSingleCase` |
+| `-create-cluster` | Force creation of a new cluster (deletes existing one) - for `TestSingleCase` |
 | `-render-method`  | Force all tests to use a specific render mode: `cli`, `server-api`, or `repo-server-api` |
 | `-binary`         | Path to Go binary (default: `./bin/argocd-diff-preview`)                    |
 | `-image`          | Docker image name (default: `argocd-diff-preview`)                          |
@@ -302,7 +302,7 @@ git diff integration-test/  # Review changes
 ```
 
 ### Cluster keeps getting recreated
-Check if tests are alternating between CLI and API mode. The harness will detect RBAC mismatches and recreate as needed — this is expected behavior when the render method changes.
+Check if tests are alternating between CLI and API mode. The harness will detect RBAC mismatches and recreate as needed - this is expected behavior when the render method changes.
 
 ### Too much output from integration tests
 Integration tests produce a lot of output (cluster creation, ArgoCD deployment, etc.). Pipe to `tail` to avoid overflow:

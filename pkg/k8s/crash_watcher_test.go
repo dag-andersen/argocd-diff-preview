@@ -280,7 +280,7 @@ func TestDetectCrashEvents_RestartResetsExistingCrashLoopReporting(t *testing.T)
 	}
 	state.DetectCrashEvents(pods)
 
-	// Poll 2: restart count goes up but still CrashLoopBackOff — restart event should reset crash-loop tracking
+	// Poll 2: restart count goes up but still CrashLoopBackOff - restart event should reset crash-loop tracking
 	// so we report crash-loop again
 	pods[0].Status.ContainerStatuses[0].RestartCount = 4
 	events := state.DetectCrashEvents(pods)
