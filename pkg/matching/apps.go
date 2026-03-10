@@ -22,11 +22,11 @@ func appIdentityKey(app *extract.ExtractedApp) string {
 
 // MatchApps finds the best pairing between base and target ExtractedApps.
 // It uses a three-phase matching strategy:
-//  1. Match by exact identity (name + source path) — strongest signal.
-//  2. Match remaining by exact name only — catches apps whose source path
+//  1. Match by exact identity (name + source path) - strongest signal.
+//  2. Match remaining by exact name only - catches apps whose source path
 //     changed but name stayed the same. This also ensures deterministic results
 //     for ApplicationSet-generated apps that produce nearly identical resources.
-//  3. Match remaining by content similarity — handles renames, moves, etc.
+//  3. Match remaining by content similarity - handles renames, moves, etc.
 //
 // Returns a list of pairs where each pair contains matching base and target apps.
 // If an app only exists in base, Target will be nil (deleted).

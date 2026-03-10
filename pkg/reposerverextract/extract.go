@@ -97,7 +97,7 @@ func RenderApplicationsFromBothBranches(
 	}
 
 	// Fetch all repository credentials from the cluster once, upfront.
-	// The repo server has no access to Kubernetes secrets — credentials must be
+	// The repo server has no access to Kubernetes secrets - credentials must be
 	// provided by the caller in every ManifestRequest. We mirror what the
 	// ArgoCD app controller does in controller/state.go before calling the repo server.
 	creds, err := FetchRepoCreds(context.Background(), argocd.K8sClient, argocd.Namespace)
@@ -284,7 +284,7 @@ func renderApp(
 		} else {
 			manifestStrings, err = repoClient.GenerateManifests(ctx, streamDir, request)
 		}
-		// Clean up the temp dir immediately after the RPC completes — don't defer
+		// Clean up the temp dir immediately after the RPC completes - don't defer
 		// inside a loop, which would keep all temp dirs alive until renderApp returns.
 		if cleanup != nil {
 			cleanup()
@@ -326,7 +326,7 @@ func renderApp(
 	// Remove null metadata fields that some repo server responses include.
 	// For example, the nginx-ingress chart returns resources with
 	// "metadata": {"annotations": null} which yaml.Marshal would render as
-	// "annotations: null" — not present in the old cluster-reconciliation path.
+	// "annotations: null" - not present in the old cluster-reconciliation path.
 	removeNullMetadataFields(manifests)
 
 	replaceAppIDInManifests(manifests, app.Id, app.Name)
@@ -495,7 +495,7 @@ func buildManifestRequestForSource(
 				Str("App", app.GetLongName()).
 				Str("sourceRepoURL", primarySource.RepoURL).
 				Str("prRepo", prRepo).
-				Msg("Source repoURL does not match PR repo — using remote RPC")
+				Msg("Source repoURL does not match PR repo - using remote RPC")
 			request = &repoapiclient.ManifestRequest{
 				Repo:               creds.GetRepo(primarySource.RepoURL),
 				Repos:              creds.HelmRepos(&primarySource),
@@ -557,7 +557,7 @@ func buildManifestRequestForSource(
 		return request, "", nil, nil
 	}
 
-	// ── Slow path: ref sources present — cross-repo primary source ────────────
+	// ── Slow path: ref sources present - cross-repo primary source ────────────
 	// When the primary source lives in a different repository from the PR, we
 	// cannot stream its files locally. Use the remote RPC and let the repo
 	// server fetch both the primary content and the ref sources from their
@@ -567,7 +567,7 @@ func buildManifestRequestForSource(
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).
 			Str("prRepo", prRepo).
-			Msg("Source repoURL does not match PR repo (slow path) — using remote RPC")
+			Msg("Source repoURL does not match PR repo (slow path) - using remote RPC")
 		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
 		for _, ref := range refSources {
 			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
@@ -681,7 +681,7 @@ func splitRefPath(valueFile string) (refName, path string, ok bool) {
 	}
 	refName, path, ok = strings.Cut(rest, "/")
 	if !ok {
-		// No sub-path after the ref name — this is a malformed value file
+		// No sub-path after the ref name - this is a malformed value file
 		// (e.g. "$cfg" instead of "$cfg/values.yaml"). A path pointing at a
 		// ref directory root is not a valid file reference, so treat it as
 		// unrecognised.

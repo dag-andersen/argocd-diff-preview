@@ -260,7 +260,7 @@ func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *
 			continue
 		}
 
-		// Non-retryable error — return immediately.
+		// Non-retryable error - return immediately.
 		return nil, err
 	}
 

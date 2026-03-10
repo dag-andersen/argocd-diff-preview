@@ -40,7 +40,7 @@ func (r *ResourceDiff) Header() string {
 		kindStr = fmt.Sprintf("%s → %s", r.OldKind, r.Kind)
 	}
 
-	// Namespace/Name part — expressed as "namespace/name" or just "name" if cluster-scoped
+	// Namespace/Name part - expressed as "namespace/name" or just "name" if cluster-scoped
 	nsChanged := r.OldNamespace != "" && r.OldNamespace != r.Namespace
 	nameChanged := r.OldName != "" && r.OldName != r.Name
 
@@ -83,7 +83,7 @@ type AppDiff struct {
 type EmptyReason int
 
 const (
-	EmptyReasonNone        EmptyReason = iota // not empty — has resources
+	EmptyReasonNone        EmptyReason = iota // not empty - has resources
 	EmptyReasonNoResources                    // application genuinely rendered no resources
 	EmptyReasonHiddenDiff                     // diff hidden by --hide-deleted-app-diff
 )

@@ -198,7 +198,7 @@ The tool will poll the applications until they're ready or the timeout is reache
 It practically just waits for the Application to look like this:
 
 <p align="center">
-  <img src="../assets/out-of-sync-applicaiton.png" width="600">
+  <img src="../assets/out-of-sync-application.png" width="600">
 </p>
 
 ---

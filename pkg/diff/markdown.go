@@ -101,7 +101,7 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 			continue
 		}
 
-		// Resource doesn't fit — try to include a truncated version.
+		// Resource doesn't fit - try to include a truncated version.
 		// Skipped sections are small and not worth partially including.
 		if r.IsSkipped {
 			break

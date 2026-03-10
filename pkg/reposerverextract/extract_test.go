@@ -489,7 +489,7 @@ spec:
 		defer cleanup()
 	}
 
-	// CRITICAL: streamDir must be empty — the path lives in a foreign repo.
+	// CRITICAL: streamDir must be empty - the path lives in a foreign repo.
 	// Streaming local files would fail with "app path does not exist".
 	assert.Empty(t, streamDir,
 		"REGRESSION: source in a foreign repo must use the remote RPC (streamDir must be empty) "+
@@ -538,7 +538,7 @@ spec:
 		defer cleanup()
 	}
 
-	// Same repo — should stream the branch folder, not use remote RPC.
+	// Same repo - should stream the branch folder, not use remote RPC.
 	assert.Equal(t, branchFolder, streamDir, "same-repo source must still stream locally even when prRepo is set")
 	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
 }

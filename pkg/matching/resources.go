@@ -61,12 +61,12 @@ func (p *Pair) ChangedResources() []ResourcePair {
 // returning only pairs where the resources differ (or are added/deleted).
 //
 // It uses a four-phase matching strategy:
-//  1. Match by kind+name+namespace (exact identity) — strongest signal
-//  2. Match remaining by name+namespace across kinds — catches kind changes
+//  1. Match by kind+name+namespace (exact identity) - strongest signal
+//  2. Match remaining by name+namespace across kinds - catches kind changes
 //     (e.g. Deployment → StatefulSet with the same name)
-//  3. Match remaining within the same kind by content similarity — catches name changes
+//  3. Match remaining within the same kind by content similarity - catches name changes
 //     (e.g. Deployment/old-name → Deployment/new-name)
-//  4. Final fallback across ANY kind by content similarity — catches both kind and name changes
+//  4. Final fallback across ANY kind by content similarity - catches both kind and name changes
 //     (e.g. Deployment/old-name → StatefulSet/new-name)
 func matchResources(baseManifests, targetManifests []unstructured.Unstructured) []ResourcePair {
 	matchedBaseIndices := make(map[int]bool)

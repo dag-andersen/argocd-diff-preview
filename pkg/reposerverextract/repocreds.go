@@ -1,6 +1,6 @@
 package reposerverextract
 
-// repocreds.go — upfront credential fetching for the repo-server rendering path.
+// repocreds.go - upfront credential fetching for the repo-server rendering path.
 //
 // The ArgoCD repo server has no access to the cluster's Kubernetes secrets. It
 // relies entirely on credentials being passed in each ManifestRequest. The
@@ -93,7 +93,7 @@ func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string
 
 	// ── Per-repo credential enrichment ───────────────────────────────────────
 	// ListRepositories returns all registered repos (git + Helm + OCI) with
-	// credentials already enriched via enrichCredsToRepos — one API call
+	// credentials already enriched via enrichCredsToRepos - one API call
 	// instead of a per-URL loop.
 	allRepos, err := argoDB.ListRepositories(ctx)
 	if err != nil {
@@ -135,7 +135,7 @@ func (rc *RepoCreds) GetRepo(repoURL string) *v1alpha1.Repository {
 	if r, ok := rc.reposByURL[normalizeRepoURL(repoURL)]; ok {
 		return r
 	}
-	// URL not found in the registry — return a bare stub.
+	// URL not found in the registry - return a bare stub.
 	// This is correct for public repositories that don't need credentials.
 	return &v1alpha1.Repository{Repo: repoURL}
 }
@@ -188,7 +188,7 @@ func (rc *RepoCreds) HelmRepoCreds(source *v1alpha1.ApplicationSource) []*v1alph
 }
 
 // sourceIsOCI returns true when the given ApplicationSource points at an OCI
-// registry — either via the "oci://" scheme (source.IsOCI()) or as a
+// registry - either via the "oci://" scheme (source.IsOCI()) or as a
 // scheme-less Helm OCI registry URL (helm.IsHelmOciRepo). Mirrors the
 // detection logic used in controller/state.go.
 func sourceIsOCI(source *v1alpha1.ApplicationSource) bool {

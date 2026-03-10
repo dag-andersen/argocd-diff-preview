@@ -476,7 +476,7 @@ func verifyNoDuplicateAppIds(apps []argoapplication.ArgoResource) error {
 func VerifyNoApplicationSets(apps []argoapplication.ArgoResource) error {
 	for _, app := range apps {
 		if app.Kind == argoapplication.ApplicationSet {
-			return fmt.Errorf("unexpected ApplicationSet %q reached the extract path — ApplicationSets must be converted to Applications before rendering", app.GetLongName())
+			return fmt.Errorf("unexpected ApplicationSet %q reached the extract path - ApplicationSets must be converted to Applications before rendering", app.GetLongName())
 		}
 	}
 	return nil
