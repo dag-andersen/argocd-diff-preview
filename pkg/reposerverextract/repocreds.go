@@ -58,7 +58,18 @@ type RepoCreds struct {
 // FetchRepoCreds connects to the cluster via the ArgoCD DB layer and fetches
 // all repository and credential information registered under the given
 // ArgoCD namespace. The returned RepoCreds is safe for concurrent read access.
-func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string) (*RepoCreds, error) {
+//
+// appRepoURLs is the set of repository URLs referenced by all Applications that
+// will be rendered. For each URL, FetchRepoCreds calls argoDB.GetRepository()
+// which—unlike ListRepositories—also inherits credentials from "repo-creds"
+// type secrets (credential templates) via prefix matching. This mirrors the
+// enrichment path used by the ArgoCD app controller in controller/state.go.
+//
+// Without this, users who only configure a repo-creds secret (common for
+// GitHub token authentication across many repositories) would get bare stubs
+// with no credentials, causing "authentication required" errors from the repo
+// server.
+func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string, appRepoURLs []string) (*RepoCreds, error) {
 	// The ArgoCD DB requires a typed kubernetes.Interface.  Our K8sClient
 	// exposes the underlying *rest.Config so we can build one on demand.
 	typedClient, err := kubernetes.NewForConfig(k8sClient.GetConfig())
@@ -105,13 +116,39 @@ func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string
 		reposByURL[normalizeRepoURL(r.Repo)] = r
 	}
 
-	if len(helmRepos)+len(ociRepos)+len(helmRepoCreds)+len(ociRepoCreds)+len(allRepos) > 0 {
+	// ── Credential-template inheritance for app repo URLs ────────────────────
+	// ListRepositories only returns repos that have an explicit "repository"
+	// type secret. Users who rely solely on "repo-creds" (credential templates)
+	// won't have their URLs in the list above. For those URLs we call
+	// argoDB.GetRepository() which creates a bare Repository and then enriches
+	// it via the repo-creds prefix-matching path — exactly what the ArgoCD app
+	// controller does in controller/state.go before calling the repo server.
+	repoCredTemplates := 0
+	for _, rawURL := range appRepoURLs {
+		key := normalizeRepoURL(rawURL)
+		if _, exists := reposByURL[key]; exists {
+			continue // already have credentials from a "repository" secret
+		}
+		repo, err := argoDB.GetRepository(ctx, rawURL, "")
+		if err != nil {
+			log.Warn().Err(err).Str("repoURL", rawURL).
+				Msg("⚠️ Failed to look up repository credentials for app repo URL")
+			continue
+		}
+		if repo.HasCredentials() {
+			reposByURL[key] = repo
+			repoCredTemplates++
+		}
+	}
+
+	if len(helmRepos)+len(ociRepos)+len(helmRepoCreds)+len(ociRepoCreds)+len(allRepos)+repoCredTemplates > 0 {
 		log.Info().
 			Int("helmRepos", len(helmRepos)).
 			Int("ociRepos", len(ociRepos)).
 			Int("helmRepoCreds", len(helmRepoCreds)).
 			Int("ociRepoCreds", len(ociRepoCreds)).
 			Int("repos", len(allRepos)).
+			Int("repoCredTemplates", repoCredTemplates).
 			Msg("📦 Fetched ArgoCD repository credentials from cluster")
 	}
 
