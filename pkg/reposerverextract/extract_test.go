@@ -596,3 +596,93 @@ func TestNormalizeRepoURL(t *testing.T) {
 		assert.Equal(t, tc.want, normalizeRepoURL(tc.input), "input: %s", tc.input)
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// collectRepoURLs
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestCollectRepoURLs_SingleSource(t *testing.T) {
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`)
+	urls := collectRepoURLs([]argoapplication.ArgoResource{app})
+	assert.Equal(t, []string{"https://github.com/org/repo.git"}, urls)
+}
+
+func TestCollectRepoURLs_MultiSource(t *testing.T) {
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  sources:
+    - repoURL: https://github.com/org/repo.git
+      path: apps/my-app
+      ref: values
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: "1.12.0"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`)
+	urls := collectRepoURLs([]argoapplication.ArgoResource{app})
+	assert.Len(t, urls, 2)
+	assert.Contains(t, urls, "https://github.com/org/repo.git")
+	assert.Contains(t, urls, "https://charts.jetstack.io")
+}
+
+func TestCollectRepoURLs_Deduplication(t *testing.T) {
+	app1 := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app1
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/app1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`)
+	app2 := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app2
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/org/repo
+    path: apps/app2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`)
+	// Same URL with and without .git — should deduplicate to one entry
+	urls := collectRepoURLs(
+		[]argoapplication.ArgoResource{app1},
+		[]argoapplication.ArgoResource{app2},
+	)
+	assert.Len(t, urls, 1)
+}
+
+func TestCollectRepoURLs_Empty(t *testing.T) {
+	urls := collectRepoURLs([]argoapplication.ArgoResource{})
+	assert.Empty(t, urls)
+}

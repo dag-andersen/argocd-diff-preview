@@ -96,11 +96,15 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
 	}
 
+	// Collect all unique repository URLs referenced by the Applications so that
+	// FetchRepoCreds can enrich them with credentials from repo-creds templates.
+	appRepoURLs := collectRepoURLs(baseApps, targetApps)
+
 	// Fetch all repository credentials from the cluster once, upfront.
 	// The repo server has no access to Kubernetes secrets - credentials must be
 	// provided by the caller in every ManifestRequest. We mirror what the
 	// ArgoCD app controller does in controller/state.go before calling the repo server.
-	creds, err := FetchRepoCreds(context.Background(), argocd.K8sClient, argocd.Namespace)
+	creds, err := FetchRepoCreds(context.Background(), argocd.K8sClient, argocd.Namespace, appRepoURLs)
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to fetch repository credentials: %w", err)
 	}
@@ -353,6 +357,55 @@ func renderApp(
 	}
 
 	return filtered, nil
+}
+
+// collectRepoURLs extracts all unique repository URLs referenced by the given
+// Application resources (from both base and target branches). It inspects
+// spec.source.repoURL and spec.sources[*].repoURL. The result is deduplicated
+// by the normalised URL form.
+//
+// NOTE: by the time apps reach the repo-server-extract path, ApplicationSets
+// have already been converted to Applications, so we only need to look under
+// spec (not spec.template.spec).
+func collectRepoURLs(appLists ...[]argoapplication.ArgoResource) []string {
+	seen := make(map[string]bool)
+	var urls []string
+
+	for _, apps := range appLists {
+		for _, app := range apps {
+			obj := app.Yaml.Object
+
+			// spec.source.repoURL (single-source apps)
+			if repoURL, found, _ := unstructured.NestedString(obj, "spec", "source", "repoURL"); found && repoURL != "" {
+				key := normalizeRepoURL(repoURL)
+				if !seen[key] {
+					seen[key] = true
+					urls = append(urls, repoURL)
+				}
+			}
+
+			// spec.sources[*].repoURL (multi-source apps)
+			if sourcesRaw, found, _ := unstructured.NestedSlice(obj, "spec", "sources"); found {
+				for _, srcRaw := range sourcesRaw {
+					srcMap, ok := srcRaw.(map[string]any)
+					if !ok {
+						continue
+					}
+					repoURL, _ := srcMap["repoURL"].(string)
+					if repoURL == "" {
+						continue
+					}
+					key := normalizeRepoURL(repoURL)
+					if !seen[key] {
+						seen[key] = true
+						urls = append(urls, repoURL)
+					}
+				}
+			}
+		}
+	}
+
+	return urls
 }
 
 // splitSources parses the application's spec.sources / spec.source and splits
