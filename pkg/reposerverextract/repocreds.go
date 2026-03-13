@@ -149,7 +149,9 @@ func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string
 			Int("ociRepoCreds", len(ociRepoCreds)).
 			Int("repos", len(allRepos)).
 			Int("repoCredTemplates", repoCredTemplates).
-			Msg("📦 Fetched ArgoCD repository credentials from cluster")
+			Msg("📦 Fetched Argo CD repository credentials from cluster")
+	} else {
+		log.Info().Msg("📦 No Argo CD repository credentials found in cluster")
 	}
 
 	return &RepoCreds{
