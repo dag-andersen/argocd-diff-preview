@@ -6,3 +6,4 @@ metadata:
 data:
   app: level-2b
   color: red
+  replicas: "3"

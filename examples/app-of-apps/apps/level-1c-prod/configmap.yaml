@@ -5,4 +5,4 @@ metadata:
   namespace: default
 data:
   app: level-1c-prod
-  color: blue
+  color: purple

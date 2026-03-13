@@ -8,6 +8,7 @@ spec:
     - list:
         elements:
           - env: prod
+          - env: staging
   template:
     metadata:
       name: "level-1c-{{env}}-app"
