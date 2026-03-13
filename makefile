@@ -12,7 +12,7 @@ BUILD_DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 use_argocd_api ?= false
 debug ?= false
 argocd_ui_url ?= ""
-render_method ?= ""
+render_method ?= "server-api"
 output_app_manifests ?= false
 
 GO_TEST_FLAGS ?=
