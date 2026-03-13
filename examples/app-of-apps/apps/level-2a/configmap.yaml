@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: level-2a-config
+  namespace: default
+data:
+  app: level-2a
+  color: green
