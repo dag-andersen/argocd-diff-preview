@@ -192,6 +192,17 @@ func normalizeRepoURL(u string) string {
 	return u
 }
 
+// repoURLContains reports whether the normalised form of repoURL contains the
+// normalised form of substr. This is used to match source repoURLs against the
+// --repo flag value which can be either a full URL
+// ("https://github.com/org/repo.git") or a short slug ("org/repo").
+//
+// Using a substring match (like the patching code's containsIgnoreCase) keeps
+// the comparison provider-agnostic — we don't assume GitHub, GitLab, etc.
+func repoURLContains(repoURL, substr string) bool {
+	return strings.Contains(normalizeRepoURL(repoURL), normalizeRepoURL(substr))
+}
+
 // HelmRepos returns the Helm + OCI repository lists to pass as
 // ManifestRequest.Repos. For OCI primary sources the OCI list is merged in
 // (mirrors controller/state.go behaviour).

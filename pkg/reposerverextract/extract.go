@@ -543,7 +543,7 @@ func buildManifestRequestForSource(
 		// repository than the PR repo. Those files are not checked out
 		// locally, so we cannot stream them. Fall back to the remote
 		// GenerateManifest RPC and let the repo server fetch them itself.
-		if prRepo != "" && normalizeRepoURL(primarySource.RepoURL) != normalizeRepoURL(prRepo) {
+		if prRepo != "" && !repoURLContains(primarySource.RepoURL, prRepo) {
 			log.Debug().
 				Str("App", app.GetLongName()).
 				Str("sourceRepoURL", primarySource.RepoURL).
@@ -615,7 +615,7 @@ func buildManifestRequestForSource(
 	// cannot stream its files locally. Use the remote RPC and let the repo
 	// server fetch both the primary content and the ref sources from their
 	// respective git caches. Value-file $ref/… paths are left unrewritten.
-	if prRepo != "" && normalizeRepoURL(primarySource.RepoURL) != normalizeRepoURL(prRepo) {
+	if prRepo != "" && !repoURLContains(primarySource.RepoURL, prRepo) {
 		log.Debug().
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).

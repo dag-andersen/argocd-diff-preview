@@ -598,6 +598,130 @@ func TestNormalizeRepoURL(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// repoURLContains - substring match used for prRepo comparisons
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestRepoURLContains(t *testing.T) {
+	cases := []struct {
+		name    string
+		repoURL string
+		substr  string
+		want    bool
+	}{
+		{
+			name:    "full URL matches full URL",
+			repoURL: "https://github.com/org/repo.git",
+			substr:  "https://github.com/org/repo.git",
+			want:    true,
+		},
+		{
+			name:    "slug matches full URL",
+			repoURL: "https://github.com/org/repo.git",
+			substr:  "org/repo",
+			want:    true,
+		},
+		{
+			name:    "slug matches full URL without .git",
+			repoURL: "https://github.com/org/repo",
+			substr:  "org/repo",
+			want:    true,
+		},
+		{
+			name:    "case insensitive",
+			repoURL: "https://github.com/Org/Repo.git",
+			substr:  "org/repo",
+			want:    true,
+		},
+		{
+			name:    "different repos do not match",
+			repoURL: "https://github.com/org/repo-a.git",
+			substr:  "org/repo-b",
+			want:    false,
+		},
+		{
+			name:    "different orgs do not match",
+			repoURL: "https://github.com/org-a/repo.git",
+			substr:  "org-b/repo",
+			want:    false,
+		},
+		{
+			name:    "GitLab full URL with slug",
+			repoURL: "https://gitlab.com/company/project.git",
+			substr:  "company/project",
+			want:    true,
+		},
+		{
+			name:    "Bitbucket full URL with slug",
+			repoURL: "https://bitbucket.org/team/repo.git",
+			substr:  "team/repo",
+			want:    true,
+		},
+		{
+			name:    "empty substr matches anything",
+			repoURL: "https://github.com/org/repo.git",
+			substr:  "",
+			want:    true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, repoURLContains(tc.repoURL, tc.substr), "repoURL=%q substr=%q", tc.repoURL, tc.substr)
+		})
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. Same-repo source with prRepo as owner/repo slug → streams locally
+//
+//	When the user passes --repo=owner/repo (the documented format), the
+//	source repoURL is a full URL like "https://github.com/owner/repo.git".
+//	The comparison must use substring matching so the slug is recognised as
+//	belonging to the same repository.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_SameRepoSource_WithSlugPrRepo_StreamsLocally(t *testing.T) {
+	// prRepo is the short "owner/repo" slug — the documented format for --repo.
+	prRepo := "aaronshifman/my-private-repo"
+	branchFolder := makeBranchFolder(t, "apps/debezium/debezium")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: debezium-operator
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/aaronshifman/my-private-repo.git
+    path: apps/debezium/debezium
+    plugin:
+      name: kustomize-build-with-helm-oci
+    targetRevision: main
+  destination:
+    namespace: debezium-operator
+    server: https://kubernetes.default.svc
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// CRITICAL: must stream locally — the source is in the same repo.
+	// Before the fix, the slug format caused a mismatch and fell into the
+	// remote RPC path, which failed with "authentication required".
+	assert.Equal(t, branchFolder, streamDir,
+		"REGRESSION: same-repo source with slug-format prRepo must stream locally, not use remote RPC")
+	assert.Equal(t, "apps/debezium/debezium", req.ApplicationSource.Path)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // collectRepoURLs
 // ─────────────────────────────────────────────────────────────────────────────
 
