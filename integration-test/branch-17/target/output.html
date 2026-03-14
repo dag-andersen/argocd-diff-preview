@@ -1,0 +1,168 @@
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Added (1):
++ level-2c-app (+8)
+
+Modified (3):
+± level-1b-app (+1|-1)
+± level-2a-app (+2|-1)
+± level-2b-app (+1)</pre>
+
+<div class="diffs">
+<details>
+<summary>
+level-1b-app (parent: root-app)
+</summary>
+
+<h4 class="resource_header">ConfigMap: default/level-1b-config</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> data:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   app: level-1b</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  color: blue</pre></td></tr>
+	<tr class="added_line"><td><pre>+  color: purple</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: ConfigMap</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: level-1b-config</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+level-2a-app (parent: level-1a-app)
+</summary>
+
+<h4 class="resource_header">ConfigMap: default/level-2a-config</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> data:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   app: level-2a</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  color: green</pre></td></tr>
+	<tr class="added_line"><td><pre>+  color: yellow</pre></td></tr>
+	<tr class="added_line"><td><pre>+  environment: production</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: ConfigMap</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: level-2a-config</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+level-2b-app (parent: level-1a-app)
+</summary>
+
+<h4 class="resource_header">ConfigMap: default/level-2b-config</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> data:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   app: level-2b</pre></td></tr>
+	<tr class="normal_line"><td><pre>   color: red</pre></td></tr>
+	<tr class="added_line"><td><pre>+  replicas: &#34;3&#34;</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: ConfigMap</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: level-2b-config</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+level-2c-app (parent: level-1a-app)
+</summary>
+
+<h4 class="resource_header">ConfigMap: default/level-2c-config</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+data:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  app: level-2c</pre></td></tr>
+	<tr class="added_line"><td><pre>+  color: orange</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ConfigMap</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: level-2c-config</pre></td></tr>
+	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+</div>
+
+<pre>_Stats_:
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>

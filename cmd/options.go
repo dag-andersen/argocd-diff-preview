@@ -82,6 +82,7 @@ var (
 	DefaultArgocdConfigPath           = "./argocd-config"
 	DefaultOutputAppManifests         = false
 	DefaultOutputBranchManifests      = false
+	DefaultTraverseAppOfApps          = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -130,6 +131,7 @@ type RawOptions struct {
 	Concurrency                uint   `mapstructure:"concurrency"`
 	OutputAppManifests         bool   `mapstructure:"output-app-manifests"`
 	OutputBranchManifests      bool   `mapstructure:"output-branch-manifests"`
+	TraverseAppOfApps          bool   `mapstructure:"traverse-app-of-apps"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -173,6 +175,7 @@ type Config struct {
 	Concurrency                uint
 	OutputAppManifests         bool
 	OutputBranchManifests      bool
+	TraverseAppOfApps          bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -268,6 +271,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-config-dir", DefaultArgocdConfigPath)
 	viper.SetDefault("output-app-manifests", DefaultOutputAppManifests)
 	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
+	viper.SetDefault("traverse-app-of-apps", DefaultTraverseAppOfApps)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -325,6 +329,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
 	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
+	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -410,6 +415,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		Concurrency:                o.Concurrency,
 		OutputAppManifests:         o.OutputAppManifests,
 		OutputBranchManifests:      o.OutputBranchManifests,
+		TraverseAppOfApps:          o.TraverseAppOfApps,
 	}
 
 	var err error
@@ -459,6 +465,11 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid cluster configuration: %w", err)
 		}
+	}
+
+	// --traverse-app-of-apps is only supported with the repo-server-api render method
+	if cfg.TraverseAppOfApps && cfg.RenderMethod != RenderMethodRepoServerAPI {
+		return nil, fmt.Errorf("--traverse-app-of-apps requires --render-method=repo-server-api (current: %s)", cfg.RenderMethod)
 	}
 
 	// Check if argocd CLI is installed when not using API mode
@@ -735,5 +746,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.OutputBranchManifests {
 		log.Info().Msgf("✨ - output-branch-manifests: %t", o.OutputBranchManifests)
+	}
+	if o.TraverseAppOfApps {
+		log.Info().Msgf("✨ - traverse-app-of-apps: %t", o.TraverseAppOfApps)
 	}
 }

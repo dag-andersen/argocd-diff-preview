@@ -63,6 +63,7 @@ type TestCase struct {
 	DisableClusterRoles        string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
 	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
+	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
@@ -271,6 +272,17 @@ var testCases = []TestCase{
 		ArgocdConfigDir:            "plugin-test",
 		CreateCluster:              "true",
 		WatchIfNoWatchPatternFound: "false",
+	},
+	// Tests the app-of-apps pattern with the repo-server-api render method.
+	// A single root Application renders child Application YAMLs, which are
+	// discovered recursively (BFS) and each rendered independently.
+	{
+		Name:              "branch-17/target",
+		TargetBranch:      "integration-test/branch-17/target",
+		BaseBranch:        "integration-test/branch-17/base",
+		RenderMethod:      "repo-server-api",
+		FileRegex:         "examples/app-of-apps/root-app\\.yaml",
+		TraverseAppOfApps: "true",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
@@ -865,6 +877,10 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		args = append(args, "-e", fmt.Sprintf("ARGOCD_UI_URL=%s", tc.ArgocdUIURL))
 	}
 
+	if tc.TraverseAppOfApps == "true" {
+		args = append(args, "-e", "TRAVERSE_APP_OF_APPS=true")
+	}
+
 	// Add image (no additional args needed - all config is via env vars)
 	args = append(args, *dockerImage)
 
@@ -954,6 +970,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	if tc.ArgocdUIURL != "" {
 		args = append(args, "--argocd-ui-url", tc.ArgocdUIURL)
+	}
+
+	if tc.TraverseAppOfApps == "true" {
+		args = append(args, "--traverse-app-of-apps")
 	}
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),
