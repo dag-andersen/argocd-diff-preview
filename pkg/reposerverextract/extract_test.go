@@ -810,3 +810,119 @@ func TestCollectRepoURLs_Empty(t *testing.T) {
 	urls := collectRepoURLs([]argoapplication.ArgoResource{})
 	assert.Empty(t, urls)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App-of-apps: buildChildArgoResource
+// ─────────────────────────────────────────────────────────────────────────────
+
+func makeManifest(t *testing.T, rawYAML string) unstructured.Unstructured {
+	t.Helper()
+	var obj unstructured.Unstructured
+	require.NoError(t, yaml.Unmarshal([]byte(rawYAML), &obj))
+	return obj
+}
+
+func TestBuildChildArgoResource_BasicApp(t *testing.T) {
+	parent := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: parent-app
+  namespace: argocd
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/parent
+  destination:
+    namespace: argocd
+`)
+
+	child := makeManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: child-app
+  namespace: other-ns
+spec:
+  project: my-project
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/child
+  destination:
+    server: https://some-external-cluster.example.com
+    namespace: child-ns
+`)
+
+	result, err := buildChildArgoResource(child, parent, "argocd")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	assert.Equal(t, "child-app", result.Id)
+	assert.Equal(t, "child-app", result.Name)
+	assert.Equal(t, parent.FileName, result.FileName)
+	assert.Equal(t, parent.Branch, result.Branch)
+	assert.Equal(t, argoapplication.Application, result.Kind)
+
+	// Namespace should be patched to argocd.
+	assert.Equal(t, "argocd", result.Yaml.GetNamespace())
+
+	// syncPolicy should be removed.
+	_, found, _ := unstructured.NestedMap(result.Yaml.Object, "spec", "syncPolicy")
+	assert.False(t, found, "syncPolicy should be removed from child Application")
+
+	// project should be set to "default".
+	project, _, _ := unstructured.NestedString(result.Yaml.Object, "spec", "project")
+	assert.Equal(t, "default", project)
+
+	// destination.server should be set to the local cluster.
+	server, _, _ := unstructured.NestedString(result.Yaml.Object, "spec", "destination", "server")
+	assert.Equal(t, "https://kubernetes.default.svc", server)
+}
+
+func TestBuildChildArgoResource_MissingName_ReturnsError(t *testing.T) {
+	parent := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: parent-app
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/parent
+  destination:
+    namespace: argocd
+`)
+
+	// A manifest with no name.
+	child := makeManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: {}
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/child
+`)
+
+	_, err := buildChildArgoResource(child, parent, "argocd")
+	assert.Error(t, err, "should return error for child Application with no name")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// App-of-apps: visitedKey
+// ─────────────────────────────────────────────────────────────────────────────
+
+func TestVisitedKey_DifferentBranchesProduceDifferentKeys(t *testing.T) {
+	keyBase := visitedKey("my-app", git.Base)
+	keyTarget := visitedKey("my-app", git.Target)
+	assert.NotEqual(t, keyBase, keyTarget,
+		"same app ID on different branches must produce different visited keys")
+}
+
+func TestVisitedKey_SameAppSameBranchProducesSameKey(t *testing.T) {
+	key1 := visitedKey("my-app", git.Base)
+	key2 := visitedKey("my-app", git.Base)
+	assert.Equal(t, key1, key2)
+}

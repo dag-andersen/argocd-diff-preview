@@ -48,6 +48,27 @@ func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
 	return p.namespacedByGk[gk], nil
 }
 
+// maxAppOfAppsDepth is the maximum recursion depth allowed when following
+// child Applications discovered in rendered manifests (app-of-apps pattern).
+// A depth of 0 means the seed apps themselves; depth 1 means their children,
+// and so on. This prevents infinite loops in circular app-of-apps graphs.
+const maxAppOfAppsDepth = 10
+
+// renderResult captures a single rendered application together with any child
+// Application resources that were discovered in its manifests.
+type renderResult struct {
+	// extracted is the ExtractedApp for the rendered application.  Its
+	// Manifests slice already has Application resources stripped out.
+	extracted extract.ExtractedApp
+
+	// childApps are the ArgoResource values built from Application manifests
+	// that were discovered inside the rendered output.  They have been patched
+	// and are ready to be rendered in the next wave.
+	childApps []argoapplication.ArgoResource
+
+	err error
+}
+
 // RenderApplicationsFromBothBranches renders manifests for all supplied base
 // and target Applications by streaming their local source directories to the
 // Argo CD repo server via gRPC.
@@ -63,6 +84,13 @@ func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
 //
 // The return type is identical to extract.RenderApplicationsFromBothBranches
 // so that callers can swap implementations with minimal changes.
+//
+// App-of-apps pattern: if a rendered application's manifests contain child
+// Application resources, those children are automatically discovered, patched,
+// and rendered recursively (up to maxAppOfAppsDepth levels deep).  The child
+// Application YAML manifests are excluded from the parent's diff output; each
+// child gets its own ExtractedApp entry.  This behaviour is only available with
+// the repo-server rendering path.
 func RenderApplicationsFromBothBranches(
 	argocd *argocdPkg.ArgoCDInstallation,
 	baseBranch *git.Branch,
@@ -118,34 +146,41 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to set up port forward to repo server: %w", err)
 	}
 
-	allApps := append(baseApps, targetApps...)
-
 	log.Info().Msgf("🤖 Rendering Applications via repo server (timeout in %d seconds)", timeout)
 
-	// ── Worker pool ──────────────────────────────────────────────────────────
-
-	type result struct {
-		app extract.ExtractedApp
-		err error
+	remainingTime := func() int {
+		return max(0, int(timeout)-int(time.Since(startTime).Seconds()))
 	}
 
-	results := make(chan result, len(allApps))
+	// ── App-of-apps iterative expansion ─────────────────────────────────────
+	// We render apps in waves (BFS).  Each wave may produce child Application
+	// resources which become the next wave's input.  A visited set (keyed on
+	// app ID + branch type) prevents re-rendering and infinite loops.
+
+	var (
+		extractedBaseApps   []extract.ExtractedApp
+		extractedTargetApps []extract.ExtractedApp
+		renderedApps        atomic.Int32
+		firstError          error
+	)
+
+	// visited tracks which (id, branch) pairs have already been rendered.
+	visited := make(map[string]bool)
 
 	semSize := int(maxConcurrency)
-	if semSize == 0 {
-		semSize = len(allApps)
-	}
 	if semSize == 0 {
 		semSize = 1
 	}
 	sem := make(chan struct{}, semSize)
 
-	totalApps := len(allApps)
-	var renderedApps atomic.Int32
-
 	progressDone := make(chan bool)
-	remainingTime := func() int {
-		return max(0, int(timeout)-int(time.Since(startTime).Seconds()))
+
+	currentWave := append(baseApps, targetApps...)
+	waveNumber := 0
+
+	// Mark seed apps as visited before the first wave.
+	for _, app := range currentWave {
+		visited[visitedKey(app.Id, app.Branch)] = true
 	}
 
 	go func() {
@@ -154,63 +189,94 @@ func RenderApplicationsFromBothBranches(
 		for {
 			select {
 			case <-ticker.C:
-				log.Info().Msgf("🤖 Rendered %d out of %d applications via repo server (timeout in %d seconds)",
-					renderedApps.Load(), totalApps, remainingTime())
+				log.Info().Msgf("🤖 Rendered %d applications via repo server so far (timeout in %d seconds)",
+					renderedApps.Load(), remainingTime())
 			case <-progressDone:
 				return
 			}
 		}
 	}()
 
-	for _, app := range allApps {
-		sem <- struct{}{}
-		go func(app argoapplication.ArgoResource) {
-			defer func() { <-sem }()
-
-			if remainingTime() <= 0 {
-				results <- result{err: fmt.Errorf("timeout reached before starting to render application: %s", app.GetLongName())}
-				return
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
-			defer cancel()
-
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, prRepo)
-			if err != nil {
-				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
-				return
-			}
-
-			renderedApps.Add(1)
-			results <- result{app: extract.CreateExtractedApp(app.Id, app.Name, app.FileName, manifests, app.Branch)}
-		}(app)
-	}
-
-	// ── Collect results ──────────────────────────────────────────────────────
-
-	extractedBaseApps := make([]extract.ExtractedApp, 0, len(baseApps))
-	extractedTargetApps := make([]extract.ExtractedApp, 0, len(targetApps))
-	var firstError error
-
-	for range len(allApps) {
-		r := <-results
-		if r.err != nil {
-			if firstError == nil {
-				firstError = r.err
-			}
-			log.Error().Err(r.err).Msg("❌ Failed to render application via repo server:")
-			continue
+	for len(currentWave) > 0 && firstError == nil {
+		if waveNumber >= maxAppOfAppsDepth {
+			log.Warn().Msgf("⚠️ App-of-apps depth limit (%d) reached; stopping child discovery", maxAppOfAppsDepth)
+			break
 		}
-		switch r.app.Branch {
-		case git.Base:
-			extractedBaseApps = append(extractedBaseApps, r.app)
-		case git.Target:
-			extractedTargetApps = append(extractedTargetApps, r.app)
-		default:
-			if firstError == nil {
-				firstError = fmt.Errorf("unknown branch type: '%s'", r.app.Branch)
+
+		if waveNumber > 0 {
+			log.Info().Msgf("🌊 App-of-apps wave %d: rendering %d child Application(s)", waveNumber, len(currentWave))
+		}
+
+		results := make(chan renderResult, len(currentWave))
+
+		for _, app := range currentWave {
+			sem <- struct{}{}
+			go func(app argoapplication.ArgoResource) {
+				defer func() { <-sem }()
+
+				if remainingTime() <= 0 {
+					results <- renderResult{err: fmt.Errorf("timeout reached before starting to render application: %s", app.GetLongName())}
+					return
+				}
+
+				ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
+				defer cancel()
+
+				manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, prRepo, argocd.Namespace)
+				if err != nil {
+					results <- renderResult{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
+					return
+				}
+
+				renderedApps.Add(1)
+				results <- renderResult{
+					extracted: extract.CreateExtractedApp(app.Id, app.Name, app.FileName, manifests, app.Branch),
+					childApps: childApps,
+				}
+			}(app)
+		}
+
+		// ── Collect wave results ─────────────────────────────────────────────
+		var nextWave []argoapplication.ArgoResource
+
+		for range len(currentWave) {
+			r := <-results
+			if r.err != nil {
+				if firstError == nil {
+					firstError = r.err
+				}
+				log.Error().Err(r.err).Msg("❌ Failed to render application via repo server:")
+				continue
+			}
+			switch r.extracted.Branch {
+			case git.Base:
+				extractedBaseApps = append(extractedBaseApps, r.extracted)
+			case git.Target:
+				extractedTargetApps = append(extractedTargetApps, r.extracted)
+			default:
+				if firstError == nil {
+					firstError = fmt.Errorf("unknown branch type: '%s'", r.extracted.Branch)
+				}
+			}
+
+			// Queue child apps that have not been rendered yet.
+			for _, child := range r.childApps {
+				key := visitedKey(child.Id, child.Branch)
+				if visited[key] {
+					log.Debug().Str("App", child.GetLongName()).Msg("Skipping already-visited child Application")
+					continue
+				}
+				visited[key] = true
+				nextWave = append(nextWave, child)
 			}
 		}
+
+		if len(nextWave) > 0 {
+			log.Info().Msgf("🔍 Discovered %d new child Application(s) from app-of-apps pattern", len(nextWave))
+		}
+
+		currentWave = nextWave
+		waveNumber++
 	}
 
 	close(progressDone)
@@ -226,6 +292,125 @@ func RenderApplicationsFromBothBranches(
 		len(extractedBaseApps), git.Base, len(extractedTargetApps), git.Target)
 
 	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
+}
+
+// visitedKey returns a unique string key for an (appID, branch) pair, used to
+// track which applications have already been rendered during app-of-apps
+// expansion.
+func visitedKey(id string, branch git.BranchType) string {
+	return id + "|" + string(branch)
+}
+
+// renderAppWithChildDiscovery renders a single application and separates the
+// resulting manifests into two groups:
+//
+//  1. Regular Kubernetes manifests (returned as the first value) – these are
+//     included in the parent application's diff output.
+//
+//  2. Child Application resources (returned as the second value) – these are
+//     patched and queued for recursive rendering.  They are excluded from the
+//     parent's manifest list so that the diff only shows the actual cluster
+//     resources they produce, not the Application objects themselves.
+func renderAppWithChildDiscovery(
+	ctx context.Context,
+	repoClient *reposerver.Client,
+	app argoapplication.ArgoResource,
+	branchFolderByType map[git.BranchType]string,
+	namespacedScopedResources map[schema.GroupKind]bool,
+	creds *RepoCreds,
+	prRepo string,
+	argocdNamespace string,
+) ([]unstructured.Unstructured, []argoapplication.ArgoResource, error) {
+	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, prRepo)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// ── Separate regular manifests from child Application resources ──────────
+	var regularManifests []unstructured.Unstructured
+	var childApps []argoapplication.ArgoResource
+
+	for _, m := range allManifests {
+		apiVersion := m.GetAPIVersion()
+		kind := m.GetKind()
+
+		if kind == "Application" && strings.HasPrefix(apiVersion, "argoproj.io/") {
+			// This is a child Application – build an ArgoResource from it.
+			child, err := buildChildArgoResource(m, app, argocdNamespace)
+			if err != nil {
+				log.Warn().Err(err).
+					Str("parentApp", app.GetLongName()).
+					Str("childName", m.GetName()).
+					Msg("⚠️ Could not build child ArgoResource from discovered Application manifest; skipping")
+				continue
+			}
+			childApps = append(childApps, *child)
+			log.Debug().
+				Str("parentApp", app.GetLongName()).
+				Str("childApp", child.GetLongName()).
+				Msg("Discovered child Application via app-of-apps pattern")
+		} else {
+			regularManifests = append(regularManifests, m)
+		}
+	}
+
+	if len(childApps) > 0 {
+		log.Info().
+			Str("parentApp", app.GetLongName()).
+			Msgf("🔍 Discovered %d child Application(s) in rendered manifests", len(childApps))
+	}
+
+	return regularManifests, childApps, nil
+}
+
+// buildChildArgoResource constructs a patched ArgoResource from a child
+// Application manifest that was found in a parent app's rendered output.
+//
+// The child inherits the parent's branch and file name (for source-path
+// attribution in the diff), and is patched with the same transformations
+// applied to all top-level applications (namespace, project, destination,
+// sync-policy removal, etc.).
+func buildChildArgoResource(
+	manifest unstructured.Unstructured,
+	parent argoapplication.ArgoResource,
+	argocdNamespace string,
+) (*argoapplication.ArgoResource, error) {
+	name := manifest.GetName()
+	if name == "" {
+		return nil, fmt.Errorf("child Application manifest has no name")
+	}
+
+	docCopy := manifest.DeepCopy()
+
+	// Use the child's own name as both its Id and display Name.  The Id will
+	// be used as the key in the visited set, so it must be stable and unique.
+	child := argoapplication.NewArgoResource(
+		docCopy,
+		argoapplication.Application,
+		name, // Id
+		name, // Name
+		parent.FileName,
+		parent.Branch,
+	)
+
+	// Apply the same patching as for top-level applications so that the child
+	// renders against the correct cluster / project / branch.
+	child.SetNamespace(argocdNamespace)
+
+	if err := child.RemoveSyncPolicy(); err != nil {
+		return nil, fmt.Errorf("failed to remove sync policy from child %q: %w", name, err)
+	}
+	if err := child.SetProjectToDefault(); err != nil {
+		return nil, fmt.Errorf("failed to set project to default for child %q: %w", name, err)
+	}
+	if err := child.SetDestinationServerToLocal(); err != nil {
+		return nil, fmt.Errorf("failed to set destination server for child %q: %w", name, err)
+	}
+	if err := child.RemoveArgoCDFinalizers(); err != nil {
+		return nil, fmt.Errorf("failed to remove finalizers from child %q: %w", name, err)
+	}
+
+	return child, nil
 }
 
 // renderApp packages a single application's source directory and streams it to

@@ -272,6 +272,16 @@ var testCases = []TestCase{
 		CreateCluster:              "true",
 		WatchIfNoWatchPatternFound: "false",
 	},
+	// Tests the app-of-apps pattern with the repo-server-api render method.
+	// A single root Application renders child Application YAMLs, which are
+	// discovered recursively (BFS) and each rendered independently.
+	{
+		Name:         "branch-17/target",
+		TargetBranch: "integration-test/branch-17/target",
+		BaseBranch:   "integration-test/branch-17/base",
+		RenderMethod: "repo-server-api",
+		FileRegex:    "examples/app-of-apps/root-app\\.yaml",
+	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.
