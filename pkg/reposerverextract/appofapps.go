@@ -101,6 +101,11 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 		git.Target: targetBranch.FolderName(),
 	}
 
+	branchByType := map[git.BranchType]*git.Branch{
+		git.Base:   baseBranch,
+		git.Target: targetBranch,
+	}
+
 	log.Info().Msgf("📌 Final number of Applications planned to be rendered via repo server: [Base: %d], [Target: %d]",
 		len(baseApps), len(targetApps))
 
@@ -293,7 +298,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, namespacedScopedResources, creds, prRepo, argocd.Namespace, tempFolder, item.depth)
+			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, prRepo, argocd.Namespace, tempFolder, item.depth)
 			if err != nil {
 				results <- renderResult{err: fmt.Errorf("failed to render app %s: %w", item.app.GetLongName(), err)}
 				return
@@ -349,6 +354,7 @@ func renderAppWithChildDiscovery(
 	argocd *argocdPkg.ArgoCDInstallation,
 	app argoapplication.ArgoResource,
 	branchFolderByType map[git.BranchType]string,
+	branchByType map[git.BranchType]*git.Branch,
 	namespacedScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
 	prRepo string,
@@ -373,12 +379,19 @@ func renderAppWithChildDiscovery(
 
 		switch m.GetKind() {
 		case "Application":
-			child, err := buildChildArgoResource(m, app, argocdNamespace)
+			name := m.GetName()
+			if name == "" {
+				log.Warn().Str("parentApp", app.GetLongName()).Msg("⚠️ Discovered child Application has no name; skipping")
+				continue
+			}
+			fileName := fmt.Sprintf("parent: %s", app.Name)
+			resource := argoapplication.NewArgoResource(&m, argoapplication.Application, name, name, fileName, app.Branch)
+			child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branchByType[app.Branch], prRepo, nil)
 			if err != nil {
 				log.Warn().Err(err).
 					Str("parentApp", app.GetLongName()).
-					Str("childName", m.GetName()).
-					Msg("⚠️ Could not build child ArgoResource from discovered Application manifest; skipping")
+					Str("childName", name).
+					Msg("⚠️ Could not patch child Application; skipping")
 				continue
 			}
 			childApps = append(childApps, *child)
@@ -397,8 +410,22 @@ func renderAppWithChildDiscovery(
 				Msgf("🔍 Discovered child ApplicationSet in rendered manifests; expanding to Applications")
 
 			appSetTempFolder := fmt.Sprintf("%s/appsets/depth-%d", tempFolder, depth)
-			docCopy := m.DeepCopy()
-			generatedManifests, err := argocd.AppsetGenerateWithRetry(docCopy, appSetTempFolder, 5)
+			branch := branchByType[app.Branch]
+
+			// Patch the ApplicationSet the same way top-level ApplicationSets are patched
+			// before being sent to the API. This strips spec.template.metadata.namespace
+			// (e.g. "argocd") which ArgoCD's /api/v1/applicationsets/generate endpoint rejects.
+			appSetResource := argoapplication.NewArgoResource(&m, argoapplication.ApplicationSet, appSetName, appSetName, app.FileName, app.Branch)
+			patchedAppSet, err := argoapplication.PatchApplication(argocdNamespace, *appSetResource, branch, prRepo, nil)
+			if err != nil {
+				log.Warn().Err(err).
+					Str("parentApp", app.GetLongName()).
+					Str("appSet", appSetName).
+					Msg("⚠️ Failed to patch child ApplicationSet before expansion; skipping")
+				continue
+			}
+
+			generatedManifests, err := argocd.AppsetGenerateWithRetry(patchedAppSet.Yaml, appSetTempFolder, 5)
 			if err != nil {
 				log.Warn().Err(err).
 					Str("parentApp", app.GetLongName()).
@@ -416,12 +443,18 @@ func renderAppWithChildDiscovery(
 						Msg("⚠️ ApplicationSet generated unexpected non-Application resource; skipping")
 					continue
 				}
-				child, err := buildChildFromGeneratedApp(genDoc, breadcrumb, app.Branch, argocdNamespace)
+				name := genDoc.GetName()
+				if name == "" {
+					log.Warn().Str("appSet", appSetName).Msg("⚠️ ApplicationSet-generated Application has no name; skipping")
+					continue
+				}
+				resource := argoapplication.NewArgoResource(&genDoc, argoapplication.Application, name, name, breadcrumb, app.Branch)
+				child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branch, prRepo, nil)
 				if err != nil {
 					log.Warn().Err(err).
 						Str("parentApp", app.GetLongName()).
 						Str("appSet", appSetName).
-						Msg("⚠️ Could not build ArgoResource from ApplicationSet-generated Application; skipping")
+						Msg("⚠️ Could not patch ApplicationSet-generated Application; skipping")
 					continue
 				}
 				childApps = append(childApps, *child)
@@ -444,65 +477,4 @@ func renderAppWithChildDiscovery(
 	}
 
 	return regularManifests, childApps, nil
-}
-
-// buildChildArgoResource constructs a patched ArgoResource from a child
-// Application manifest that was found in a parent app's rendered output.
-//
-// The child inherits the parent's branch. Its FileName is set to
-// "parent: <parentName>" so the diff output lets users trace the app-of-apps
-// tree without needing to know the physical file path.
-func buildChildArgoResource(
-	manifest unstructured.Unstructured,
-	parent argoapplication.ArgoResource,
-	argocdNamespace string,
-) (*argoapplication.ArgoResource, error) {
-	fileName := fmt.Sprintf("parent: %s", parent.Name)
-	return buildChildFromGeneratedApp(manifest, fileName, parent.Branch, argocdNamespace)
-}
-
-// buildChildFromGeneratedApp constructs a patched ArgoResource from a generated
-// Application manifest (either directly discovered in a parent's rendered output,
-// or produced by expanding a child ApplicationSet). The caller supplies the
-// FileName breadcrumb and branch type.
-func buildChildFromGeneratedApp(
-	manifest unstructured.Unstructured,
-	fileName string,
-	branch git.BranchType,
-	argocdNamespace string,
-) (*argoapplication.ArgoResource, error) {
-	name := manifest.GetName()
-	if name == "" {
-		return nil, fmt.Errorf("child Application manifest has no name")
-	}
-
-	docCopy := manifest.DeepCopy()
-
-	child := argoapplication.NewArgoResource(
-		docCopy,
-		argoapplication.Application,
-		name,     // Id
-		name,     // Name
-		fileName, // FileName: breadcrumb for tracing the app-of-apps tree
-		branch,
-	)
-
-	// Apply the same patching as for top-level applications so that the child
-	// renders against the correct cluster / project / branch.
-	child.SetNamespace(argocdNamespace)
-
-	if err := child.RemoveSyncPolicy(); err != nil {
-		return nil, fmt.Errorf("failed to remove sync policy from child %q: %w", name, err)
-	}
-	if err := child.SetProjectToDefault(); err != nil {
-		return nil, fmt.Errorf("failed to set project to default for child %q: %w", name, err)
-	}
-	if err := child.SetDestinationServerToLocal(); err != nil {
-		return nil, fmt.Errorf("failed to set destination server for child %q: %w", name, err)
-	}
-	if err := child.RemoveArgoCDFinalizers(); err != nil {
-		return nil, fmt.Errorf("failed to remove finalizers from child %q: %w", name, err)
-	}
-
-	return child, nil
 }

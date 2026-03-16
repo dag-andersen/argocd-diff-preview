@@ -2,11 +2,13 @@
 
 Summary:
 ```yaml
-Added (1):
+Added (2):
++ level-1c-staging-app (+8)
 + level-2c-app (+8)
 
-Modified (3):
+Modified (4):
 ± level-1b-app (+1|-1)
+± level-1c-prod-app (+1|-1)
 ± level-2a-app (+2|-1)
 ± level-2b-app (+1)
 ```
@@ -25,6 +27,24 @@ Modified (3):
  kind: ConfigMap
  metadata:
    name: level-1b-config
+   namespace: default
+```
+</details>
+
+<details>
+<summary>level-1c-prod-app (parent: root-app (appset: level-1c-appset))</summary>
+<br>
+
+#### ConfigMap: default/level-1c-prod-config
+```diff
+ apiVersion: v1
+ data:
+   app: level-1c-prod
+-  color: blue
++  color: purple
+ kind: ConfigMap
+ metadata:
+   name: level-1c-prod-config
    namespace: default
 ```
 </details>
@@ -63,6 +83,23 @@ Modified (3):
  metadata:
    name: level-2b-config
    namespace: default
+```
+</details>
+
+<details>
+<summary>level-1c-staging-app (parent: root-app (appset: level-1c-appset))</summary>
+<br>
+
+#### ConfigMap: default/level-1c-staging-config
+```diff
++apiVersion: v1
++data:
++  app: level-1c-staging
++  color: orange
++kind: ConfigMap
++metadata:
++  name: level-1c-staging-config
++  namespace: default
 ```
 </details>
 

@@ -59,11 +59,13 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Added (1):
+<pre>Added (2):
++ level-1c-staging-app (+8)
 + level-2c-app (+8)
 
-Modified (3):
+Modified (4):
 ± level-1b-app (+1|-1)
+± level-1c-prod-app (+1|-1)
 ± level-2a-app (+2|-1)
 ± level-2b-app (+1)</pre>
 
@@ -85,6 +87,29 @@ level-1b-app (parent: root-app)
 	<tr class="normal_line"><td><pre> kind: ConfigMap</pre></td></tr>
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>   name: level-1b-config</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+level-1c-prod-app (parent: root-app (appset: level-1c-appset))
+</summary>
+
+<h4 class="resource_header">ConfigMap: default/level-1c-prod-config</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> data:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   app: level-1c-prod</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  color: blue</pre></td></tr>
+	<tr class="added_line"><td><pre>+  color: purple</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: ConfigMap</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: level-1c-prod-config</pre></td></tr>
 	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
 </table>
 </div>
@@ -133,6 +158,28 @@ level-2b-app (parent: level-1a-app)
 	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
 	<tr class="normal_line"><td><pre>   name: level-2b-config</pre></td></tr>
 	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+level-1c-staging-app (parent: root-app (appset: level-1c-appset))
+</summary>
+
+<h4 class="resource_header">ConfigMap: default/level-1c-staging-config</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+data:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  app: level-1c-staging</pre></td></tr>
+	<tr class="added_line"><td><pre>+  color: orange</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ConfigMap</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: level-1c-staging-config</pre></td></tr>
+	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
 </table>
 </div>
 

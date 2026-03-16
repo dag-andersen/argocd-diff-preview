@@ -369,7 +369,7 @@ func run(cfg *Config) error {
 		ExtractDuration:            extractDuration + convertAppSetsToAppsDuration,
 		ArgoCDInstallationDuration: argocdInstallationDuration,
 		ClusterCreationDuration:    clusterCreationDuration,
-		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
+		ApplicationCount:           len(baseManifests) + len(targetManifests),
 	}
 
 	// Write manifest files if requested

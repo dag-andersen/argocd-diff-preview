@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -803,6 +804,444 @@ spec:`
 	}
 
 	return string(yamlBytes)
+}
+
+// TestPatchApplication verifies the full PatchApplication pipeline on a single
+// ArgoResource. Each sub-test exercises one or more of the patches that
+// PatchApplication chains together (namespace, project, destination, sync
+// policy, finalizers, source redirect).
+func TestPatchApplication(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	const (
+		argocdNamespace = "argocd"
+		prRepo          = "https://github.com/org/repo.git"
+		branchName      = "my-feature"
+	)
+
+	branch := git.NewBranch(branchName, git.Target)
+
+	tests := []struct {
+		name              string
+		kind              ApplicationKind
+		inputYAML         string
+		wantYAML          string
+		redirectRevisions []string
+	}{
+		{
+			name: "namespace is set to argocd",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: some-other-namespace
+spec:
+  project: my-project
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: apps/my-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/my-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
+			name: "sync policy is removed",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sync-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: apps/sync-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sync-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/sync-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
+			name: "project is reset to default",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: proj-app
+  namespace: argocd
+spec:
+  project: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: apps/proj-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: proj-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/proj-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
+			name: "destination server is redirected to in-cluster",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dest-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: apps/dest-app
+  destination:
+    name: remote-cluster
+    namespace: production
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dest-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/dest-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production
+`,
+		},
+		{
+			name: "argocd finalizer is removed",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: final-app
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+    - some-other-finalizer
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: apps/final-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: final-app
+  namespace: argocd
+  finalizers:
+    - some-other-finalizer
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/final-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
+			name: "source targetRevision is redirected to branch",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: src-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: main
+    path: apps/src-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: src-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/src-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
+			name: "source revision not redirected when repoURL does not match",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/other/unrelated.git
+    targetRevision: HEAD
+    path: apps/external-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/other/unrelated.git
+    targetRevision: HEAD
+    path: apps/external-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
+			name: "specific redirectRevisions: only matching revision is redirected",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: selective-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: HEAD
+    path: apps/selective-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: selective-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: my-feature
+    path: apps/selective-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			redirectRevisions: []string{"HEAD", "main"},
+		},
+		{
+			name: "specific redirectRevisions: non-matching revision is left unchanged",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pinned-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: v1.2.3
+    path: apps/pinned-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pinned-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo.git
+    targetRevision: v1.2.3
+    path: apps/pinned-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			redirectRevisions: []string{"HEAD", "main"},
+		},
+		{
+			name: "ApplicationSet namespace and project patched",
+			kind: ApplicationSet,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-appset
+  namespace: some-namespace
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/org/repo.git
+        revision: HEAD
+  template:
+    metadata:
+      namespace: argocd
+    spec:
+      project: platform
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-appset
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/org/repo.git
+        revision: my-feature
+  template:
+    metadata:
+      namespace: argocd
+    spec:
+      project: default
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var obj map[string]any
+			err := yaml.Unmarshal([]byte(tt.inputYAML), &obj)
+			assert.NoError(t, err)
+
+			resource := &ArgoResource{
+				Yaml:     &unstructured.Unstructured{Object: obj},
+				Kind:     tt.kind,
+				Id:       "test-id",
+				Name:     "test-name",
+				FileName: "parent: root-app",
+			}
+
+			redirectRevisions := tt.redirectRevisions
+
+			// ── Normal cases ────────────────────────────────────────────────
+			patched, err := PatchApplication(argocdNamespace, *resource, branch, prRepo, redirectRevisions)
+			assert.NoError(t, err)
+			assert.NotNil(t, patched)
+
+			// FileName breadcrumb must be preserved unchanged.
+			assert.Equal(t, resource.FileName, patched.FileName,
+				"PatchApplication must preserve FileName")
+
+			got, err := patched.AsString()
+			assert.NoError(t, err)
+
+			assert.Equal(t, normalizeYAML(tt.wantYAML), normalizeYAML(got))
+		})
+	}
 }
 
 func TestRedirectSourceHydrator(t *testing.T) {
