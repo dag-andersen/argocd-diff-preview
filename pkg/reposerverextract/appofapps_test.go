@@ -376,8 +376,151 @@ spec:
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// visitedKey
+// buildChildFromGeneratedApp
 // ─────────────────────────────────────────────────────────────────────────────
+
+// TestBuildChildFromGeneratedApp_BasicFields verifies that Id, Name, FileName,
+// and Branch are set correctly when building from a generated Application.
+func TestBuildChildFromGeneratedApp_BasicFields(t *testing.T) {
+	manifest := makeChildManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: generated-app
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/generated
+  destination:
+    namespace: default
+`)
+
+	breadcrumb := "parent: root (appset: my-appset)"
+	result, err := buildChildFromGeneratedApp(manifest, breadcrumb, git.Base, "argocd")
+	require.NoError(t, err)
+	assert.Equal(t, "generated-app", result.Id)
+	assert.Equal(t, "generated-app", result.Name)
+	assert.Equal(t, breadcrumb, result.FileName)
+	assert.Equal(t, git.Base, result.Branch)
+	assert.Equal(t, argoapplication.Application, result.Kind)
+}
+
+// TestBuildChildFromGeneratedApp_PatchesApplied verifies that all required
+// patches (namespace, project, destination, sync policy, finalizers) are applied.
+func TestBuildChildFromGeneratedApp_PatchesApplied(t *testing.T) {
+	manifest := makeChildManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: generated-app
+  namespace: some-other-ns
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: restricted-project
+  syncPolicy:
+    automated:
+      prune: true
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/generated
+  destination:
+    server: https://external-cluster.example.com
+    namespace: default
+`)
+
+	result, err := buildChildFromGeneratedApp(manifest, "parent: root (appset: my-appset)", git.Target, "argocd")
+	require.NoError(t, err)
+
+	assert.Equal(t, "argocd", result.Yaml.GetNamespace(), "namespace must be overwritten with ArgoCD namespace")
+
+	project, _, _ := unstructured.NestedString(result.Yaml.Object, "spec", "project")
+	assert.Equal(t, "default", project, "project must be reset to 'default'")
+
+	_, found, _ := unstructured.NestedMap(result.Yaml.Object, "spec", "syncPolicy")
+	assert.False(t, found, "syncPolicy must be removed")
+
+	server, _, _ := unstructured.NestedString(result.Yaml.Object, "spec", "destination", "server")
+	assert.Equal(t, "https://kubernetes.default.svc", server, "destination server must point to local cluster")
+
+	finalizers := result.Yaml.GetFinalizers()
+	assert.NotContains(t, finalizers, "resources-finalizer.argocd.argoproj.io", "ArgoCD finalizer must be removed")
+}
+
+// TestBuildChildFromGeneratedApp_EmptyName verifies that a manifest with no name
+// returns an error.
+func TestBuildChildFromGeneratedApp_EmptyName(t *testing.T) {
+	manifest := makeChildManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: {}
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/generated
+`)
+
+	_, err := buildChildFromGeneratedApp(manifest, "parent: root (appset: my-appset)", git.Base, "argocd")
+	assert.Error(t, err, "missing name must return an error")
+}
+
+// TestBuildChildFromGeneratedApp_DoesNotMutateOriginal verifies that the original
+// manifest is not modified (we deep-copy before patching).
+func TestBuildChildFromGeneratedApp_DoesNotMutateOriginal(t *testing.T) {
+	manifest := makeChildManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: generated-app
+  namespace: original-ns
+spec:
+  project: custom-project
+  syncPolicy:
+    automated: {}
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/generated
+  destination:
+    server: https://external.example.com
+    namespace: default
+`)
+
+	originalNS := manifest.GetNamespace()
+	originalProject, _, _ := unstructured.NestedString(manifest.Object, "spec", "project")
+
+	_, err := buildChildFromGeneratedApp(manifest, "parent: root (appset: my-appset)", git.Base, "argocd")
+	require.NoError(t, err)
+
+	assert.Equal(t, originalNS, manifest.GetNamespace(), "original manifest namespace must not be mutated")
+	project, _, _ := unstructured.NestedString(manifest.Object, "spec", "project")
+	assert.Equal(t, originalProject, project, "original manifest project must not be mutated")
+	_, found, _ := unstructured.NestedMap(manifest.Object, "spec", "syncPolicy")
+	assert.True(t, found, "original manifest syncPolicy must not be removed")
+}
+
+// TestBuildChildArgoResource_UsesParentNameBreadcrumb verifies that
+// buildChildArgoResource (which wraps buildChildFromGeneratedApp) sets
+// FileName to "parent: <parentName>" - distinct from the appset breadcrumb format.
+func TestBuildChildArgoResource_UsesParentNameBreadcrumb(t *testing.T) {
+	parent := makeParent(t, "root-app", git.Base)
+	child := makeChildManifest(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: child-app
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/child
+  destination:
+    namespace: default
+`)
+
+	result, err := buildChildArgoResource(child, parent, "argocd")
+	require.NoError(t, err)
+	assert.Equal(t, "parent: root-app", result.FileName,
+		"direct child FileName must be 'parent: <parentName>'")
+}
 
 func TestVisitedKey_Format(t *testing.T) {
 	key := visitedKey("my-app", git.Base)

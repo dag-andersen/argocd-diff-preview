@@ -331,6 +331,7 @@ func run(cfg *Config) error {
 				targetApps.SelectedApps,
 				cfg.Repo,
 				appSelectionOptions,
+				tempFolder,
 			)
 		} else {
 			baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranches(
