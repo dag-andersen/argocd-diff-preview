@@ -63,13 +63,42 @@ pre {
 + level-1c-staging-app (+8)
 + level-2c-app (+8)
 
-Modified (4):
+Modified (6):
+± level-1a-app (+13)
 ± level-1b-app (+1|-1)
 ± level-1c-prod-app (+1|-1)
 ± level-2a-app (+2|-1)
-± level-2b-app (+1)</pre>
+± level-2b-app (+1)
+± root-app (+1)</pre>
 
 <div class="diffs">
+<details>
+<summary>
+level-1a-app (parent: root-app)
+</summary>
+
+<h4 class="resource_header">Application: argocd/level-2c-app</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: argoproj.io/v1alpha1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: Application</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: level-2c-app</pre></td></tr>
+	<tr class="added_line"><td><pre>+  namespace: argocd</pre></td></tr>
+	<tr class="added_line"><td><pre>+spec:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  destination:</pre></td></tr>
+	<tr class="added_line"><td><pre>+    name: in-cluster</pre></td></tr>
+	<tr class="added_line"><td><pre>+    namespace: default</pre></td></tr>
+	<tr class="added_line"><td><pre>+  project: default</pre></td></tr>
+	<tr class="added_line"><td><pre>+  source:</pre></td></tr>
+	<tr class="added_line"><td><pre>+    path: examples/app-of-apps/apps/level-2c</pre></td></tr>
+	<tr class="added_line"><td><pre>+    repoURL: https://github.com/dag-andersen/argocd-diff-preview</pre></td></tr>
+</table>
+</div>
+
+</details>
+
 <details>
 <summary>
 level-1b-app (parent: root-app)
@@ -165,6 +194,41 @@ level-2b-app (parent: level-1a-app)
 
 <details>
 <summary>
+root-app (examples/app-of-apps/root-app.yaml)
+</summary>
+
+<h4 class="resource_header">ApplicationSet: argocd/level-1c-appset</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: argoproj.io/v1alpha1</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: ApplicationSet</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: level-1c-appset</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: argocd</pre></td></tr>
+	<tr class="normal_line"><td><pre> spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   generators:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   - list:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       elements:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       - env: prod</pre></td></tr>
+	<tr class="added_line"><td><pre>+      - env: staging</pre></td></tr>
+	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       name: level-1c-{{env}}-app</pre></td></tr>
+	<tr class="normal_line"><td><pre>       namespace: argocd</pre></td></tr>
+	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       destination:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         name: in-cluster</pre></td></tr>
+	<tr class="normal_line"><td><pre>         namespace: default</pre></td></tr>
+	<tr class="normal_line"><td><pre>       project: default</pre></td></tr>
+	<tr class="normal_line"><td><pre>       source:</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
 level-1c-staging-app (parent: root-app (appset: level-1c-appset))
 </summary>
 
@@ -209,7 +273,7 @@ level-2c-app (parent: level-1a-app)
 </div>
 
 <pre>_Stats_:
-[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 14], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>

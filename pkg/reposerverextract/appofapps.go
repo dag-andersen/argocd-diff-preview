@@ -334,20 +334,22 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
 }
 
-// renderAppWithChildDiscovery renders a single application and separates the
-// resulting manifests into two groups:
+// renderAppWithChildDiscovery renders a single application and returns:
 //
-//  1. Regular Kubernetes manifests (returned as the first value) – these are
-//     included in the parent application's diff output.
+//  1. All rendered manifests to include in the diff (returned as the first
+//     value). This is the original allManifests slice returned by the repo
+//     server, including Application/ApplicationSet objects as-is so that
+//     changes to those objects (e.g. annotation changes) are visible in the
+//     diff output.
 //
-//  2. Child Application resources (returned as the second value) – these are
-//     patched and queued for recursive rendering. They are excluded from the
-//     parent's manifest list so that the diff only shows the actual cluster
-//     resources they produce, not the Application objects themselves.
+//  2. Child ArgoResource values to enqueue for recursive rendering (returned as
+//     the second value). Application resources are deep-copied, patched, and
+//     enqueued directly. ApplicationSet resources are deep-copied, patched, and
+//     then expanded into their generated Applications via
+//     argocd.AppsetGenerateWithRetry. In both cases the deep copy ensures
+//     PatchApplication does not mutate the originals in allManifests.
 //
-// ApplicationSet resources found in rendered manifests are expanded into their
-// generated Applications via argocd.AppsetGenerateWithRetry, then treated the
-// same as directly-discovered child Applications.
+// A visited set in the caller prevents re-rendering the same child twice.
 func renderAppWithChildDiscovery(
 	ctx context.Context,
 	repoClient *reposerver.Client,
@@ -367,13 +369,15 @@ func renderAppWithChildDiscovery(
 		return nil, nil, err
 	}
 
-	// ── Separate regular manifests from child Application/ApplicationSet resources ──────────
-	var regularManifests []unstructured.Unstructured
+	// Discover child Application/ApplicationSet resources in the rendered manifests.
+	// Non-argoproj.io resources are left untouched in allManifests.
+	// For Application/ApplicationSet entries we deep-copy the slot in allManifests
+	// so the diff sees the original unmodified YAML, then use the original m freely
+	// for patching (PatchApplication mutates the Yaml pointer in-place).
 	var childApps []argoapplication.ArgoResource
 
 	for _, m := range allManifests {
 		if !strings.HasPrefix(m.GetAPIVersion(), "argoproj.io/") {
-			regularManifests = append(regularManifests, m)
 			continue
 		}
 
@@ -381,17 +385,19 @@ func renderAppWithChildDiscovery(
 		case "Application":
 			name := m.GetName()
 			if name == "" {
-				log.Warn().Str("parentApp", app.GetLongName()).Msg("⚠️ Discovered child Application has no name; skipping")
+				log.Warn().Str("parentApp", app.GetLongName()).Msg("⚠️ Discovered child Application has no name; skipping child rendering")
 				continue
 			}
 			fileName := fmt.Sprintf("parent: %s", app.Name)
-			resource := argoapplication.NewArgoResource(&m, argoapplication.Application, name, name, fileName, app.Branch)
+			// Deep copy so PatchApplication mutates the copy, leaving m in
+			// allManifests (the diff) untouched.
+			resource := argoapplication.NewArgoResource(m.DeepCopy(), argoapplication.Application, name, name, fileName, app.Branch)
 			child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branchByType[app.Branch], prRepo, nil)
 			if err != nil {
 				log.Warn().Err(err).
 					Str("parentApp", app.GetLongName()).
 					Str("childName", name).
-					Msg("⚠️ Could not patch child Application; skipping")
+					Msg("⚠️ Could not patch child Application; skipping child rendering")
 				continue
 			}
 			childApps = append(childApps, *child)
@@ -401,8 +407,6 @@ func renderAppWithChildDiscovery(
 				Msg("Discovered child Application via app-of-apps pattern")
 
 		case "ApplicationSet":
-			// Expand the ApplicationSet into its generated Applications using the
-			// ArgoCD API/CLI, then treat each generated app as a child to enqueue.
 			appSetName := m.GetName()
 			log.Info().
 				Str("parentApp", app.GetLongName()).
@@ -412,16 +416,17 @@ func renderAppWithChildDiscovery(
 			appSetTempFolder := fmt.Sprintf("%s/appsets/depth-%d", tempFolder, depth)
 			branch := branchByType[app.Branch]
 
-			// Patch the ApplicationSet the same way top-level ApplicationSets are patched
-			// before being sent to the API. This strips spec.template.metadata.namespace
+			// Patch before sending to the API. This strips spec.template.metadata.namespace
 			// (e.g. "argocd") which ArgoCD's /api/v1/applicationsets/generate endpoint rejects.
-			appSetResource := argoapplication.NewArgoResource(&m, argoapplication.ApplicationSet, appSetName, appSetName, app.FileName, app.Branch)
+			// Deep copy so PatchApplication mutates the copy, leaving m in
+			// allManifests (the diff) untouched.
+			appSetResource := argoapplication.NewArgoResource(m.DeepCopy(), argoapplication.ApplicationSet, appSetName, appSetName, app.FileName, app.Branch)
 			patchedAppSet, err := argoapplication.PatchApplication(argocdNamespace, *appSetResource, branch, prRepo, nil)
 			if err != nil {
 				log.Warn().Err(err).
 					Str("parentApp", app.GetLongName()).
 					Str("appSet", appSetName).
-					Msg("⚠️ Failed to patch child ApplicationSet before expansion; skipping")
+					Msg("⚠️ Failed to patch child ApplicationSet before expansion; skipping expansion")
 				continue
 			}
 
@@ -430,7 +435,7 @@ func renderAppWithChildDiscovery(
 				log.Warn().Err(err).
 					Str("parentApp", app.GetLongName()).
 					Str("appSet", appSetName).
-					Msg("⚠️ Could not expand child ApplicationSet; skipping")
+					Msg("⚠️ Could not expand child ApplicationSet; skipping expansion")
 				continue
 			}
 
@@ -464,9 +469,6 @@ func renderAppWithChildDiscovery(
 					Str("childApp", child.GetLongName()).
 					Msg("Discovered child Application via ApplicationSet expansion")
 			}
-
-		default:
-			regularManifests = append(regularManifests, m)
 		}
 	}
 
@@ -476,5 +478,5 @@ func renderAppWithChildDiscovery(
 			Msgf("🔍 Discovered %d child Application(s) in rendered manifests", len(childApps))
 	}
 
-	return regularManifests, childApps, nil
+	return allManifests, childApps, nil
 }

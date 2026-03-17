@@ -6,12 +6,36 @@ Added (2):
 + level-1c-staging-app (+8)
 + level-2c-app (+8)
 
-Modified (4):
+Modified (6):
+± level-1a-app (+13)
 ± level-1b-app (+1|-1)
 ± level-1c-prod-app (+1|-1)
 ± level-2a-app (+2|-1)
 ± level-2b-app (+1)
+± root-app (+1)
 ```
+
+<details>
+<summary>level-1a-app (parent: root-app)</summary>
+<br>
+
+#### Application: argocd/level-2c-app
+```diff
++apiVersion: argoproj.io/v1alpha1
++kind: Application
++metadata:
++  name: level-2c-app
++  namespace: argocd
++spec:
++  destination:
++    name: in-cluster
++    namespace: default
++  project: default
++  source:
++    path: examples/app-of-apps/apps/level-2c
++    repoURL: https://github.com/dag-andersen/argocd-diff-preview
+```
+</details>
 
 <details>
 <summary>level-1b-app (parent: root-app)</summary>
@@ -87,6 +111,36 @@ Modified (4):
 </details>
 
 <details>
+<summary>root-app (examples/app-of-apps/root-app.yaml)</summary>
+<br>
+
+#### ApplicationSet: argocd/level-1c-appset
+```diff
+ apiVersion: argoproj.io/v1alpha1
+ kind: ApplicationSet
+ metadata:
+   name: level-1c-appset
+   namespace: argocd
+ spec:
+   generators:
+   - list:
+       elements:
+       - env: prod
++      - env: staging
+   template:
+     metadata:
+       name: level-1c-{{env}}-app
+       namespace: argocd
+     spec:
+       destination:
+         name: in-cluster
+         namespace: default
+       project: default
+       source:
+```
+</details>
+
+<details>
 <summary>level-1c-staging-app (parent: root-app (appset: level-1c-appset))</summary>
 <br>
 
@@ -121,4 +175,4 @@ Modified (4):
 </details>
 
 _Stats_:
-[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 14], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
