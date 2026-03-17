@@ -2139,3 +2139,215 @@ func TestDiffAction_String(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// pairByContent unit tests
+// ---------------------------------------------------------------------------
+
+func TestPairByContent_EmptyBaseIndices(t *testing.T) {
+	app := makeApp("a", "app", nil)
+	result := pairByContent([]extract.ExtractedApp{app}, []extract.ExtractedApp{app}, nil, []int{0})
+	if len(result) != 0 {
+		t.Errorf("expected no pairs for empty base indices, got %d", len(result))
+	}
+}
+
+func TestPairByContent_EmptyTargetIndices(t *testing.T) {
+	app := makeApp("a", "app", nil)
+	result := pairByContent([]extract.ExtractedApp{app}, []extract.ExtractedApp{app}, []int{0}, nil)
+	if len(result) != 0 {
+		t.Errorf("expected no pairs for empty target indices, got %d", len(result))
+	}
+}
+
+func TestPairByContent_SingleCandidate(t *testing.T) {
+	// Fast path: one base, one target → paired without similarity computation.
+	base := makeApp("a", "app", []unstructured.Unstructured{
+		makeResource("apps/v1", "Deployment", "default", "d1", nil),
+	})
+	target := makeApp("a", "app", []unstructured.Unstructured{
+		makeResource("apps/v1", "Deployment", "default", "d1", nil),
+	})
+	result := pairByContent([]extract.ExtractedApp{base}, []extract.ExtractedApp{target}, []int{0}, []int{0})
+	if len(result) != 1 {
+		t.Fatalf("expected 1 pair, got %d", len(result))
+	}
+	if ti, ok := result[0]; !ok || ti != 0 {
+		t.Errorf("expected base[0]→target[0], got %v", result)
+	}
+}
+
+func TestPairByContent_GreedyMatchByContent(t *testing.T) {
+	// Two base apps and two target apps with the same identity key but
+	// different content. The greedy matcher should pair them by similarity
+	// (base[0]↔target[0] identical, base[1]↔target[1] identical) rather than
+	// mixing them up.
+	deployA := makeResource("apps/v1", "Deployment", "default", "frontend", map[string]any{
+		"spec": map[string]any{"replicas": int64(3), "image": "nginx"},
+	})
+	deployB := makeResource("apps/v1", "Deployment", "default", "backend", map[string]any{
+		"spec": map[string]any{"replicas": int64(1), "image": "redis"},
+	})
+
+	baseApps := []extract.ExtractedApp{
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployB}),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployB}),
+	}
+
+	result := pairByContent(baseApps, targetApps, []int{0, 1}, []int{0, 1})
+
+	if len(result) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(result))
+	}
+	// base[0] has deployA content → should match target[0] (also deployA)
+	if result[0] != 0 {
+		t.Errorf("expected base[0]→target[0], got base[0]→target[%d]", result[0])
+	}
+	// base[1] has deployB content → should match target[1] (also deployB)
+	if result[1] != 1 {
+		t.Errorf("expected base[1]→target[1], got base[1]→target[%d]", result[1])
+	}
+}
+
+func TestPairByContent_GreedyMatchSwappedOrder(t *testing.T) {
+	// Same as above but target apps are in reversed order.
+	// Greedy matcher should still pair by content, not by position.
+	deployA := makeResource("apps/v1", "Deployment", "default", "frontend", map[string]any{
+		"spec": map[string]any{"replicas": int64(3), "image": "nginx"},
+	})
+	deployB := makeResource("apps/v1", "Deployment", "default", "backend", map[string]any{
+		"spec": map[string]any{"replicas": int64(1), "image": "redis"},
+	})
+
+	baseApps := []extract.ExtractedApp{
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployB}),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployB}), // swapped
+		makeApp("shared-id", "app", []unstructured.Unstructured{deployA}), // swapped
+	}
+
+	result := pairByContent(baseApps, targetApps, []int{0, 1}, []int{0, 1})
+
+	if len(result) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(result))
+	}
+	// base[0] (deployA) should match target[1] (deployA)
+	if result[0] != 1 {
+		t.Errorf("expected base[0]→target[1], got base[0]→target[%d]", result[0])
+	}
+	// base[1] (deployB) should match target[0] (deployB)
+	if result[1] != 0 {
+		t.Errorf("expected base[1]→target[0], got base[1]→target[%d]", result[1])
+	}
+}
+
+func TestPairByContent_UnevenCandidates_MoreBase(t *testing.T) {
+	// 3 base candidates, 2 target candidates. The best 2 base apps should be
+	// matched; the third has no partner.
+	deployA := makeResource("apps/v1", "Deployment", "default", "frontend", map[string]any{
+		"spec": map[string]any{"replicas": int64(3), "image": "nginx"},
+	})
+	deployB := makeResource("apps/v1", "Deployment", "default", "backend", map[string]any{
+		"spec": map[string]any{"replicas": int64(1), "image": "redis"},
+	})
+	deployC := makeResource("apps/v1", "Deployment", "default", "worker", map[string]any{
+		"spec": map[string]any{"replicas": int64(5), "image": "python"},
+	})
+
+	baseApps := []extract.ExtractedApp{
+		makeApp("id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("id", "app", []unstructured.Unstructured{deployB}),
+		makeApp("id", "app", []unstructured.Unstructured{deployC}),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeApp("id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("id", "app", []unstructured.Unstructured{deployB}),
+	}
+
+	result := pairByContent(baseApps, targetApps, []int{0, 1, 2}, []int{0, 1})
+
+	if len(result) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(result))
+	}
+	// base[0] (deployA) → target[0] (deployA), base[1] (deployB) → target[1] (deployB)
+	if result[0] != 0 {
+		t.Errorf("expected base[0]→target[0], got base[0]→target[%d]", result[0])
+	}
+	if result[1] != 1 {
+		t.Errorf("expected base[1]→target[1], got base[1]→target[%d]", result[1])
+	}
+	// base[2] should NOT be paired
+	if _, ok := result[2]; ok {
+		t.Errorf("expected base[2] to be unpaired, but it was matched to target[%d]", result[2])
+	}
+}
+
+func TestPairByContent_UnevenCandidates_MoreTarget(t *testing.T) {
+	// 2 base candidates, 3 target candidates.
+	deployA := makeResource("apps/v1", "Deployment", "default", "frontend", map[string]any{
+		"spec": map[string]any{"replicas": int64(3), "image": "nginx"},
+	})
+	deployB := makeResource("apps/v1", "Deployment", "default", "backend", map[string]any{
+		"spec": map[string]any{"replicas": int64(1), "image": "redis"},
+	})
+	deployC := makeResource("apps/v1", "Deployment", "default", "worker", map[string]any{
+		"spec": map[string]any{"replicas": int64(5), "image": "python"},
+	})
+
+	baseApps := []extract.ExtractedApp{
+		makeApp("id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("id", "app", []unstructured.Unstructured{deployB}),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeApp("id", "app", []unstructured.Unstructured{deployC}),
+		makeApp("id", "app", []unstructured.Unstructured{deployA}),
+		makeApp("id", "app", []unstructured.Unstructured{deployB}),
+	}
+
+	result := pairByContent(baseApps, targetApps, []int{0, 1}, []int{0, 1, 2})
+
+	if len(result) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(result))
+	}
+	// base[0] (deployA) → target[1] (deployA)
+	if result[0] != 1 {
+		t.Errorf("expected base[0]→target[1], got base[0]→target[%d]", result[0])
+	}
+	// base[1] (deployB) → target[2] (deployB)
+	if result[1] != 2 {
+		t.Errorf("expected base[1]→target[2], got base[1]→target[%d]", result[1])
+	}
+}
+
+func TestPairByContent_DeterministicTieBreaking(t *testing.T) {
+	// When all candidates have the same similarity score (all empty manifests),
+	// the tie-breaking should be deterministic: lowest base index first, then
+	// lowest target index.
+	baseApps := []extract.ExtractedApp{
+		makeApp("id", "app", nil),
+		makeApp("id", "app", nil),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeApp("id", "app", nil),
+		makeApp("id", "app", nil),
+	}
+
+	// Run multiple times to verify determinism.
+	for i := 0; i < 10; i++ {
+		result := pairByContent(baseApps, targetApps, []int{0, 1}, []int{0, 1})
+		if len(result) != 2 {
+			t.Fatalf("iteration %d: expected 2 pairs, got %d", i, len(result))
+		}
+		// With tie-breaking: base[0]→target[0] picked first (lowest bi, lowest ti),
+		// then base[1]→target[1] (next available).
+		if result[0] != 0 || result[1] != 1 {
+			t.Errorf("iteration %d: expected deterministic {0→0, 1→1}, got %v", i, result)
+		}
+	}
+}
