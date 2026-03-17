@@ -277,11 +277,24 @@ var testCases = []TestCase{
 	// A single root Application renders child Application YAMLs, which are
 	// discovered recursively (BFS) and each rendered independently.
 	{
-		Name:              "branch-17/target",
+		Name:              "branch-17/target-1",
 		TargetBranch:      "integration-test/branch-17/target",
 		BaseBranch:        "integration-test/branch-17/base",
+		Suffix:            "-1",
 		RenderMethod:      "repo-server-api",
 		FileRegex:         "examples/app-of-apps/root-app\\.yaml",
+		TraverseAppOfApps: "true",
+	},
+	// Same as branch-17/target but watches the entire examples/app-of-apps folder
+	// instead of only the root-app.yaml file. This exercises the watch pattern
+	// against all files under the folder (app YAMLs, configmaps, etc.).
+	{
+		Name:              "branch-17/target-2",
+		TargetBranch:      "integration-test/branch-17/target",
+		BaseBranch:        "integration-test/branch-17/base",
+		Suffix:            "-2",
+		RenderMethod:      "repo-server-api",
+		FileRegex:         "examples/app-of-apps/.*",
 		TraverseAppOfApps: "true",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
