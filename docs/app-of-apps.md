@@ -74,8 +74,30 @@ Child applications discovered through the App of Apps expansion are subject to t
 | `--watch-if-no-watch-pattern-found` | ✅ Yes |
 | File path regex (`--file-regex`) | ❌ No - child apps have no physical file path |
 
+!!! warning "Filters apply at every level of the tree"
+    A child application is only discovered if its **parent is rendered**. If a parent application is excluded by a selector, watch-pattern, or any other filter, the tool never renders it - and therefore never sees its children. This means changes further down the tree can go undetected.
+
+    For example, if you use `--selector "team=frontend"` and your root app does not have the label `team: frontend`, none of its children will be processed - even if a child app *does* carry that label.
+
+    When using application selection filters together with `--traverse-app-of-apps`, make sure your **root and intermediate applications pass the filters**, not just the leaf applications you care about.
+
 !!! tip "Watch patterns on child apps"
     You can add `argocd-diff-preview/watch-pattern` or `argocd.argoproj.io/manifest-generate-paths` annotations directly to your child Application manifests. These annotations are evaluated against the PR's changed files, just like they are for top-level applications.
+
+### Recommended: use `--file-regex` to select only root applications
+
+If you follow the App of Apps pattern, a practical approach is to use `--file-regex` to select only the root application files and let the tree traversal take care of the rest. This way the root apps are always rendered, and all children are discovered automatically.
+
+For example, if your root application is defined in `apps/root.yaml`:
+
+```bash
+argocd-diff-preview \
+  --render-method=repo-server-api \
+  --traverse-app-of-apps \
+  --file-regex="^apps/root\.yaml$"
+```
+
+This avoids the problem described above where filters accidentally exclude a parent and silently hide changes in its children.
 
 ---
 
