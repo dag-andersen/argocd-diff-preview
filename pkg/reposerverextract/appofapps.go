@@ -59,11 +59,17 @@ type renderResult struct {
 	err error
 }
 
-// visitedKey returns a unique string key for an (appID, branch) pair, used to
-// track which applications have already been rendered during app-of-apps
-// expansion.
-func visitedKey(id string, branch git.BranchType) string {
-	return id + "|" + string(branch)
+// visitedKey returns a unique string key for a (namespace, name, branch)
+// triple, used to track which applications have already been rendered during
+// app-of-apps expansion. Using the raw Kubernetes namespace/name (rather than
+// the deduplicated Id) ensures that a child Application discovered via
+// traversal is recognised as already-visited even when the same app was
+// previously seeded as a top-level app whose Id was made unique (e.g. "root"
+// became "root--1").
+func visitedKey(namespace, name string, branch git.BranchType) string {
+	// Use \x00 (null byte) as separator: it cannot appear in Kubernetes
+	// namespace or name values, so there is no risk of prefix collision.
+	return namespace + "\x00" + name + "\x00" + string(branch)
 }
 
 // RenderApplicationsFromBothBranchesWithAppOfApps is like
@@ -188,7 +194,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 	// Seed the queue with the initial base + target apps (depth 0).
 	visitedMu.Lock()
 	for _, app := range append(baseApps, targetApps...) {
-		visited[visitedKey(app.Id, app.Branch)] = true
+		visited[visitedKey(app.Yaml.GetNamespace(), app.Yaml.GetName(), app.Branch)] = true
 		enqueue(app, 0)
 	}
 	visitedMu.Unlock()
@@ -258,7 +264,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 				}
 				visitedMu.Lock()
 				for _, child := range selection.SelectedApps {
-					key := visitedKey(child.Id, child.Branch)
+					key := visitedKey(child.Yaml.GetNamespace(), child.Yaml.GetName(), child.Branch)
 					if visited[key] {
 						log.Debug().Str("App", child.GetLongName()).Msg("Skipping already-visited child Application")
 						continue
