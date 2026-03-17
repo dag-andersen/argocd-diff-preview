@@ -10,6 +10,8 @@ package reposerverextract
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -59,17 +61,52 @@ type renderResult struct {
 	err error
 }
 
-// visitedKey returns a unique string key for a (namespace, name, branch)
-// triple, used to track which applications have already been rendered during
-// app-of-apps expansion. Using the raw Kubernetes namespace/name (rather than
-// the deduplicated Id) ensures that a child Application discovered via
-// traversal is recognised as already-visited even when the same app was
-// previously seeded as a top-level app whose Id was made unique (e.g. "root"
-// became "root--1").
-func visitedKey(namespace, name string, branch git.BranchType) string {
+// visitedKey returns a unique string key for an application, used to track
+// which applications have already been rendered during app-of-apps expansion.
+//
+// The key is based on (namespace, name, branch, specHash) where specHash is a
+// SHA-256 of the app's spec field. This handles two distinct scenarios:
+//
+//  1. Same k8s identity, same content - a child app discovered via traversal
+//     that matches a top-level seed app (even if the seed's Id was deduplicated
+//     from "root" to "root-1"). The namespace/name/branch/specHash will all
+//     match, so it is correctly recognised as already-visited.
+//
+//  2. Same k8s identity, different content - two different files both define an
+//     Application named "root" but with different spec.source.path. These must
+//     be rendered separately; the differing specHash ensures they get distinct
+//     keys.
+func visitedKey(yaml *unstructured.Unstructured, branch git.BranchType) string {
+	namespace := yaml.GetNamespace()
+	name := yaml.GetName()
+
+	// Hash the spec field so that two apps with the same namespace/name but
+	// different source configurations are treated as distinct entries.
+	// Fall back to an empty hash if spec is absent or cannot be marshalled.
+	specHash := specHashOf(yaml)
+
 	// Use \x00 (null byte) as separator: it cannot appear in Kubernetes
 	// namespace or name values, so there is no risk of prefix collision.
-	return namespace + "\x00" + name + "\x00" + string(branch)
+	return namespace + "\x00" + name + "\x00" + string(branch) + "\x00" + specHash
+}
+
+// specHashOf returns a short hex-encoded SHA-256 hash of the "spec" field of
+// the given unstructured object. If the spec is absent or cannot be marshalled
+// to JSON, an empty string is returned (callers treat it as a valid hash).
+func specHashOf(yaml *unstructured.Unstructured) string {
+	if yaml == nil {
+		return ""
+	}
+	spec, found, _ := unstructured.NestedMap(yaml.Object, "spec")
+	if !found {
+		return ""
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return fmt.Sprintf("%x", sum[:8]) // 16 hex chars - enough for deduplication
 }
 
 // RenderApplicationsFromBothBranchesWithAppOfApps is like
@@ -194,7 +231,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 	// Seed the queue with the initial base + target apps (depth 0).
 	visitedMu.Lock()
 	for _, app := range append(baseApps, targetApps...) {
-		visited[visitedKey(app.Yaml.GetNamespace(), app.Yaml.GetName(), app.Branch)] = true
+		visited[visitedKey(app.Yaml, app.Branch)] = true
 		enqueue(app, 0)
 	}
 	visitedMu.Unlock()
@@ -264,7 +301,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 				}
 				visitedMu.Lock()
 				for _, child := range selection.SelectedApps {
-					key := visitedKey(child.Yaml.GetNamespace(), child.Yaml.GetName(), child.Branch)
+					key := visitedKey(child.Yaml, child.Branch)
 					if visited[key] {
 						log.Debug().Str("App", child.GetLongName()).Msg("Skipping already-visited child Application")
 						continue
