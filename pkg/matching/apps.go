@@ -61,15 +61,8 @@ func MatchApps(baseApps, targetApps []extract.ExtractedApp) []Pair {
 	for _, key := range sortedIdentityKeys {
 		baseIdxs := baseByIdentity[key]
 		targetIdxs := targetByIdentity[key]
-
-		matchLen := min(len(baseIdxs), len(targetIdxs))
-		for i := range matchLen {
-			bi := baseIdxs[i]
-			ti := targetIdxs[i]
-			pairs = append(pairs, Pair{
-				Base:   &baseApps[bi],
-				Target: &targetApps[ti],
-			})
+		for bi, ti := range pairByContent(baseApps, targetApps, baseIdxs, targetIdxs) {
+			pairs = append(pairs, Pair{Base: &baseApps[bi], Target: &targetApps[ti]})
 			matchedBase[bi] = true
 			matchedTarget[ti] = true
 		}
@@ -102,15 +95,8 @@ func MatchApps(baseApps, targetApps []extract.ExtractedApp) []Pair {
 	for _, name := range sortedBaseNames {
 		baseIdxs := baseByName[name]
 		targetIdxs := targetByName[name]
-
-		matchLen := min(len(baseIdxs), len(targetIdxs))
-		for i := range matchLen {
-			bi := baseIdxs[i]
-			ti := targetIdxs[i]
-			pairs = append(pairs, Pair{
-				Base:   &baseApps[bi],
-				Target: &targetApps[ti],
-			})
+		for bi, ti := range pairByContent(baseApps, targetApps, baseIdxs, targetIdxs) {
+			pairs = append(pairs, Pair{Base: &baseApps[bi], Target: &targetApps[ti]})
 			matchedBase[bi] = true
 			matchedTarget[ti] = true
 		}
@@ -163,6 +149,65 @@ func MatchApps(baseApps, targetApps []extract.ExtractedApp) []Pair {
 	}
 
 	return pairs
+}
+
+// pairByContent pairs base and target indices using content similarity when
+// there are multiple candidates sharing the same identity key or name.
+//
+// When there is only one base and one target candidate the result is trivial
+// (no similarity computation needed). When there are multiple candidates on
+// either side, greedy similarity matching is used so that e.g. two apps that
+// share a name and SourcePath but render completely different resources (such
+// as a prod and a test variant discovered via app-of-apps traversal from two
+// different root apps) are still paired correctly rather than arbitrarily by
+// insertion order.
+//
+// Returns a map of baseIdx → targetIdx for each matched pair.
+func pairByContent(baseApps, targetApps []extract.ExtractedApp, baseIdxs, targetIdxs []int) map[int]int {
+	result := make(map[int]int)
+	if len(baseIdxs) == 0 || len(targetIdxs) == 0 {
+		return result
+	}
+
+	// Fast path: single candidate on each side - no need for similarity.
+	if len(baseIdxs) == 1 && len(targetIdxs) == 1 {
+		result[baseIdxs[0]] = targetIdxs[0]
+		return result
+	}
+
+	// Multiple candidates: rank all pairs by content similarity and greedily
+	// pick the best non-overlapping matches.
+	type candidate struct {
+		bi, ti int
+		score  float64
+	}
+	var candidates []candidate
+	for _, bi := range baseIdxs {
+		for _, ti := range targetIdxs {
+			score := resourceSetSimilarity(baseApps[bi].Manifests, targetApps[ti].Manifests)
+			candidates = append(candidates, candidate{bi, ti, score})
+		}
+	}
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if math.Abs(candidates[i].score-candidates[j].score) > 1e-9 {
+			return candidates[i].score > candidates[j].score
+		}
+		if candidates[i].bi != candidates[j].bi {
+			return candidates[i].bi < candidates[j].bi
+		}
+		return candidates[i].ti < candidates[j].ti
+	})
+
+	usedBase := make(map[int]bool)
+	usedTarget := make(map[int]bool)
+	for _, c := range candidates {
+		if !usedBase[c.bi] && !usedTarget[c.ti] {
+			result[c.bi] = c.ti
+			usedBase[c.bi] = true
+			usedTarget[c.ti] = true
+		}
+	}
+	return result
 }
 
 // matchAppsBySimilarity finds best matches for apps using content similarity
