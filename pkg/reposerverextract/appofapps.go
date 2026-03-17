@@ -253,6 +253,13 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 
 	// Single collector goroutine: reads results, collects extracted apps, and
 	// enqueues newly discovered children back onto the work channel.
+	//
+	// INVARIANT: This is the only goroutine that decrements or reads `pending`.
+	// The enqueue helper (which increments pending) is only called from this
+	// goroutine (for child apps) or from the main goroutine during seeding
+	// (which completes before any results are processed). Because decrement
+	// and zero-check both happen here, there is no TOCTOU race: when
+	// pending.Load() == 0 it truly means no items are queued or in-flight.
 	collectorDone := make(chan struct{})
 	go func() {
 		defer close(collectorDone)
@@ -262,62 +269,60 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 					firstError = r.err
 				}
 				log.Error().Err(r.err).Msg("❌ Failed to render application via repo server:")
-				pending.Add(-1)
-				continue
-			}
-
-			switch r.extracted.Branch {
-			case git.Base:
-				extractedBaseApps = append(extractedBaseApps, r.extracted)
-			case git.Target:
-				extractedTargetApps = append(extractedTargetApps, r.extracted)
-			default:
-				if firstError == nil {
-					firstError = fmt.Errorf("unknown branch type: '%s'", r.extracted.Branch)
-				}
-			}
-
-			// Enqueue children that haven't been seen yet and pass the selection filter.
-			// Child apps are filtered by Selector, FilesChanged (via watch-pattern annotations),
-			// IgnoreInvalidWatchPattern, and WatchIfNoWatchPatternFound — exactly as top-level apps are.
-			// FilesChanged works correctly here: the PR diff is the same regardless of whether an
-			// app was discovered from a file or from a parent's rendered output; the watch pattern
-			// on the child app is what determines whether it is affected.
-			//
-			// FileRegex is intentionally excluded because it filters by the physical filename of
-			// the Application YAML file. Child apps don't come from a file; their FileName is
-			// "parent: <name>" (a breadcrumb), which would give false matches against any regex.
-			if r.depth < maxAppOfAppsDepth {
-				childSelectionOptions := argoapplication.ApplicationSelectionOptions{
-					Selector:                   appSelectionOptions.Selector,
-					FilesChanged:               appSelectionOptions.FilesChanged,
-					IgnoreInvalidWatchPattern:  appSelectionOptions.IgnoreInvalidWatchPattern,
-					WatchIfNoWatchPatternFound: appSelectionOptions.WatchIfNoWatchPatternFound,
-					// FileRegex intentionally omitted: child apps have no real file path
-				}
-				selection := argoapplication.ApplicationSelection(r.childApps, childSelectionOptions)
-				for _, skipped := range selection.SkippedApps {
-					log.Debug().Str("App", skipped.GetLongName()).Msg("Skipping child Application excluded by ApplicationSelectionOptions")
-				}
-				visitedMu.Lock()
-				for _, child := range selection.SelectedApps {
-					key := visitedKey(child.Yaml, child.Branch)
-					if visited[key] {
-						log.Debug().Str("App", child.GetLongName()).Msg("Skipping already-visited child Application")
-						continue
+			} else {
+				switch r.extracted.Branch {
+				case git.Base:
+					extractedBaseApps = append(extractedBaseApps, r.extracted)
+				case git.Target:
+					extractedTargetApps = append(extractedTargetApps, r.extracted)
+				default:
+					if firstError == nil {
+						firstError = fmt.Errorf("unknown branch type: '%s'", r.extracted.Branch)
 					}
-					visited[key] = true
-					enqueue(child, r.depth+1)
 				}
-				visitedMu.Unlock()
-			} else if len(r.childApps) > 0 {
-				log.Warn().Msgf("⚠️ App-of-apps depth limit (%d) reached; not enqueuing %d child(ren) of %s",
-					maxAppOfAppsDepth, len(r.childApps), r.extracted.Name)
+
+				// Enqueue children that haven't been seen yet and pass the selection filter.
+				// Child apps are filtered by Selector, FilesChanged (via watch-pattern annotations),
+				// IgnoreInvalidWatchPattern, and WatchIfNoWatchPatternFound — exactly as top-level apps are.
+				// FilesChanged works correctly here: the PR diff is the same regardless of whether an
+				// app was discovered from a file or from a parent's rendered output; the watch pattern
+				// on the child app is what determines whether it is affected.
+				//
+				// FileRegex is intentionally excluded because it filters by the physical filename of
+				// the Application YAML file. Child apps don't come from a file; their FileName is
+				// "parent: <name>" (a breadcrumb), which would give false matches against any regex.
+				if r.depth < maxAppOfAppsDepth {
+					childSelectionOptions := argoapplication.ApplicationSelectionOptions{
+						Selector:                   appSelectionOptions.Selector,
+						FilesChanged:               appSelectionOptions.FilesChanged,
+						IgnoreInvalidWatchPattern:  appSelectionOptions.IgnoreInvalidWatchPattern,
+						WatchIfNoWatchPatternFound: appSelectionOptions.WatchIfNoWatchPatternFound,
+						// FileRegex intentionally omitted: child apps have no real file path
+					}
+					selection := argoapplication.ApplicationSelection(r.childApps, childSelectionOptions)
+					for _, skipped := range selection.SkippedApps {
+						log.Debug().Str("App", skipped.GetLongName()).Msg("Skipping child Application excluded by ApplicationSelectionOptions")
+					}
+					visitedMu.Lock()
+					for _, child := range selection.SelectedApps {
+						key := visitedKey(child.Yaml, child.Branch)
+						if visited[key] {
+							log.Debug().Str("App", child.GetLongName()).Msg("Skipping already-visited child Application")
+							continue
+						}
+						visited[key] = true
+						enqueue(child, r.depth+1)
+					}
+					visitedMu.Unlock()
+				} else if len(r.childApps) > 0 {
+					log.Warn().Msgf("⚠️ App-of-apps depth limit (%d) reached; not enqueuing %d child(ren) of %s",
+						maxAppOfAppsDepth, len(r.childApps), r.extracted.Name)
+				}
 			}
 
-			pending.Add(-1)
-
+			// Decrement pending for both success and error paths.
 			// When all pending work is done, close the work channel so workers exit.
+			pending.Add(-1)
 			if pending.Load() == 0 {
 				close(work)
 			}

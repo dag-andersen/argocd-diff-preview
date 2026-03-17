@@ -90,7 +90,7 @@ The expansion engine tracks every `(app-id, branch)` pair it has already rendere
 
 ## Depth limit
 
-The expansion stops after a maximum depth of **5 levels** to guard against runaway trees. If your App of Apps hierarchy is deeper than 5 levels, applications beyond that depth will not be rendered and a warning will be logged.
+The expansion stops after a maximum depth of **10 levels** to guard against runaway trees. If your App of Apps hierarchy is deeper than 10 levels, applications beyond that depth will not be rendered and a warning will be logged.
 
 ---
 
