@@ -433,7 +433,7 @@ func renderAppWithChildDiscovery(
 		case "Application":
 			name := m.GetName()
 			if name == "" {
-				log.Warn().Str("parentApp", app.GetLongName()).Msg("⚠️ Discovered child Application has no name; skipping child rendering")
+				log.Warn().Str("parentApp", app.Name).Msg("⚠️ Discovered child Application has no name; skipping child rendering")
 				continue
 			}
 			fileName := fmt.Sprintf("parent: %s", app.Name)
@@ -443,21 +443,21 @@ func renderAppWithChildDiscovery(
 			child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branchByType[app.Branch], prRepo, nil)
 			if err != nil {
 				log.Warn().Err(err).
-					Str("parentApp", app.GetLongName()).
+					Str("parentApp", app.Name).
 					Str("childName", name).
 					Msg("⚠️ Could not patch child Application; skipping child rendering")
 				continue
 			}
 			childApps = append(childApps, *child)
 			log.Debug().
-				Str("parentApp", app.GetLongName()).
+				Str("parentApp", app.Name).
 				Str("childApp", child.GetLongName()).
 				Msg("Discovered child Application via app-of-apps pattern")
 
 		case "ApplicationSet":
 			appSetName := m.GetName()
 			log.Info().
-				Str("parentApp", app.GetLongName()).
+				Str("parentApp", app.Name).
 				Str("appSet", appSetName).
 				Msgf("🔍 Discovered child ApplicationSet in rendered manifests; expanding to Applications")
 
@@ -472,7 +472,7 @@ func renderAppWithChildDiscovery(
 			patchedAppSet, err := argoapplication.PatchApplication(argocdNamespace, *appSetResource, branch, prRepo, nil)
 			if err != nil {
 				log.Warn().Err(err).
-					Str("parentApp", app.GetLongName()).
+					Str("parentApp", app.Name).
 					Str("appSet", appSetName).
 					Msg("⚠️ Failed to patch child ApplicationSet before expansion; skipping expansion")
 				continue
@@ -481,7 +481,7 @@ func renderAppWithChildDiscovery(
 			generatedManifests, err := argocd.AppsetGenerateWithRetry(patchedAppSet.Yaml, appSetTempFolder, 5)
 			if err != nil {
 				log.Warn().Err(err).
-					Str("parentApp", app.GetLongName()).
+					Str("parentApp", app.Name).
 					Str("appSet", appSetName).
 					Msg("⚠️ Could not expand child ApplicationSet; skipping expansion")
 				continue
@@ -505,14 +505,14 @@ func renderAppWithChildDiscovery(
 				child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branch, prRepo, nil)
 				if err != nil {
 					log.Warn().Err(err).
-						Str("parentApp", app.GetLongName()).
+						Str("parentApp", app.Name).
 						Str("appSet", appSetName).
 						Msg("⚠️ Could not patch ApplicationSet-generated Application; skipping")
 					continue
 				}
 				childApps = append(childApps, *child)
 				log.Debug().
-					Str("parentApp", app.GetLongName()).
+					Str("parentApp", app.Name).
 					Str("appSet", appSetName).
 					Str("childApp", child.GetLongName()).
 					Msg("Discovered child Application via ApplicationSet expansion")
@@ -522,7 +522,7 @@ func renderAppWithChildDiscovery(
 
 	if len(childApps) > 0 {
 		log.Info().
-			Str("parentApp", app.GetLongName()).
+			Str("parentApp", app.Name).
 			Msgf("🔍 Discovered %d child Application(s) in rendered manifests", len(childApps))
 	}
 
