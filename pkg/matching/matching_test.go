@@ -2339,7 +2339,7 @@ func TestPairByContent_DeterministicTieBreaking(t *testing.T) {
 	}
 
 	// Run multiple times to verify determinism.
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		result := pairByContent(baseApps, targetApps, []int{0, 1}, []int{0, 1})
 		if len(result) != 2 {
 			t.Fatalf("iteration %d: expected 2 pairs, got %d", i, len(result))
