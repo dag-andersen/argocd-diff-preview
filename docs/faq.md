@@ -59,26 +59,24 @@ Comparing to live cluster state introduces non-determinism and ambiguity. The cl
 
 ---
 
-### Does it work with the Apps of Apps Pattern?
+### Does it work with the App of Apps Pattern?
 
-**Short answer:** Yes, but it depends on your setup.
+**Short answer:** Yes.
 
-**Longer answer:** The Apps of Apps Pattern can be configured in many ways, making it challenging to handle all cases. This tool identifies and renders all resources with `kind: Application` or `kind: ApplicationSet`. If your Applications or ApplicationSets are written as plain manifests in your repository, the tool will work seamlessly. However, if you have an Application that deploys a Helm chart, which then deploys the rest of your Applications, you will need to render the Helm chart before running the tool.
+**Longer answer:** The tool scans your repository for all resources with `kind: Application` or `kind: ApplicationSet` and renders them. If your child Applications exist as plain YAML manifests in the repository, the tool works out of the box - no extra flags needed.
 
-Relevant issue: [#75](https://github.com/dag-andersen/argocd-diff-preview/issues/75)
+If your child Applications are *generated dynamically* at render time (e.g. a root Application that deploys a Helm chart which templates child Application manifests), the tool cannot see them by default. In that case you can either:
+
+1. **Pre-render** the Application manifests in your CI pipeline before running `argocd-diff-preview`. See [Helm/Kustomize generated Argo CD applications](./generated-applications.md).
+2. **Use `--traverse-app-of-apps`** (🧪 experimental) to let the tool discover and render child Applications automatically at runtime.
+
+More info: [App of Apps docs](./app-of-apps.md)
+
+Relevant issues: [#41](https://github.com/dag-andersen/argocd-diff-preview/issues/41), [#75](https://github.com/dag-andersen/argocd-diff-preview/issues/75), [#200](https://github.com/dag-andersen/argocd-diff-preview/issues/200), [#381](https://github.com/dag-andersen/argocd-diff-preview/issues/381)
 
 #### Why can't the tool automatically render my Helm Charts or Kustomize templates?
 
-Helm and Kustomize configurations are inherently complex:
-
-- **Helm:** Any YAML file can be used as a values file for Helm charts, making it impossible for the tool to automatically determine which YAML files should be used as values files and which Helm charts they belong to.
-- **Kustomize:** Overlays in Kustomize can be chained in various ways. The tool cannot reliably figure out which overlays to use or skip.
-
-Because of this, users must render their Helm charts and Kustomize templates before running the tool.
-
-The tool is rather conservative in making assumptions about how Applications are rendered, with the goal of avoiding false positives.
-
-More info: [docs](./generated-applications.md)
+The tool intentionally avoids guessing how to render Helm charts and Kustomize templates - the configurations are ambiguous by nature, and incorrect assumptions would lead to misleading diffs. See the [generated applications docs](./generated-applications.md#why-cant-the-tool-do-this-automatically) for details.
 
 ---
 
@@ -86,7 +84,7 @@ More info: [docs](./generated-applications.md)
 
 **Short answer:** Yes
 
-**Longer answer:** Yes, but it deepends on how complicated your setup is. Check out the [multi-repo](./multi-repo.md) documentation to learn how to use the tool with a distributed Argo CD repository setup.
+**Longer answer:** Yes, but it depends on how complicated your setup is. Check out the [multi-repo](./multi-repo.md) documentation to learn how to use the tool with a distributed Argo CD repository setup.
 
 ---
 

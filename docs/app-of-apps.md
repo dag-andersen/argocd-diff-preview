@@ -1,24 +1,34 @@
 # App of Apps
 
-!!! warning "🧪 Experimental"
-    App of Apps support is an experimental feature. The behaviour and flags described on this page may change in future releases without a deprecation notice.
-
 The [App of Apps pattern](https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/) is a common Argo CD pattern where a parent Application renders child Application manifests. The parent application points to a directory of Application YAML files, and Argo CD creates those child applications automatically.
 
-Without App of Apps support, `argocd-diff-preview` renders only the applications it discovers directly in your repository files. Child applications that are *generated* by a parent - and therefore never exist as files in the repo - are invisible to the tool.
+`argocd-diff-preview` already works with the App of Apps pattern **out of the box** - as long as the child Applications (or ApplicationSets) exist as plain YAML manifests in your repository. The tool scans your repository files, finds every `kind: Application` and `kind: ApplicationSet`, and renders them all.
 
-With the `--traverse-app-of-apps` flag, `argocd-diff-preview` can discover and render those child applications automatically.
+However, if your child Applications are *generated* at render time by a parent - for example, a root Application that points to a Helm chart which templates child Application manifests - they never exist as files in the repo. In that case you need either pre-rendering or the `--traverse-app-of-apps` flag.
 
 ---
 
-## Consider alternatives first
+## When you don't need `--traverse-app-of-apps`
 
-!!! tip "Prefer simpler alternatives when possible"
-    The `--traverse-app-of-apps` feature is **slower** and **more limited** than the standard rendering flow. Before enabling it, consider whether one of the alternatives below covers your use case.
+If your child Applications are committed as plain YAML files in the repository, the tool picks them up automatically. No extra flags needed.
 
-**Pre-render your Application manifests**
+---
 
-If your applications do not exist as plain manifests inside the repo, but are instead generated from Helm or Kustomize, you can pre-render them in your CI pipeline and place the output in the branch folder. `argocd-diff-preview` will then pick them up as regular files. See [Helm/Kustomize generated Argo CD applications](./generated-applications.md) for details and examples.
+## When you do need it
+
+If child Applications are generated dynamically (e.g. by a Helm chart or Kustomize overlay inside a parent Application), they are invisible to the file scanner. You have two options:
+
+### Option 1: Pre-render your Application manifests
+
+If your applications are generated from Helm or Kustomize, you can pre-render them in your CI pipeline and place the output in the branch folder. `argocd-diff-preview` will then pick them up as regular files. See [Helm/Kustomize generated Argo CD applications](./generated-applications.md) for details and examples.
+
+### Option 2: Use `--traverse-app-of-apps`
+
+!!! warning "🧪 Experimental"
+    The `--traverse-app-of-apps` flag is an experimental feature. Its behaviour may change in future releases without a deprecation notice.
+
+!!! tip "Prefer pre-rendering when possible"
+    The `--traverse-app-of-apps` flag is **slower** and **more limited** than the standard rendering flow. Consider [pre-rendering](./generated-applications.md) first.
 
 Only use `--traverse-app-of-apps` when the child Applications are *not* committed as plain manifests to the repository AND can *not* be pre-rendered easily.
 
