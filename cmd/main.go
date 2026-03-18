@@ -320,16 +320,31 @@ func run(cfg *Config) error {
 
 		// Extract resources by streaming source files directly to the Argo CD repo server via gRPC.
 		// This bypasses the cluster reconciliation loop used by extract.RenderApplicationsFromBothBranches.
-		baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranches(
-			argocd,
-			baseBranch,
-			targetBranch,
-			cfg.Timeout,
-			cfg.Concurrency,
-			baseApps.SelectedApps,
-			targetApps.SelectedApps,
-			cfg.Repo,
-		)
+		if cfg.TraverseAppOfApps {
+			baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranchesWithAppOfApps(
+				argocd,
+				baseBranch,
+				targetBranch,
+				cfg.Timeout,
+				cfg.Concurrency,
+				baseApps.SelectedApps,
+				targetApps.SelectedApps,
+				cfg.Repo,
+				appSelectionOptions,
+				tempFolder,
+			)
+		} else {
+			baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranches(
+				argocd,
+				baseBranch,
+				targetBranch,
+				cfg.Timeout,
+				cfg.Concurrency,
+				baseApps.SelectedApps,
+				targetApps.SelectedApps,
+				cfg.Repo,
+			)
+		}
 	} else {
 		// Extract resources from the cluster based on each branch, passing the manifests directly
 		deleteAfterProcessing := !cfg.CreateCluster
@@ -354,7 +369,7 @@ func run(cfg *Config) error {
 		ExtractDuration:            extractDuration + convertAppSetsToAppsDuration,
 		ArgoCDInstallationDuration: argocdInstallationDuration,
 		ClusterCreationDuration:    clusterCreationDuration,
-		ApplicationCount:           len(baseApps.SelectedApps) + len(targetApps.SelectedApps),
+		ApplicationCount:           len(baseManifests) + len(targetManifests),
 	}
 
 	// Write manifest files if requested

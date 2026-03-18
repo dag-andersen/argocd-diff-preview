@@ -20,7 +20,7 @@ func patchApplications(
 	var patchedApps []ArgoResource
 
 	for _, app := range applications {
-		patchedApp, err := patchApplication(
+		patchedApp, err := PatchApplication(
 			argocdNamespace,
 			app,
 			branch,
@@ -36,8 +36,8 @@ func patchApplications(
 	return patchedApps, nil
 }
 
-// patchApplication patches a single ArgoResource
-func patchApplication(
+// PatchApplication patches a single ArgoResource
+func PatchApplication(
 	argocdNamespace string,
 	app ArgoResource,
 	branch *git.Branch,

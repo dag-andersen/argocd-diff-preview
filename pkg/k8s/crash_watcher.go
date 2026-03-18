@@ -117,12 +117,12 @@ func (c *Client) WatchForContainerRestarts(namespace, labelSelector string, poll
 				switch event.EventType {
 				case "restart":
 					log.Warn().Msgf(
-						"⚠️ Container '%s' in pod '%s' has restarted (restarts: %d -> %d). This may cause rendering failures or timeouts.",
+						"🚨🚨🚨🚨🚨 Container '%s' in pod '%s' has restarted (restarts: %d -> %d). This may cause rendering failures or timeouts.",
 						event.ContainerName, event.PodName, event.PrevRestarts, event.CurrRestarts,
 					)
 				case "crash-loop":
 					log.Warn().Msgf(
-						"⚠️ Container '%s' in pod '%s' is in CrashLoopBackOff. ArgoCD may not be functioning correctly.",
+						"🚨🚨🚨🚨🚨 Container '%s' in pod '%s' is in CrashLoopBackOff. ArgoCD may not be functioning correctly.",
 						event.ContainerName, event.PodName,
 					)
 				}
