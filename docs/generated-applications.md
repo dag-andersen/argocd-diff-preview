@@ -2,6 +2,15 @@
 
 `argocd-diff-preview` discovers applications by scanning your repository for YAML files with `kind: Application` or `kind: ApplicationSet`. If your Application manifests are not committed directly to the repository but are instead *generated* by a Helm chart or Kustomize template, you need to render them first and place the output somewhere in the branch folder before running the tool.
 
+### Why can't the tool do this automatically?
+
+Helm and Kustomize configurations are inherently complex:
+
+- **Helm:** Any YAML file can be used as a values file for Helm charts, making it impossible for the tool to automatically determine which YAML files should be used as values files and which Helm charts they belong to.
+- **Kustomize:** Overlays in Kustomize can be chained in various ways. The tool cannot reliably figure out which overlays to use or skip.
+
+Because of this, the tool is conservative and avoids making assumptions about how Applications are rendered - with the goal of avoiding false positives.
+
 ---
 
 ## Example scenario
