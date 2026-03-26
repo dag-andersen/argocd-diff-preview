@@ -191,7 +191,12 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 	}
 
 	if sectionsDiff.Len() == 0 {
-		sectionsDiff.WriteString("No changes found")
+		if len(m.sections) > 0 {
+			sectionsDiff.WriteString(fmt.Sprintf("⚠️ Changes were found but `--max-diff-length` (%d) is too small to display them. Increase the value or check the HTML output instead.", maxDiffMessageCharCount))
+			log.Warn().Msgf("🚨 --max-diff-length (%d) is too small to display any diff content. Increase the value or use the HTML output instead.", maxDiffMessageCharCount)
+		} else {
+			sectionsDiff.WriteString("No changes found")
+		}
 	}
 
 	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())

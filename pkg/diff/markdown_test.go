@@ -213,6 +213,35 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			},
 		},
 		{
+			name: "Extremely small max-diff-length shows helpful message instead of no changes found",
+			output: MarkdownOutput{
+				title:   "Tiny Diff",
+				summary: "Some changes",
+				sections: []MarkdownSection{
+					{
+						appName:  "My App",
+						filePath: "path/to/app.yaml",
+						appURL:   "",
+						resources: []ResourceSection{
+							{Header: "@@ Application modified: My App @@", Content: "+ new line\n- old line\n"},
+						},
+					},
+				},
+				statsInfo: StatsInfo{
+					ApplicationCount: 1,
+				},
+			},
+			maxSize:                 3, // Extremely small - like the user in issue #392
+			maxDiffMessageCharCount: 3,
+			expectedContains: []string{
+				"too small to display them",
+				"--max-diff-length",
+			},
+			expectedNotContains: []string{
+				"No changes found",
+			},
+		},
+		{
 			name: "Truncated output shows warning",
 			output: MarkdownOutput{
 				title:   "Large Diff",
