@@ -136,7 +136,11 @@ repoServer:
 
 ### Stripping `.sops` metadata from encrypted manifests
 
-If your repository contains SOPS-encrypted Application manifests (e.g. `*.sops.yaml` files), the top-level `.sops` metadata block will cause ArgoCD Application CRD schema validation to fail. To fix this, strip the `.sops` block from encrypted files before running argocd-diff-preview:
+This workaround is only needed when the ArgoCD `Application` manifest itself is SOPS-encrypted (e.g. `my-app.sops.yaml` containing `kind: Application`). In that case, the top-level `.sops` metadata block added by SOPS isn't part of the Application CRD schema, so ArgoCD rejects it during validation.
+
+If your SOPS-encrypted files are only used as data sources for KSOPS generators (Secrets, ConfigMaps, etc.) rather than Application manifests, you don't need this step — the stub plugin above is sufficient.
+
+To fix this, strip the `.sops` block from encrypted Application files before running argocd-diff-preview:
 
 ```bash
 # Strip .sops metadata from encrypted manifests so the top-level field
