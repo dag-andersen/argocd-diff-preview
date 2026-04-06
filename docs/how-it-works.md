@@ -8,7 +8,7 @@ The tool follows a simple but powerful approach: use a real Argo CD instance to 
 
 #### Ephemeral Cluster Mode
 
-![](./assets/flows/ephemeral-flow.png)
+![](./assets/flows/ephemeral-flow-black.png)
 
 #### Pre-installed Argo CD Mode
 
