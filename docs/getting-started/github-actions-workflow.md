@@ -39,7 +39,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.2.1
+            dagandersen/argocd-diff-preview:v0.2.2
 
       - name: Post diff as comment
         run: |
@@ -92,7 +92,7 @@ In the simple code examples above, we do not provide the cluster with any creden
           -v $(pwd)/secrets:/secrets \           ⬅️ Mount the secrets folder
           -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
           -e REPO=${{ github.repository }} \
-          dagandersen/argocd-diff-preview:v0.2.1
+          dagandersen/argocd-diff-preview:v0.2.2
 ```
 
 !!! tip "Extracting secrets from an existing Argo CD installation"
