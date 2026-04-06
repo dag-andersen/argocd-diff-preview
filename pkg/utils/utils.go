@@ -50,10 +50,10 @@ func CreateFolder(path string, override bool) error {
 	return err
 }
 
-var uniqueNumber uint64
+var uniqueNumber atomic.Uint64
 
 func UniqueNumber() uint64 {
-	return atomic.AddUint64(&uniqueNumber, 1)
+	return uniqueNumber.Add(1)
 }
 
 func UniqueId() string {
