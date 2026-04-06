@@ -61,6 +61,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--line-count <count>`, `-c`              | `LINE_COUNT`                 | `5`                                    | Generate diffs with \<n\> lines of context                                                  |
 | `--log-format <format>`                   | `LOG_FORMAT`                 | `human`                                | Log format. Options: `human`, `json`                                                        |
 | `--max-diff-length <length>`              | `MAX_DIFF_LENGTH`            | `65536`                                | Max diff message character count (only limits the generated Markdown file)                  |
+| `--summary-threshold <count>`             | `SUMMARY_THRESHOLD`          | `20`                                   | Collapse summary details when total changed applications exceed this value (`0` = always show inline) |
 | `--output-folder <folder>`, `-o`          | `OUTPUT_FOLDER`              | `./output`                             | Output folder where the diff will be saved                                                  |
 | `--redirect-target-revisions <revs>`      | `REDIRECT_TARGET_REVISIONS`  | -                                      | List of target revisions to redirect                                                        |
 | `--render-method <method>`                | `RENDER_METHOD`              | `server-api`                           | Manifest rendering method. Options: `cli`, `server-api`, `repo-server-api`                  |

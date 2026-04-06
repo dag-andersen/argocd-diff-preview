@@ -29,6 +29,7 @@ func GeneratePreview(
 	statsInfo StatsInfo,
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
+	summaryThreshold uint,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
 ) (time.Duration, error) {
 	startTime := time.Now()
@@ -64,7 +65,7 @@ func GeneratePreview(
 	}
 
 	// Build summary
-	summary := buildSummary(appDiffs)
+	inlineSummary, summaryDetails := buildSummary(appDiffs, int(summaryThreshold))
 
 	// Convert to markdown/HTML sections
 	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
@@ -72,11 +73,12 @@ func GeneratePreview(
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
 	markdownOutput := MarkdownOutput{
-		title:         title,
-		summary:       summary,
-		sections:      markdownSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
+		title:          title,
+		summary:        inlineSummary,
+		summaryDetails: summaryDetails,
+		sections:       markdownSections,
+		statsInfo:      statsInfo,
+		selectionInfo:  selectionInfo,
 	}
 	markdown := markdownOutput.printDiff(maxDiffMessageCharCount)
 	markdownPath := fmt.Sprintf("%s/diff.md", outputFolder)
@@ -90,7 +92,7 @@ func GeneratePreview(
 	log.Debug().Msg("Creating html output")
 	htmlOutput := HTMLOutput{
 		title:         title,
-		summary:       summary,
+		summary:       inlineSummary,
 		sections:      htmlSections,
 		statsInfo:     statsInfo,
 		selectionInfo: selectionInfo,
@@ -108,13 +110,14 @@ func GeneratePreview(
 	return time.Since(startTime), nil
 }
 
-// buildSummary builds a summary string from AppDiffs
-func buildSummary(diffs []matching.AppDiff) string {
+// buildSummary returns (inlineContent, detailsBlock).
+// inlineContent goes in the summary yaml block; when total > threshold it only contains counts.
+// detailsBlock is a collapsible markdown details section with the full application list.
+// Pass threshold=0 to always return the full list inline.
+func buildSummary(diffs []matching.AppDiff, threshold int) (string, string) {
 	if len(diffs) == 0 {
-		return "No changes found"
+		return "No changes found", ""
 	}
-
-	var summaryBuilder strings.Builder
 
 	addedCount := 0
 	deletedCount := 0
@@ -131,42 +134,68 @@ func buildSummary(diffs []matching.AppDiff) string {
 		}
 	}
 
+	total := addedCount + deletedCount + modifiedCount
+
+	var listBuilder strings.Builder
+
 	if addedCount > 0 {
-		fmt.Fprintf(&summaryBuilder, "Added (%d):\n", addedCount)
+		fmt.Fprintf(&listBuilder, "Added (%d):\n", addedCount)
 		for _, d := range diffs {
 			if d.Action == matching.ActionAdded {
-				fmt.Fprintf(&summaryBuilder, "+ %s%s\n", d.PrettyName(), d.ChangeStats())
+				fmt.Fprintf(&listBuilder, "+ %s%s\n", d.PrettyName(), d.ChangeStats())
 			}
 		}
 	}
 
 	if deletedCount > 0 {
-		// Add a newline before Deleted section if there was an Added section
-		if summaryBuilder.Len() > 0 {
-			fmt.Fprintln(&summaryBuilder)
+		if listBuilder.Len() > 0 {
+			fmt.Fprintln(&listBuilder)
 		}
-		fmt.Fprintf(&summaryBuilder, "Deleted (%d):\n", deletedCount)
+		fmt.Fprintf(&listBuilder, "Deleted (%d):\n", deletedCount)
 		for _, d := range diffs {
 			if d.Action == matching.ActionDeleted {
-				fmt.Fprintf(&summaryBuilder, "- %s%s\n", d.PrettyName(), d.ChangeStats())
+				fmt.Fprintf(&listBuilder, "- %s%s\n", d.PrettyName(), d.ChangeStats())
 			}
 		}
 	}
 
 	if modifiedCount > 0 {
-		// Add a newline before Modified section if there was an Added or Deleted section
-		if summaryBuilder.Len() > 0 {
-			fmt.Fprintln(&summaryBuilder)
+		if listBuilder.Len() > 0 {
+			fmt.Fprintln(&listBuilder)
 		}
-		fmt.Fprintf(&summaryBuilder, "Modified (%d):\n", modifiedCount)
+		fmt.Fprintf(&listBuilder, "Modified (%d):\n", modifiedCount)
 		for _, d := range diffs {
 			if d.Action == matching.ActionModified {
-				fmt.Fprintf(&summaryBuilder, "± %s%s\n", d.PrettyName(), d.ChangeStats())
+				fmt.Fprintf(&listBuilder, "± %s%s\n", d.PrettyName(), d.ChangeStats())
 			}
 		}
 	}
 
-	return summaryBuilder.String()
+	header := fmt.Sprintf("Total: %d applications changed\n", total)
+
+	if threshold > 0 && total > threshold {
+		var compact strings.Builder
+		fmt.Fprint(&compact, header)
+		if addedCount > 0 {
+			fmt.Fprintf(&compact, "\nAdded: %d\n", addedCount)
+		}
+		if deletedCount > 0 {
+			fmt.Fprintf(&compact, "Deleted: %d\n", deletedCount)
+		}
+		if modifiedCount > 0 {
+			fmt.Fprintf(&compact, "Modified: %d\n", modifiedCount)
+		}
+
+		details := fmt.Sprintf(
+			"<details>\n<summary>Changed applications (%d)</summary>\n\n```yaml\n%s```\n\n</details>\n",
+			total,
+			listBuilder.String(),
+		)
+
+		return compact.String(), details
+	}
+
+	return header + listBuilder.String(), ""
 }
 
 // buildMatchingSections converts AppDiffs to markdown and HTML sections

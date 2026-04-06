@@ -148,7 +148,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			name: "Basic output with sections",
 			output: MarkdownOutput{
 				title:   "Test Diff",
-				summary: "Added: 1\nModified: 1",
+				summary: "Total: 2 applications changed\n\nAdded: 1\nModified: 1",
 				sections: []MarkdownSection{
 					{
 						appName:  "App 1",
@@ -176,7 +176,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			maxDiffMessageCharCount: 5000,
 			expectedContains: []string{
 				"## Test Diff",
-				"Added: 1\nModified: 1",
+				"Total: 2 applications changed\n\nAdded: 1\nModified: 1",
 				"<summary>App 1 (path/to/app1.yaml)</summary>",
 				"<summary>App 2 (path/to/app2.yaml)</summary>",
 				"@@ Application added: App 1 @@",
@@ -187,6 +187,37 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			},
 			expectedNotContains: []string{
 				"⚠️⚠️⚠️ Diff exceeds max length",
+				"No changes found",
+			},
+		},
+		{
+			name: "Summary details render before app diffs",
+			output: MarkdownOutput{
+				title:          "Summary Details",
+				summary:        "Total: 3 applications changed\n\nAdded: 1\nModified: 2",
+				summaryDetails: "<details>\n<summary>Changed applications (3)</summary>\n\n```yaml\nAdded (1):\n+ app-1 (+2)\n```\n\n</details>\n",
+				sections: []MarkdownSection{
+					{
+						appName:  "App 1",
+						filePath: "path/to/app1.yaml",
+						appURL:   "",
+						resources: []ResourceSection{
+							{Header: "@@ Application modified: App 1 @@", Content: "- old content\n+ new content"},
+						},
+					},
+				},
+				statsInfo: StatsInfo{
+					ApplicationCount: 1,
+				},
+			},
+			maxSize:                 10000,
+			maxDiffMessageCharCount: 5000,
+			expectedContains: []string{
+				"<summary>Changed applications (3)</summary>",
+				"```yaml\nAdded (1):\n+ app-1 (+2)\n```",
+				"<summary>App 1 (path/to/app1.yaml)</summary>",
+			},
+			expectedNotContains: []string{
 				"No changes found",
 			},
 		},
