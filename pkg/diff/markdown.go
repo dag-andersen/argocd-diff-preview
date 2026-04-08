@@ -47,6 +47,11 @@ var (
 	diffTooLongWarning       = "\n🚨 Diff is too long"
 )
 
+const (
+	infoBoxBufferSize    = 80
+	summaryTooLongNotice = "\n... Summary truncated to fit `--max-diff-length`"
+)
+
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
@@ -148,22 +153,49 @@ Summary:
 %info_box%
 `
 
-func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
-
-	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
-	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(m.summary))
-	selection_changes := ""
-	if s := m.selectionInfo.String(); s != "" {
-		selection_changes = fmt.Sprintf("\n%s\n", s)
-	}
-	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
-
-	// the InfoBox has a dynamic size. This is a problem for the integration tests, because the output is not deterministic.
-	// By adding a buffer, we ensure availableSpaceForDetailedDiff has a fixed size
-	infoBoxBufferSize := 80
-
-	warningMessage := fmt.Sprintf("⚠️⚠️⚠️ Diff exceeds max length of %d characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag",
+func diffExceedsMaxLengthMessage(maxDiffMessageCharCount uint) string {
+	return fmt.Sprintf("⚠️⚠️⚠️ Diff exceeds max length of %d characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
+}
+
+func changesFoundButNotDisplayedMessage(maxDiffMessageCharCount uint) string {
+	return fmt.Sprintf("⚠️ Changes were found but `--max-diff-length` (%d) is too small to display them. Increase the value or check the HTML output instead.", maxDiffMessageCharCount)
+}
+
+func truncateSummary(summary string, maxSize int) (string, bool) {
+	summary = strings.TrimSpace(summary)
+	if len(summary) <= maxSize {
+		return summary, false
+	}
+	if maxSize <= 0 {
+		return "", true
+	}
+
+	if maxSize <= len(summaryTooLongNotice) {
+		return summaryTooLongNotice[:maxSize], true
+	}
+
+	trimmedSummary := strings.TrimRight(summary[:maxSize-len(summaryTooLongNotice)], " \t\n\r")
+	if trimmedSummary == "" {
+		return summaryTooLongNotice[:maxSize], true
+	}
+
+	return trimmedSummary + summaryTooLongNotice, true
+}
+
+func renderMarkdownOutput(title, summary, appDiffs, selectionChanges, infoBox string) string {
+	output := strings.ReplaceAll(markdownTemplate, "%title%", title)
+	output = strings.ReplaceAll(output, "%summary%", summary)
+	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(appDiffs))
+	output = strings.ReplaceAll(output, "%selection_changes%", selectionChanges)
+	output = strings.ReplaceAll(output, "%info_box%", infoBox)
+	return strings.TrimSpace(output) + "\n"
+}
+
+func (m *MarkdownOutput) buildSectionsDiff(summary, selectionChanges, warningMessage string, maxDiffMessageCharCount uint) (string, bool) {
+	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
+	output = strings.ReplaceAll(output, "%summary%", summary)
+	output = strings.ReplaceAll(output, "%selection_changes%", selectionChanges)
 
 	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize
 
@@ -172,7 +204,7 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 	var sectionsDiff strings.Builder
 
 	spaceRemaining := availableSpaceForDetailedDiff
-	AddWarning := false
+	addWarning := false
 
 	for _, section := range m.sections {
 		if spaceRemaining <= 0 {
@@ -181,30 +213,74 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 		sectionContent, truncated := section.build(spaceRemaining)
 		sectionsDiff.WriteString(sectionContent)
 		if truncated {
-			AddWarning = true
+			addWarning = true
 		}
 		spaceRemaining -= len(sectionContent)
 	}
 
-	if AddWarning {
-		sectionsDiff.WriteString(warningMessage)
-	}
+	return sectionsDiff.String(), addWarning
+}
 
-	if sectionsDiff.Len() == 0 {
-		if len(m.sections) > 0 {
-			fmt.Fprintf(&sectionsDiff, "⚠️ Changes were found but `--max-diff-length` (%d) is too small to display them. Increase the value or check the HTML output instead.", maxDiffMessageCharCount)
-			log.Warn().Msgf("🚨 --max-diff-length (%d) is too small to display any diff content. Increase the value or use the HTML output instead.", maxDiffMessageCharCount)
-		} else {
-			sectionsDiff.WriteString("No changes found")
+func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
+	selection_changes := ""
+	if s := m.selectionInfo.String(); s != "" {
+		selection_changes = fmt.Sprintf("\n%s\n", s)
+	}
+	warningMessage := diffExceedsMaxLengthMessage(maxDiffMessageCharCount)
+	summary := strings.TrimSpace(m.summary)
+
+	if maxDiffMessageCharCount > 0 {
+		summarySkeleton := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
+		summarySkeleton = strings.ReplaceAll(summarySkeleton, "%summary%", "")
+		summarySkeleton = strings.ReplaceAll(summarySkeleton, "%selection_changes%", selection_changes)
+
+		requiredReservedSpace := max(len(warningMessage), len(changesFoundButNotDisplayedMessage(maxDiffMessageCharCount)))
+		summaryBudget := int(maxDiffMessageCharCount) - len(summarySkeleton) - requiredReservedSpace - infoBoxBufferSize
+
+		truncatedSummary, truncated := truncateSummary(summary, summaryBudget)
+		if truncated {
+			log.Warn().Msgf("🚨 Markdown summary is too long, truncating to fit --max-diff-length (%d)", maxDiffMessageCharCount)
+			summary = truncatedSummary
 		}
 	}
 
-	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())
-	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
+	sectionsDiff, addWarning := m.buildSectionsDiff(summary, selection_changes, warningMessage, maxDiffMessageCharCount)
+	if addWarning {
+		sectionsDiff += warningMessage
+	}
 
-	output = strings.TrimSpace(output) + "\n"
+	if len(sectionsDiff) == 0 {
+		if len(m.sections) > 0 {
+			sectionsDiff = changesFoundButNotDisplayedMessage(maxDiffMessageCharCount)
+			log.Warn().Msgf("🚨 --max-diff-length (%d) is too small to display any diff content. Increase the value or use the HTML output instead.", maxDiffMessageCharCount)
+		} else {
+			sectionsDiff = "No changes found"
+		}
+	}
 
-	if AddWarning {
+	output := renderMarkdownOutput(m.title, summary, sectionsDiff, selection_changes, m.statsInfo.String())
+
+	if maxDiffMessageCharCount > 0 && len(output) > int(maxDiffMessageCharCount) {
+		summaryBudget := len(summary) - (len(output) - int(maxDiffMessageCharCount))
+		truncatedSummary, truncated := truncateSummary(summary, summaryBudget)
+		if truncated && truncatedSummary != summary {
+			summary = truncatedSummary
+			sectionsDiff, addWarning = m.buildSectionsDiff(summary, selection_changes, warningMessage, maxDiffMessageCharCount)
+			if addWarning {
+				sectionsDiff += warningMessage
+			}
+			if len(sectionsDiff) == 0 {
+				if len(m.sections) > 0 {
+					sectionsDiff = changesFoundButNotDisplayedMessage(maxDiffMessageCharCount)
+				} else {
+					sectionsDiff = "No changes found"
+				}
+			}
+			output = renderMarkdownOutput(m.title, summary, sectionsDiff, selection_changes, m.statsInfo.String())
+		}
+	}
+
+	if addWarning {
 		// log warning
 		log.Warn().Msgf("🚨 Markdown diff is too long, which exceeds --max-diff-length (%d). Truncating to %d characters. This can be adjusted with the `--max-diff-length` flag", maxDiffMessageCharCount, len(output))
 		log.Warn().Msgf("🚨 HTML diff is not affected by this truncation")
