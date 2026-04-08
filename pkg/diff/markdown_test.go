@@ -139,7 +139,6 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 	tests := []struct {
 		name                    string
 		output                  MarkdownOutput
-		maxSize                 int
 		maxDiffMessageCharCount uint
 		expectedContains        []string
 		expectedNotContains     []string
@@ -172,7 +171,6 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 					FullDuration:     time.Second * 5,
 				},
 			},
-			maxSize:                 10000,
 			maxDiffMessageCharCount: 5000,
 			expectedContains: []string{
 				"## Test Diff",
@@ -200,7 +198,6 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 					ApplicationCount: 0,
 				},
 			},
-			maxSize:                 10000,
 			maxDiffMessageCharCount: 5000,
 			expectedContains: []string{
 				"## Empty Diff",
@@ -231,7 +228,6 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 					ApplicationCount: 1,
 				},
 			},
-			maxSize:                 3, // Extremely small - like the user in issue #392
 			maxDiffMessageCharCount: 3,
 			expectedContains: []string{
 				"too small to display them",
@@ -260,7 +256,6 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 					ApplicationCount: 1,
 				},
 			},
-			maxSize:                 500, // Small size to force truncation
 			maxDiffMessageCharCount: 500,
 			expectedContains: []string{
 				"## Large Diff",
@@ -700,4 +695,76 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestTruncateSummary(t *testing.T) {
+	t.Run("No truncation when summary fits", func(t *testing.T) {
+		summary := "Modified (1):\n± app (+1)"
+		got, truncated := truncateSummary(summary, len(summary))
+		if truncated {
+			t.Fatalf("expected summary to fit without truncation")
+		}
+		if got != summary {
+			t.Fatalf("expected summary to remain unchanged, got %q", got)
+		}
+	})
+
+	t.Run("Adds explicit notice when summary is truncated", func(t *testing.T) {
+		summary := strings.Repeat("± spark-a--clark (+1)\n", 50)
+		got, truncated := truncateSummary(summary, 120)
+		if !truncated {
+			t.Fatalf("expected summary to be truncated")
+		}
+		if len(got) > 120 {
+			t.Fatalf("expected truncated summary to fit budget, got len=%d", len(got))
+		}
+		if !strings.Contains(got, "Summary truncated to fit") {
+			t.Fatalf("expected truncation notice, got %q", got)
+		}
+	})
+
+	t.Run("Drops summary entirely when no space remains", func(t *testing.T) {
+		got, truncated := truncateSummary("Modified (1):\n± app (+1)", 0)
+		if !truncated {
+			t.Fatalf("expected summary to be truncated")
+		}
+		if got != "" {
+			t.Fatalf("expected empty summary when budget is exhausted, got %q", got)
+		}
+	})
+}
+
+func TestMarkdownOutput_PrintDiff_TruncatesLargeSummary(t *testing.T) {
+	summary := "Modified (11160):\n" + strings.Repeat("± spark-a--clark (+1)\n", 400)
+
+	output := MarkdownOutput{
+		title:   "Large Summary Diff",
+		summary: summary,
+		sections: []MarkdownSection{
+			{
+				appName:  "spark-a--clark",
+				filePath: "apps/spark-a--clark.yaml",
+				resources: []ResourceSection{
+					{Header: "@@ Application modified: spark-a--clark @@", Content: "+ small change"},
+				},
+			},
+		},
+		statsInfo: StatsInfo{
+			ApplicationCount: 1,
+			FullDuration:     time.Second,
+		},
+	}
+
+	const maxDiffMessageCharCount = 700
+	got := output.printDiff(maxDiffMessageCharCount)
+
+	if len(got) > maxDiffMessageCharCount {
+		t.Fatalf("expected markdown output to fit max diff length, got %d > %d", len(got), maxDiffMessageCharCount)
+	}
+	if !strings.Contains(got, "Summary truncated to fit") {
+		t.Fatalf("expected output to contain summary truncation notice, got:\n%s", got)
+	}
+	if !strings.Contains(got, "--max-diff-length") {
+		t.Fatalf("expected output to mention --max-diff-length, got:\n%s", got)
+	}
 }
