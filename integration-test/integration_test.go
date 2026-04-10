@@ -214,6 +214,16 @@ var testCases = []TestCase{
 		MaxDiffLength:              "900",
 		WatchIfNoWatchPatternFound: "false",
 	},
+	// Tests that a large summary gets truncated when --max-diff-length is very small.
+	// Branch-9 deletes 9 apps, producing a ~200 char summary that won't fit in 400 chars
+	// after template overhead, forcing summary truncation.
+	{
+		Name:          "branch-9/target-3",
+		TargetBranch:  "integration-test/branch-9/target",
+		BaseBranch:    "integration-test/branch-9/base",
+		Suffix:        "-3",
+		MaxDiffLength: "400",
+	},
 	{
 		Name:                       "branch-10/target-1",
 		TargetBranch:               "integration-test/branch-10/target",
