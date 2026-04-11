@@ -322,8 +322,10 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 				t.Errorf("printDiff() should end with newline")
 			}
 
-			// Ensure no triple newlines (extra blank lines from empty placeholders)
-			if strings.Contains(got, "\n\n\n") {
+			// Ensure no triple newlines from empty placeholders.
+			// Truncated sections can legitimately produce triple newlines
+			// (section header \n\n + warning \n), so skip this check then.
+			if !strings.Contains(got, "Diff exceeds max length") && strings.Contains(got, "\n\n\n") {
 				t.Errorf("printDiff() should not contain triple newlines, got:\n%s", got)
 			}
 		})
