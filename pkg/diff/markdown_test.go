@@ -210,7 +210,7 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			},
 			maxDiffMessageCharCount: 5000,
 			expectedContains: []string{
-				"<summary>Changed applications (1)</summary>",
+				"<summary>Detailed Summary (1)</summary>",
 				"```yaml\nAdded (1):\n+ app-1 (+2)\n```",
 				"<summary>App 1 (path/to/app1.yaml)</summary>",
 			},

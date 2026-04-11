@@ -333,7 +333,7 @@ func TestHTMLOutput_PrintDiff_CollapsedAppList(t *testing.T) {
 	result := output.printDiff()
 
 	// Should contain the collapsible details block
-	if !strings.Contains(result, "<summary>Changed applications (2)</summary>") {
+	if !strings.Contains(result, "<summary>Detailed Summary (2)</summary>") {
 		t.Errorf("expected collapsible summary header, got:\n%s", result)
 	}
 	// App list should be inside a <pre> block
@@ -365,7 +365,7 @@ func TestHTMLOutput_PrintDiff_NoCollapsedAppList(t *testing.T) {
 	result := output.printDiff()
 
 	// Should NOT contain a collapsible details block for the app list
-	if strings.Contains(result, "Changed applications") {
+	if strings.Contains(result, "Detailed Summary") {
 		t.Errorf("should not contain collapsible details when compactSummary is empty, got:\n%s", result)
 	}
 }

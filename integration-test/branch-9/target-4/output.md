@@ -7,7 +7,7 @@ Deleted: 9
 ```
 
 <details>
-<summary>Changed applications (9)</summary>
+<summary>Detailed Summary (9)</summary>
 
 ```yaml
 Deleted (9):
@@ -23,6 +23,7 @@ Deleted (9):
 ```
 
 </details>
+
 <details>
 <summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>

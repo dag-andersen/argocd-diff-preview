@@ -45,7 +45,7 @@ func markdownSectionFooter() string {
 // markdownDetailedSummarySection wraps the full summary in a collapsible <details> block.
 func markdownDetailedSummarySection(fullSummary string, appCount int) string {
 	return fmt.Sprintf(
-		"\n<details>\n<summary>Changed applications (%d)</summary>\n\n```yaml\n%s```\n\n</details>",
+		"\n<details>\n<summary>Detailed Summary (%d)</summary>\n\n```yaml\n%s```\n\n</details>\n",
 		appCount,
 		fullSummary,
 	)
