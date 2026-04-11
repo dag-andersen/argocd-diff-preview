@@ -225,8 +225,8 @@ var testCases = []TestCase{
 		Suffix:        "-3",
 		MaxDiffLength: "400",
 	},
-	// Tests the collapsible summary feature with --summary-threshold=2.
-	// Branch-9 deletes 9 apps, so with threshold=2 the summary should collapse
+	// Tests the collapsible summary feature with --summary-threshold=5.
+	// Branch-9 deletes 9 apps, so with threshold=5 the summary should collapse
 	// the app list behind a <details> block.
 	{
 		Name:             "branch-9/target-4",
@@ -234,6 +234,17 @@ var testCases = []TestCase{
 		BaseBranch:       "integration-test/branch-9/base",
 		Suffix:           "-4",
 		MaxDiffLength:    "10000",
+		SummaryThreshold: "5",
+	},
+	// Tests the collapsible summary combined with a tight max-diff-length.
+	// With threshold=5 the summary collapses, and max-diff-length=400 forces
+	// truncation of both the summary and diff sections.
+	{
+		Name:             "branch-9/target-5",
+		TargetBranch:     "integration-test/branch-9/target",
+		BaseBranch:       "integration-test/branch-9/base",
+		Suffix:           "-5",
+		MaxDiffLength:    "400",
 		SummaryThreshold: "5",
 	},
 	{
