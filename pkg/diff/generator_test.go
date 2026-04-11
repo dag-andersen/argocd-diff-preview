@@ -10,22 +10,22 @@ import (
 // Tests for buildMatchingSummary
 
 func TestBuildMatchingSummary_NoDiffs(t *testing.T) {
-	summary, details := buildSummary(nil, 20)
-	if summary != "No changes found" {
-		t.Errorf("expected 'No changes found', got %q", summary)
+	fullSummary, compactSummary := buildSummary(nil, 20)
+	if fullSummary != "No changes found" {
+		t.Errorf("expected 'No changes found', got %q", fullSummary)
 	}
-	if details != "" {
-		t.Errorf("expected no details, got %q", details)
+	if compactSummary != "" {
+		t.Errorf("expected no compact summary, got %q", compactSummary)
 	}
 }
 
 func TestBuildMatchingSummary_EmptySlice(t *testing.T) {
-	summary, details := buildSummary([]matching.AppDiff{}, 20)
-	if summary != "No changes found" {
-		t.Errorf("expected 'No changes found', got %q", summary)
+	fullSummary, compactSummary := buildSummary([]matching.AppDiff{}, 20)
+	if fullSummary != "No changes found" {
+		t.Errorf("expected 'No changes found', got %q", fullSummary)
 	}
-	if details != "" {
-		t.Errorf("expected no details, got %q", details)
+	if compactSummary != "" {
+		t.Errorf("expected no compact summary, got %q", compactSummary)
 	}
 }
 
@@ -35,29 +35,26 @@ func TestBuildMatchingSummary_OnlyAdded(t *testing.T) {
 		{NewName: "app-2", Action: matching.ActionAdded, AddedLines: 5},
 	}
 
-	summary, details := buildSummary(diffs, 20)
+	fullSummary, compactSummary := buildSummary(diffs, 20)
 
-	if !strings.Contains(summary, "Total: 2 applications changed") {
-		t.Errorf("expected total count, got:\n%s", summary)
+	if !strings.Contains(fullSummary, "Added (2):") {
+		t.Errorf("expected 'Added (2):', got:\n%s", fullSummary)
 	}
-	if !strings.Contains(summary, "Added (2):") {
-		t.Errorf("expected 'Added (2):', got:\n%s", summary)
+	if !strings.Contains(fullSummary, "+ app-1 (+10)") {
+		t.Errorf("expected '+ app-1 (+10)', got:\n%s", fullSummary)
 	}
-	if !strings.Contains(summary, "+ app-1 (+10)") {
-		t.Errorf("expected '+ app-1 (+10)', got:\n%s", summary)
+	if !strings.Contains(fullSummary, "+ app-2 (+5)") {
+		t.Errorf("expected '+ app-2 (+5)', got:\n%s", fullSummary)
 	}
-	if !strings.Contains(summary, "+ app-2 (+5)") {
-		t.Errorf("expected '+ app-2 (+5)', got:\n%s", summary)
-	}
-	if details != "" {
-		t.Errorf("expected no details, got:\n%s", details)
+	if compactSummary != "" {
+		t.Errorf("expected no compact summary, got:\n%s", compactSummary)
 	}
 	// Should NOT contain Deleted or Modified sections
-	if strings.Contains(summary, "Deleted") {
-		t.Errorf("should not contain 'Deleted', got:\n%s", summary)
+	if strings.Contains(fullSummary, "Deleted") {
+		t.Errorf("should not contain 'Deleted', got:\n%s", fullSummary)
 	}
-	if strings.Contains(summary, "Modified") {
-		t.Errorf("should not contain 'Modified', got:\n%s", summary)
+	if strings.Contains(fullSummary, "Modified") {
+		t.Errorf("should not contain 'Modified', got:\n%s", fullSummary)
 	}
 }
 
@@ -66,16 +63,16 @@ func TestBuildMatchingSummary_OnlyDeleted(t *testing.T) {
 		{OldName: "app-1", Action: matching.ActionDeleted, DeletedLines: 15},
 	}
 
-	summary, details := buildSummary(diffs, 20)
+	fullSummary, compactSummary := buildSummary(diffs, 20)
 
-	if !strings.Contains(summary, "Deleted (1):") {
-		t.Errorf("expected 'Deleted (1):', got:\n%s", summary)
+	if !strings.Contains(fullSummary, "Deleted (1):") {
+		t.Errorf("expected 'Deleted (1):', got:\n%s", fullSummary)
 	}
-	if !strings.Contains(summary, "- app-1 (-15)") {
-		t.Errorf("expected '- app-1 (-15)', got:\n%s", summary)
+	if !strings.Contains(fullSummary, "- app-1 (-15)") {
+		t.Errorf("expected '- app-1 (-15)', got:\n%s", fullSummary)
 	}
-	if details != "" {
-		t.Errorf("expected no details, got:\n%s", details)
+	if compactSummary != "" {
+		t.Errorf("expected no compact summary, got:\n%s", compactSummary)
 	}
 }
 
@@ -84,16 +81,16 @@ func TestBuildMatchingSummary_OnlyModified(t *testing.T) {
 		{OldName: "app-1", NewName: "app-1", Action: matching.ActionModified, AddedLines: 3, DeletedLines: 2},
 	}
 
-	summary, details := buildSummary(diffs, 20)
+	fullSummary, compactSummary := buildSummary(diffs, 20)
 
-	if !strings.Contains(summary, "Modified (1):") {
-		t.Errorf("expected 'Modified (1):', got:\n%s", summary)
+	if !strings.Contains(fullSummary, "Modified (1):") {
+		t.Errorf("expected 'Modified (1):', got:\n%s", fullSummary)
 	}
-	if !strings.Contains(summary, "± app-1 (+3|-2)") {
-		t.Errorf("expected '± app-1 (+3|-2)', got:\n%s", summary)
+	if !strings.Contains(fullSummary, "± app-1 (+3|-2)") {
+		t.Errorf("expected '± app-1 (+3|-2)', got:\n%s", fullSummary)
 	}
-	if details != "" {
-		t.Errorf("expected no details, got:\n%s", details)
+	if compactSummary != "" {
+		t.Errorf("expected no compact summary, got:\n%s", compactSummary)
 	}
 }
 
@@ -106,9 +103,6 @@ func TestBuildMatchingSummary_MixedActions(t *testing.T) {
 
 	summary, details := buildSummary(diffs, 20)
 
-	if !strings.Contains(summary, "Total: 3 applications changed") {
-		t.Errorf("expected total count, got:\n%s", summary)
-	}
 	if !strings.Contains(summary, "Added (1):") {
 		t.Errorf("expected 'Added (1):', got:\n%s", summary)
 	}
@@ -163,30 +157,31 @@ func TestBuildMatchingSummary_CollapsesLargeSummary(t *testing.T) {
 		{OldName: "mod-app", NewName: "mod-app", Action: matching.ActionModified, AddedLines: 5, DeletedLines: 3},
 	}
 
-	summary, details := buildSummary(diffs, 2)
+	fullSummary, compactSummary := buildSummary(diffs, 2)
 
-	expectedSummary := []string{
+	// compactSummary should contain only counts
+	expectedCompact := []string{
 		"Total: 3 applications changed",
 		"Added: 1",
 		"Deleted: 1",
 		"Modified: 1",
 	}
-	for _, expected := range expectedSummary {
-		if !strings.Contains(summary, expected) {
-			t.Errorf("expected compact summary to contain %q, got:\n%s", expected, summary)
+	for _, expected := range expectedCompact {
+		if !strings.Contains(compactSummary, expected) {
+			t.Errorf("expected compact summary to contain %q, got:\n%s", expected, compactSummary)
 		}
 	}
 
-	unexpectedInline := []string{"+ new-app (+12)", "- deleted-app (-20)", "± mod-app (+5|-3)"}
-	for _, unexpected := range unexpectedInline {
-		if strings.Contains(summary, unexpected) {
-			t.Errorf("expected compact summary to omit %q, got:\n%s", unexpected, summary)
+	// compactSummary should not contain per-app details
+	unexpectedCompact := []string{"+ new-app (+12)", "- deleted-app (-20)", "± mod-app (+5|-3)"}
+	for _, unexpected := range unexpectedCompact {
+		if strings.Contains(compactSummary, unexpected) {
+			t.Errorf("expected compact summary to omit %q, got:\n%s", unexpected, compactSummary)
 		}
 	}
 
-	expectedDetails := []string{
-		"<details>",
-		"<summary>Changed applications (3)</summary>",
+	// fullSummary should contain the full per-app details (format-agnostic)
+	expectedFullSummary := []string{
 		"Added (1):",
 		"+ new-app (+12)",
 		"Deleted (1):",
@@ -194,9 +189,17 @@ func TestBuildMatchingSummary_CollapsesLargeSummary(t *testing.T) {
 		"Modified (1):",
 		"± mod-app (+5|-3)",
 	}
-	for _, expected := range expectedDetails {
-		if !strings.Contains(details, expected) {
-			t.Errorf("expected details to contain %q, got:\n%s", expected, details)
+	for _, expected := range expectedFullSummary {
+		if !strings.Contains(fullSummary, expected) {
+			t.Errorf("expected full summary to contain %q, got:\n%s", expected, fullSummary)
+		}
+	}
+
+	// Should not contain any markdown/HTML formatting
+	unexpectedFullSummary := []string{"<details>", "<summary>", "```"}
+	for _, unexpected := range unexpectedFullSummary {
+		if strings.Contains(fullSummary, unexpected) {
+			t.Errorf("expected full summary to be format-agnostic, but found %q in:\n%s", unexpected, fullSummary)
 		}
 	}
 }
@@ -207,13 +210,13 @@ func TestBuildMatchingSummary_ThresholdZeroAlwaysShowsInline(t *testing.T) {
 		{NewName: "app-2", Action: matching.ActionAdded, AddedLines: 5},
 	}
 
-	summary, details := buildSummary(diffs, 0)
+	fullSummary, compactSummary := buildSummary(diffs, 0)
 
-	if !strings.Contains(summary, "+ app-1 (+10)") || !strings.Contains(summary, "+ app-2 (+5)") {
-		t.Errorf("expected full summary inline, got:\n%s", summary)
+	if !strings.Contains(fullSummary, "+ app-1 (+10)") || !strings.Contains(fullSummary, "+ app-2 (+5)") {
+		t.Errorf("expected full summary, got:\n%s", fullSummary)
 	}
-	if details != "" {
-		t.Errorf("expected no details when threshold is zero, got:\n%s", details)
+	if compactSummary != "" {
+		t.Errorf("expected no compact summary when threshold is zero, got:\n%s", compactSummary)
 	}
 }
 

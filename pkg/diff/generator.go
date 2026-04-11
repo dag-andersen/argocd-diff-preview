@@ -1,3 +1,6 @@
+// generator.go orchestrates diff generation and delegates to format-specific
+// output files (markdown.go, html.go). Helper functions in this file should
+// remain format-agnostic - avoid embedding HTML tags or Markdown syntax here.
 package diff
 
 import (
@@ -65,7 +68,7 @@ func GeneratePreview(
 	}
 
 	// Build summary
-	inlineSummary, summaryDetails := buildSummary(appDiffs, int(summaryThreshold))
+	fullSummary, compactSummary := buildSummary(appDiffs, int(summaryThreshold))
 
 	// Convert to markdown/HTML sections
 	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
@@ -74,8 +77,8 @@ func GeneratePreview(
 	log.Debug().Msg("Creating markdown output")
 	markdownOutput := MarkdownOutput{
 		title:          title,
-		summary:        inlineSummary,
-		summaryDetails: summaryDetails,
+		fullSummary:    fullSummary,
+		compactSummary: compactSummary,
 		sections:       markdownSections,
 		statsInfo:      statsInfo,
 		selectionInfo:  selectionInfo,
@@ -91,11 +94,12 @@ func GeneratePreview(
 	// HTML
 	log.Debug().Msg("Creating html output")
 	htmlOutput := HTMLOutput{
-		title:         title,
-		summary:       inlineSummary,
-		sections:      htmlSections,
-		statsInfo:     statsInfo,
-		selectionInfo: selectionInfo,
+		title:          title,
+		fullSummary:    fullSummary,
+		compactSummary: compactSummary,
+		sections:       htmlSections,
+		statsInfo:      statsInfo,
+		selectionInfo:  selectionInfo,
 	}
 	htmlDiff := htmlOutput.printDiff()
 	htmlPath := fmt.Sprintf("%s/diff.html", outputFolder)
@@ -110,10 +114,11 @@ func GeneratePreview(
 	return time.Since(startTime), nil
 }
 
-// buildSummary returns (inlineContent, detailsBlock).
-// inlineContent goes in the summary yaml block; when total > threshold it only contains counts.
-// detailsBlock is a collapsible markdown details section with the full application list.
-// Pass threshold=0 to always return the full list inline.
+// buildSummary returns (fullSummary, compactSummary).
+// fullSummary is always the full application list with per-app details (plain text).
+// compactSummary is a short counts-only summary returned when total > threshold;
+// it is empty when the threshold is not exceeded.
+// Pass threshold=0 to never produce a compact summary.
 func buildSummary(diffs []matching.AppDiff, threshold int) (string, string) {
 	if len(diffs) == 0 {
 		return "No changes found", ""
@@ -171,13 +176,11 @@ func buildSummary(diffs []matching.AppDiff, threshold int) (string, string) {
 		}
 	}
 
-	header := fmt.Sprintf("Total: %d applications changed\n", total)
-
 	if threshold > 0 && total > threshold {
 		var compact strings.Builder
-		fmt.Fprint(&compact, header)
+		fmt.Fprintf(&compact, "Total: %d applications changed\n", total)
 		if addedCount > 0 {
-			fmt.Fprintf(&compact, "\nAdded: %d\n", addedCount)
+			fmt.Fprintf(&compact, "Added: %d\n", addedCount)
 		}
 		if deletedCount > 0 {
 			fmt.Fprintf(&compact, "Deleted: %d\n", deletedCount)
@@ -186,16 +189,10 @@ func buildSummary(diffs []matching.AppDiff, threshold int) (string, string) {
 			fmt.Fprintf(&compact, "Modified: %d\n", modifiedCount)
 		}
 
-		details := fmt.Sprintf(
-			"<details>\n<summary>Changed applications (%d)</summary>\n\n```yaml\n%s```\n\n</details>\n",
-			total,
-			listBuilder.String(),
-		)
-
-		return compact.String(), details
+		return listBuilder.String(), compact.String()
 	}
 
-	return header + listBuilder.String(), ""
+	return listBuilder.String(), ""
 }
 
 // buildMatchingSections converts AppDiffs to markdown and HTML sections

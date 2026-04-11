@@ -42,6 +42,15 @@ func markdownSectionFooter() string {
 	return "</details>\n\n"
 }
 
+// markdownDetailedSummarySection wraps the full summary in a collapsible <details> block.
+func markdownDetailedSummarySection(fullSummary string, appCount int) string {
+	return fmt.Sprintf(
+		"\n<details>\n<summary>Changed applications (%d)</summary>\n\n```yaml\n%s```\n\n</details>",
+		appCount,
+		fullSummary,
+	)
+}
+
 var (
 	minSizeForSectionContent = 100
 	diffTooLongWarning       = "\n🚨 Diff is too long"
@@ -136,8 +145,8 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 
 type MarkdownOutput struct {
 	title          string
-	summary        string
-	summaryDetails string
+	fullSummary    string // full application list with per-app details
+	compactSummary string // short counts-only summary; empty if not collapsed
 	sections       []MarkdownSection
 	statsInfo      StatsInfo
 	selectionInfo  SelectionInfo
@@ -148,9 +157,9 @@ const markdownTemplate = `
 
 Summary:
 ` + "```yaml" + `
-%summary%
+%inline_summary%
 ` + "```" + `
-
+%detailed_summary_section%
 %app_diffs%
 %selection_changes%
 %info_box%
@@ -190,27 +199,39 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
 	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
 
-	// temp value to check if summary was truncated, to decide whether to log a warning about it
-	var summary string
+	// When compactSummary is set, use it as the inline summary and render the
+	// full summary in a collapsible <details> block via %detailed_summary_section%.
+
+	var inline_summary string
+	var detailedSummarySection string
+	detailedSummarySectionSize := 0
+
+	if m.compactSummary != "" {
+		inline_summary = m.compactSummary
+		detailedSummarySection = markdownDetailedSummarySection(m.fullSummary, len(m.sections))
+		detailedSummarySectionSize = len(detailedSummarySection) - len("%detailed_summary_section%")
+	} else {
+		inline_summary = m.fullSummary
+	}
 
 	// Truncate summary upfront if it would consume the entire budget
 	if 0 < maxDiffMessageCharCount {
-		diffLengthWithoutSummary := len(strings.ReplaceAll(output, "%summary%", ""))
-		summaryBudget := int(maxDiffMessageCharCount) - diffLengthWithoutSummary - len(warningMessage) - infoBoxBufferSize
-		truncatedSummary, truncated := truncateSummary(m.summary, summaryBudget)
+		diffLengthWithoutSummary := len(strings.ReplaceAll(output, "%inline_summary%", ""))
+		summaryBudget := int(maxDiffMessageCharCount) - diffLengthWithoutSummary - len(warningMessage) - infoBoxBufferSize - detailedSummarySectionSize
+		truncatedSummary, truncated := truncateSummary(inline_summary, summaryBudget)
 		if truncated {
 			log.Warn().Msgf("🚨 Markdown summary is too long, truncating to fit --max-diff-length (%d)", maxDiffMessageCharCount)
-			summary = truncatedSummary
+			inline_summary = truncatedSummary
 		} else {
-			summary = strings.TrimSpace(m.summary)
+			inline_summary = strings.TrimSpace(inline_summary)
 		}
 	} else {
-		summary = strings.TrimSpace(m.summary)
+		inline_summary = strings.TrimSpace(inline_summary)
 	}
 
-	output = strings.ReplaceAll(output, "%summary%", summary)
+	output = strings.ReplaceAll(output, "%inline_summary%", inline_summary)
 
-	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize
+	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize - detailedSummarySectionSize
 
 	log.Debug().Msgf("availableSpaceForDetailedDiff: %d", availableSpaceForDetailedDiff)
 
@@ -244,13 +265,9 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 		}
 	}
 
-	appDiffs := strings.TrimSpace(sectionsDiff.String())
-	if m.summaryDetails != "" {
-		appDiffs = strings.TrimSpace(m.summaryDetails) + "\n\n" + appDiffs
-	}
-
+	output = strings.ReplaceAll(output, "%detailed_summary_section%", detailedSummarySection)
 	output = strings.ReplaceAll(output, "%info_box%", m.statsInfo.String())
-	output = strings.ReplaceAll(output, "%app_diffs%", appDiffs)
+	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
 
 	output = strings.TrimSpace(output) + "\n"
 
