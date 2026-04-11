@@ -47,6 +47,13 @@ var (
 	diffTooLongWarning       = "\n🚨 Diff is too long"
 )
 
+// the InfoBox has a dynamic size. This is a problem for the integration tests, because the output is not deterministic.
+// By adding a buffer, we ensure availableSpaceForDetailedDiff has a fixed size
+const (
+	infoBoxBufferSize    = 80
+	summaryTooLongNotice = "\n... Summary truncated to fit `--max-diff-length`"
+)
+
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
 	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
@@ -149,22 +156,59 @@ Summary:
 %info_box%
 `
 
+func truncateSummary(summary string, maxSize int) (string, bool) {
+	summary = strings.TrimSpace(summary)
+	if len(summary) <= maxSize {
+		return summary, false
+	}
+	if maxSize <= 0 {
+		return "", true
+	}
+
+	if maxSize <= len(summaryTooLongNotice) {
+		return summaryTooLongNotice[:maxSize], true
+	}
+
+	trimmedSummary := strings.TrimRight(summary[:maxSize-len(summaryTooLongNotice)], " \t\n\r")
+	if trimmedSummary == "" {
+		return summaryTooLongNotice[:maxSize], true
+	}
+
+	return trimmedSummary + summaryTooLongNotice, true
+}
+
 func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 
-	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
-	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(m.summary))
 	selection_changes := ""
 	if s := m.selectionInfo.String(); s != "" {
 		selection_changes = fmt.Sprintf("\n%s\n", s)
 	}
-	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
-
-	// the InfoBox has a dynamic size. This is a problem for the integration tests, because the output is not deterministic.
-	// By adding a buffer, we ensure availableSpaceForDetailedDiff has a fixed size
-	infoBoxBufferSize := 80
 
 	warningMessage := fmt.Sprintf("⚠️⚠️⚠️ Diff exceeds max length of %d characters. Truncating to fit. This can be adjusted with the `--max-diff-length` flag",
 		maxDiffMessageCharCount)
+
+	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
+	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
+
+	// temp value to check if summary was truncated, to decide whether to log a warning about it
+	var summary string
+
+	// Truncate summary upfront if it would consume the entire budget
+	if 0 < maxDiffMessageCharCount {
+		diffLengthWithoutSummary := len(strings.ReplaceAll(output, "%summary%", ""))
+		summaryBudget := int(maxDiffMessageCharCount) - diffLengthWithoutSummary - len(warningMessage) - infoBoxBufferSize
+		truncatedSummary, truncated := truncateSummary(m.summary, summaryBudget)
+		if truncated {
+			log.Warn().Msgf("🚨 Markdown summary is too long, truncating to fit --max-diff-length (%d)", maxDiffMessageCharCount)
+			summary = truncatedSummary
+		} else {
+			summary = strings.TrimSpace(m.summary)
+		}
+	} else {
+		summary = strings.TrimSpace(m.summary)
+	}
+
+	output = strings.ReplaceAll(output, "%summary%", summary)
 
 	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize
 
@@ -173,7 +217,7 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 	var sectionsDiff strings.Builder
 
 	spaceRemaining := availableSpaceForDetailedDiff
-	AddWarning := false
+	addWarning := false
 
 	for _, section := range m.sections {
 		if spaceRemaining <= 0 {
@@ -182,12 +226,12 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 		sectionContent, truncated := section.build(spaceRemaining)
 		sectionsDiff.WriteString(sectionContent)
 		if truncated {
-			AddWarning = true
+			addWarning = true
 		}
 		spaceRemaining -= len(sectionContent)
 	}
 
-	if AddWarning {
+	if addWarning {
 		sectionsDiff.WriteString(warningMessage)
 	}
 
@@ -210,7 +254,7 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 
 	output = strings.TrimSpace(output) + "\n"
 
-	if AddWarning {
+	if addWarning {
 		// log warning
 		log.Warn().Msgf("🚨 Markdown diff is too long, which exceeds --max-diff-length (%d). Truncating to %d characters. This can be adjusted with the `--max-diff-length` flag", maxDiffMessageCharCount, len(output))
 		log.Warn().Msgf("🚨 HTML diff is not affected by this truncation")
