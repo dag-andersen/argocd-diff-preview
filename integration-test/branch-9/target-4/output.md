@@ -435,7 +435,8 @@ Deleted (9):
 -    app.kubernetes.io/managed-by: Helm
 -    app.kubernetes.io/name: myApp
 -    app.kubernetes.io/version: 1.16.0
--    helm.sh/
+-    helm.sh/chart: myApp-0.1.0
+-  name: sup
 ```
 
 🚨 Diff is too long

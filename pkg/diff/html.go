@@ -114,7 +114,7 @@ func emptyReasonHTML(reason matching.EmptyReason) string {
 // htmlDetailedSummarySection wraps the full summary in a collapsible <details> block.
 func htmlDetailedSummarySection(fullSummary string, appCount int) string {
 	return fmt.Sprintf(
-		"\n<details>\n<summary>Changed applications (%d)</summary>\n<pre>%s</pre>\n</details>",
+		"\n<div class=\"diffs\">\n<details>\n<summary>Detailed Summary (%d)</summary>\n<pre>%s</pre>\n</details>\n</div>",
 		appCount,
 		html.EscapeString(strings.TrimSpace(fullSummary)),
 	)
