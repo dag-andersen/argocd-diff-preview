@@ -57,5 +57,5 @@ For other CI/CD platforms (GitLab CI, Jenkins, CircleCI, etc.), consult their do
       -v $(pwd)/output:/output \
       -e TARGET_BRANCH=${{ github.event.pull_request.head.sha }}  # ✅ Use SHA
       -e REPO=${{ github.repository }} \
-      dagandersen/argocd-diff-preview:v0.2.2
+      dagandersen/argocd-diff-preview:v0.2.3
 ```
