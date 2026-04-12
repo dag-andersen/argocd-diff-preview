@@ -247,8 +247,8 @@ func TestBuildManifestRequest_MultiSource_LocalChart_WithRef_RewritesValueFiles(
 	//       values-prod.yaml
 	//
 	// A "ref-only" source has ref != "" and path == "".  A source with both ref
-	// and path set is treated as a content source (not a ref source) by the
-	// split logic in splitSources.
+	// and path set is treated as both a content source AND a ref source by the
+	// split logic in splitSources (see GH #401 fix).
 	branchFolder := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "apps", "my-chart"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "apps", "my-chart", "Chart.yaml"), []byte("name: my-chart\n"), 0o644))
@@ -304,6 +304,116 @@ spec:
 	absValueFile = filepath.Clean(absValueFile)
 	_, statErr := os.Stat(absValueFile)
 	assert.NoError(t, statErr, "rewritten value file path %q should exist on disk", absValueFile)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4b. Multi-source: external chart with a ref+path dual-purpose source (GH #401)
+//
+//	When a source has BOTH ref and path set, the source serves a dual purpose:
+//	it produces content (from path) AND it provides a $ref namespace for other
+//	sources' value files. The current splitSources logic classifies it only as
+//	a content source, causing the chart source's $ref lookup to fail with:
+//	  "source referenced "$values", but no source has a 'ref' field defined"
+//
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_ExternalChart_WithRefAndPath_GH401(t *testing.T) {
+	// Exact reproduction of https://github.com/dag-andersen/argocd-diff-preview/issues/401
+	//
+	// This application has a single source that sets BOTH ref and path:
+	//   sources:
+	//     - ref: values
+	//       repoURL: https://github.com/dominik-th/argocd-diff-preview-bug.git
+	//       targetRevision: HEAD
+	//       path: manifests          ← ref AND path on the same source
+	//     - chart: cert-manager
+	//       repoURL: https://charts.jetstack.io
+	//       targetRevision: v1.20.1
+	//       helm:
+	//         valueFiles:
+	//           - $values/values.yaml
+	//
+	// splitSources currently treats this first source as content-only (because
+	// path != ""), so refSources is empty, and the chart source's request has
+	// no RefSources - causing the repo server to error.
+
+	branchFolder := t.TempDir()
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo
+  namespace: argocd
+spec:
+  destination:
+    namespace: demo
+    server: https://kubernetes.default.svc
+  project: default
+  sources:
+    - ref: values
+      repoURL: https://github.com/dominik-th/argocd-diff-preview-bug.git
+      targetRevision: HEAD
+      path: manifests
+    - chart: cert-manager
+      helm:
+        valueFiles:
+          - $values/values.yaml
+      repoURL: https://charts.jetstack.io
+      targetRevision: v1.20.1
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+
+	// The first source has both ref and path. It should be a content source
+	// (it has a path that produces manifests), but its ref information must
+	// also be available for sibling sources.
+	require.True(t, hasMultipleSources)
+
+	// BUG ASSERTION: The dual-purpose source (ref+path) must appear in
+	// refSources so that the chart source's $values/... value file can be
+	// resolved. Currently splitSources puts it only in contentSources.
+	require.Len(t, contentSources, 2, "both sources are content sources (the dual-purpose one has a path)")
+
+	// This is the key assertion that currently FAILS - the dual-purpose source
+	// must also be present in refSources.
+	require.NotEmpty(t, refSources,
+		"BUG GH#401: a source with both ref and path must also appear in refSources")
+
+	// Now verify the chart source gets a proper RefSources map.
+	// Find the chart content source.
+	var chartSource v1alpha1.ApplicationSource
+	for _, cs := range contentSources {
+		if cs.Chart != "" {
+			chartSource = cs
+			break
+		}
+	}
+	require.NotEmpty(t, chartSource.Chart, "should find the chart content source")
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, "")
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// External chart - must use remote RPC (no streaming).
+	assert.Empty(t, streamDir,
+		"external Helm chart with ref sources must use the remote RPC (streamDir must be empty)")
+
+	// RefSources must be populated so the repo server can resolve $values/…
+	require.NotNil(t, req.RefSources,
+		"RefSources must be populated for $ref value files")
+	refTarget, ok := req.RefSources["$values"]
+	require.True(t, ok, "RefSources must contain an entry for '$values'")
+	assert.Equal(t, "https://github.com/dominik-th/argocd-diff-preview-bug.git", refTarget.Repo.Repo)
+	assert.Equal(t, "HEAD", refTarget.TargetRevision)
+
+	// Value file paths must stay as $values/… for the remote RPC.
+	require.NotNil(t, req.ApplicationSource.Helm)
+	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
+	assert.Equal(t, "$values/values.yaml", req.ApplicationSource.Helm.ValueFiles[0],
+		"value file path must remain as a $ref path for the remote RPC")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
