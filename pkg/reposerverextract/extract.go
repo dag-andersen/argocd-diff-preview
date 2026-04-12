@@ -459,9 +459,10 @@ func splitSources(app argoapplication.ArgoResource) (
 	}
 
 	for _, s := range appSources {
-		if s.Ref != "" && s.Path == "" {
+		if s.Ref != "" {
 			refSources = append(refSources, s)
-		} else {
+		}
+		if s.Path != "" || s.Chart != "" || s.Ref == "" {
 			contentSources = append(contentSources, s)
 		}
 	}
