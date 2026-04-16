@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
@@ -32,14 +33,35 @@ func (c *Client) PortForwardToPod(namespace, podName string, localPort, remotePo
 		Name(podName).
 		SubResource("portforward")
 
-	// Create SPDY transport for the connection
+	// Create both WebSocket and SPDY dialers for compatibility
+	// GKE Connect Gateway requires WebSocket with SPDY protocol (Sec-WebSocket-Protocol: SPDY/3.1)
+	// Traditional clusters accept direct SPDY upgrade without WebSocket wrapping
+
+	// Create SPDY dialer (fallback for clusters)
 	transport, upgrader, err := spdy.RoundTripperFor(c.config)
 	if err != nil {
 		return fmt.Errorf("failed to create SPDY round tripper: %w", err)
 	}
+	spdyDialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
-	// Create dialer
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+	// Create WebSocket tunneling dialer (required for GKE Connect Gateway)
+	websocketDialer, err := portforward.NewSPDYOverWebsocketDialer(req.URL(), c.config)
+	if err != nil {
+		return fmt.Errorf("failed to create WebSocket dialer: %w", err)
+	}
+
+	// Use fallback pattern: try WebSocket first, fallback to SPDY on upgrade failures
+	dialer := portforward.NewFallbackDialer(
+		websocketDialer,
+		spdyDialer,
+		func(err error) bool {
+			shouldFallback := httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
+			if shouldFallback {
+				log.Debug().Err(err).Msg("WebSocket upgrade failed, falling back to SPDY")
+			}
+			return shouldFallback
+		},
+	)
 
 	// Set up port forwarding
 	ports := []string{fmt.Sprintf("%d:%d", localPort, remotePort)}
