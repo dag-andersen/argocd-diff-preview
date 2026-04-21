@@ -14,9 +14,22 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// RenderMode controls whether an application should be rendered
+type RenderMode string
+
+const (
+	// RenderAlways means the application is always rendered, even if identical between branches
+	RenderAlways RenderMode = "always"
+	// RenderNever means the application is never rendered (same as ignore: true)
+	RenderNever RenderMode = "never"
+	// RenderChanged means the application is only rendered if it changed between branches (default)
+	RenderChanged RenderMode = "changed"
+)
+
 const (
 	annotationWatchPattern = "argocd-diff-preview/watch-pattern"
 	annotationIgnore       = "argocd-diff-preview/ignore"
+	annotationRender       = "argocd-diff-preview/render"
 )
 
 type ApplicationSelectionOptions struct {
@@ -137,13 +150,56 @@ func (a *ArgoResource) filterByIgnoreAnnotation() (bool, string) {
 	// get annotations
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
 	if err != nil || !found || len(annotations) == 0 {
-		return true, "no 'argocd-diff-preview/ignore' annotation found"
+		return true, "no 'argocd-diff-preview/ignore' or 'argocd-diff-preview/render' annotation found"
 	}
 
+	// Check the new render annotation first (takes precedence)
+	if value, exists := annotations[annotationRender]; exists {
+		switch RenderMode(strings.ToLower(strings.TrimSpace(value))) {
+		case RenderNever:
+			return false, fmt.Sprintf("application is ignored because of '%s: %s'", annotationRender, value)
+		case RenderAlways, RenderChanged:
+			return true, fmt.Sprintf("application is selected because of '%s: %s'", annotationRender, value)
+		default:
+			log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("⚠️ Unknown value '%s' for annotation '%s'. Expected 'always', 'never', or 'changed'. Defaulting to 'changed'.", value, annotationRender)
+			return true, fmt.Sprintf("unknown render annotation value '%s', defaulting to 'changed'", value)
+		}
+	}
+
+	// Fall back to legacy ignore annotation
 	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
 		return false, fmt.Sprintf("application is ignored because of '%s: %s'", annotationIgnore, value)
 	}
 	return true, "application is not ignored"
+}
+
+// GetRenderMode returns the render mode for the application based on annotations
+func (a *ArgoResource) GetRenderMode() RenderMode {
+	if a.Yaml == nil {
+		return RenderChanged
+	}
+
+	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
+	if err != nil || !found || len(annotations) == 0 {
+		return RenderChanged
+	}
+
+	if value, exists := annotations[annotationRender]; exists {
+		mode := RenderMode(strings.ToLower(strings.TrimSpace(value)))
+		switch mode {
+		case RenderAlways, RenderNever, RenderChanged:
+			return mode
+		default:
+			return RenderChanged
+		}
+	}
+
+	// Legacy: treat ignore=true as never
+	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
+		return RenderNever
+	}
+
+	return RenderChanged
 }
 
 // filterBySelectors checks if the application matches the given selectors
