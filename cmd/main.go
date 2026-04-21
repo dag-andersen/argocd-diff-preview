@@ -250,6 +250,7 @@ func run(cfg *Config) error {
 		tempFolder,
 		redirectRevisions,
 		cfg.Debug,
+		cfg.FailOnDuplicateGeneratedApplications,
 		appSelectionOptions,
 	)
 	if err != nil {

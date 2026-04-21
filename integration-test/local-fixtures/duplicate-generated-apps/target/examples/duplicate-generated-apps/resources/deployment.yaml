@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-from-duplicate-generated-apps
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: duplicate-generated-apps
+  template:
+    metadata:
+      labels:
+        app: duplicate-generated-apps
+    spec:
+      containers:
+        - name: duplicate-generated-apps
+          image: dag-andersen/myapp:latest
+          ports:
+            - containerPort: 80

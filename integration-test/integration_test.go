@@ -39,32 +39,33 @@ const (
 
 // TestCase defines a single integration test case
 type TestCase struct {
-	Name                       string
-	TargetBranch               string
-	BaseBranch                 string
-	Suffix                     string // Used for multiple test variations on same branch
-	LineCount                  string
-	DiffIgnore                 string
-	FilesChanged               string
-	Selector                   string
-	FileRegex                  string
-	Title                      string
-	KindOptions                string
-	CreateCluster              string
-	MaxDiffLength              string
-	WatchIfNoWatchPatternFound string
-	AutoDetectFilesChanged     string
-	IgnoreInvalidWatchPattern  string
-	HideDeletedAppDiff         string
-	IgnoreResources            string
-	ArgocdLoginOptions         string
-	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
-	RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global flag
-	DisableClusterRoles        string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
-	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
-	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
-	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
-	ExpectFailure              bool   // If true, the test is expected to fail
+	Name                                 string
+	TargetBranch                         string
+	BaseBranch                           string
+	Suffix                               string // Used for multiple test variations on same branch
+	LineCount                            string
+	DiffIgnore                           string
+	FilesChanged                         string
+	Selector                             string
+	FileRegex                            string
+	Title                                string
+	KindOptions                          string
+	CreateCluster                        string
+	MaxDiffLength                        string
+	WatchIfNoWatchPatternFound           string
+	AutoDetectFilesChanged               string
+	IgnoreInvalidWatchPattern            string
+	HideDeletedAppDiff                   string
+	IgnoreResources                      string
+	ArgocdLoginOptions                   string
+	ArgocdAuthToken                      string // Auth token for Argo CD (if set, will be used instead of login)
+	RenderMethod                         string // "cli", "server-api", "repo-server-api", or "" to use global flag
+	DisableClusterRoles                  string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
+	ArgocdConfigDir                      string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
+	ArgocdUIURL                          string // Argo CD URL for generating application links in diff output
+	TraverseAppOfApps                    string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
+	FailOnDuplicateGeneratedApplications string // If "true", fail when a single ApplicationSet generates duplicate application names
+	ExpectFailure                        bool   // If true, the test is expected to fail
 }
 
 // testCases defines all integration test cases matching the Makefile
@@ -335,6 +336,13 @@ var testCases = []TestCase{
 		FilesChanged:               "examples/external-chart/nginx.yaml",
 		ExpectFailure:              true,
 		WatchIfNoWatchPatternFound: "false",
+	},
+	{
+		Name:                                 "local-fixture/duplicate-generated-apps-strict",
+		TargetBranch:                         "dir:./local-fixtures/duplicate-generated-apps/target",
+		BaseBranch:                           "dir:./local-fixtures/duplicate-generated-apps/base",
+		FailOnDuplicateGeneratedApplications: "true",
+		ExpectFailure:                        true,
 	},
 }
 
@@ -621,6 +629,13 @@ func cloneBranch(branch, targetDir string) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
+	if sourceDir, ok := strings.CutPrefix(branch, "dir:"); ok {
+		if err := copyFixtureDir(sourceDir, targetDir); err != nil {
+			return err
+		}
+		return writeBranchGitignore(targetDir)
+	}
+
 	repoURL := fmt.Sprintf("https://github.com/%s/%s.git", defaultGitHubOrg, defaultGitOpsRepo)
 
 	// Clone with depth=1, with retries for transient network errors
@@ -645,40 +660,50 @@ func cloneBranch(branch, targetDir string) error {
 
 	// Copy contents up and clean up
 	repoDir := filepath.Join(targetDir, "repo")
-
-	// Copy all files from repo to targetDir
-	entries, err := os.ReadDir(repoDir)
-	if err != nil {
-		return fmt.Errorf("failed to read repo dir: %w", err)
-	}
-
-	for _, entry := range entries {
-		src := filepath.Join(repoDir, entry.Name())
-		dst := filepath.Join(targetDir, entry.Name())
-
-		if entry.Name() == ".git" {
-			continue // Skip .git directory
-		}
-
-		if entry.IsDir() {
-			if err := copyDir(src, dst); err != nil {
-				return fmt.Errorf("failed to copy directory %s: %w", entry.Name(), err)
-			}
-		} else {
-			if err := copyFile(src, dst); err != nil {
-				return fmt.Errorf("failed to copy file %s: %w", entry.Name(), err)
-			}
-		}
+	if err := copyFixtureDir(repoDir, targetDir); err != nil {
+		return err
 	}
 
 	// Remove the cloned repo directory
 	_ = os.RemoveAll(repoDir)
 
 	// Create .gitignore with "*"
+	return writeBranchGitignore(targetDir)
+}
+
+func copyFixtureDir(srcDir, targetDir string) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return fmt.Errorf("failed to read source dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.Name() == ".git" {
+			continue
+		}
+
+		src := filepath.Join(srcDir, entry.Name())
+		dst := filepath.Join(targetDir, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(src, dst); err != nil {
+				return fmt.Errorf("failed to copy directory %s: %w", entry.Name(), err)
+			}
+			continue
+		}
+
+		if err := copyFile(src, dst); err != nil {
+			return fmt.Errorf("failed to copy file %s: %w", entry.Name(), err)
+		}
+	}
+
+	return nil
+}
+
+func writeBranchGitignore(targetDir string) error {
 	if err := os.WriteFile(filepath.Join(targetDir, ".gitignore"), []byte("*\n"), 0644); err != nil {
 		return fmt.Errorf("failed to create .gitignore: %w", err)
 	}
-
 	return nil
 }
 
@@ -903,6 +928,9 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	if tc.TraverseAppOfApps == "true" {
 		args = append(args, "-e", "TRAVERSE_APP_OF_APPS=true")
 	}
+	if tc.FailOnDuplicateGeneratedApplications == "true" {
+		args = append(args, "-e", "FAIL_ON_DUPLICATE_GENERATED_APPLICATIONS=true")
+	}
 
 	// Add image (no additional args needed - all config is via env vars)
 	args = append(args, *dockerImage)
@@ -997,6 +1025,9 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	if tc.TraverseAppOfApps == "true" {
 		args = append(args, "--traverse-app-of-apps")
+	}
+	if tc.FailOnDuplicateGeneratedApplications == "true" {
+		args = append(args, "--fail-on-duplicate-generated-applications")
 	}
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),
