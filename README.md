@@ -92,9 +92,45 @@ Check out [How it works](https://dag-andersen.github.io/argocd-diff-preview/how-
 
 ## Basic usage in a GitHub Actions Workflow
 
-The most basic example of how to use `argocd-diff-preview` in a GitHub Actions workflow is shown below. In this example, the tool will run on every pull request to the `main` branch, and the diff will be posted as a comment on the pull request.
+There are a couple of ways to run argocd-diff-preview in Github Actions workflows. In both of the examples shown, the tool will run on every pull request to the `main` branch, and the diff will be posted as a comment on the pull request. 
 
-This example works only if your Git repository is public and you are using public Helm Charts. If you have a private repository or are using private Helm Charts, you need to provide the tool with the necessary credentials. Refer to the [full documentation](https://dag-andersen.github.io/argocd-diff-preview/getting-started/github-actions-workflow#private-repositories-and-helm-charts) to learn how to do this.
+These examples only work only if your Git repository is public and you are using public Helm Charts. If you have a private repository or are using private Helm Charts, you need to provide the tool with the necessary credentials. Refer to the [full documentation](https://dag-andersen.github.io/argocd-diff-preview/getting-started/github-actions-workflow#private-repositories-and-helm-charts) to learn how to do this.
+
+It is possible to use the composite action defined in `action/action.yml` which handles installation and supports native inputs:
+
+```yaml
+```
+name: "ArgoCD Diff Preview Workflow"
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: pr-action-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  install-argocd-diff-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install argocd diff preview
+        uses: dag-andersen/argocd-diff-preview/action@main
+        with:
+          version: '0.1.23'
+          timeout: '500'
+          dry-run: true
+          create-cluster: true
+          disable-client-throttling: true
+          target-branch: main
+          repo: ${{ github.repository }}
+```
+```
+
+
+
+Another way to use `argocd-diff-preview` in a GitHub Actions workflow is shown below. 
 
 ```yaml
 # .github/workflows/generate-diff.yml
