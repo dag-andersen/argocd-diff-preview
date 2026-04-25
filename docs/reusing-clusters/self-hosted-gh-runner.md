@@ -119,7 +119,52 @@ helm install arc-runner-set arc-runners/gha-runner-scale-set \
 
 ### Step 3: Configure RBAC
 
-The runner service account needs permissions to access Argo CD resources (in the namespace `argocd-diff-preview`). Create the following RBAC configuration:
+The runner service account needs permissions to access Argo CD resources (in the namespace `argocd-diff-preview`).
+
+#### Option A: Minimal RBAC with `--repo-server-address` (recommended)
+
+If you use `--render-method=repo-server-api` and `--repo-server-address` to connect directly to the repo server (see [rendering methods](../rendering-methods.md#skipping-the-port-forward-with---repo-server-address)), no `pods/portforward` permission is needed:
+
+```yaml title="arc-runner-rbac.yaml"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: arc-runner
+  namespace: arc-runners
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: arc-runner-diff-preview
+  namespace: argocd-diff-preview
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: arc-runner-diff-preview
+  namespace: argocd-diff-preview
+subjects:
+  - kind: ServiceAccount
+    name: arc-runner
+    namespace: arc-runners
+roleRef:
+  kind: Role
+  name: arc-runner-diff-preview
+  apiGroup: rbac.authorization.k8s.io
+```
+
+Pass `--repo-server-address argocd-repo-server.argocd-diff-preview.svc.cluster.local:8081` when running the tool to skip the port-forward entirely.
+
+#### Option B: Broad RBAC (simpler setup)
+
+If you want a simpler setup without worrying about exact permissions:
 
 ```yaml title="arc-runner-rbac.yaml"
 apiVersion: v1

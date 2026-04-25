@@ -25,3 +25,28 @@ The `repo-server-api` method is an experimental fast-path that bypasses the clus
 - **How it works:** It connects directly to the Argo CD `repo-server` component via gRPC, asking it to generate the manifests synchronously. 
 - **Characteristics:** The fastest method available. No cluster-side Application objects are created, and no polling of the reconciliation loop is needed. 
 - **Lockdown mode:** Compatible with [lockdown mode](reusing-clusters/lockdown-mode.md) (namespace-scoped Argo CD).
+
+### Skipping the port-forward with `--repo-server-address`
+
+By default, `repo-server-api` reaches the repo server by setting up a port-forward through the Kubernetes API server. If your runner is already running inside the same cluster as Argo CD (e.g. a self-hosted CI runner), the repo server is directly reachable via Kubernetes DNS — no port-forward needed.
+
+Use `--repo-server-address` to connect directly:
+
+```bash
+argocd-diff-preview \
+  --render-method repo-server-api \
+  --repo-server-address argocd-repo-server.argocd.svc.cluster.local:8081 \
+  --argocd-namespace argocd \
+  --create-cluster false \
+  ...
+```
+
+This eliminates the `pods/portforward` RBAC requirement. The minimum RBAC for the runner service account becomes:
+
+```yaml
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list"]
+  # pods/portforward is NOT required when --repo-server-address is set
+```
