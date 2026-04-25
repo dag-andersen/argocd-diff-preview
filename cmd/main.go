@@ -208,6 +208,7 @@ func run(cfg *Config) error {
 		cfg.RenderMethod,
 		cfg.ArgocdAuthToken,
 		cfg.ArgocdConfigPath,
+		cfg.RepoServerAddress,
 	)
 
 	// Ensure cleanup is performed when we exit (e.g., stopping port forwards)
