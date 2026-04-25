@@ -25,10 +25,6 @@ func TestNewClientWithAddress_PlaintextMode(t *testing.T) {
 	assert.Nil(t, c.k8sClient)
 }
 
-// TestEnsurePortForward_NilK8sClient_IsNoop verifies that when a client is
-// created with NewClientWithAddress (k8sClient == nil), EnsurePortForward is a
-// no-op and returns nil. This is the contract that allows --repo-server-address
-// to bypass the port-forward path.
 func TestEnsurePortForward_NilK8sClient_IsNoop(t *testing.T) {
 	c := NewClientWithAddress("argocd-repo-server.argocd.svc.cluster.local:8081", false, true)
 	require.Nil(t, c.k8sClient)
@@ -37,8 +33,6 @@ func TestEnsurePortForward_NilK8sClient_IsNoop(t *testing.T) {
 	assert.NoError(t, err, "EnsurePortForward should be a no-op when k8sClient is nil")
 }
 
-// TestEnsurePortForward_NilK8sClient_Idempotent verifies that calling
-// EnsurePortForward multiple times on a direct-address client stays a no-op.
 func TestEnsurePortForward_NilK8sClient_Idempotent(t *testing.T) {
 	c := NewClientWithAddress("localhost:8081", true, false)
 

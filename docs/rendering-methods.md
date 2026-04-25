@@ -41,12 +41,11 @@ argocd-diff-preview \
   ...
 ```
 
-This eliminates the `pods/portforward` RBAC requirement. The minimum RBAC for the runner service account becomes:
+This eliminates the `pods/portforward` RBAC requirement — that rule is only needed for the default port-forward path. The minimum RBAC for the runner service account becomes:
 
 ```yaml
 rules:
   - apiGroups: [""]
     resources: ["pods", "services"]
     verbs: ["get", "list"]
-  # pods/portforward is NOT required when --repo-server-address is set
 ```
