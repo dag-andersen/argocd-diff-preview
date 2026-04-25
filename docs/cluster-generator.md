@@ -122,5 +122,5 @@ jobs:
             -v $(pwd)/secrets:/secrets \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            dagandersen/argocd-diff-preview:v0.2.3
+            dagandersen/argocd-diff-preview:v0.2.4
 ```

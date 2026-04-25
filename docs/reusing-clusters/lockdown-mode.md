@@ -83,7 +83,7 @@ docker run \
   -v $(pwd)/target-branch:/target-branch \
   -e TARGET_BRANCH=my-feature-branch \
   -e REPO=my-org/my-repo \
-  dagandersen/argocd-diff-preview:v0.2.3 \
+  dagandersen/argocd-diff-preview:v0.2.4 \
   --argocd-namespace=argocd-diff-preview \
   --create-cluster=false \
   --render-method=server-api
