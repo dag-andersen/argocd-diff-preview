@@ -87,9 +87,10 @@ func NewClientWithAddress(address string, disableTLS bool, insecureSkipVerify bo
 
 // EnsurePortForward starts a port-forward to the Argo CD repo server if one is
 // not already running. It is idempotent and safe to call concurrently.
+// No-op when k8sClient is nil (client created via NewClientWithAddress).
 func (c *Client) EnsurePortForward() error {
 	if c.k8sClient == nil {
-		return fmt.Errorf("no k8s client configured – cannot port-forward")
+		return nil
 	}
 
 	c.portForwardMutex.Lock()

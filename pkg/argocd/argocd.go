@@ -42,11 +42,14 @@ type ArgoCDInstallation struct {
 	ChartRepoUsername string
 	ChartRepoPassword string
 	LoginOptions      string
+	// RepoServerAddress, when non-empty, is used by repo-server-api mode to
+	// connect directly to the repo server instead of setting up a port-forward.
+	RepoServerAddress string
 	renderMode        vars.RenderMethod
 	operations        Operations // CLI or API implementation
 }
 
-func New(client *k8s.Client, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string, configPath string) *ArgoCDInstallation {
+func New(client *k8s.Client, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string, configPath string, repoServerAddress string) *ArgoCDInstallation {
 	return &ArgoCDInstallation{
 		K8sClient:         client,
 		Namespace:         namespace,
@@ -57,6 +60,7 @@ func New(client *k8s.Client, namespace string, version string, repoName string, 
 		ChartRepoUsername: repoUsername,
 		ChartRepoPassword: repoPassword,
 		LoginOptions:      loginOptions,
+		RepoServerAddress: repoServerAddress,
 		renderMode:        renderMode,
 		operations:        NewOperations(renderMode, client, namespace, loginOptions, authToken),
 	}

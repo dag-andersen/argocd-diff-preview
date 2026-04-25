@@ -110,8 +110,17 @@ func RenderApplicationsFromBothBranches(
 	}
 
 	// Create a single repo server client shared across all goroutines.
-	// EnsurePortForward is idempotent and mutex-protected inside the client.
-	repoClient := reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
+	// When --repo-server-address is set the caller can already reach the repo
+	// server directly (e.g. running inside the same cluster), so we skip the
+	// port-forward entirely. Otherwise EnsurePortForward is idempotent and
+	// mutex-protected inside the client.
+	var repoClient *reposerver.Client
+	if argocd.RepoServerAddress != "" {
+		log.Info().Msgf("🔌 Connecting to repo server directly at %s (no port-forward)", argocd.RepoServerAddress)
+		repoClient = reposerver.NewClientWithAddress(argocd.RepoServerAddress, false, true)
+	} else {
+		repoClient = reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
+	}
 	defer repoClient.Cleanup()
 
 	if err := repoClient.EnsurePortForward(); err != nil {

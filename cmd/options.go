@@ -132,6 +132,7 @@ type RawOptions struct {
 	OutputAppManifests         bool   `mapstructure:"output-app-manifests"`
 	OutputBranchManifests      bool   `mapstructure:"output-branch-manifests"`
 	TraverseAppOfApps          bool   `mapstructure:"traverse-app-of-apps"`
+	RepoServerAddress          string `mapstructure:"repo-server-address"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -176,6 +177,7 @@ type Config struct {
 	OutputAppManifests         bool
 	OutputBranchManifests      bool
 	TraverseAppOfApps          bool
+	RepoServerAddress          string
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -330,6 +332,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
+	rootCmd.Flags().String("repo-server-address", "", "Address of the Argo CD repo server (host:port). When set, --render-method=repo-server-api connects directly instead of setting up a port-forward. Useful when running inside the cluster or when the repo server is otherwise reachable from the current host.")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -416,6 +419,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		OutputAppManifests:         o.OutputAppManifests,
 		OutputBranchManifests:      o.OutputBranchManifests,
 		TraverseAppOfApps:          o.TraverseAppOfApps,
+		RepoServerAddress:          o.RepoServerAddress,
 	}
 
 	var err error
@@ -470,6 +474,11 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	// --traverse-app-of-apps is only supported with the repo-server-api render method
 	if cfg.TraverseAppOfApps && cfg.RenderMethod != RenderMethodRepoServerAPI {
 		return nil, fmt.Errorf("--traverse-app-of-apps requires --render-method=repo-server-api (current: %s)", cfg.RenderMethod)
+	}
+
+	// --repo-server-address is only applicable with the repo-server-api render method
+	if cfg.RepoServerAddress != "" && cfg.RenderMethod != RenderMethodRepoServerAPI {
+		return nil, fmt.Errorf("--repo-server-address requires --render-method=repo-server-api (current: %s)", cfg.RenderMethod)
 	}
 
 	// Check if argocd CLI is installed when not using API mode
@@ -749,5 +758,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.TraverseAppOfApps {
 		log.Info().Msgf("✨ - traverse-app-of-apps: %t", o.TraverseAppOfApps)
+	}
+	if o.RepoServerAddress != "" {
+		log.Info().Msgf("✨ - repo-server-address: %s", o.RepoServerAddress)
 	}
 }
