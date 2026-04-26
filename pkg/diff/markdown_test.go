@@ -146,8 +146,8 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 		{
 			name: "Basic output with sections",
 			output: MarkdownOutput{
-				title:   "Test Diff",
-				summary: "Added: 1\nModified: 1",
+				title:       "Test Diff",
+				fullSummary: "Added: 1\nModified: 1",
 				sections: []MarkdownSection{
 					{
 						appName:  "App 1",
@@ -189,11 +189,41 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			},
 		},
 		{
+			name: "Summary details render before app diffs",
+			output: MarkdownOutput{
+				title:          "Summary Details",
+				fullSummary:    "Added (1):\n+ app-1 (+2)\n",
+				compactSummary: "Total: 3 applications changed\nAdded: 1\nModified: 2",
+				sections: []MarkdownSection{
+					{
+						appName:  "App 1",
+						filePath: "path/to/app1.yaml",
+						appURL:   "",
+						resources: []ResourceSection{
+							{Header: "@@ Application modified: App 1 @@", Content: "- old content\n+ new content"},
+						},
+					},
+				},
+				statsInfo: StatsInfo{
+					ApplicationCount: 1,
+				},
+			},
+			maxDiffMessageCharCount: 5000,
+			expectedContains: []string{
+				"<summary>Detailed Summary (1)</summary>",
+				"```yaml\nAdded (1):\n+ app-1 (+2)\n```",
+				"<summary>App 1 (path/to/app1.yaml)</summary>",
+			},
+			expectedNotContains: []string{
+				"No changes found",
+			},
+		},
+		{
 			name: "Empty sections shows no changes",
 			output: MarkdownOutput{
-				title:    "Empty Diff",
-				summary:  "No changes",
-				sections: []MarkdownSection{},
+				title:       "Empty Diff",
+				fullSummary: "No changes",
+				sections:    []MarkdownSection{},
 				statsInfo: StatsInfo{
 					ApplicationCount: 0,
 				},
@@ -212,8 +242,8 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 		{
 			name: "Extremely small max-diff-length shows helpful message instead of no changes found",
 			output: MarkdownOutput{
-				title:   "Tiny Diff",
-				summary: "Some changes",
+				title:       "Tiny Diff",
+				fullSummary: "Some changes",
 				sections: []MarkdownSection{
 					{
 						appName:  "My App",
@@ -240,8 +270,8 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 		{
 			name: "Truncated output shows warning",
 			output: MarkdownOutput{
-				title:   "Large Diff",
-				summary: "Large changes",
+				title:       "Large Diff",
+				fullSummary: "Large changes",
 				sections: []MarkdownSection{
 					{
 						appName:  "Large App",
@@ -291,6 +321,13 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 			if !strings.HasSuffix(got, "\n") {
 				t.Errorf("printDiff() should end with newline")
 			}
+
+			// Ensure no triple newlines from empty placeholders.
+			// Truncated sections can legitimately produce triple newlines
+			// (section header \n\n + warning \n), so skip this check then.
+			if !strings.Contains(got, "Diff exceeds max length") && strings.Contains(got, "\n\n\n") {
+				t.Errorf("printDiff() should not contain triple newlines, got:\n%s", got)
+			}
 		})
 	}
 }
@@ -298,8 +335,8 @@ func TestMarkdownOutput_PrintDiff(t *testing.T) {
 func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 	t.Run("Very small max size", func(t *testing.T) {
 		output := MarkdownOutput{
-			title:   "Test",
-			summary: "Test summary",
+			title:       "Test",
+			fullSummary: "Test summary",
 			sections: []MarkdownSection{
 				{
 					appName:  "App",
@@ -324,8 +361,8 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 
 	t.Run("Zero max size", func(t *testing.T) {
 		output := MarkdownOutput{
-			title:   "Test",
-			summary: "Test summary",
+			title:       "Test",
+			fullSummary: "Test summary",
 			sections: []MarkdownSection{
 				{
 					appName:  "App",
@@ -544,8 +581,8 @@ func TestMarkdownSection_Build_TruncationBehavior(t *testing.T) {
 
 func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 	output := MarkdownOutput{
-		title:   "Custom Title",
-		summary: "Custom Summary\nWith Multiple Lines",
+		title:       "Custom Title",
+		fullSummary: "Custom Summary\nWith Multiple Lines",
 		sections: []MarkdownSection{
 			{
 				appName:  "Test Section",
@@ -597,8 +634,8 @@ func TestMarkdownOutput_TemplateReplacement(t *testing.T) {
 func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 	t.Run("No selection changes when counts are equal", func(t *testing.T) {
 		output := MarkdownOutput{
-			title:   "Test Diff",
-			summary: "Summary",
+			title:       "Test Diff",
+			fullSummary: "Summary",
 			sections: []MarkdownSection{
 				{
 					appName:  "App",
@@ -626,8 +663,8 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 
 	t.Run("Shows selection changes when Application counts differ", func(t *testing.T) {
 		output := MarkdownOutput{
-			title:   "Test Diff",
-			summary: "Summary",
+			title:       "Test Diff",
+			fullSummary: "Summary",
 			sections: []MarkdownSection{
 				{
 					appName:  "App",
@@ -662,8 +699,8 @@ func TestMarkdownOutput_SelectionChanges(t *testing.T) {
 
 	t.Run("Shows selection changes when ApplicationSet counts differ", func(t *testing.T) {
 		output := MarkdownOutput{
-			title:   "Test Diff",
-			summary: "Summary",
+			title:       "Test Diff",
+			fullSummary: "Summary",
 			sections: []MarkdownSection{
 				{
 					appName:  "App",
@@ -738,8 +775,8 @@ func TestMarkdownOutput_PrintDiff_TruncatesLargeSummary(t *testing.T) {
 	summary := "Modified (11160):\n" + strings.Repeat("± spark-a--clark (+1)\n", 400)
 
 	output := MarkdownOutput{
-		title:   "Large Summary Diff",
-		summary: summary,
+		title:       "Large Summary Diff",
+		fullSummary: summary,
 		sections: []MarkdownSection{
 			{
 				appName:  "spark-a--clark",

@@ -64,6 +64,7 @@ type TestCase struct {
 	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
+	SummaryThreshold           string // Collapse summary details when total changed apps exceed this value
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
@@ -223,6 +224,28 @@ var testCases = []TestCase{
 		BaseBranch:    "integration-test/branch-9/base",
 		Suffix:        "-3",
 		MaxDiffLength: "400",
+	},
+	// Tests the collapsible summary feature with --summary-threshold=5.
+	// Branch-9 deletes 9 apps, so with threshold=5 the summary should collapse
+	// the app list behind a <details> block.
+	{
+		Name:             "branch-9/target-4",
+		TargetBranch:     "integration-test/branch-9/target",
+		BaseBranch:       "integration-test/branch-9/base",
+		Suffix:           "-4",
+		MaxDiffLength:    "10000",
+		SummaryThreshold: "5",
+	},
+	// Tests the collapsible summary combined with a tight max-diff-length.
+	// With threshold=5 the summary collapses, and max-diff-length=400 forces
+	// truncation of both the summary and diff sections.
+	{
+		Name:             "branch-9/target-5",
+		TargetBranch:     "integration-test/branch-9/target",
+		BaseBranch:       "integration-test/branch-9/base",
+		Suffix:           "-5",
+		MaxDiffLength:    "400",
+		SummaryThreshold: "5",
 	},
 	{
 		Name:                       "branch-10/target-1",
@@ -904,6 +927,10 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		args = append(args, "-e", "TRAVERSE_APP_OF_APPS=true")
 	}
 
+	if tc.SummaryThreshold != "" {
+		args = append(args, "-e", fmt.Sprintf("SUMMARY_THRESHOLD=%s", tc.SummaryThreshold))
+	}
+
 	// Add image (no additional args needed - all config is via env vars)
 	args = append(args, *dockerImage)
 
@@ -997,6 +1024,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 
 	if tc.TraverseAppOfApps == "true" {
 		args = append(args, "--traverse-app-of-apps")
+	}
+
+	if tc.SummaryThreshold != "" {
+		args = append(args, "--summary-threshold", tc.SummaryThreshold)
 	}
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),

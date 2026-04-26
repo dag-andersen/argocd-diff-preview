@@ -187,8 +187,8 @@ func TestHTMLSection_PrintHTMLSection_MultipleResources(t *testing.T) {
 
 func TestHTMLOutput_PrintDiff_Basic(t *testing.T) {
 	output := HTMLOutput{
-		title:   "Test Diff",
-		summary: "Added (1):\n+ my-app (+10)",
+		title:       "Test Diff",
+		fullSummary: "Added (1):\n+ my-app (+10)",
 		sections: []HTMLSection{
 			{
 				appName:  "my-app",
@@ -225,9 +225,9 @@ func TestHTMLOutput_PrintDiff_Basic(t *testing.T) {
 
 func TestHTMLOutput_PrintDiff_NoSections(t *testing.T) {
 	output := HTMLOutput{
-		title:    "Empty Diff",
-		summary:  "No changes",
-		sections: []HTMLSection{},
+		title:       "Empty Diff",
+		fullSummary: "No changes",
+		sections:    []HTMLSection{},
 	}
 
 	result := output.printDiff()
@@ -239,9 +239,9 @@ func TestHTMLOutput_PrintDiff_NoSections(t *testing.T) {
 
 func TestHTMLOutput_PrintDiff_SelectionInfo(t *testing.T) {
 	output := HTMLOutput{
-		title:    "Test",
-		summary:  "Summary",
-		sections: []HTMLSection{},
+		title:       "Test",
+		fullSummary: "Summary",
+		sections:    []HTMLSection{},
 		selectionInfo: SelectionInfo{
 			Base:   AppSelectionInfo{SkippedApplications: 2, SkippedApplicationSets: 1},
 			Target: AppSelectionInfo{SkippedApplications: 5, SkippedApplicationSets: 1},
@@ -260,8 +260,8 @@ func TestHTMLOutput_PrintDiff_SelectionInfo(t *testing.T) {
 
 func TestHTMLOutput_PrintDiff_NoSelectionInfo(t *testing.T) {
 	output := HTMLOutput{
-		title:   "Test",
-		summary: "Summary",
+		title:       "Test",
+		fullSummary: "Summary",
 		sections: []HTMLSection{
 			{appName: "app", filePath: "path", resources: []ResourceSection{{Header: "H", Content: "+x\n"}}},
 		},
@@ -281,8 +281,8 @@ func TestHTMLOutput_PrintDiff_NoSelectionInfo(t *testing.T) {
 
 func TestHTMLOutput_PrintDiff_TemplatePlaceholders(t *testing.T) {
 	output := HTMLOutput{
-		title:   "My Title",
-		summary: "My Summary",
+		title:       "My Title",
+		fullSummary: "My Summary",
 		sections: []HTMLSection{
 			{appName: "app", filePath: "path", resources: []ResourceSection{{Header: "H", Content: "+x\n"}}},
 		},
@@ -292,7 +292,7 @@ func TestHTMLOutput_PrintDiff_TemplatePlaceholders(t *testing.T) {
 	result := output.printDiff()
 
 	// All placeholders should be replaced
-	placeholders := []string{"%title%", "%summary%", "%app_diffs%", "%selection_changes%", "%info_box%"}
+	placeholders := []string{"%title%", "%summary%", "%detailed_summary_section%", "%app_diffs%", "%selection_changes%", "%info_box%"}
 	for _, p := range placeholders {
 		if strings.Contains(result, p) {
 			t.Errorf("placeholder %q was not replaced in output", p)
@@ -302,8 +302,8 @@ func TestHTMLOutput_PrintDiff_TemplatePlaceholders(t *testing.T) {
 
 func TestHTMLOutput_PrintDiff_ValidHTML(t *testing.T) {
 	output := HTMLOutput{
-		title:   "Test",
-		summary: "Summary",
+		title:       "Test",
+		fullSummary: "Summary",
 		sections: []HTMLSection{
 			{appName: "app", filePath: "path", resources: []ResourceSection{{Header: "H", Content: "+line\n"}}},
 		},
@@ -316,5 +316,56 @@ func TestHTMLOutput_PrintDiff_ValidHTML(t *testing.T) {
 	}
 	if !strings.Contains(result, "</html>") {
 		t.Error("expected output to contain </html>")
+	}
+}
+
+func TestHTMLOutput_PrintDiff_CollapsedAppList(t *testing.T) {
+	output := HTMLOutput{
+		title:          "Collapsed Test",
+		fullSummary:    "Modified (2):\n± app-1 (+3|-2)\n± app-2 (+1|-1)\n",
+		compactSummary: "Total: 2 applications changed\nModified: 2",
+		sections: []HTMLSection{
+			{appName: "app-1", filePath: "path/1", resources: []ResourceSection{{Header: "Deployment: app-1", Content: "+x\n"}}},
+			{appName: "app-2", filePath: "path/2", resources: []ResourceSection{{Header: "Deployment: app-2", Content: "+y\n"}}},
+		},
+	}
+
+	result := output.printDiff()
+
+	// Should contain the collapsible details block
+	if !strings.Contains(result, "<summary>Detailed Summary (2)</summary>") {
+		t.Errorf("expected collapsible summary header, got:\n%s", result)
+	}
+	// App list should be inside a <pre> block
+	if !strings.Contains(result, "<pre>Modified (2):") {
+		t.Errorf("expected app list in <pre> block, got:\n%s", result)
+	}
+	// Content should be HTML-escaped
+	if !strings.Contains(result, "± app-1 (+3|-2)") {
+		t.Errorf("expected app-1 in collapsed details, got:\n%s", result)
+	}
+	// The per-app diff sections should still appear after the details block
+	if !strings.Contains(result, "app-1 (path/1)") {
+		t.Errorf("expected app-1 section, got:\n%s", result)
+	}
+	if !strings.Contains(result, "app-2 (path/2)") {
+		t.Errorf("expected app-2 section, got:\n%s", result)
+	}
+}
+
+func TestHTMLOutput_PrintDiff_NoCollapsedAppList(t *testing.T) {
+	output := HTMLOutput{
+		title:       "No Collapse",
+		fullSummary: "Modified (1):\n± app-1 (+3|-2)",
+		sections: []HTMLSection{
+			{appName: "app-1", filePath: "path/1", resources: []ResourceSection{{Header: "Deployment: app-1", Content: "+x\n"}}},
+		},
+	}
+
+	result := output.printDiff()
+
+	// Should NOT contain a collapsible details block for the app list
+	if strings.Contains(result, "Detailed Summary") {
+		t.Errorf("should not contain collapsible details when compactSummary is empty, got:\n%s", result)
 	}
 }

@@ -399,6 +399,7 @@ func run(cfg *Config) error {
 		statsInfo,
 		selectionInfo,
 		cfg.ArgocdUIURL,
+		cfg.SummaryThreshold,
 		cfg.IgnoreResourceRules,
 	)
 	if err != nil {

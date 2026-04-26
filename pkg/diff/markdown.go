@@ -42,6 +42,15 @@ func markdownSectionFooter() string {
 	return "</details>\n\n"
 }
 
+// markdownDetailedSummarySection wraps the full summary in a collapsible <details> block.
+func markdownDetailedSummarySection(fullSummary string, appCount int) string {
+	return fmt.Sprintf(
+		"\n<details>\n<summary>Detailed Summary (%d)</summary>\n\n```yaml\n%s```\n\n</details>\n",
+		appCount,
+		fullSummary,
+	)
+}
+
 var (
 	minSizeForSectionContent = 100
 	diffTooLongWarning       = "\n🚨 Diff is too long"
@@ -135,11 +144,12 @@ func (m *MarkdownSection) build(maxSize int) (string, bool) {
 }
 
 type MarkdownOutput struct {
-	title         string
-	summary       string
-	sections      []MarkdownSection
-	statsInfo     StatsInfo
-	selectionInfo SelectionInfo
+	title          string
+	fullSummary    string // full application list with per-app details
+	compactSummary string // short counts-only summary; empty if not collapsed
+	sections       []MarkdownSection
+	statsInfo      StatsInfo
+	selectionInfo  SelectionInfo
 }
 
 const markdownTemplate = `
@@ -147,9 +157,9 @@ const markdownTemplate = `
 
 Summary:
 ` + "```yaml" + `
-%summary%
+%inline_summary%
 ` + "```" + `
-
+%detailed_summary_section%
 %app_diffs%
 %selection_changes%
 %info_box%
@@ -189,25 +199,37 @@ func (m *MarkdownOutput) printDiff(maxDiffMessageCharCount uint) string {
 	output := strings.ReplaceAll(markdownTemplate, "%title%", m.title)
 	output = strings.ReplaceAll(output, "%selection_changes%", selection_changes)
 
-	// temp value to check if summary was truncated, to decide whether to log a warning about it
-	var summary string
+	// When compactSummary is set, use it as the inline summary and render the
+	// full summary in a collapsible <details> block via %detailed_summary_section%.
+
+	var inline_summary string
+	var detailedSummarySection string
+
+	if m.compactSummary != "" {
+		inline_summary = m.compactSummary
+		detailedSummarySection = markdownDetailedSummarySection(m.fullSummary, len(m.sections))
+	} else {
+		inline_summary = m.fullSummary
+	}
+
+	output = strings.ReplaceAll(output, "%detailed_summary_section%", detailedSummarySection)
 
 	// Truncate summary upfront if it would consume the entire budget
 	if 0 < maxDiffMessageCharCount {
-		diffLengthWithoutSummary := len(strings.ReplaceAll(output, "%summary%", ""))
+		diffLengthWithoutSummary := len(strings.ReplaceAll(output, "%inline_summary%", ""))
 		summaryBudget := int(maxDiffMessageCharCount) - diffLengthWithoutSummary - len(warningMessage) - infoBoxBufferSize
-		truncatedSummary, truncated := truncateSummary(m.summary, summaryBudget)
+		truncatedSummary, truncated := truncateSummary(inline_summary, summaryBudget)
 		if truncated {
 			log.Warn().Msgf("🚨 Markdown summary is too long, truncating to fit --max-diff-length (%d)", maxDiffMessageCharCount)
-			summary = truncatedSummary
+			inline_summary = truncatedSummary
 		} else {
-			summary = strings.TrimSpace(m.summary)
+			inline_summary = strings.TrimSpace(inline_summary)
 		}
 	} else {
-		summary = strings.TrimSpace(m.summary)
+		inline_summary = strings.TrimSpace(inline_summary)
 	}
 
-	output = strings.ReplaceAll(output, "%summary%", summary)
+	output = strings.ReplaceAll(output, "%inline_summary%", inline_summary)
 
 	availableSpaceForDetailedDiff := int(maxDiffMessageCharCount) - len(output) - len(warningMessage) - infoBoxBufferSize
 

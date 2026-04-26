@@ -9,11 +9,12 @@ import (
 )
 
 type HTMLOutput struct {
-	title         string
-	summary       string
-	sections      []HTMLSection
-	statsInfo     StatsInfo
-	selectionInfo SelectionInfo
+	title          string
+	fullSummary    string // full application list with per-app details
+	compactSummary string // short counts-only summary; empty if not collapsed
+	sections       []HTMLSection
+	statsInfo      StatsInfo
+	selectionInfo  SelectionInfo
 }
 
 const htmlTemplate = `
@@ -78,8 +79,8 @@ pre {
 <h1>%title%</h1>
 
 <p>Summary:</p>
-<pre>%summary%</pre>
-
+<pre>%inline_summary%</pre>
+%detailed_summary_section%
 <div class="diffs">
 %app_diffs%
 </div>
@@ -110,10 +111,19 @@ func emptyReasonHTML(reason matching.EmptyReason) string {
 	}
 }
 
+// htmlDetailedSummarySection wraps the full summary in a collapsible <details> block.
+func htmlDetailedSummarySection(fullSummary string, appCount int) string {
+	return fmt.Sprintf(
+		"\n<div class=\"diffs\">\n<details>\n<summary>Detailed Summary (%d)</summary>\n<pre>%s</pre>\n</details>\n</div>",
+		appCount,
+		html.EscapeString(strings.TrimSpace(fullSummary)),
+	)
+}
+
 const htmlSectionTemplate = `
 <details>
 <summary>
-%summary%
+%inline_summary%
 </summary>
 %body%
 </details>
@@ -137,7 +147,7 @@ func (h *HTMLSection) printHTMLSection() string {
 			html.EscapeString(h.appName),
 			html.EscapeString(h.filePath))
 	}
-	s = strings.ReplaceAll(s, "%summary%", summary)
+	s = strings.ReplaceAll(s, "%inline_summary%", summary)
 
 	var body strings.Builder
 
@@ -187,8 +197,21 @@ func (h *HTMLOutput) printDiff() string {
 		sectionsDiff.WriteString("No changes found")
 	}
 
+	// When compactSummary is set, use it as the inline summary and render the
+	// full summary in a collapsible <details> block via %detailed_summary_section%.
+	var inline_summary string
+	var detailedSummarySection string
+
+	if h.compactSummary != "" {
+		inline_summary = h.compactSummary
+		detailedSummarySection = htmlDetailedSummarySection(h.fullSummary, len(h.sections))
+	} else {
+		inline_summary = h.fullSummary
+	}
+
 	output := strings.ReplaceAll(htmlTemplate, "%title%", h.title)
-	output = strings.ReplaceAll(output, "%summary%", strings.TrimSpace(h.summary))
+	output = strings.ReplaceAll(output, "%inline_summary%", strings.TrimSpace(inline_summary))
+	output = strings.ReplaceAll(output, "%detailed_summary_section%", detailedSummarySection)
 	output = strings.ReplaceAll(output, "%app_diffs%", strings.TrimSpace(sectionsDiff.String()))
 	selection_changes := ""
 	if s := h.selectionInfo.String(); s != "" {
