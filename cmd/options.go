@@ -46,136 +46,139 @@ const (
 
 // defaults
 var (
-	DefaultTimeout                    = uint64(180)
-	DefaultLineCount                  = uint(5)
-	DefaultBaseBranch                 = "main"
-	DefaultOutputFolder               = "./output"
-	DefaultSecretsFolder              = "./secrets"
-	DefaultCluster                    = "auto"
-	DefaultClusterName                = "argocd-diff-preview"
-	DefaultKindOptions                = ""
-	DefaultKindInternal               = false
-	DefaultK3dOptions                 = ""
-	DefaultMaxDiffLength              = uint(65536)
-	DefaultArgocdNamespace            = "argocd"
-	DefaultArgocdChartVersion         = "latest"
-	DefaultArgocdChartName            = "argo"
-	DefaultArgocdChartURL             = "https://argoproj.github.io/argo-helm"
-	DefaultArgocdChartRepoUsername    = ""
-	DefaultArgocdChartRepoPassword    = ""
-	DefaultLogFormat                  = "human"
-	DefaultTitle                      = "Argo CD Diff Preview"
-	DefaultCreateCluster              = true
-	DefaultKeepClusterAlive           = false
-	DefaultDryRun                     = false
-	DefaultAutoDetectFilesChanged     = true
-	DefaultWatchIfNoWatchPatternFound = true
-	DefaultIgnoreInvalidWatchPattern  = false
-	DefaultHideDeletedAppDiff         = false
-	DefaultIgnoreResourceRules        = ""
-	DefaultArgocdLoginOptions         = ""
-	DefaultDisableClientThrottling    = true
-	DefaultArgocdAuthToken            = ""
-	DefaultArgocdUIURL                = ""
-	DefaultConcurrency                = uint(40)
-	DefaultRenderMethod               = "server-api"
-	DefaultArgocdConfigPath           = "./argocd-config"
-	DefaultOutputAppManifests         = false
-	DefaultOutputBranchManifests      = false
-	DefaultTraverseAppOfApps          = false
+	DefaultTimeout                              = uint64(180)
+	DefaultLineCount                            = uint(5)
+	DefaultBaseBranch                           = "main"
+	DefaultOutputFolder                         = "./output"
+	DefaultSecretsFolder                        = "./secrets"
+	DefaultCluster                              = "auto"
+	DefaultClusterName                          = "argocd-diff-preview"
+	DefaultKindOptions                          = ""
+	DefaultKindInternal                         = false
+	DefaultK3dOptions                           = ""
+	DefaultMaxDiffLength                        = uint(65536)
+	DefaultArgocdNamespace                      = "argocd"
+	DefaultArgocdChartVersion                   = "latest"
+	DefaultArgocdChartName                      = "argo"
+	DefaultArgocdChartURL                       = "https://argoproj.github.io/argo-helm"
+	DefaultArgocdChartRepoUsername              = ""
+	DefaultArgocdChartRepoPassword              = ""
+	DefaultLogFormat                            = "human"
+	DefaultTitle                                = "Argo CD Diff Preview"
+	DefaultCreateCluster                        = true
+	DefaultKeepClusterAlive                     = false
+	DefaultDryRun                               = false
+	DefaultAutoDetectFilesChanged               = true
+	DefaultWatchIfNoWatchPatternFound           = true
+	DefaultIgnoreInvalidWatchPattern            = false
+	DefaultHideDeletedAppDiff                   = false
+	DefaultIgnoreResourceRules                  = ""
+	DefaultArgocdLoginOptions                   = ""
+	DefaultDisableClientThrottling              = true
+	DefaultArgocdAuthToken                      = ""
+	DefaultArgocdUIURL                          = ""
+	DefaultConcurrency                          = uint(40)
+	DefaultRenderMethod                         = "server-api"
+	DefaultArgocdConfigPath                     = "./argocd-config"
+	DefaultOutputAppManifests                   = false
+	DefaultOutputBranchManifests                = false
+	DefaultTraverseAppOfApps                    = false
+	DefaultFailOnDuplicateGeneratedApplications = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
 type RawOptions struct {
-	Debug                      bool   `mapstructure:"debug"`
-	DryRun                     bool   `mapstructure:"dry-run"`
-	Timeout                    uint64 `mapstructure:"timeout"`
-	FileRegex                  string `mapstructure:"file-regex"`
-	DiffIgnore                 string `mapstructure:"diff-ignore"`
-	LineCount                  uint   `mapstructure:"line-count"`
-	BaseBranch                 string `mapstructure:"base-branch"`
-	TargetBranch               string `mapstructure:"target-branch"`
-	Repo                       string `mapstructure:"repo"`
-	OutputFolder               string `mapstructure:"output-folder"`
-	SecretsFolder              string `mapstructure:"secrets-folder"`
-	CreateCluster              bool   `mapstructure:"create-cluster"`
-	ClusterType                string `mapstructure:"cluster"`
-	ClusterName                string `mapstructure:"cluster-name"`
-	KindOptions                string `mapstructure:"kind-options"`
-	KindInternal               bool   `mapstructure:"kind-internal"`
-	K3dOptions                 string `mapstructure:"k3d-options"`
-	MaxDiffLength              uint   `mapstructure:"max-diff-length"`
-	Selector                   string `mapstructure:"selector"`
-	FilesChanged               string `mapstructure:"files-changed"`
-	IgnoreInvalidWatchPattern  bool   `mapstructure:"ignore-invalid-watch-pattern"`
-	WatchIfNoWatchPatternFound bool   `mapstructure:"watch-if-no-watch-pattern-found"`
-	AutoDetectFilesChanged     bool   `mapstructure:"auto-detect-files-changed"`
-	KeepClusterAlive           bool   `mapstructure:"keep-cluster-alive"`
-	ArgocdNamespace            string `mapstructure:"argocd-namespace"`
-	ArgocdChartVersion         string `mapstructure:"argocd-chart-version"`
-	ArgocdChartName            string `mapstructure:"argocd-chart-name"`
-	ArgocdChartURL             string `mapstructure:"argocd-chart-url"`
-	ArgocdChartRepoUsername    string `mapstructure:"argocd-chart-repo-username"`
-	ArgocdChartRepoPassword    string `mapstructure:"argocd-chart-repo-password"`
-	ArgocdLoginOptions         string `mapstructure:"argocd-login-options"`
-	ArgocdAuthToken            string `mapstructure:"argocd-auth-token"`
-	ArgocdConfigPath           string `mapstructure:"argocd-config-dir"`
-	RenderMethod               string `mapstructure:"render-method"`
-	RedirectTargetRevisions    string `mapstructure:"redirect-target-revisions"`
-	LogFormat                  string `mapstructure:"log-format"`
-	Title                      string `mapstructure:"title"`
-	HideDeletedAppDiff         bool   `mapstructure:"hide-deleted-app-diff"`
-	IgnoreResourceRules        string `mapstructure:"ignore-resources"`
-	DisableClientThrottling    bool   `mapstructure:"disable-client-throttling"`
-	ArgocdUIURL                string `mapstructure:"argocd-ui-url"`
-	Concurrency                uint   `mapstructure:"concurrency"`
-	OutputAppManifests         bool   `mapstructure:"output-app-manifests"`
-	OutputBranchManifests      bool   `mapstructure:"output-branch-manifests"`
-	TraverseAppOfApps          bool   `mapstructure:"traverse-app-of-apps"`
+	Debug                                bool   `mapstructure:"debug"`
+	DryRun                               bool   `mapstructure:"dry-run"`
+	Timeout                              uint64 `mapstructure:"timeout"`
+	FileRegex                            string `mapstructure:"file-regex"`
+	DiffIgnore                           string `mapstructure:"diff-ignore"`
+	LineCount                            uint   `mapstructure:"line-count"`
+	BaseBranch                           string `mapstructure:"base-branch"`
+	TargetBranch                         string `mapstructure:"target-branch"`
+	Repo                                 string `mapstructure:"repo"`
+	OutputFolder                         string `mapstructure:"output-folder"`
+	SecretsFolder                        string `mapstructure:"secrets-folder"`
+	CreateCluster                        bool   `mapstructure:"create-cluster"`
+	ClusterType                          string `mapstructure:"cluster"`
+	ClusterName                          string `mapstructure:"cluster-name"`
+	KindOptions                          string `mapstructure:"kind-options"`
+	KindInternal                         bool   `mapstructure:"kind-internal"`
+	K3dOptions                           string `mapstructure:"k3d-options"`
+	MaxDiffLength                        uint   `mapstructure:"max-diff-length"`
+	Selector                             string `mapstructure:"selector"`
+	FilesChanged                         string `mapstructure:"files-changed"`
+	IgnoreInvalidWatchPattern            bool   `mapstructure:"ignore-invalid-watch-pattern"`
+	WatchIfNoWatchPatternFound           bool   `mapstructure:"watch-if-no-watch-pattern-found"`
+	AutoDetectFilesChanged               bool   `mapstructure:"auto-detect-files-changed"`
+	KeepClusterAlive                     bool   `mapstructure:"keep-cluster-alive"`
+	ArgocdNamespace                      string `mapstructure:"argocd-namespace"`
+	ArgocdChartVersion                   string `mapstructure:"argocd-chart-version"`
+	ArgocdChartName                      string `mapstructure:"argocd-chart-name"`
+	ArgocdChartURL                       string `mapstructure:"argocd-chart-url"`
+	ArgocdChartRepoUsername              string `mapstructure:"argocd-chart-repo-username"`
+	ArgocdChartRepoPassword              string `mapstructure:"argocd-chart-repo-password"`
+	ArgocdLoginOptions                   string `mapstructure:"argocd-login-options"`
+	ArgocdAuthToken                      string `mapstructure:"argocd-auth-token"`
+	ArgocdConfigPath                     string `mapstructure:"argocd-config-dir"`
+	RenderMethod                         string `mapstructure:"render-method"`
+	RedirectTargetRevisions              string `mapstructure:"redirect-target-revisions"`
+	LogFormat                            string `mapstructure:"log-format"`
+	Title                                string `mapstructure:"title"`
+	HideDeletedAppDiff                   bool   `mapstructure:"hide-deleted-app-diff"`
+	IgnoreResourceRules                  string `mapstructure:"ignore-resources"`
+	DisableClientThrottling              bool   `mapstructure:"disable-client-throttling"`
+	ArgocdUIURL                          string `mapstructure:"argocd-ui-url"`
+	Concurrency                          uint   `mapstructure:"concurrency"`
+	OutputAppManifests                   bool   `mapstructure:"output-app-manifests"`
+	OutputBranchManifests                bool   `mapstructure:"output-branch-manifests"`
+	TraverseAppOfApps                    bool   `mapstructure:"traverse-app-of-apps"`
+	FailOnDuplicateGeneratedApplications bool   `mapstructure:"fail-on-duplicate-generated-applications"`
 }
 
 // Config is the final, validated, ready-to-use configuration
 type Config struct {
 	// Direct passthrough fields
-	Debug                      bool
-	DryRun                     bool
-	Timeout                    uint64
-	DiffIgnore                 string
-	LineCount                  uint
-	BaseBranch                 string
-	TargetBranch               string
-	Repo                       string
-	OutputFolder               string
-	SecretsFolder              string
-	CreateCluster              bool
-	ClusterName                string
-	KindOptions                string
-	KindInternal               bool
-	K3dOptions                 string
-	MaxDiffLength              uint
-	IgnoreInvalidWatchPattern  bool
-	WatchIfNoWatchPatternFound bool
-	AutoDetectFilesChanged     bool
-	KeepClusterAlive           bool
-	ArgocdNamespace            string
-	ArgocdChartVersion         string
-	ArgocdChartName            string
-	ArgocdChartURL             string
-	ArgocdChartRepoUsername    string
-	ArgocdChartRepoPassword    string
-	ArgocdLoginOptions         string
-	ArgocdAuthToken            string
-	ArgocdConfigPath           string
-	LogFormat                  string
-	Title                      string
-	HideDeletedAppDiff         bool
-	DisableClientThrottling    bool
-	RenderMethod               RenderMethod
-	ArgocdUIURL                string
-	Concurrency                uint
-	OutputAppManifests         bool
-	OutputBranchManifests      bool
-	TraverseAppOfApps          bool
+	Debug                                bool
+	DryRun                               bool
+	Timeout                              uint64
+	DiffIgnore                           string
+	LineCount                            uint
+	BaseBranch                           string
+	TargetBranch                         string
+	Repo                                 string
+	OutputFolder                         string
+	SecretsFolder                        string
+	CreateCluster                        bool
+	ClusterName                          string
+	KindOptions                          string
+	KindInternal                         bool
+	K3dOptions                           string
+	MaxDiffLength                        uint
+	IgnoreInvalidWatchPattern            bool
+	WatchIfNoWatchPatternFound           bool
+	AutoDetectFilesChanged               bool
+	KeepClusterAlive                     bool
+	ArgocdNamespace                      string
+	ArgocdChartVersion                   string
+	ArgocdChartName                      string
+	ArgocdChartURL                       string
+	ArgocdChartRepoUsername              string
+	ArgocdChartRepoPassword              string
+	ArgocdLoginOptions                   string
+	ArgocdAuthToken                      string
+	ArgocdConfigPath                     string
+	LogFormat                            string
+	Title                                string
+	HideDeletedAppDiff                   bool
+	DisableClientThrottling              bool
+	RenderMethod                         RenderMethod
+	ArgocdUIURL                          string
+	Concurrency                          uint
+	OutputAppManifests                   bool
+	OutputBranchManifests                bool
+	TraverseAppOfApps                    bool
+	FailOnDuplicateGeneratedApplications bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -272,6 +275,7 @@ func Parse() *Config {
 	viper.SetDefault("output-app-manifests", DefaultOutputAppManifests)
 	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
 	viper.SetDefault("traverse-app-of-apps", DefaultTraverseAppOfApps)
+	viper.SetDefault("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -330,6 +334,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
+	rootCmd.Flags().Bool("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications, "Fail when a single ApplicationSet generates multiple Applications with the same name")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -378,44 +383,45 @@ func (o *RawOptions) checkRequired() []string {
 func (o *RawOptions) ToConfig() (*Config, error) {
 	cfg := &Config{
 		// Direct passthrough fields
-		Debug:                      o.Debug,
-		DryRun:                     o.DryRun,
-		Timeout:                    o.Timeout,
-		DiffIgnore:                 o.DiffIgnore,
-		LineCount:                  o.LineCount,
-		BaseBranch:                 o.BaseBranch,
-		TargetBranch:               o.TargetBranch,
-		Repo:                       o.Repo,
-		OutputFolder:               o.OutputFolder,
-		SecretsFolder:              o.SecretsFolder,
-		CreateCluster:              o.CreateCluster,
-		ClusterName:                o.ClusterName,
-		KindOptions:                o.KindOptions,
-		KindInternal:               o.KindInternal,
-		K3dOptions:                 o.K3dOptions,
-		MaxDiffLength:              o.MaxDiffLength,
-		IgnoreInvalidWatchPattern:  o.IgnoreInvalidWatchPattern,
-		WatchIfNoWatchPatternFound: o.WatchIfNoWatchPatternFound,
-		AutoDetectFilesChanged:     o.AutoDetectFilesChanged,
-		KeepClusterAlive:           o.KeepClusterAlive,
-		ArgocdNamespace:            o.ArgocdNamespace,
-		ArgocdChartVersion:         o.ArgocdChartVersion,
-		ArgocdChartName:            o.ArgocdChartName,
-		ArgocdChartURL:             o.ArgocdChartURL,
-		ArgocdChartRepoUsername:    o.ArgocdChartRepoUsername,
-		ArgocdChartRepoPassword:    o.ArgocdChartRepoPassword,
-		ArgocdLoginOptions:         o.ArgocdLoginOptions,
-		ArgocdAuthToken:            o.ArgocdAuthToken,
-		ArgocdConfigPath:           o.ArgocdConfigPath,
-		LogFormat:                  o.LogFormat,
-		Title:                      o.Title,
-		HideDeletedAppDiff:         o.HideDeletedAppDiff,
-		DisableClientThrottling:    o.DisableClientThrottling,
-		ArgocdUIURL:                o.ArgocdUIURL,
-		Concurrency:                o.Concurrency,
-		OutputAppManifests:         o.OutputAppManifests,
-		OutputBranchManifests:      o.OutputBranchManifests,
-		TraverseAppOfApps:          o.TraverseAppOfApps,
+		Debug:                                o.Debug,
+		DryRun:                               o.DryRun,
+		Timeout:                              o.Timeout,
+		DiffIgnore:                           o.DiffIgnore,
+		LineCount:                            o.LineCount,
+		BaseBranch:                           o.BaseBranch,
+		TargetBranch:                         o.TargetBranch,
+		Repo:                                 o.Repo,
+		OutputFolder:                         o.OutputFolder,
+		SecretsFolder:                        o.SecretsFolder,
+		CreateCluster:                        o.CreateCluster,
+		ClusterName:                          o.ClusterName,
+		KindOptions:                          o.KindOptions,
+		KindInternal:                         o.KindInternal,
+		K3dOptions:                           o.K3dOptions,
+		MaxDiffLength:                        o.MaxDiffLength,
+		IgnoreInvalidWatchPattern:            o.IgnoreInvalidWatchPattern,
+		WatchIfNoWatchPatternFound:           o.WatchIfNoWatchPatternFound,
+		AutoDetectFilesChanged:               o.AutoDetectFilesChanged,
+		KeepClusterAlive:                     o.KeepClusterAlive,
+		ArgocdNamespace:                      o.ArgocdNamespace,
+		ArgocdChartVersion:                   o.ArgocdChartVersion,
+		ArgocdChartName:                      o.ArgocdChartName,
+		ArgocdChartURL:                       o.ArgocdChartURL,
+		ArgocdChartRepoUsername:              o.ArgocdChartRepoUsername,
+		ArgocdChartRepoPassword:              o.ArgocdChartRepoPassword,
+		ArgocdLoginOptions:                   o.ArgocdLoginOptions,
+		ArgocdAuthToken:                      o.ArgocdAuthToken,
+		ArgocdConfigPath:                     o.ArgocdConfigPath,
+		LogFormat:                            o.LogFormat,
+		Title:                                o.Title,
+		HideDeletedAppDiff:                   o.HideDeletedAppDiff,
+		DisableClientThrottling:              o.DisableClientThrottling,
+		ArgocdUIURL:                          o.ArgocdUIURL,
+		Concurrency:                          o.Concurrency,
+		OutputAppManifests:                   o.OutputAppManifests,
+		OutputBranchManifests:                o.OutputBranchManifests,
+		TraverseAppOfApps:                    o.TraverseAppOfApps,
+		FailOnDuplicateGeneratedApplications: o.FailOnDuplicateGeneratedApplications,
 	}
 
 	var err error
@@ -749,5 +755,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.TraverseAppOfApps {
 		log.Info().Msgf("✨ - traverse-app-of-apps: %t", o.TraverseAppOfApps)
+	}
+	if o.FailOnDuplicateGeneratedApplications {
+		log.Info().Msgf("✨ - fail-on-duplicate-generated-applications: %t", o.FailOnDuplicateGeneratedApplications)
 	}
 }

@@ -2,6 +2,8 @@ package argoapplication
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +24,7 @@ func ConvertAppSetsToAppsInBothBranches(
 	tempFolder string,
 	redirectRevisions []string,
 	debug bool,
+	failOnDuplicateGeneratedApplications bool,
 	appSelectionOptions ApplicationSelectionOptions,
 ) (*ArgoSelection, *ArgoSelection, time.Duration, error) {
 	startTime := time.Now()
@@ -35,6 +38,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		baseBranch,
 		baseTempFolder,
 		debug,
+		failOnDuplicateGeneratedApplications,
 		appSelectionOptions,
 		repo,
 		redirectRevisions,
@@ -52,6 +56,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		targetBranch,
 		targetTempFolder,
 		debug,
+		failOnDuplicateGeneratedApplications,
 		appSelectionOptions,
 		repo,
 		redirectRevisions,
@@ -72,6 +77,7 @@ func processAppSets(
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
+	failOnDuplicateGeneratedApplications bool,
 	appSelectionOptions ApplicationSelectionOptions,
 	repo string,
 	redirectRevisions []string,
@@ -83,6 +89,7 @@ func processAppSets(
 		branch,
 		tempFolder,
 		debug,
+		failOnDuplicateGeneratedApplications,
 	)
 	if err != nil {
 		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
@@ -198,6 +205,7 @@ func convertAppSetsToApps(
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
+	failOnDuplicateGeneratedApplications bool,
 ) (*AppSetConversionResult, error) {
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
@@ -243,7 +251,7 @@ func convertAppSetsToApps(
 			defer wg.Done()
 			defer func() { <-sem }() // release semaphore slot
 
-			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder)
+			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder, failOnDuplicateGeneratedApplications)
 			results <- appSetGenerateResult{index: i, apps: apps, err: err}
 		}(i, appSet)
 	}
@@ -290,6 +298,7 @@ func generateAppsFromAppSet(
 	appSet ArgoResource,
 	branch *git.Branch,
 	tempFolder string,
+	failOnDuplicateGeneratedApplications bool,
 ) ([]ArgoResource, error) {
 	retryCount := 5
 	generatedApps, err := argocd.AppsetGenerateWithRetry(appSet.Yaml, tempFolder, retryCount)
@@ -330,10 +339,60 @@ func generateAppsFromAppSet(
 		apps = append(apps, *app)
 	}
 
+	if err := validateGeneratedApplicationNames(appSet, apps, branch, failOnDuplicateGeneratedApplications); err != nil {
+		return nil, err
+	}
+
 	log.Debug().Str("branch", branch.Name).Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msgf(
 		"Generated %d Applications from ApplicationSet",
 		len(apps),
 	)
 
 	return apps, nil
+}
+
+func duplicateGeneratedApplicationNames(apps []ArgoResource) []string {
+	counts := make(map[string]int)
+	for _, app := range apps {
+		counts[app.Name]++
+	}
+
+	var duplicates []string
+	for name, count := range counts {
+		if count > 1 {
+			duplicates = append(duplicates, name)
+		}
+	}
+
+	slices.Sort(duplicates)
+	return duplicates
+}
+
+func validateGeneratedApplicationNames(
+	appSet ArgoResource,
+	apps []ArgoResource,
+	branch *git.Branch,
+	failOnDuplicateGeneratedApplications bool,
+) error {
+	duplicates := duplicateGeneratedApplicationNames(apps)
+	if len(duplicates) == 0 {
+		return nil
+	}
+
+	msg := fmt.Sprintf(
+		"ApplicationSet %s generated applications with duplicate names: %s",
+		appSet.GetLongName(),
+		strings.Join(duplicates, ", "),
+	)
+
+	if failOnDuplicateGeneratedApplications {
+		return fmt.Errorf("%s", msg)
+	}
+
+	log.Warn().
+		Str("branch", branch.Name).
+		Str(appSet.Kind.ShortName(), appSet.GetLongName()).
+		Msgf("⚠️ %s. Continuing because --fail-on-duplicate-generated-applications is not enabled", msg)
+
+	return nil
 }
