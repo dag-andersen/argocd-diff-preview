@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -375,4 +376,36 @@ func TestLabelApplicationWithRunID(t *testing.T) {
 			assert.Equal(t, tt.expectedLabels, actualLabels)
 		})
 	}
+}
+
+func TestApplicationSetGeneratedDuplicateNamesAreNormalizedBeforeExtract(t *testing.T) {
+	t.Run("duplicates fail verification before normalization", func(t *testing.T) {
+		apps := []argoapplication.ArgoResource{
+			*createTestArgoResource("dupe", "dupe", "generated-by-appset.yaml", git.Target),
+			*createTestArgoResource("dupe", "dupe", "generated-by-appset.yaml", git.Target),
+		}
+
+		err := verifyNoDuplicateAppIds(apps)
+		require.EqualError(t, err, "duplicate app name: dupe")
+	})
+
+	t.Run("UniqueIds masks the duplicate before extract runs", func(t *testing.T) {
+		apps := []argoapplication.ArgoResource{
+			*createTestArgoResource("dupe", "dupe", "generated-by-appset.yaml", git.Target),
+			*createTestArgoResource("dupe", "dupe", "generated-by-appset.yaml", git.Target),
+		}
+
+		normalized := argoapplication.UniqueIds(apps, git.NewBranch("feature", git.Target))
+		require.NoError(t, verifyNoDuplicateAppIds(normalized))
+
+		ids := []string{normalized[0].Id, normalized[1].Id}
+		assert.ElementsMatch(t, []string{"dupe-1", "dupe-2"}, ids)
+
+		for i := range normalized {
+			require.NoError(t, updateYamlName(&normalized[i], "pr123"))
+		}
+
+		yamlNames := []string{normalized[0].Yaml.GetName(), normalized[1].Yaml.GetName()}
+		assert.ElementsMatch(t, []string{"pr123-t-dupe-1", "pr123-t-dupe-2"}, yamlNames)
+	})
 }
