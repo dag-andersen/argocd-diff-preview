@@ -80,6 +80,12 @@ func PatchApplication(
 		return nil, fmt.Errorf("failed to redirect source hydrator: %w", err)
 	}
 
+	err = app.SetHelmReleaseNameIfUnset()
+	if err != nil {
+		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
+		return nil, fmt.Errorf("failed to set Helm releaseName: %w", err)
+	}
+
 	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
@@ -93,6 +99,67 @@ func PatchApplication(
 	}
 
 	return &app, nil
+}
+
+// SetHelmReleaseNameIfUnset ensures Helm chart sources use a stable releaseName.
+//
+// Argo CD defaults Helm releaseName to Application metadata.name when unset.
+// argocd-diff-preview prefixes Application names at render time to isolate base and
+// target runs, which can leak into chart resource names and create false-positive
+// diffs when names are truncated. Setting releaseName to the original app name
+// keeps Helm naming stable across branches.
+//
+// This only applies to Application resources and only for Helm chart sources
+// (source.chart or sources[].chart). Existing releaseName values are preserved.
+func (a *ArgoResource) SetHelmReleaseNameIfUnset() error {
+	if a.Kind != Application || a.Yaml == nil {
+		return nil
+	}
+
+	if strings.TrimSpace(a.Name) == "" {
+		return nil
+	}
+
+	spec, found, _ := unstructured.NestedMap(a.Yaml.Object, "spec")
+	if !found {
+		return nil
+	}
+
+	if source, ok := spec["source"].(map[string]any); ok {
+		setHelmReleaseNameIfUnsetOnSource(source, a.Name)
+	}
+
+	if sources, ok := spec["sources"].([]any); ok {
+		for _, sourceInterface := range sources {
+			if source, ok := sourceInterface.(map[string]any); ok {
+				setHelmReleaseNameIfUnsetOnSource(source, a.Name)
+			}
+		}
+	}
+
+	if err := unstructured.SetNestedMap(a.Yaml.Object, spec, "spec"); err != nil {
+		return fmt.Errorf("failed to set spec map: %w", err)
+	}
+
+	return nil
+}
+
+func setHelmReleaseNameIfUnsetOnSource(source map[string]any, appName string) {
+	if _, hasChart := source["chart"]; !hasChart {
+		return
+	}
+
+	helmMap, ok := source["helm"].(map[string]any)
+	if !ok {
+		helmMap = make(map[string]any)
+		source["helm"] = helmMap
+	}
+
+	if _, exists := helmMap["releaseName"]; exists {
+		return
+	}
+
+	helmMap["releaseName"] = appName
 }
 
 // SetNamespace sets the namespace of the resource
