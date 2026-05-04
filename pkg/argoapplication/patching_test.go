@@ -763,6 +763,168 @@ spec:
 	}
 }
 
+func TestSetHelmReleaseNameIfUnset(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	tests := []struct {
+		name     string
+		kind     ApplicationKind
+		appName  string
+		inputYML string
+		wantYML  string
+	}{
+		{
+			name:    "single helm source gets releaseName when unset",
+			kind:    Application,
+			appName: "non-prod-clickhouse-operator",
+			inputYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: non-prod-clickhouse-operator
+spec:
+  source:
+    repoURL: ghcr.io/clickhouse
+    chart: clickhouse-operator-helm
+    targetRevision: 0.0.4
+`,
+			wantYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: non-prod-clickhouse-operator
+spec:
+  source:
+    repoURL: ghcr.io/clickhouse
+    chart: clickhouse-operator-helm
+    targetRevision: 0.0.4
+    helm:
+      releaseName: non-prod-clickhouse-operator
+`,
+		},
+		{
+			name:    "existing releaseName is preserved",
+			kind:    Application,
+			appName: "non-prod-clickhouse-operator",
+			inputYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: non-prod-clickhouse-operator
+spec:
+  source:
+    repoURL: ghcr.io/clickhouse
+    chart: clickhouse-operator-helm
+    targetRevision: 0.0.4
+    helm:
+      releaseName: already-set
+`,
+			wantYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: non-prod-clickhouse-operator
+spec:
+  source:
+    repoURL: ghcr.io/clickhouse
+    chart: clickhouse-operator-helm
+    targetRevision: 0.0.4
+    helm:
+      releaseName: already-set
+`,
+		},
+		{
+			name:    "multi-source only sets chart sources",
+			kind:    Application,
+			appName: "my-app",
+			inputYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  sources:
+    - repoURL: https://github.com/org/repo
+      path: apps/my-app
+      targetRevision: main
+    - repoURL: ghcr.io/clickhouse
+      chart: clickhouse-operator-helm
+      targetRevision: 0.0.4
+`,
+			wantYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  sources:
+    - repoURL: https://github.com/org/repo
+      path: apps/my-app
+      targetRevision: main
+    - repoURL: ghcr.io/clickhouse
+      chart: clickhouse-operator-helm
+      targetRevision: 0.0.4
+      helm:
+        releaseName: my-app
+`,
+		},
+		{
+			name:    "applicationset is not modified",
+			kind:    ApplicationSet,
+			appName: "set-name",
+			inputYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: set-name
+spec:
+  template:
+    spec:
+      source:
+        repoURL: ghcr.io/clickhouse
+        chart: clickhouse-operator-helm
+        targetRevision: 0.0.4
+`,
+			wantYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: set-name
+spec:
+  template:
+    spec:
+      source:
+        repoURL: ghcr.io/clickhouse
+        chart: clickhouse-operator-helm
+        targetRevision: 0.0.4
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var node map[string]any
+			err := yaml.Unmarshal([]byte(tt.inputYML), &node)
+			assert.NoError(t, err)
+
+			app := &ArgoResource{
+				Yaml:     &unstructured.Unstructured{Object: node},
+				Kind:     tt.kind,
+				Id:       "test-id",
+				Name:     tt.appName,
+				FileName: "test.yaml",
+			}
+
+			err = app.SetHelmReleaseNameIfUnset()
+			assert.NoError(t, err)
+
+			got, err := app.AsString()
+			assert.NoError(t, err)
+			assert.Equal(t, normalizeYAML(tt.wantYML), normalizeYAML(got))
+		})
+	}
+}
+
 // normalizeYAML normalizes YAML strings by parsing and re-marshaling
 func normalizeYAML(yamlStr string) string {
 	var node map[string]any
