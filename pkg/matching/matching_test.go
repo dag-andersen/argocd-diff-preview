@@ -1796,6 +1796,13 @@ func TestShouldShowLine(t *testing.T) {
 			expected:      false,
 		},
 		{
+			name:          "change line matching checksum/secret is hidden",
+			line:          "checksum/secret: abc123def",
+			isChange:      true,
+			ignorePattern: nil,
+			expected:      false,
+		},
+		{
 			name:          "change line matching caBundle is hidden",
 			line:          "caBundle: LS0tLS1CRUdJTi...",
 			isChange:      true,
