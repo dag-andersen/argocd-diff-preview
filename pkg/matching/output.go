@@ -425,6 +425,7 @@ var defaultIgnorePatterns = []string{
 	"checksum/cmd-params: ",
 	"checksum/cm: ",
 	"checksum/config-maps: ",
+	"checksum/secret: ",
 	"checksum/secrets: ",
 	"caBundle: ",
 	"ca.crt: ",
