@@ -84,7 +84,7 @@ func (c *Client) DeleteArgoCDApplication(namespace string, name string) error {
 // and matching the given label key
 func (c *Client) DeleteAllApplicationsOlderThan(namespace string, minutes int) error {
 
-	log.Info().Msgf("Deleting applications older than %d minutes", minutes)
+	log.Info().Msgf("⏳ Deleting applications older than %d minutes", minutes)
 
 	deletedCount := 0
 
@@ -111,9 +111,9 @@ func (c *Client) DeleteAllApplicationsOlderThan(namespace string, minutes int) e
 	}
 
 	if deletedCount > 0 {
-		log.Info().Msgf("Deleted %d applications", deletedCount)
+		log.Info().Msgf("🗑️ Deleted %d applications", deletedCount)
 	} else {
-		log.Info().Msgf("No applications with the label '%s' were found older than %d minutes", vars.ArgoCDApplicationLabelKey, minutes)
+		log.Info().Msgf("🤖 No applications with the label '%s' were found older than %d minutes", vars.ArgoCDApplicationLabelKey, minutes)
 	}
 
 	return nil

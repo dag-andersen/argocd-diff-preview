@@ -14,6 +14,12 @@ func RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps *argoapplication.
 	for _, baseApp := range baseApps.SelectedApps {
 		for _, targetApp := range targetApps.SelectedApps {
 			if baseApp.Id == targetApp.Id && yamlEqual(baseApp.Yaml, targetApp.Yaml) {
+				if shouldAlwaysRender(baseApp, targetApp) {
+					log.Debug().
+						Str(baseApp.Kind.ShortName(), baseApp.Name).
+						Msg("Keeping application because `argocd-diff-preview/render=always`")
+					break
+				}
 				log.Debug().Str(baseApp.Kind.ShortName(), baseApp.Name).Msg("Skipping application because it has not changed")
 				duplicateYaml = append(duplicateYaml, baseApp.Yaml)
 				break
@@ -58,6 +64,10 @@ func RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps *argoapplication.
 	}
 
 	return baseAppsDeDuplication, targetAppsDeDuplication
+}
+
+func shouldAlwaysRender(baseApp, targetApp argoapplication.ArgoResource) bool {
+	return baseApp.GetRenderMode() == argoapplication.RenderAlways || targetApp.GetRenderMode() == argoapplication.RenderAlways
 }
 
 func filterDuplicates(apps *argoapplication.ArgoSelection, duplicates []*unstructured.Unstructured) *argoapplication.ArgoSelection {

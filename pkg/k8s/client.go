@@ -50,7 +50,7 @@ func NewClient(disableClientThrottling bool) (*Client, error) {
 			log.Debug().Err(err).Msg("Failed to create k8s client from service account")
 		} else {
 			config = c
-			log.Info().Msg("Using service account and environment variables to connect to cluster")
+			log.Info().Msg("📡 Using service account and environment variables to connect to cluster")
 		}
 	}
 

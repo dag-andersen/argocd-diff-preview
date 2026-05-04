@@ -31,9 +31,47 @@ spec:
 	return &obj
 }
 
+func createTestYAMLWithAnnotations(kind, name, namespace string, annotations map[string]string) *unstructured.Unstructured {
+	annotationLines := ""
+	if len(annotations) > 0 {
+		annotationLines = "\n  annotations:"
+		for key, value := range annotations {
+			annotationLines += "\n    " + key + ": \"" + value + "\""
+		}
+	}
+
+	yamlStr := `apiVersion: argoproj.io/v1alpha1
+kind: ` + kind + `
+metadata:
+  name: ` + name + `
+  namespace: ` + namespace + annotationLines + `
+spec:
+  destination:
+    namespace: ` + namespace
+
+	var obj unstructured.Unstructured
+	err := yaml.Unmarshal([]byte(yamlStr), &obj)
+	if err != nil {
+		panic(err)
+	}
+	return &obj
+}
+
 // Helper function to create test ArgoResource
 func createTestArgoResource(kind, name, fileName string, branch git.BranchType) argoapplication.ArgoResource {
 	yamlObj := createTestYAML(kind, name, "default")
+	var appKind argoapplication.ApplicationKind
+	if kind == "Application" {
+		appKind = argoapplication.Application
+	} else {
+		appKind = argoapplication.ApplicationSet
+	}
+
+	return *argoapplication.NewArgoResource(yamlObj, appKind, name, name, fileName, branch)
+}
+
+func createTestArgoResourceWithAnnotations(kind, name, fileName string, branch git.BranchType, annotations map[string]string) argoapplication.ArgoResource {
+	yamlObj := createTestYAMLWithAnnotations(kind, name, "default", annotations)
 	var appKind argoapplication.ApplicationKind
 	if kind == "Application" {
 		appKind = argoapplication.Application
@@ -248,4 +286,96 @@ func TestFilterDuplicates_PreservesExistingSkippedApps(t *testing.T) {
 	assert.Len(t, result.SelectedApps, 1)
 	assert.Equal(t, "app2", result.SelectedApps[0].Name)
 	assert.Len(t, result.SkippedApps, 2) // skippedApp + app1
+}
+
+func TestRemoveIdenticalCopiesBetweenBranches_ApplicationSetWithRenderAlwaysIsNotRemoved(t *testing.T) {
+	baseAppSet := createTestArgoResourceWithAnnotations(
+		"ApplicationSet",
+		"appset-1",
+		"appset.yaml",
+		git.Base,
+		map[string]string{"argocd-diff-preview/render": "always"},
+	)
+	targetAppSet := createTestArgoResourceWithAnnotations(
+		"ApplicationSet",
+		"appset-1",
+		"appset.yaml",
+		git.Target,
+		map[string]string{"argocd-diff-preview/render": "always"},
+	)
+
+	base := createArgoSelection([]argoapplication.ArgoResource{baseAppSet})
+	target := createArgoSelection([]argoapplication.ArgoResource{targetAppSet})
+
+	baseResult, targetResult := RemoveIdenticalCopiesBetweenBranches(base, target)
+
+	assert.Len(t, baseResult.SelectedApps, 1)
+	assert.Len(t, targetResult.SelectedApps, 1)
+	assert.Equal(t, "appset-1", baseResult.SelectedApps[0].Name)
+	assert.Equal(t, "appset-1", targetResult.SelectedApps[0].Name)
+	assert.Len(t, baseResult.SkippedApps, 0)
+	assert.Len(t, targetResult.SkippedApps, 0)
+}
+
+func TestRemoveIdenticalCopiesBetweenBranches_ApplicationSetWithoutRenderAlwaysIsRemoved(t *testing.T) {
+	baseAppSet := createTestArgoResource("ApplicationSet", "appset-2", "appset.yaml", git.Base)
+	targetAppSet := createTestArgoResource("ApplicationSet", "appset-2", "appset.yaml", git.Target)
+
+	base := createArgoSelection([]argoapplication.ArgoResource{baseAppSet})
+	target := createArgoSelection([]argoapplication.ArgoResource{targetAppSet})
+
+	baseResult, targetResult := RemoveIdenticalCopiesBetweenBranches(base, target)
+
+	assert.Len(t, baseResult.SelectedApps, 0)
+	assert.Len(t, targetResult.SelectedApps, 0)
+	assert.Len(t, baseResult.SkippedApps, 1)
+	assert.Len(t, targetResult.SkippedApps, 1)
+}
+
+func TestRemoveIdenticalCopiesBetweenBranches_ApplicationSetWithRenderAlwaysOnOneSideIsNotRemoved(t *testing.T) {
+	baseAppSet := createTestArgoResourceWithAnnotations(
+		"ApplicationSet",
+		"appset-3",
+		"appset.yaml",
+		git.Base,
+		map[string]string{"argocd-diff-preview/render": "always"},
+	)
+	targetAppSet := createTestArgoResource("ApplicationSet", "appset-3", "appset.yaml", git.Target)
+
+	base := createArgoSelection([]argoapplication.ArgoResource{baseAppSet})
+	target := createArgoSelection([]argoapplication.ArgoResource{targetAppSet})
+
+	baseResult, targetResult := RemoveIdenticalCopiesBetweenBranches(base, target)
+
+	assert.Len(t, baseResult.SelectedApps, 1)
+	assert.Len(t, targetResult.SelectedApps, 1)
+	assert.Len(t, baseResult.SkippedApps, 0)
+	assert.Len(t, targetResult.SkippedApps, 0)
+}
+
+func TestRemoveIdenticalCopiesBetweenBranches_ApplicationSetWithRenderChangedIsRemoved(t *testing.T) {
+	baseAppSet := createTestArgoResourceWithAnnotations(
+		"ApplicationSet",
+		"appset-4",
+		"appset.yaml",
+		git.Base,
+		map[string]string{"argocd-diff-preview/render": "changed"},
+	)
+	targetAppSet := createTestArgoResourceWithAnnotations(
+		"ApplicationSet",
+		"appset-4",
+		"appset.yaml",
+		git.Target,
+		map[string]string{"argocd-diff-preview/render": "changed"},
+	)
+
+	base := createArgoSelection([]argoapplication.ArgoResource{baseAppSet})
+	target := createArgoSelection([]argoapplication.ArgoResource{targetAppSet})
+
+	baseResult, targetResult := RemoveIdenticalCopiesBetweenBranches(base, target)
+
+	assert.Len(t, baseResult.SelectedApps, 0)
+	assert.Len(t, targetResult.SelectedApps, 0)
+	assert.Len(t, baseResult.SkippedApps, 1)
+	assert.Len(t, targetResult.SkippedApps, 1)
 }
