@@ -19,8 +19,15 @@ import (
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/cli/values"
 	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v3/pkg/registry"
 	"helm.sh/helm/v3/pkg/repo"
 )
+
+const ociScheme = "oci://"
+
+func isOCIChartURL(url string) bool {
+	return strings.HasPrefix(strings.TrimSpace(url), ociScheme)
+}
 
 // Common resource GVRs
 var (
@@ -137,6 +144,11 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		log.Info().Msg("🦑 Installing Argo CD Helm Chart version: 'latest'")
 	}
 
+	oci := isOCIChartURL(a.ChartURL)
+	if oci && installLatest {
+		return fmt.Errorf("an explicit --argocd-chart-version is required when --argocd-chart-url uses the oci:// scheme (OCI registries do not expose a 'latest' tag via index.yaml)")
+	}
+
 	// Check for values files
 	valuesFiles, err := a.findValuesFiles()
 	if err != nil {
@@ -145,65 +157,6 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Initialize Helm client settings
 	settings := cli.New()
-
-	// Try to add the repo first
-	repoFile := settings.RepositoryConfig
-
-	// Create repository config if it doesn't exist
-	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath.Dir(repoFile), 0755); err != nil {
-			return fmt.Errorf("failed to create repository directory: %w", err)
-		}
-
-		// Create a new repository file
-		r := repo.NewFile()
-		r.Add(&repo.Entry{
-			Name:     a.ChartName,
-			URL:      a.ChartURL,
-			Username: a.ChartRepoUsername,
-			Password: a.ChartRepoPassword,
-		})
-
-		if err := r.WriteFile(repoFile, 0644); err != nil {
-			return fmt.Errorf("failed to write repository file: %w", err)
-		}
-	} else {
-		// Update existing repository
-		r, err := repo.LoadFile(repoFile)
-		if err != nil {
-			return fmt.Errorf("failed to load repository file: %w", err)
-		}
-
-		if !r.Has(a.ChartName) {
-			r.Add(&repo.Entry{
-				Name:     a.ChartName,
-				URL:      a.ChartURL,
-				Username: a.ChartRepoUsername,
-				Password: a.ChartRepoPassword,
-			})
-
-			if err := r.WriteFile(repoFile, 0644); err != nil {
-				return fmt.Errorf("failed to update repository file: %w", err)
-			}
-		}
-	}
-
-	// Update repository
-	repoEntry := &repo.Entry{
-		Name:     a.ChartName,
-		URL:      a.ChartURL,
-		Username: a.ChartRepoUsername,
-		Password: a.ChartRepoPassword,
-	}
-
-	chartRepo, err := repo.NewChartRepository(repoEntry, getter.All(settings))
-	if err != nil {
-		return fmt.Errorf("failed to create chart repository: %w", err)
-	}
-
-	if _, err := chartRepo.DownloadIndexFile(); err != nil {
-		return fmt.Errorf("failed to download index file: %w", err)
-	}
 
 	// Initialize the action configuration
 	actionConfig := new(action.Configuration)
@@ -226,11 +179,14 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		helmClient.Version = chartVersion
 	}
 
-	// Locate chart
-	chartName := fmt.Sprintf("%s/argo-cd", a.ChartName)
-	chartPath, err := helmClient.LocateChart(chartName, settings)
+	var chartPath string
+	if oci {
+		chartPath, err = a.locateOCIChart(settings, actionConfig, helmClient)
+	} else {
+		chartPath, err = a.locateHTTPChart(settings, helmClient)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to locate chart: %w", err)
+		return err
 	}
 
 	// Load chart
@@ -288,6 +244,121 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	log.Info().Msg("🦑 Argo CD Helm chart installed successfully")
 	return nil
+}
+
+// locateHTTPChart resolves the chart path for a classic HTTP(S) Helm repo. It
+// adds/updates the local repositories.yaml entry, downloads the index file,
+// and asks the install action to fetch <repoName>/argo-cd.
+func (a *ArgoCDInstallation) locateHTTPChart(settings *cli.EnvSettings, helmClient *action.Install) (string, error) {
+	repoFile := settings.RepositoryConfig
+
+	// Create repository config if it doesn't exist
+	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(repoFile), 0755); err != nil {
+			return "", fmt.Errorf("failed to create repository directory: %w", err)
+		}
+
+		r := repo.NewFile()
+		r.Add(&repo.Entry{
+			Name:     a.ChartName,
+			URL:      a.ChartURL,
+			Username: a.ChartRepoUsername,
+			Password: a.ChartRepoPassword,
+		})
+
+		if err := r.WriteFile(repoFile, 0644); err != nil {
+			return "", fmt.Errorf("failed to write repository file: %w", err)
+		}
+	} else {
+		r, err := repo.LoadFile(repoFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to load repository file: %w", err)
+		}
+
+		if !r.Has(a.ChartName) {
+			r.Add(&repo.Entry{
+				Name:     a.ChartName,
+				URL:      a.ChartURL,
+				Username: a.ChartRepoUsername,
+				Password: a.ChartRepoPassword,
+			})
+
+			if err := r.WriteFile(repoFile, 0644); err != nil {
+				return "", fmt.Errorf("failed to update repository file: %w", err)
+			}
+		}
+	}
+
+	repoEntry := &repo.Entry{
+		Name:     a.ChartName,
+		URL:      a.ChartURL,
+		Username: a.ChartRepoUsername,
+		Password: a.ChartRepoPassword,
+	}
+
+	chartRepo, err := repo.NewChartRepository(repoEntry, getter.All(settings))
+	if err != nil {
+		return "", fmt.Errorf("failed to create chart repository: %w", err)
+	}
+
+	if _, err := chartRepo.DownloadIndexFile(); err != nil {
+		return "", fmt.Errorf("failed to download index file: %w", err)
+	}
+
+	chartPath, err := helmClient.LocateChart(fmt.Sprintf("%s/argo-cd", a.ChartName), settings)
+	if err != nil {
+		return "", fmt.Errorf("failed to locate chart: %w", err)
+	}
+	return chartPath, nil
+}
+
+// locateOCIChart resolves the chart path for an OCI-based Helm repo
+// (e.g. oci://ghcr.io/argoproj/argo-helm/argo-cd). OCI charts have no
+// index.yaml, so we skip the repositories.yaml dance and pull directly by
+// reference. If credentials are provided, we log in to the registry first.
+func (a *ArgoCDInstallation) locateOCIChart(settings *cli.EnvSettings, actionConfig *action.Configuration, helmClient *action.Install) (string, error) {
+	registryClient, err := registry.NewClient(
+		registry.ClientOptDebug(settings.Debug),
+		registry.ClientOptWriter(os.Stderr),
+		registry.ClientOptCredentialsFile(settings.RegistryConfig),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create OCI registry client: %w", err)
+	}
+	actionConfig.RegistryClient = registryClient
+	helmClient.SetRegistryClient(registryClient)
+
+	if a.ChartRepoUsername != "" && a.ChartRepoPassword != "" {
+		host, err := ociHost(a.ChartURL)
+		if err != nil {
+			return "", err
+		}
+		log.Debug().Msgf("Logging in to OCI registry %s as %s", host, a.ChartRepoUsername)
+		if err := registryClient.Login(host,
+			registry.LoginOptBasicAuth(a.ChartRepoUsername, a.ChartRepoPassword),
+		); err != nil {
+			return "", fmt.Errorf("failed to log in to OCI registry %s: %w", host, err)
+		}
+	}
+
+	chartPath, err := helmClient.LocateChart(a.ChartURL, settings)
+	if err != nil {
+		return "", fmt.Errorf("failed to pull OCI chart %s: %w", a.ChartURL, err)
+	}
+	return chartPath, nil
+}
+
+// ociHost extracts the registry host from an oci:// URL.
+// e.g. oci://ghcr.io/argoproj/argo-helm/argo-cd -> ghcr.io
+func ociHost(ociURL string) (string, error) {
+	rest := strings.TrimPrefix(strings.TrimSpace(ociURL), ociScheme)
+	if rest == "" {
+		return "", fmt.Errorf("invalid oci:// URL %q: missing host", ociURL)
+	}
+	if i := strings.Index(rest, "/"); i >= 0 {
+		rest = rest[:i]
+	}
+	return rest, nil
 }
 
 func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
