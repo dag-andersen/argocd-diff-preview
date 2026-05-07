@@ -77,6 +77,18 @@ func (c *Client) DeleteArgoCDApplication(namespace string, name string) error {
 	}
 
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+	app, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get application %s before deletion: %w", name, err)
+	}
+
+	if len(app.GetFinalizers()) > 0 {
+		app.SetFinalizers(nil)
+		if _, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Update(context.Background(), app, metav1.UpdateOptions{}); err != nil {
+			return fmt.Errorf("failed to remove finalizers from application %s before deletion: %w", name, err)
+		}
+	}
+
 	return c.clientSet.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
 }
 

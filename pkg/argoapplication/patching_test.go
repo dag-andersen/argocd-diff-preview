@@ -1151,6 +1151,12 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+    - resources-finalizer.argocd.argoproj.io/background
+    - resources-finalizer.argocd.argoproj.io/foreground
+    - pre-delete-finalizer.argocd.argoproj.io
+    - pre-delete-finalizer.argocd.argoproj.io/cleanup
+    - post-delete-finalizer.argocd.argoproj.io
+    - post-delete-finalizer.argocd.argoproj.io/cleanup
     - some-other-finalizer
 spec:
   project: default
