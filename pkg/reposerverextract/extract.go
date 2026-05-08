@@ -537,6 +537,8 @@ func buildManifestRequestForSource(
 				Namespace:          namespace,
 				ApplicationSource:  &primarySource,
 				HasMultipleSources: hasMultipleSources,
+				ProjectName:        "default",
+				ProjectSourceRepos: []string{"*"},
 			}
 			return request, "", nil, nil
 		}
@@ -559,6 +561,8 @@ func buildManifestRequestForSource(
 				Namespace:          namespace,
 				ApplicationSource:  &primarySource,
 				HasMultipleSources: hasMultipleSources,
+				ProjectName:        "default",
+				ProjectSourceRepos: []string{"*"},
 			}
 			return request, "", nil, nil
 		}
@@ -571,6 +575,8 @@ func buildManifestRequestForSource(
 			Namespace:          namespace,
 			ApplicationSource:  &primarySource,
 			HasMultipleSources: hasMultipleSources,
+			ProjectName:        "default",
+			ProjectSourceRepos: []string{"*"},
 		}
 		return request, branchFolder, nil, nil
 	}
@@ -607,6 +613,8 @@ func buildManifestRequestForSource(
 			ApplicationSource:  &primarySource,
 			HasMultipleSources: hasMultipleSources,
 			RefSources:         refSourcesMap,
+			ProjectName:        "default",
+			ProjectSourceRepos: []string{"*"},
 		}
 		return request, "", nil, nil
 	}
@@ -639,6 +647,8 @@ func buildManifestRequestForSource(
 			ApplicationSource:  &primarySource,
 			HasMultipleSources: hasMultipleSources,
 			RefSources:         refSourcesMap,
+			ProjectName:        "default",
+			ProjectSourceRepos: []string{"*"},
 		}
 		return request, "", nil, nil
 	}
@@ -720,6 +730,8 @@ func buildManifestRequestForSource(
 		Namespace:          namespace,
 		ApplicationSource:  &rewrittenSource,
 		HasMultipleSources: hasMultipleSources,
+		ProjectName:        "default",
+		ProjectSourceRepos: []string{"*"},
 	}
 	return request, tempDir, cleanup, nil
 }

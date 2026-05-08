@@ -8,3 +8,5 @@ target-branch/
 temp/
 bin/
 .idea
+.opencode
+.claude
