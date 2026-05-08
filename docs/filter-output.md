@@ -8,6 +8,8 @@ This page explains how to reduce noise in your diff output by ignoring specific 
 
 Use the `--diff-ignore` option to hide lines matching a regex pattern.
 
+The tool also hides common noisy generated lines by default, including `caBundle:`, `ca.crt:`, and common Helm checksum annotations such as `checksum/secret:` and `checksum/secrets:`.
+
 ### Example: Image tag changes
 
 Since this tool highlights diffs between branches, it's important to stay up to date with your main branch. If your main branch is updated frequently with new container image tags, you'll see a lot of noise in the diff - changes like `image: my-image:v1.0.0` → `image: my-image:v1.0.1` will appear in every PR:
@@ -84,4 +86,3 @@ This hides:
 - The Deployment named `my-deploy` in the `apps` group
 - All CustomResourceDefinitions (any group)
 - The ConfigMap named `argocd-cm` in the core group
-

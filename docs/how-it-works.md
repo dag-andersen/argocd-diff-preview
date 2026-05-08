@@ -34,7 +34,8 @@ Before processing, the tool filters which applications to render. By default, al
 | Strategy | How it works |
 |----------|--------------|
 | **Watch patterns** | Add `argocd-diff-preview/watch-pattern` annotation to only render apps when specific files change |
-| **Ignore annotation** | Add `argocd-diff-preview/ignore: "true"` to skip specific applications entirely |
+| **Render annotation** | Add `argocd-diff-preview/render: "never"` to skip applications, or `argocd-diff-preview/render: "always"` to force rendering |
+| **Ignore annotation (deprecated)** | Add `argocd-diff-preview/ignore: "true"` to skip specific applications entirely |
 | **Label selectors** | Use `--selector "team=platform"` to filter by Kubernetes labels |
 | **File path regex** | Use `--file-regex="team-a/"` to filter by the application's file location |
 
