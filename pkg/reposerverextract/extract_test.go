@@ -104,6 +104,8 @@ spec:
 	assert.Empty(t, req.ApplicationSource.Chart, "should not have a Chart field")
 	assert.Equal(t, "production", req.Namespace)
 	assert.Nil(t, req.RefSources)
+	assert.Equal(t, "default", req.ProjectName, "project name must be set so repo-server does not mask helm dep errors as permission errors")
+	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "all source repos must be permitted")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,6 +146,8 @@ spec:
 	assert.Equal(t, "cert-manager", req.ApplicationSource.Chart)
 	assert.Equal(t, "https://charts.jetstack.io", req.Repo.Repo)
 	assert.Nil(t, req.RefSources)
+	assert.Equal(t, "default", req.ProjectName, "project name must be set so repo-server does not mask helm dep errors as permission errors")
+	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "all source repos must be permitted")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
