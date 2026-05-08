@@ -156,5 +156,21 @@ Run this after extracting the branch archives and before invoking argocd-diff-pr
 !!! tip
     This approach can be adapted for other kustomize exec plugins that depend on external secrets or credentials not available in CI.
 
+---
+
+## OCI Helm charts
+
+The default chart repository is the classic HTTP Helm repository at `https://argoproj.github.io/argo-helm`.
+
+You can also install Argo CD from an OCI Helm chart by setting `--argocd-chart-url` to an `oci://` reference, for example `oci://ghcr.io/argoproj/argo-helm/argo-cd`.
+
+```bash
+argocd-diff-preview \
+  --argocd-chart-url=oci://ghcr.io/argoproj/argo-helm/argo-cd \
+  --argocd-chart-version=8.6.1 \
+  --repo=<owner>/<repo> \
+  --target-branch=<branch>
+```
+
 !!! important "Questions, issues, or suggestions"
     If you experience issues or have any questions, please open an issue in the repository! 🚀

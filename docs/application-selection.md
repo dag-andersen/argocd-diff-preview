@@ -2,12 +2,13 @@
 
 Rendering manifests for all applications in your repository on every pull request can be time-consuming, especially in large monorepos. By default, `argocd-diff-preview` renders all applications it finds, but you can significantly speed up the process by limiting which applications are rendered.
 
-This page describes **4 strategies** for controlling which applications are rendered:
+This page describes **5 strategies** for controlling which applications are rendered:
 
 1. **Rendering only changed applications** - Automatically detect and render only applications affected by file changes
-2. **Ignoring individual applications** - Explicitly exclude specific applications from rendering
-3. **Label selectors** - Select/filter applications based on Kubernetes labels
-4. **File path regex** - Target applications based on their file path location
+2. **Render annotation** - Explicitly force applications to render or be skipped regardless of detected changes
+3. **Ignoring individual applications (deprecated)** - Explicitly exclude specific applications from rendering
+4. **Label selectors** - Select/filter applications based on Kubernetes labels
+5. **File path regex** - Target applications based on their file path location
 
 ---
 
@@ -241,7 +242,33 @@ jobs:
 
 ---
 
-## 2. Ignoring Individual Applications
+## 2. Render Annotation
+
+The `argocd-diff-preview/render` annotation controls whether an Application or ApplicationSet is rendered.
+
+| Value | Behavior |
+|-------|----------|
+| `changed` | Render only when the application changed or when its watch pattern matches changed files. This is the default behavior. |
+| `always` | Always render the application, even when the manifest is identical between the base and target branches. |
+| `never` | Never render the application. This replaces the deprecated `argocd-diff-preview/ignore: "true"` annotation. |
+
+This is useful for ApplicationSets where the ApplicationSet manifest itself may not change, but the generated Applications can still differ because generator input changed elsewhere.
+
+```yaml title="ApplicationSet" hl_lines="7"
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: my-appset
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/render: "always"
+spec:
+  # ...
+```
+
+---
+
+## 3. Ignoring Individual Applications
 
 Sometimes you need to permanently exclude specific applications from diff previews. This is useful for applications that:
 - Are rarely updated and don't need review
@@ -250,7 +277,10 @@ Sometimes you need to permanently exclude specific applications from diff previe
 
 Add the `argocd-diff-preview/ignore: "true"` annotation to any Application or ApplicationSet manifest to skip it during rendering.
 
-**Example: Ignoring an Application**
+!!! warning "Deprecated annotation"
+    The older `argocd-diff-preview/ignore: "true"` annotation is deprecated. It is still supported for backwards compatibility, but new configurations should use `argocd-diff-preview/render: "never"` instead.
+
+**Deprecated example: Ignoring an Application with `/ignore`**
 
 ```yaml title="Application" hl_lines="7"
 apiVersion: argoproj.io/v1alpha1
@@ -278,12 +308,9 @@ spec:
   # ...
 ```
 
-!!! note "Combining with other filters"
-    The ignore annotation takes precedence over other selection methods. An ignored application will never be rendered, even if it matches label selectors or file patterns.
-
 ---
 
-## 3. Label Selectors
+## 4. Label Selectors
 
 Label selectors provide a flexible way to filter applications using Kubernetes labels. This is particularly useful when you organize your applications by team, environment, or criticality.
 
@@ -324,7 +351,7 @@ spec:
 
 ---
 
-## 4. Application File Path Regex
+## 5. Application File Path Regex
 
 File path regex filtering is useful for targeting applications based on their location in your repository structure. This is especially helpful in monorepos where different teams or projects maintain applications in separate directories.
 
