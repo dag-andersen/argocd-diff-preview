@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/stretchr/testify/assert"
@@ -65,6 +66,12 @@ func makeBranchFolder(t *testing.T, relPath string) string {
 	return dir
 }
 
+func assertDefaultProjectFields(t *testing.T, req *repoapiclient.ManifestRequest) {
+	t.Helper()
+	assert.Equal(t, "default", req.ProjectName, "project name must match the patched application project")
+	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "source repos must be permissive so helm build errors are not masked as permission errors")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1.  Single-source, local chart (fast path, no refs)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,8 +111,7 @@ spec:
 	assert.Empty(t, req.ApplicationSource.Chart, "should not have a Chart field")
 	assert.Equal(t, "production", req.Namespace)
 	assert.Nil(t, req.RefSources)
-	assert.Equal(t, "default", req.ProjectName, "project name must be set so repo-server does not mask helm dep errors as permission errors")
-	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "all source repos must be permitted")
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,8 +152,7 @@ spec:
 	assert.Equal(t, "cert-manager", req.ApplicationSource.Chart)
 	assert.Equal(t, "https://charts.jetstack.io", req.Repo.Repo)
 	assert.Nil(t, req.RefSources)
-	assert.Equal(t, "default", req.ProjectName, "project name must be set so repo-server does not mask helm dep errors as permission errors")
-	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "all source repos must be permitted")
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -234,6 +239,7 @@ spec:
 	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
 	assert.Equal(t, "$local/clusters/prod/cert-manager-values.yaml", req.ApplicationSource.Helm.ValueFiles[0],
 		"value file path must remain as a $ref path for the remote RPC")
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -308,6 +314,7 @@ spec:
 	absValueFile = filepath.Clean(absValueFile)
 	_, statErr := os.Stat(absValueFile)
 	assert.NoError(t, statErr, "rewritten value file path %q should exist on disk", absValueFile)
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -418,6 +425,7 @@ spec:
 	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
 	assert.Equal(t, "$values/values.yaml", req.ApplicationSource.Helm.ValueFiles[0],
 		"value file path must remain as a $ref path for the remote RPC")
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -470,6 +478,7 @@ spec:
 	require.NotNil(t, req.RefSources)
 	_, hasLocal := req.RefSources["$local"]
 	assert.True(t, hasLocal, "RefSources must contain '$local'")
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -548,6 +557,7 @@ spec:
 		assert.Equal(t, branchFolder, streamDir, "content source %d should stream the branch folder", i)
 		assert.True(t, req.HasMultipleSources, "HasMultipleSources must be true for both requests")
 		assert.Equal(t, "argocd", req.Namespace)
+		assertDefaultProjectFields(t, req)
 		reqs[i].path = req.ApplicationSource.Path
 	}
 
@@ -615,6 +625,7 @@ spec:
 	assert.Equal(t, "HEAD", req.Revision)
 	assert.Equal(t, "cloud-services", req.Namespace)
 	assert.False(t, hasMultipleSources)
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -655,6 +666,7 @@ spec:
 	// Same repo - should stream the branch folder, not use remote RPC.
 	assert.Equal(t, branchFolder, streamDir, "same-repo source must still stream locally even when prRepo is set")
 	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -833,6 +845,7 @@ spec:
 	assert.Equal(t, branchFolder, streamDir,
 		"REGRESSION: same-repo source with slug-format prRepo must stream locally, not use remote RPC")
 	assert.Equal(t, "apps/debezium/debezium", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
