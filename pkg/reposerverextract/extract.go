@@ -514,6 +514,25 @@ func buildManifestRequestForSource(
 
 	namespace, _, _ := unstructured.NestedString(obj, append(specPath, "destination", "namespace")...)
 
+	newManifestRequest := func(source *v1alpha1.ApplicationSource) *repoapiclient.ManifestRequest {
+		return &repoapiclient.ManifestRequest{
+			Repo:               creds.GetRepo(source.RepoURL),
+			Repos:              creds.HelmRepos(source),
+			HelmRepoCreds:      creds.HelmRepoCreds(source),
+			Revision:           source.TargetRevision,
+			AppName:            app.Id,
+			Namespace:          namespace,
+			ApplicationSource:  source,
+			HasMultipleSources: hasMultipleSources,
+			// Applications are patched to the default project before rendering. We
+			// allow all source repos here so repo-server does not replace Helm
+			// dependency build/download errors with misleading project permission
+			// errors when checking dependency repositories.
+			ProjectName:        "default",
+			ProjectSourceRepos: []string{"*"},
+		}
+	}
+
 	// ── Fast path: no ref sources → stream the whole branch folder ────────────
 	// The repo server resolves ApplicationSource.Path relative to the stream
 	// root (workDir), so streaming the entire branch folder and setting Path
@@ -528,19 +547,7 @@ func buildManifestRequestForSource(
 	if len(refSources) == 0 {
 		if primarySource.Chart != "" {
 			// Remote Helm chart – no local files to stream.
-			request = &repoapiclient.ManifestRequest{
-				Repo:               creds.GetRepo(primarySource.RepoURL),
-				Repos:              creds.HelmRepos(&primarySource),
-				HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
-				Revision:           primarySource.TargetRevision,
-				AppName:            app.Id,
-				Namespace:          namespace,
-				ApplicationSource:  &primarySource,
-				HasMultipleSources: hasMultipleSources,
-				ProjectName:        "default",
-				ProjectSourceRepos: []string{"*"},
-			}
-			return request, "", nil, nil
+			return newManifestRequest(&primarySource), "", nil, nil
 		}
 		// Cross-repo source: the source's repoURL points at a different
 		// repository than the PR repo. Those files are not checked out
@@ -552,33 +559,9 @@ func buildManifestRequestForSource(
 				Str("sourceRepoURL", primarySource.RepoURL).
 				Str("prRepo", prRepo).
 				Msg("Source repoURL does not match PR repo - using remote RPC")
-			request = &repoapiclient.ManifestRequest{
-				Repo:               creds.GetRepo(primarySource.RepoURL),
-				Repos:              creds.HelmRepos(&primarySource),
-				HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
-				Revision:           primarySource.TargetRevision,
-				AppName:            app.Id,
-				Namespace:          namespace,
-				ApplicationSource:  &primarySource,
-				HasMultipleSources: hasMultipleSources,
-				ProjectName:        "default",
-				ProjectSourceRepos: []string{"*"},
-			}
-			return request, "", nil, nil
+			return newManifestRequest(&primarySource), "", nil, nil
 		}
-		request = &repoapiclient.ManifestRequest{
-			Repo:               creds.GetRepo(primarySource.RepoURL),
-			Repos:              creds.HelmRepos(&primarySource),
-			HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
-			Revision:           primarySource.TargetRevision,
-			AppName:            app.Id,
-			Namespace:          namespace,
-			ApplicationSource:  &primarySource,
-			HasMultipleSources: hasMultipleSources,
-			ProjectName:        "default",
-			ProjectSourceRepos: []string{"*"},
-		}
-		return request, branchFolder, nil, nil
+		return newManifestRequest(&primarySource), branchFolder, nil, nil
 	}
 	// ── Slow path: ref sources present ───────────────────────────────────────
 	//
@@ -603,19 +586,8 @@ func buildManifestRequestForSource(
 				TargetRevision: ref.TargetRevision,
 			}
 		}
-		request = &repoapiclient.ManifestRequest{
-			Repo:               creds.GetRepo(primarySource.RepoURL),
-			Repos:              creds.HelmRepos(&primarySource),
-			HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
-			Revision:           primarySource.TargetRevision,
-			AppName:            app.Id,
-			Namespace:          namespace,
-			ApplicationSource:  &primarySource,
-			HasMultipleSources: hasMultipleSources,
-			RefSources:         refSourcesMap,
-			ProjectName:        "default",
-			ProjectSourceRepos: []string{"*"},
-		}
+		request = newManifestRequest(&primarySource)
+		request.RefSources = refSourcesMap
 		return request, "", nil, nil
 	}
 
@@ -637,19 +609,8 @@ func buildManifestRequestForSource(
 				TargetRevision: ref.TargetRevision,
 			}
 		}
-		request = &repoapiclient.ManifestRequest{
-			Repo:               creds.GetRepo(primarySource.RepoURL),
-			Repos:              creds.HelmRepos(&primarySource),
-			HelmRepoCreds:      creds.HelmRepoCreds(&primarySource),
-			Revision:           primarySource.TargetRevision,
-			AppName:            app.Id,
-			Namespace:          namespace,
-			ApplicationSource:  &primarySource,
-			HasMultipleSources: hasMultipleSources,
-			RefSources:         refSourcesMap,
-			ProjectName:        "default",
-			ProjectSourceRepos: []string{"*"},
-		}
+		request = newManifestRequest(&primarySource)
+		request.RefSources = refSourcesMap
 		return request, "", nil, nil
 	}
 
@@ -721,18 +682,7 @@ func buildManifestRequestForSource(
 		rewrittenSource.Helm = &helmCopy
 	}
 
-	request = &repoapiclient.ManifestRequest{
-		Repo:               creds.GetRepo(rewrittenSource.RepoURL),
-		Repos:              creds.HelmRepos(&rewrittenSource),
-		HelmRepoCreds:      creds.HelmRepoCreds(&rewrittenSource),
-		Revision:           rewrittenSource.TargetRevision,
-		AppName:            app.Id,
-		Namespace:          namespace,
-		ApplicationSource:  &rewrittenSource,
-		HasMultipleSources: hasMultipleSources,
-		ProjectName:        "default",
-		ProjectSourceRepos: []string{"*"},
-	}
+	request = newManifestRequest(&rewrittenSource)
 	return request, tempDir, cleanup, nil
 }
 
