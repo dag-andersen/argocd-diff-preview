@@ -229,17 +229,27 @@ func (a *ArgoResource) SetDestinationServerToLocal() error {
 	return nil
 }
 
-// RemoveArgoCDFinalizers removes only the resources-finalizer.argocd.argoproj.io finalizer
+// RemoveArgoCDFinalizers removes Argo CD finalizers that can block deleting preview applications
 func (a *ArgoResource) RemoveArgoCDFinalizers() error {
 	finalizers := a.Yaml.GetFinalizers()
 	if finalizers == nil {
 		return nil
 	}
 
-	// Filter out Argo CD finalizer in a single operation
+	argoCDFinalizers := map[string]bool{
+		"resources-finalizer.argocd.argoproj.io":            true,
+		"resources-finalizer.argocd.argoproj.io/background": true,
+		"resources-finalizer.argocd.argoproj.io/foreground": true,
+		"pre-delete-finalizer.argocd.argoproj.io":           true,
+		"pre-delete-finalizer.argocd.argoproj.io/cleanup":   true,
+		"post-delete-finalizer.argocd.argoproj.io":          true,
+		"post-delete-finalizer.argocd.argoproj.io/cleanup":  true,
+	}
+
+	// Filter out Argo CD finalizers in a single operation
 	filteredFinalizers := finalizers[:0]
 	for _, f := range finalizers {
-		if f != "resources-finalizer.argocd.argoproj.io" {
+		if !argoCDFinalizers[f] {
 			filteredFinalizers = append(filteredFinalizers, f)
 		}
 	}
