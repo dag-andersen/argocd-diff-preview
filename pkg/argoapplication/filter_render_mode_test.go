@@ -112,3 +112,18 @@ func TestGetRenderMode(t *testing.T) {
 		})
 	}
 }
+
+func TestSetRenderMode(t *testing.T) {
+	resource := &ArgoResource{Yaml: &unstructured.Unstructured{Object: map[string]any{
+		"metadata": map[string]any{
+			"name": "test-app",
+		},
+	}}}
+
+	resource.SetRenderMode(RenderAlways)
+
+	assert.Equal(t, RenderAlways, resource.GetRenderMode())
+	assert.Equal(t, map[string]string{
+		"argocd-diff-preview/render": "always",
+	}, resource.Yaml.GetAnnotations())
+}
