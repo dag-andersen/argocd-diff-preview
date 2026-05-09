@@ -101,8 +101,8 @@ Added (1):
 </details>
 
 _Skipped resources_: 
-- Applications: `5` (base) -> `6` (target)
-- ApplicationSets: `2` (base) -> `1` (target)
+- Applications: `5` (base) -> `8` (target)
+- ApplicationSets: `3` (base) -> `1` (target)
 
 _Stats_:
-[Applications: 31], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 37], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
