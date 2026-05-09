@@ -197,20 +197,6 @@ func (a *ArgoResource) GetRenderMode() RenderMode {
 	return RenderChanged
 }
 
-// SetRenderMode writes the render annotation for the resource.
-func (a *ArgoResource) SetRenderMode(mode RenderMode) {
-	if a.Yaml == nil {
-		return
-	}
-
-	annotations := a.Yaml.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
-	}
-	annotations[annotationRender] = string(mode)
-	a.Yaml.SetAnnotations(annotations)
-}
-
 // filterBySelectors checks if the application matches the given selectors
 func (a *ArgoResource) filterBySelectors(selectors []app_selector.Selector) (bool, string) {
 	// Early return if no YAML

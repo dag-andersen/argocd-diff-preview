@@ -249,10 +249,12 @@ The `argocd-diff-preview/render` annotation controls whether an Application or A
 | Value | Behavior |
 |-------|----------|
 | `changed` | Render only when the application changed or when its watch pattern matches changed files. This is the default behavior. |
-| `always` | Always render the application, even when the manifest is identical between the base and target branches. |
+| `always` | Always render the application or ApplicationSet. This takes precedence over selectors, file path regex filters, and changed-file detection. |
 | `never` | Never render the application. This replaces the deprecated `argocd-diff-preview/ignore: "true"` annotation. |
 
 This is useful for ApplicationSets where the ApplicationSet manifest itself may not change, but the generated Applications can still differ because generator input changed elsewhere.
+
+For ApplicationSets, the annotation only controls whether the ApplicationSet itself is rendered. It does not automatically force every generated Application to render. If a generated Application should also bypass selection filters, add `argocd-diff-preview/render: "always"` to the ApplicationSet template metadata annotations.
 
 ```yaml title="ApplicationSet" hl_lines="7"
 apiVersion: argoproj.io/v1alpha1
