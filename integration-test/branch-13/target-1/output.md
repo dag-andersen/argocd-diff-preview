@@ -101,7 +101,7 @@ Added (1):
 </details>
 
 _Skipped resources_: 
-- Applications: `5` (base) -> `8` (target)
+- Applications: `6` (base) -> `9` (target)
 - ApplicationSets: `3` (base) -> `1` (target)
 
 _Stats_:
