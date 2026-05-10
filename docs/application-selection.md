@@ -256,16 +256,30 @@ This is useful for ApplicationSets where the ApplicationSet manifest itself may 
 
 For ApplicationSets, the annotation only controls whether the ApplicationSet itself is rendered. It does not automatically force every generated Application to render. If a generated Application should also bypass selection filters, add `argocd-diff-preview/render: "always"` to the ApplicationSet template metadata annotations.
 
-```yaml title="ApplicationSet" hl_lines="7"
+```yaml title="ApplicationSet" hl_lines="7 20"
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: my-appset
   namespace: argocd
-  annotations:
+  annotations: # Forces the ApplicationSet to always render, even if its own manifest doesn't change
     argocd-diff-preview/render: "always"
 spec:
-  # ...
+  generators:
+    - git:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview
+        revision: HEAD
+        directories:
+          - path: examples/helm/charts/*
+  template:
+    metadata:
+      name: '{{ .path.basename }}'
+      annotations:
+        # Forces every generated Application to always render, even if it doesn't change and doesn't match label selectors or file path regex filters
+        argocd-diff-preview/render: "always"
+    spec:
+      project: default
+      ...
 ```
 
 ---
@@ -280,9 +294,9 @@ Sometimes you need to permanently exclude specific applications from diff previe
 Add the `argocd-diff-preview/ignore: "true"` annotation to any Application or ApplicationSet manifest to skip it during rendering.
 
 !!! warning "Deprecated annotation"
-    The older `argocd-diff-preview/ignore: "true"` annotation is deprecated. It is still supported for backwards compatibility, but new configurations should use `argocd-diff-preview/render: "never"` instead.
+    This annotation is deprecated. It is still supported for backwards compatibility, but new configurations should use `argocd-diff-preview/render: "never"` instead.
 
-**Deprecated example: Ignoring an Application with `/ignore`**
+**Example: Ignoring an Application with `/ignore`**
 
 ```yaml title="Application" hl_lines="7"
 apiVersion: argoproj.io/v1alpha1
