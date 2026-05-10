@@ -896,6 +896,61 @@ metadata:
 			watchIfNoWatchPatternFound: false,
 			want:                       true,
 		},
+		{
+			name: "render always bypasses non-matching selector",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    team: other-team
+  annotations:
+    argocd-diff-preview/render: always`,
+			selectors: []app_selector.Selector{
+				{Key: "team", Value: "your-team", Operator: app_selector.Eq},
+			},
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "render always bypasses non-matching watch pattern",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/render: always
+    argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
+			selectors:                  []app_selector.Selector{},
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "render always bypasses selector and watch pattern filters",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    team: other-team
+  annotations:
+    argocd-diff-preview/render: always
+    argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
+			selectors: []app_selector.Selector{
+				{Key: "team", Value: "your-team", Operator: app_selector.Eq},
+			},
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
 		// Integration tests for WatchIfNoWatchPatternFound behavior
 		{
 			name: "no watch pattern with WatchIfNoWatchPatternFound=true should include app",
