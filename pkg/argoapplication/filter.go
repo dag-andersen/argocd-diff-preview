@@ -189,11 +189,6 @@ func (a *ArgoResource) GetRenderMode() RenderMode {
 		}
 	}
 
-	// Legacy: treat ignore=true as never
-	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
-		return RenderNever
-	}
-
 	return RenderChanged
 }
 

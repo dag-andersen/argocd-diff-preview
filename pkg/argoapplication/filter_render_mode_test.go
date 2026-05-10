@@ -81,7 +81,7 @@ func TestGetRenderMode(t *testing.T) {
 			expectedMode: RenderChanged,
 		},
 		{
-			name: "legacy ignore true maps to render never",
+			name: "legacy ignore true does not set render mode",
 			resource: &ArgoResource{Yaml: &unstructured.Unstructured{Object: map[string]any{
 				"metadata": map[string]any{
 					"annotations": map[string]any{
@@ -89,7 +89,7 @@ func TestGetRenderMode(t *testing.T) {
 					},
 				},
 			}}},
-			expectedMode: RenderNever,
+			expectedMode: RenderChanged,
 		},
 		{
 			name: "render annotation takes precedence over legacy ignore",
