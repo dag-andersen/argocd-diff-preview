@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,39 @@ func makeContainerStatus(name string, restartCount int32, waitingReason string) 
 		}
 	}
 	return cs
+}
+
+func TestCrashEventMessage_Restart(t *testing.T) {
+	event := CrashEvent{
+		PodName:       "argocd-server-abc",
+		ContainerName: "argocd-server",
+		EventType:     "restart",
+		PrevRestarts:  1,
+		CurrRestarts:  2,
+	}
+
+	message := event.Message()
+	for _, expected := range []string{"argocd-server", "argocd-server-abc", "1 -> 2"} {
+		if !strings.Contains(message, expected) {
+			t.Errorf("Expected message to contain %q, got %q", expected, message)
+		}
+	}
+}
+
+func TestCrashEventRecorder_EventsReturnsCopy(t *testing.T) {
+	recorder := &CrashEventRecorder{}
+	recorder.Add([]CrashEvent{{PodName: "pod-a", ContainerName: "container-a", EventType: "crash-loop"}})
+
+	events := recorder.Events()
+	if len(events) != 1 {
+		t.Fatalf("Expected 1 event, got %d", len(events))
+	}
+
+	events[0].PodName = "mutated"
+	events = recorder.Events()
+	if events[0].PodName != "pod-a" {
+		t.Errorf("Expected recorder events to be immutable from caller mutations, got %q", events[0].PodName)
+	}
 }
 
 func TestDetectCrashEvents_FirstPollNoEvents(t *testing.T) {
