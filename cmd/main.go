@@ -232,12 +232,13 @@ func run(cfg *Config) error {
 	}
 
 	// Start background crash watcher for ArgoCD pods
-	stopCrashWatcher := k8sClient.WatchForContainerRestarts(
+	stopCrashWatcher, crashEventRecorder := k8sClient.WatchForContainerRestarts(
 		cfg.ArgocdNamespace,
 		"app.kubernetes.io/part-of=argocd",
 		5*time.Second,
 	)
 	defer close(stopCrashWatcher)
+	defer printCrashEventSummary(crashEventRecorder)
 
 	// Generate applications from ApplicationSets
 	baseApps, targetApps, convertAppSetsToAppsDuration, err := argoapplication.ConvertAppSetsToAppsInBothBranches(
@@ -417,6 +418,22 @@ func run(cfg *Config) error {
 	log.Info().Msgf("⏰ Run time stats: %s", statsInfo.Stats())
 
 	return nil
+}
+
+func printCrashEventSummary(recorder *k8s.CrashEventRecorder) {
+	if recorder == nil {
+		return
+	}
+
+	events := recorder.Events()
+	if len(events) == 0 {
+		return
+	}
+
+	log.Warn().Msg("💡 Argo CD component crash or restart events were detected during this run:")
+	for _, event := range events {
+		log.Warn().Msgf("💡 %s", event.Message())
+	}
 }
 
 // writeManifests flattens apps once and writes manifest files based on the enabled options.
