@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	argocdconfig "github.com/dag-andersen/argocd-diff-preview/argocd-config"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
@@ -24,6 +25,12 @@ import (
 )
 
 const ociScheme = "oci://"
+
+const (
+	valuesFileName              = "values.yaml"
+	valuesOverrideFileName      = "values-override.yaml"
+	embeddedValuesOverrideLabel = "embedded values-override.yaml"
+)
 
 func isOCIChartURL(url string) bool {
 	return strings.HasPrefix(strings.TrimSpace(url), ociScheme)
@@ -195,11 +202,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		return fmt.Errorf("failed to load chart: %w", err)
 	}
 
-	// Load values from files
-	valueOpts := &values.Options{
-		ValueFiles: valuesFiles,
-	}
-	chartValues, err := valueOpts.MergeValues(getter.All(settings))
+	chartValues, err := a.mergeValues(settings, valuesFiles)
 	if err != nil {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
@@ -367,33 +370,95 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 
 	files, err := os.ReadDir(a.ConfigPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			log.Info().Msgf("📂 Folder '%s' doesn't exist. Installing Argo CD Helm Chart with embedded argocd-diff-preview overrides", a.ConfigPath)
+			return []string{embeddedValuesOverrideLabel}, nil
+		}
 		return nil, fmt.Errorf("failed to read folder: %w", err)
 	}
 
 	var foundValues bool
-	var foundValuesOverride bool
+	var foundUserValuesOverride bool
 
 	for _, file := range files {
 		log.Debug().Msgf("- 📄 %s", file.Name())
 
 		name := file.Name()
-		if name == "values.yaml" {
+		if name == valuesFileName {
 			foundValues = true
 		}
-		if name == "values-override.yaml" {
-			foundValuesOverride = true
+		if name == valuesOverrideFileName {
+			foundUserValuesOverride = true
 		}
 	}
 
 	valuesFiles := []string{}
 	if foundValues {
-		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, "values.yaml"))
+		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, valuesFileName))
 	}
-	if foundValuesOverride {
-		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, "values-override.yaml"))
+
+	valuesFiles = append(valuesFiles, embeddedValuesOverrideLabel)
+
+	if foundUserValuesOverride {
+		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, valuesOverrideFileName))
 	}
 
 	return valuesFiles, nil
+}
+
+func (a *ArgoCDInstallation) mergeValues(settings *cli.EnvSettings, valuesFiles []string) (map[string]interface{}, error) {
+	mergedValues := map[string]interface{}{}
+
+	for _, valuesFile := range valuesFiles {
+		var currentValues map[string]interface{}
+		var err error
+
+		if valuesFile == embeddedValuesOverrideLabel {
+			currentValues, err = loadEmbeddedValuesOverride()
+		} else {
+			valueOpts := &values.Options{ValueFiles: []string{valuesFile}}
+			currentValues, err = valueOpts.MergeValues(getter.All(settings))
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		mergedValues = mergeMaps(mergedValues, currentValues)
+	}
+
+	return mergedValues, nil
+}
+
+func loadEmbeddedValuesOverride() (map[string]interface{}, error) {
+	var chartValues map[string]interface{}
+	if err := yaml.Unmarshal(argocdconfig.ValuesOverride, &chartValues); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal embedded values override: %w", err)
+	}
+
+	if chartValues == nil {
+		chartValues = map[string]interface{}{}
+	}
+
+	return chartValues, nil
+}
+
+func mergeMaps(base, override map[string]interface{}) map[string]interface{} {
+	if base == nil {
+		base = map[string]interface{}{}
+	}
+
+	for key, overrideValue := range override {
+		if overrideMap, ok := overrideValue.(map[string]interface{}); ok {
+			if baseMap, ok := base[key].(map[string]interface{}); ok {
+				base[key] = mergeMaps(baseMap, overrideMap)
+				continue
+			}
+		}
+
+		base[key] = overrideValue
+	}
+
+	return base
 }
 
 // OnlyLogin performs only the login step without installing ArgoCD
