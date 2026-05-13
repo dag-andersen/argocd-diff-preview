@@ -83,7 +83,8 @@ var (
 	DefaultOutputAppManifests                  = false
 	DefaultOutputBranchManifests               = false
 	DefaultTraverseAppOfApps                   = false
-	DefaultFailOnInvalidGeneratedApplications  = false
+	DefaultFailOnInvalidGeneratedApplications   = false
+	DefaultFailOnDuplicateGeneratedApplications = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -133,7 +134,8 @@ type RawOptions struct {
 	OutputAppManifests                 bool   `mapstructure:"output-app-manifests"`
 	OutputBranchManifests              bool   `mapstructure:"output-branch-manifests"`
 	TraverseAppOfApps                  bool   `mapstructure:"traverse-app-of-apps"`
-	FailOnInvalidGeneratedApplications bool   `mapstructure:"fail-on-invalid-generated-applications"`
+	FailOnInvalidGeneratedApplications    bool `mapstructure:"fail-on-invalid-generated-applications"`
+	FailOnDuplicateGeneratedApplications  bool `mapstructure:"fail-on-duplicate-generated-applications"` // Deprecated: use FailOnInvalidGeneratedApplications
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -178,7 +180,8 @@ type Config struct {
 	OutputAppManifests                 bool
 	OutputBranchManifests              bool
 	TraverseAppOfApps                  bool
-	FailOnInvalidGeneratedApplications bool
+	FailOnInvalidGeneratedApplications   bool
+	FailOnDuplicateGeneratedApplications bool // Deprecated: use FailOnInvalidGeneratedApplications
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -276,6 +279,7 @@ func Parse() *Config {
 	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
 	viper.SetDefault("traverse-app-of-apps", DefaultTraverseAppOfApps)
 	viper.SetDefault("fail-on-invalid-generated-applications", DefaultFailOnInvalidGeneratedApplications)
+	viper.SetDefault("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -335,6 +339,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
 	rootCmd.Flags().Bool("fail-on-invalid-generated-applications", DefaultFailOnInvalidGeneratedApplications, "Fail if any generated Application is invalid (missing kind/name, invalid labels, invalid annotation keys, or duplicate names)")
+	rootCmd.Flags().Bool("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications, "[Deprecated: use --fail-on-invalid-generated-applications] Fail when a single ApplicationSet generates multiple Applications with the same name")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -421,7 +426,8 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		OutputAppManifests:                 o.OutputAppManifests,
 		OutputBranchManifests:              o.OutputBranchManifests,
 		TraverseAppOfApps:                  o.TraverseAppOfApps,
-		FailOnInvalidGeneratedApplications: o.FailOnInvalidGeneratedApplications,
+		FailOnInvalidGeneratedApplications:   o.FailOnInvalidGeneratedApplications,
+		FailOnDuplicateGeneratedApplications: o.FailOnDuplicateGeneratedApplications,
 	}
 
 	var err error
@@ -758,5 +764,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.FailOnInvalidGeneratedApplications {
 		log.Info().Msgf("✨ - fail-on-invalid-generated-applications: %t", o.FailOnInvalidGeneratedApplications)
+	}
+	if o.FailOnDuplicateGeneratedApplications {
+		log.Warn().Msg("⚠️ - fail-on-duplicate-generated-applications is deprecated, use --fail-on-invalid-generated-applications instead")
 	}
 }

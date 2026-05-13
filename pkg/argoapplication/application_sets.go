@@ -87,6 +87,7 @@ func processAppSets(
 		tempFolder,
 		debug,
 		appSelectionOptions.FailOnInvalidGeneratedApplications,
+		appSelectionOptions.FailOnDuplicateGeneratedApplications,
 	)
 	if err != nil {
 		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
@@ -203,6 +204,7 @@ func convertAppSetsToApps(
 	tempFolder string,
 	debug bool,
 	failOnInvalid bool,
+	failOnDuplicate bool,
 ) (*AppSetConversionResult, error) {
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
@@ -248,7 +250,7 @@ func convertAppSetsToApps(
 			defer wg.Done()
 			defer func() { <-sem }() // release semaphore slot
 
-			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder, failOnInvalid)
+			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder, failOnInvalid, failOnDuplicate)
 			results <- appSetGenerateResult{index: i, apps: apps, err: err}
 		}(i, appSet)
 	}
@@ -296,6 +298,7 @@ func generateAppsFromAppSet(
 	branch *git.Branch,
 	tempFolder string,
 	failOnInvalid bool,
+	failOnDuplicate bool,
 ) ([]ArgoResource, error) {
 	retryCount := 5
 	generatedApps, err := argocd.AppsetGenerateWithRetry(appSet.Yaml, tempFolder, retryCount)
@@ -362,7 +365,7 @@ func generateAppsFromAppSet(
 		apps = append(apps, *app)
 	}
 
-	if err := validateGeneratedApplicationNames(appSet, apps, branch, failOnInvalid); err != nil {
+	if err := validateGeneratedApplicationNames(appSet, apps, branch, failOnInvalid, failOnDuplicate); err != nil {
 		return nil, err
 	}
 
@@ -396,6 +399,7 @@ func validateGeneratedApplicationNames(
 	apps []ArgoResource,
 	branch *git.Branch,
 	failOnInvalid bool,
+	failOnDuplicate bool,
 ) error {
 	duplicates := duplicateGeneratedApplicationNames(apps)
 	if len(duplicates) == 0 {
@@ -408,14 +412,14 @@ func validateGeneratedApplicationNames(
 		strings.Join(duplicates, ", "),
 	)
 
-	if failOnInvalid {
+	if failOnInvalid || failOnDuplicate {
 		return fmt.Errorf("%s", msg)
 	}
 
 	log.Warn().
 		Str("branch", branch.Name).
 		Str(appSet.Kind.ShortName(), appSet.GetLongName()).
-		Msgf("⚠️ %s. Continuing because --fail-on-invalid-generated-applications is not enabled", msg)
+		Msgf("⚠️ %s. Continuing because neither --fail-on-invalid-generated-applications nor --fail-on-duplicate-generated-applications is enabled", msg)
 
 	return nil
 }

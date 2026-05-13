@@ -33,7 +33,7 @@ func TestValidateGeneratedApplicationNames(t *testing.T) {
 			createGeneratedApplicationForTest("dupe", "appset.yaml"),
 		}
 
-		require.NoError(t, validateGeneratedApplicationNames(appSet, apps, branch, false))
+		require.NoError(t, validateGeneratedApplicationNames(appSet, apps, branch, false, false))
 	})
 
 	t.Run("strict mode fails", func(t *testing.T) {
@@ -44,7 +44,7 @@ func TestValidateGeneratedApplicationNames(t *testing.T) {
 			createGeneratedApplicationForTest("other", "appset.yaml"),
 		}
 
-		err := validateGeneratedApplicationNames(appSet, apps, branch, true)
+		err := validateGeneratedApplicationNames(appSet, apps, branch, true, false)
 		require.EqualError(t, err, "ApplicationSet duplicate-generated-apps [t|appset.yaml] generated applications with duplicate names: dupe, other")
 	})
 
@@ -55,8 +55,8 @@ func TestValidateGeneratedApplicationNames(t *testing.T) {
 		baseApps := []ArgoResource{createGeneratedApplicationForTest("app-1", "base-appset.yaml")}
 		targetApps := []ArgoResource{createGeneratedApplicationForTest("app-1", "target-appset.yaml")}
 
-		require.NoError(t, validateGeneratedApplicationNames(baseAppSet, baseApps, git.NewBranch("main", git.Base), true))
-		require.NoError(t, validateGeneratedApplicationNames(targetAppSet, targetApps, git.NewBranch("feature", git.Target), true))
+		require.NoError(t, validateGeneratedApplicationNames(baseAppSet, baseApps, git.NewBranch("main", git.Base), true, false))
+		require.NoError(t, validateGeneratedApplicationNames(targetAppSet, targetApps, git.NewBranch("feature", git.Target), true, false))
 	})
 }
 

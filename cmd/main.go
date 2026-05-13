@@ -85,12 +85,13 @@ func run(cfg *Config) error {
 	searchIsLimited := len(selectors) > 0 || len(filesChanged) > 0 || fileRegex != nil
 
 	appSelectionOptions := argoapplication.ApplicationSelectionOptions{
-		Selector:                           selectors,
-		FileRegex:                          fileRegex,
-		FilesChanged:                       filesChanged,
-		IgnoreInvalidWatchPattern:          cfg.IgnoreInvalidWatchPattern,
-		WatchIfNoWatchPatternFound:         cfg.WatchIfNoWatchPatternFound,
-		FailOnInvalidGeneratedApplications: cfg.FailOnInvalidGeneratedApplications,
+		Selector:                             selectors,
+		FileRegex:                            fileRegex,
+		FilesChanged:                         filesChanged,
+		IgnoreInvalidWatchPattern:            cfg.IgnoreInvalidWatchPattern,
+		WatchIfNoWatchPatternFound:           cfg.WatchIfNoWatchPatternFound,
+		FailOnInvalidGeneratedApplications:   cfg.FailOnInvalidGeneratedApplications,
+		FailOnDuplicateGeneratedApplications: cfg.FailOnDuplicateGeneratedApplications,
 	}
 
 	// Get applications for both branches
