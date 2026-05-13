@@ -33,11 +33,12 @@ const (
 )
 
 type ApplicationSelectionOptions struct {
-	FileRegex                  *regexp.Regexp
-	Selector                   []app_selector.Selector
-	FilesChanged               []string
-	IgnoreInvalidWatchPattern  bool
-	WatchIfNoWatchPatternFound bool
+	FileRegex                          *regexp.Regexp
+	Selector                           []app_selector.Selector
+	FilesChanged                       []string
+	IgnoreInvalidWatchPattern          bool
+	WatchIfNoWatchPatternFound         bool
+	FailOnInvalidGeneratedApplications bool
 }
 
 const maxFilesChangedDisplay = 20

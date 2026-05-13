@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
@@ -24,7 +25,6 @@ func ConvertAppSetsToAppsInBothBranches(
 	tempFolder string,
 	redirectRevisions []string,
 	debug bool,
-	failOnDuplicateGeneratedApplications bool,
 	appSelectionOptions ApplicationSelectionOptions,
 ) (*ArgoSelection, *ArgoSelection, time.Duration, error) {
 	startTime := time.Now()
@@ -38,7 +38,6 @@ func ConvertAppSetsToAppsInBothBranches(
 		baseBranch,
 		baseTempFolder,
 		debug,
-		failOnDuplicateGeneratedApplications,
 		appSelectionOptions,
 		repo,
 		redirectRevisions,
@@ -56,7 +55,6 @@ func ConvertAppSetsToAppsInBothBranches(
 		targetBranch,
 		targetTempFolder,
 		debug,
-		failOnDuplicateGeneratedApplications,
 		appSelectionOptions,
 		repo,
 		redirectRevisions,
@@ -77,7 +75,6 @@ func processAppSets(
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
-	failOnDuplicateGeneratedApplications bool,
 	appSelectionOptions ApplicationSelectionOptions,
 	repo string,
 	redirectRevisions []string,
@@ -89,7 +86,7 @@ func processAppSets(
 		branch,
 		tempFolder,
 		debug,
-		failOnDuplicateGeneratedApplications,
+		appSelectionOptions.FailOnInvalidGeneratedApplications,
 	)
 	if err != nil {
 		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
@@ -205,7 +202,7 @@ func convertAppSetsToApps(
 	branch *git.Branch,
 	tempFolder string,
 	debug bool,
-	failOnDuplicateGeneratedApplications bool,
+	failOnInvalid bool,
 ) (*AppSetConversionResult, error) {
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
@@ -251,7 +248,7 @@ func convertAppSetsToApps(
 			defer wg.Done()
 			defer func() { <-sem }() // release semaphore slot
 
-			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder, failOnDuplicateGeneratedApplications)
+			apps, err := generateAppsFromAppSet(argocd, appSet, branch, tempFolder, failOnInvalid)
 			results <- appSetGenerateResult{index: i, apps: apps, err: err}
 		}(i, appSet)
 	}
@@ -298,7 +295,7 @@ func generateAppsFromAppSet(
 	appSet ArgoResource,
 	branch *git.Branch,
 	tempFolder string,
-	failOnDuplicateGeneratedApplications bool,
+	failOnInvalid bool,
 ) ([]ArgoResource, error) {
 	retryCount := 5
 	generatedApps, err := argocd.AppsetGenerateWithRetry(appSet.Yaml, tempFolder, retryCount)
@@ -316,21 +313,47 @@ func generateAppsFromAppSet(
 	for _, doc := range generatedApps {
 		kind := doc.GetKind()
 		if kind == "" {
-			log.Error().
-				Str(appSet.Kind.ShortName(), appSet.GetLongName()).
-				Msg("❌ Output from ApplicationSet contains no kind")
+			msg := "❌ Output from ApplicationSet contains no kind"
+			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg(msg)
+			if failOnInvalid {
+				return nil, fmt.Errorf("%s: %s", msg, appSet.GetLongName())
+			}
 			continue
 		}
 		if kind != "Application" {
-			log.Error().
-				Str(appSet.Kind.ShortName(), appSet.GetLongName()).
-				Msg("❌ Output from ApplicationSet contains non-Application resources")
+			msg := fmt.Sprintf("❌ Output from ApplicationSet contains non-Application resource of kind '%s'", kind)
+			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg(msg)
+			if failOnInvalid {
+				return nil, fmt.Errorf("%s: %s", msg, appSet.GetLongName())
+			}
 			continue
 		}
 
 		name := doc.GetName()
 		if name == "" {
-			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg("❌ Generated Application missing name")
+			msg := "❌ Generated Application missing name"
+			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg(msg)
+			if failOnInvalid {
+				return nil, fmt.Errorf("%s: %s", msg, appSet.GetLongName())
+			}
+			continue
+		}
+
+		if err := validateLabels(doc.GetLabels()); err != nil {
+			msg := fmt.Sprintf("❌ Generated Application '%s' has invalid labels: %s", name, err)
+			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg(msg)
+			if failOnInvalid {
+				return nil, fmt.Errorf("%s: %s", msg, appSet.GetLongName())
+			}
+			continue
+		}
+
+		if err := validateAnnotations(doc.GetAnnotations()); err != nil {
+			msg := fmt.Sprintf("❌ Generated Application '%s' has invalid annotations: %s", name, err)
+			log.Error().Str(appSet.Kind.ShortName(), appSet.GetLongName()).Msg(msg)
+			if failOnInvalid {
+				return nil, fmt.Errorf("%s: %s", msg, appSet.GetLongName())
+			}
 			continue
 		}
 
@@ -339,7 +362,7 @@ func generateAppsFromAppSet(
 		apps = append(apps, *app)
 	}
 
-	if err := validateGeneratedApplicationNames(appSet, apps, branch, failOnDuplicateGeneratedApplications); err != nil {
+	if err := validateGeneratedApplicationNames(appSet, apps, branch, failOnInvalid); err != nil {
 		return nil, err
 	}
 
@@ -372,7 +395,7 @@ func validateGeneratedApplicationNames(
 	appSet ArgoResource,
 	apps []ArgoResource,
 	branch *git.Branch,
-	failOnDuplicateGeneratedApplications bool,
+	failOnInvalid bool,
 ) error {
 	duplicates := duplicateGeneratedApplicationNames(apps)
 	if len(duplicates) == 0 {
@@ -385,14 +408,43 @@ func validateGeneratedApplicationNames(
 		strings.Join(duplicates, ", "),
 	)
 
-	if failOnDuplicateGeneratedApplications {
+	if failOnInvalid {
 		return fmt.Errorf("%s", msg)
 	}
 
 	log.Warn().
 		Str("branch", branch.Name).
 		Str(appSet.Kind.ShortName(), appSet.GetLongName()).
-		Msgf("⚠️ %s. Continuing because --fail-on-duplicate-generated-applications is not enabled", msg)
+		Msgf("⚠️ %s. Continuing because --fail-on-invalid-generated-applications is not enabled", msg)
 
+	return nil
+}
+
+func validateLabels(labels map[string]string) error {
+	var errs []string
+	for k, v := range labels {
+		if msgs := k8svalidation.IsQualifiedName(k); len(msgs) > 0 {
+			errs = append(errs, fmt.Sprintf("invalid label key %q: %s", k, strings.Join(msgs, "; ")))
+		}
+		if msgs := k8svalidation.IsValidLabelValue(v); len(msgs) > 0 {
+			errs = append(errs, fmt.Sprintf("invalid label value %q for key %q: %s", v, k, strings.Join(msgs, "; ")))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, ", "))
+	}
+	return nil
+}
+
+func validateAnnotations(annotations map[string]string) error {
+	var errs []string
+	for k := range annotations {
+		if msgs := k8svalidation.IsQualifiedName(k); len(msgs) > 0 {
+			errs = append(errs, fmt.Sprintf("invalid annotation key %q: %s", k, strings.Join(msgs, "; ")))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, ", "))
+	}
 	return nil
 }
