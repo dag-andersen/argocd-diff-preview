@@ -669,6 +669,53 @@ spec:
 	assertDefaultProjectFields(t, req)
 }
 
+func TestBuildManifestRequest_SameRepoPrimaryWithExternalRef_UsesRemoteRPC(t *testing.T) {
+	prRepo := "org/helm-charts"
+	branchFolder := makeBranchFolder(t, "charts/my-chart")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  sources:
+    - repoURL: https://github.com/org/helm-charts.git
+      path: charts/my-chart
+      targetRevision: main
+      helm:
+        valueFiles:
+          - $helm-values-repo/values.yaml
+    - repoURL: https://github.com/org/app-values.git
+      targetRevision: main
+      ref: helm-values-repo
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir,
+		"external ref source must use remote RPC so repo server fetches ref repository instead of copying PR repo root")
+	assert.Equal(t, []string{"$helm-values-repo/values.yaml"}, req.ApplicationSource.Helm.ValueFiles,
+		"remote RPC must keep $ref value files unchanged")
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$helm-values-repo"]
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/org/app-values.git", refTarget.Repo.Repo)
+	assert.Equal(t, "main", refTarget.TargetRevision)
+	assertDefaultProjectFields(t, req)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // repocreds: GetRepo normalises .git suffix on lookup
 //

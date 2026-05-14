@@ -563,7 +563,7 @@ func buildManifestRequestForSource(
 		}
 		return newManifestRequest(&primarySource), branchFolder, nil, nil
 	}
-	// ── Slow path: ref sources present ───────────────────────────────────────
+	// Slow path: ref sources present
 	//
 	// Special case: external Helm chart primary source WITH ref sources.
 	// Example pattern (cluster-common-charts ApplicationSet):
@@ -579,38 +579,27 @@ func buildManifestRequestForSource(
 	// repo server fetches the ref content from its own git cache. The $ref/…
 	// value file paths are left unchanged (no rewriting needed).
 	if primarySource.Chart != "" {
-		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
-		for _, ref := range refSources {
-			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
-				Repo:           *creds.GetRepo(ref.RepoURL),
-				TargetRevision: ref.TargetRevision,
-			}
-		}
 		request = newManifestRequest(&primarySource)
-		request.RefSources = refSourcesMap
+		request.RefSources = buildRefSourcesMap(refSources, creds)
 		return request, "", nil, nil
 	}
 
-	// ── Slow path: ref sources present - cross-repo primary source ────────────
+	// Slow path: ref sources present - cross-repo primary or ref source
 	// When the primary source lives in a different repository from the PR, we
 	// cannot stream its files locally. Use the remote RPC and let the repo
 	// server fetch both the primary content and the ref sources from their
 	// respective git caches. Value-file $ref/… paths are left unrewritten.
-	if prRepo != "" && !repoURLContains(primarySource.RepoURL, prRepo) {
+	// The same applies when a ref source lives outside the PR repository. Copying
+	// the local branch folder into .refs would provide the wrong repository
+	// content, especially for ref-only sources whose Path is empty.
+	if prRepo != "" && (!repoURLContains(primarySource.RepoURL, prRepo) || hasExternalRefSource(refSources, prRepo)) {
 		log.Debug().
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).
 			Str("prRepo", prRepo).
-			Msg("Source repoURL does not match PR repo (slow path) - using remote RPC")
-		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
-		for _, ref := range refSources {
-			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
-				Repo:           *creds.GetRepo(ref.RepoURL),
-				TargetRevision: ref.TargetRevision,
-			}
-		}
+			Msg("Source or ref repoURL does not match PR repo (slow path) - using remote RPC")
 		request = newManifestRequest(&primarySource)
-		request.RefSources = refSourcesMap
+		request.RefSources = buildRefSourcesMap(refSources, creds)
 		return request, "", nil, nil
 	}
 
@@ -704,6 +693,26 @@ func splitRefPath(valueFile string) (refName, path string, ok bool) {
 		return "", "", false
 	}
 	return refName, path, true
+}
+
+func buildRefSourcesMap(refSources []v1alpha1.ApplicationSource, creds *RepoCreds) map[string]*v1alpha1.RefTarget {
+	refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
+	for _, ref := range refSources {
+		refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
+			Repo:           *creds.GetRepo(ref.RepoURL),
+			TargetRevision: ref.TargetRevision,
+		}
+	}
+	return refSourcesMap
+}
+
+func hasExternalRefSource(refSources []v1alpha1.ApplicationSource, prRepo string) bool {
+	for _, ref := range refSources {
+		if !repoURLContains(ref.RepoURL, prRepo) {
+			return true
+		}
+	}
+	return false
 }
 
 // copyDir recursively copies src into dst, creating dst if needed.
