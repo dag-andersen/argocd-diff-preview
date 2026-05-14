@@ -392,6 +392,10 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 		}
 	}
 
+	// Values are merged in this order. Later files override earlier files:
+	// 1. user values.yaml
+	// 2. embedded argocd-diff-preview values-override.yaml
+	// 3. user values-override.yaml
 	valuesFiles := []string{}
 	if foundUserValues {
 		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, valuesFileName))
