@@ -578,8 +578,8 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 	if err := os.MkdirAll(runDirs.Root, 0755); err != nil {
 		t.Fatalf("Failed to create run dir: %v", err)
 	}
-	if err := os.MkdirAll(runDirs.Secrets, 0755); err != nil {
-		t.Fatalf("Failed to create secrets dir: %v", err)
+	if err := copyDir(filepath.Join(repoRoot, "integration-test", "secrets"), runDirs.Secrets); err != nil {
+		t.Fatalf("Failed to copy secrets fixture: %v", err)
 	}
 	if err := os.MkdirAll(runDirs.Temp, 0755); err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -970,7 +970,6 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 		"--line-count", getLineCount(tc),
 		"--max-diff-length", getMaxDiffLength(tc),
 		"--title", getTitle(tc),
-		"--secrets-folder", runDirs.Secrets,
 		"--keep-cluster-alive",
 		"--disable-client-throttling",
 	}
