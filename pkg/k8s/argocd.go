@@ -10,7 +10,9 @@ import (
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 	"github.com/rs/zerolog/log"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -77,19 +79,40 @@ func (c *Client) DeleteArgoCDApplication(namespace string, name string) error {
 	}
 
 	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
-	app, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to get application %s before deletion: %w", name, err)
-	}
-
-	if len(app.GetFinalizers()) > 0 {
-		app.SetFinalizers(nil)
-		if _, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Update(context.Background(), app, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("failed to remove finalizers from application %s before deletion: %w", name, err)
-		}
+	if err := c.removeArgoCDApplicationFinalizers(namespace, name); err != nil {
+		return err
 	}
 
 	return c.clientSet.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+}
+
+func (c *Client) removeArgoCDApplicationFinalizers(namespace string, name string) error {
+	applicationRes := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
+
+	for attempt := 1; attempt <= 5; attempt++ {
+		app, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("failed to get application %s before deletion: %w", name, err)
+		}
+
+		if len(app.GetFinalizers()) == 0 {
+			return nil
+		}
+
+		patch := []byte(`{"metadata":{"finalizers":null}}`)
+		if _, err := c.clientSet.Resource(applicationRes).Namespace(namespace).Patch(context.Background(), name, types.MergePatchType, patch, metav1.PatchOptions{}); err == nil {
+			return nil
+		} else if !errors.IsConflict(err) {
+			return fmt.Errorf("failed to remove finalizers from application %s before deletion: %w", name, err)
+		}
+
+		time.Sleep(time.Duration(attempt) * 100 * time.Millisecond)
+	}
+
+	return fmt.Errorf("failed to remove finalizers from application %s before deletion: too many update conflicts", name)
 }
 
 // DeleteAllApplicationsOlderThan deletes all ArgoCD applications older than a given number of minutes
@@ -114,7 +137,7 @@ func (c *Client) DeleteAllApplicationsOlderThan(namespace string, minutes int) e
 		creationTimestamp := app.GetCreationTimestamp()
 		timeDiff := time.Since(creationTimestamp.Time)
 		if timeDiff.Minutes() > float64(minutes) {
-			err := c.clientSet.Resource(applicationRes).Namespace(namespace).Delete(context.Background(), app.GetName(), metav1.DeleteOptions{})
+			err := c.DeleteArgoCDApplication(namespace, app.GetName())
 			if err != nil {
 				return err
 			}
