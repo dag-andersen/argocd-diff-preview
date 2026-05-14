@@ -377,7 +377,7 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 		return nil, fmt.Errorf("failed to read folder: %w", err)
 	}
 
-	var foundValues bool
+	var foundUserValues bool
 	var foundUserValuesOverride bool
 
 	for _, file := range files {
@@ -385,7 +385,7 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 
 		name := file.Name()
 		if name == valuesFileName {
-			foundValues = true
+			foundUserValues = true
 		}
 		if name == valuesOverrideFileName {
 			foundUserValuesOverride = true
@@ -393,7 +393,7 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 	}
 
 	valuesFiles := []string{}
-	if foundValues {
+	if foundUserValues {
 		valuesFiles = append(valuesFiles, filepath.Join(a.ConfigPath, valuesFileName))
 	}
 
