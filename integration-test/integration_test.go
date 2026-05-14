@@ -35,6 +35,7 @@ const (
 	defaultMaxDiffLen = "65536"
 	defaultTitle      = "Argo CD Diff Preview"
 	argocdNamespace   = "argocd-diff-preview"
+	clusterName       = "argocd-diff-preview"
 )
 
 // TestCase defines a single integration test case
@@ -465,7 +466,7 @@ func kindClusterExists() bool {
 		return false
 	}
 	// Check if our cluster name is in the list
-	return slices.Contains(strings.Split(strings.TrimSpace(string(output)), "\n"), "argocd-diff-preview")
+	return slices.Contains(strings.Split(strings.TrimSpace(string(output)), "\n"), clusterName)
 }
 
 // clusterHasArgocdClusterRoles checks if the cluster has ArgoCD cluster roles installed.
@@ -540,7 +541,7 @@ func orderTestCases(cases []TestCase) []TestCase {
 
 // deleteKindCluster deletes the kind cluster used for testing
 func deleteKindCluster() error {
-	cmd := exec.Command("kind", "delete", "cluster", "--name", "argocd-diff-preview")
+	cmd := exec.Command("kind", "delete", "cluster", "--name", clusterName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -734,21 +735,40 @@ func buildDockerImage() error {
 }
 
 // runWithGoBinary executes the test using the Go binary
-// Runs from repo root directory so it can find argocd-config/
+// Runs from a subdirectory so the binary does not accidentally depend on
+// ./argocd-config from the repository root. Tests that need custom Argo CD
+// values pass --argocd-config-dir explicitly.
 func runWithGoBinary(tc TestCase, createCluster bool) error {
-	args := buildArgs(tc, createCluster)
-
 	// Get repo root (parent of integration-test/)
 	repoRoot, err := filepath.Abs("..")
 	if err != nil {
 		return fmt.Errorf("failed to get repo root: %w", err)
 	}
 
+	runDir := filepath.Join(repoRoot, "temp", "go-binary-run")
+	if err := os.RemoveAll(runDir); err != nil {
+		return fmt.Errorf("failed to clean go binary run dir: %w", err)
+	}
+	if err := os.MkdirAll(runDir, 0755); err != nil {
+		return fmt.Errorf("failed to create go binary run dir: %w", err)
+	}
+	if err := copyDir(filepath.Join(repoRoot, "base-branch"), filepath.Join(runDir, "base-branch")); err != nil {
+		return fmt.Errorf("failed to copy base branch into go binary run dir: %w", err)
+	}
+	if err := copyDir(filepath.Join(repoRoot, "target-branch"), filepath.Join(runDir, "target-branch")); err != nil {
+		return fmt.Errorf("failed to copy target branch into go binary run dir: %w", err)
+	}
+	if err := copyDir(filepath.Join(repoRoot, "kind-config"), filepath.Join(runDir, "kind-config")); err != nil {
+		return fmt.Errorf("failed to copy kind config into go binary run dir: %w", err)
+	}
+
+	args := buildArgs(tc, createCluster, repoRoot)
+
 	// Binary path is relative to repo root
 	absBinaryPath := filepath.Join(repoRoot, *binaryPath)
 
 	cmd := exec.Command(absBinaryPath, args...)
-	cmd.Dir = repoRoot // Run from repo root so it finds argocd-config/
+	cmd.Dir = runDir
 
 	// Try to get TTY for real-time output (Go test captures stdout/stderr)
 	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
@@ -922,8 +942,9 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	return cmd.Run()
 }
 
-// buildArgs constructs command line arguments for the Go binary
-func buildArgs(tc TestCase, createCluster bool) []string {
+// buildArgs constructs command line arguments for the Go binary.
+// Paths are absolute because the binary runs from a dedicated subdirectory.
+func buildArgs(tc TestCase, createCluster bool, repoRoot string) []string {
 	args := []string{
 		"--base-branch", tc.BaseBranch,
 		"--target-branch", tc.TargetBranch,
@@ -933,6 +954,8 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 		"--line-count", getLineCount(tc),
 		"--max-diff-length", getMaxDiffLength(tc),
 		"--title", getTitle(tc),
+		"--output-folder", filepath.Join(repoRoot, "output"),
+		"--secrets-folder", filepath.Join(repoRoot, "secrets"),
 		"--keep-cluster-alive",
 		"--disable-client-throttling",
 	}
@@ -1004,9 +1027,9 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	// If ArgocdConfigDir is explicitly set, use that directory instead.
 	// This avoids mutating the shared argocd-config/values.yaml on disk.
 	if tc.ArgocdConfigDir != "" {
-		args = append(args, "--argocd-config-dir", fmt.Sprintf("./integration-test/%s", tc.ArgocdConfigDir))
+		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", tc.ArgocdConfigDir))
 	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
-		args = append(args, "--argocd-config-dir", "./integration-test/no-cluster-roles")
+		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", "no-cluster-roles"))
 	}
 
 	return args
