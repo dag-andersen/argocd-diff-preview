@@ -224,12 +224,12 @@ func TestEmbeddedValuesOverrideMatchesDefaultConfig(t *testing.T) {
 	}
 }
 
-func assertNestedValue(t *testing.T, values map[string]interface{}, want interface{}, path ...string) {
+func assertNestedValue(t *testing.T, values map[string]any, want any, path ...string) {
 	t.Helper()
 
-	var current interface{} = values
+	var current any = values
 	for _, key := range path {
-		currentMap, ok := current.(map[string]interface{})
+		currentMap, ok := current.(map[string]any)
 		if !ok {
 			t.Fatalf("path %v hit non-map value %#v", path, current)
 		}

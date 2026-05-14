@@ -410,11 +410,11 @@ func (a *ArgoCDInstallation) findValuesFiles() ([]string, error) {
 	return valuesFiles, nil
 }
 
-func (a *ArgoCDInstallation) mergeValues(settings *cli.EnvSettings, valuesFiles []string) (map[string]interface{}, error) {
-	mergedValues := map[string]interface{}{}
+func (a *ArgoCDInstallation) mergeValues(settings *cli.EnvSettings, valuesFiles []string) (map[string]any, error) {
+	mergedValues := map[string]any{}
 
 	for _, valuesFile := range valuesFiles {
-		var currentValues map[string]interface{}
+		var currentValues map[string]any
 		var err error
 
 		if valuesFile == embeddedValuesOverrideLabel {
@@ -433,27 +433,27 @@ func (a *ArgoCDInstallation) mergeValues(settings *cli.EnvSettings, valuesFiles 
 	return mergedValues, nil
 }
 
-func loadEmbeddedValuesOverride() (map[string]interface{}, error) {
-	var chartValues map[string]interface{}
+func loadEmbeddedValuesOverride() (map[string]any, error) {
+	var chartValues map[string]any
 	if err := yaml.Unmarshal(argocdconfig.ValuesOverride, &chartValues); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal embedded values override: %w", err)
 	}
 
 	if chartValues == nil {
-		chartValues = map[string]interface{}{}
+		chartValues = map[string]any{}
 	}
 
 	return chartValues, nil
 }
 
-func mergeMaps(base, override map[string]interface{}) map[string]interface{} {
+func mergeMaps(base, override map[string]any) map[string]any {
 	if base == nil {
-		base = map[string]interface{}{}
+		base = map[string]any{}
 	}
 
 	for key, overrideValue := range override {
-		if overrideMap, ok := overrideValue.(map[string]interface{}); ok {
-			if baseMap, ok := base[key].(map[string]interface{}); ok {
+		if overrideMap, ok := overrideValue.(map[string]any); ok {
+			if baseMap, ok := base[key].(map[string]any); ok {
 				base[key] = mergeMaps(baseMap, overrideMap)
 				continue
 			}
