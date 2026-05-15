@@ -21,6 +21,7 @@ RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-${TARGETARCH}
 # Copy source code - only what's needed
 COPY cmd/ ./cmd/
 COPY pkg/ ./pkg/
+COPY argocd-config/ ./argocd-config/
 
 # Build arguments for version information (declared late to maximize cache hits)
 ARG VERSION=dev
@@ -43,7 +44,7 @@ COPY --from=build /argocd-diff-preview/argocd-diff-preview .
 COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 
 # copy argocd helm chart values
-COPY ./argocd-config ./argocd-config
+COPY ./argocd-config/*.yaml ./argocd-config/
 
 # set the startup command to run your binary
 ENTRYPOINT ["./argocd-diff-preview"]
