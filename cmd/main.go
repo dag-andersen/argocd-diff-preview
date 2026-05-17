@@ -98,7 +98,7 @@ func run(cfg *Config) error {
 		baseBranch,
 		targetBranch,
 		appSelectionOptions,
-		cfg.Repo,
+		cfg.RepoSelector,
 		redirectRevisions,
 	)
 	if err != nil {
@@ -246,7 +246,7 @@ func run(cfg *Config) error {
 		targetApps,
 		baseBranch,
 		targetBranch,
-		cfg.Repo,
+		cfg.RepoSelector,
 		tempFolder,
 		redirectRevisions,
 		cfg.Debug,
@@ -330,7 +330,7 @@ func run(cfg *Config) error {
 				cfg.Concurrency,
 				baseApps.SelectedApps,
 				targetApps.SelectedApps,
-				cfg.Repo,
+				cfg.RepoSelector,
 				appSelectionOptions,
 				tempFolder,
 			)
@@ -343,7 +343,7 @@ func run(cfg *Config) error {
 				cfg.Concurrency,
 				baseApps.SelectedApps,
 				targetApps.SelectedApps,
-				cfg.Repo,
+				cfg.RepoSelector,
 			)
 		}
 	} else {

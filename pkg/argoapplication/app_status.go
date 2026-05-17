@@ -3,13 +3,14 @@ package argoapplication
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 )
 
 func isErrorCondition(condType string) bool {
-	return condType != "" && containsIgnoreCase(condType, "error")
+	return condType != "" && strings.Contains(strings.ToLower(condType), "error")
 }
 
 // GetApplicationStatus returns the error status of an application

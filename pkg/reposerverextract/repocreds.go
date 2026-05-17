@@ -24,6 +24,7 @@ import (
 	"github.com/argoproj/argo-cd/v3/util/db"
 	helmutil "github.com/argoproj/argo-cd/v3/util/helm"
 	argosettings "github.com/argoproj/argo-cd/v3/util/settings"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 
@@ -194,15 +195,16 @@ func normalizeRepoURL(u string) string {
 	return u
 }
 
-// repoURLContains reports whether the normalised form of repoURL contains the
-// normalised form of substr. This is used to match source repoURLs against the
-// --repo flag value which can be either a full URL
+// repoURLContains reports whether repoURL identifies the same repository as
+// substr. This is used to match source repoURLs against the --repo flag value
+// which can be either a full URL
 // ("https://github.com/org/repo.git") or a short slug ("org/repo").
 //
-// Using a substring match (like the patching code's containsIgnoreCase) keeps
-// the comparison provider-agnostic — we don't assume GitHub, GitLab, etc.
+// The comparison is provider-agnostic, but it must compare complete path
+// segments so repos like org/foo and org/foo-deploy are not treated as the
+// same repository.
 func repoURLContains(repoURL, substr string) bool {
-	return strings.Contains(normalizeRepoURL(repoURL), normalizeRepoURL(substr))
+	return repository.MatchesRepo(repoURL, substr)
 }
 
 // HelmRepos returns the Helm + OCI repository lists to pass as
