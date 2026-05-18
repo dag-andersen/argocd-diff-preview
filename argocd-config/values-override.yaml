@@ -29,6 +29,11 @@ repoServer:
     successThreshold: 1
     timeoutSeconds: 1
     failureThreshold: 40
+  # This prevents 'empty index.yaml' file corruption issues when multiple helm dependency build processes try to write the same index.yaml file
+  # Setting this to false disables the shared working dir
+  # Ref: https://github.com/argoproj/argo-cd/issues/12902
+  # Ref: https://github.com/helm/helm/issues/10735#issuecomment-1486058169
+  useEphemeralHelmWorkingDir: false
 controller:
   readinessProbe:
     initialDelaySeconds: 0
