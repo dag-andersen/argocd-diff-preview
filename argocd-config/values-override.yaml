@@ -1,5 +1,13 @@
 # Overrides done by argocd-diff-preview
-# These will happen after the values.yaml file is loaded
+
+# This file is embedded by the argocd-diff-preview binary and will be loaded after the values.yaml file
+# If a values-override.yaml is placed in argocd-config directory when argocd-diff-preview runs,
+# contents will be loaded after this embedded config. Use with caution, if needing to override anything in this file
+#
+# Loading order:
+# - values.yaml            If present in argocd-config directory
+# - values-override.yaml   Embedded in argocd-diff-preview (this file)
+# - values-override.yaml   If present in argocd-config directory
 notifications:
   enabled: false
 dex:
