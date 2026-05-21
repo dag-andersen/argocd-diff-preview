@@ -67,6 +67,7 @@ type TestCase struct {
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
 	RepoRegex                  string // If set, use --repo-regex instead of --repo
+	ShowAppNamespace           string // If "true", shows the source Application namespace in diff output
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
@@ -108,9 +109,10 @@ var testCases = []TestCase{
 		ArgocdUIURL:        "https://argocd.example.com",
 	},
 	{
-		Name:         "branch-2/target",
-		TargetBranch: "integration-test/branch-2/target",
-		BaseBranch:   "integration-test/branch-2/base",
+		Name:             "branch-2/target",
+		TargetBranch:     "integration-test/branch-2/target",
+		BaseBranch:       "integration-test/branch-2/base",
+		ShowAppNamespace: "true",
 	},
 	{
 		Name:         "branch-3/target",
@@ -192,9 +194,10 @@ var testCases = []TestCase{
 		RenderMethod: "server-api",
 	},
 	{
-		Name:         "branch-6/target",
-		TargetBranch: "integration-test/branch-6/target",
-		BaseBranch:   "integration-test/branch-6/base",
+		Name:             "branch-6/target",
+		TargetBranch:     "integration-test/branch-6/target",
+		BaseBranch:       "integration-test/branch-6/base",
+		ShowAppNamespace: "true",
 	},
 	{
 		Name:                       "branch-7/target",
@@ -978,6 +981,10 @@ func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 		args = append(args, "-e", "TRAVERSE_APP_OF_APPS=true")
 	}
 
+	if tc.ShowAppNamespace == "true" {
+		args = append(args, "-e", "SHOW_APP_NAMESPACE=true")
+	}
+
 	// Add image (no additional args needed - all config is via env vars)
 	args = append(args, *dockerImage)
 
@@ -1078,6 +1085,10 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 
 	if tc.TraverseAppOfApps == "true" {
 		args = append(args, "--traverse-app-of-apps")
+	}
+
+	if tc.ShowAppNamespace == "true" {
+		args = append(args, "--show-app-namespace")
 	}
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),

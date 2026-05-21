@@ -30,6 +30,7 @@ func GeneratePreview(
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	showAppNamespace bool,
 ) (time.Duration, error) {
 	startTime := time.Now()
 	maxDiffMessageCharCount := maxCharCount
@@ -67,7 +68,7 @@ func GeneratePreview(
 	summary := buildSummary(appDiffs)
 
 	// Convert to markdown/HTML sections
-	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL)
+	markdownSections, htmlSections := buildMatchingSections(appDiffs, argocdUIURL, showAppNamespace)
 
 	// Markdown
 	log.Debug().Msg("Creating markdown output")
@@ -170,12 +171,16 @@ func buildSummary(diffs []matching.AppDiff) string {
 }
 
 // buildMatchingSections converts AppDiffs to markdown and HTML sections
-func buildMatchingSections(diffs []matching.AppDiff, argocdUIURL string) ([]MarkdownSection, []HTMLSection) {
+func buildMatchingSections(diffs []matching.AppDiff, argocdUIURL string, showAppNamespace bool) ([]MarkdownSection, []HTMLSection) {
 	markdownSections := make([]MarkdownSection, 0, len(diffs))
 	htmlSections := make([]HTMLSection, 0, len(diffs))
 
 	for _, d := range diffs {
 		appURL := buildAppURLFromDiff(d, argocdUIURL)
+		appNamespace := ""
+		if showAppNamespace {
+			appNamespace = d.PrettyNamespace()
+		}
 
 		// Convert matching.ResourceDiff → diff.ResourceSection
 		sections := make([]ResourceSection, len(d.Resources))
@@ -188,19 +193,21 @@ func buildMatchingSections(diffs []matching.AppDiff, argocdUIURL string) ([]Mark
 		}
 
 		markdownSections = append(markdownSections, MarkdownSection{
-			appName:     d.PrettyName(),
-			filePath:    d.PrettyPath(),
-			appURL:      appURL,
-			resources:   sections,
-			emptyReason: d.EmptyReason,
+			appName:      d.PrettyName(),
+			appNamespace: appNamespace,
+			filePath:     d.PrettyPath(),
+			appURL:       appURL,
+			resources:    sections,
+			emptyReason:  d.EmptyReason,
 		})
 
 		htmlSections = append(htmlSections, HTMLSection{
-			appName:     d.PrettyName(),
-			filePath:    d.PrettyPath(),
-			appURL:      appURL,
-			resources:   sections,
-			emptyReason: d.EmptyReason,
+			appName:      d.PrettyName(),
+			appNamespace: appNamespace,
+			filePath:     d.PrettyPath(),
+			appURL:       appURL,
+			resources:    sections,
+			emptyReason:  d.EmptyReason,
 		})
 	}
 

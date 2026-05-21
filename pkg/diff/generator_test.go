@@ -186,7 +186,7 @@ func TestBuildAppURLFromDiff(t *testing.T) {
 // Tests for buildMatchingSections
 
 func TestBuildMatchingSections_Empty(t *testing.T) {
-	md, html := buildMatchingSections(nil, "")
+	md, html := buildMatchingSections(nil, "", false)
 	if len(md) != 0 {
 		t.Errorf("expected 0 markdown sections, got %d", len(md))
 	}
@@ -214,7 +214,7 @@ func TestBuildMatchingSections_WithResources(t *testing.T) {
 		},
 	}
 
-	md, html := buildMatchingSections(diffs, "https://argocd.example.com")
+	md, html := buildMatchingSections(diffs, "https://argocd.example.com", false)
 
 	if len(md) != 1 {
 		t.Fatalf("expected 1 markdown section, got %d", len(md))
@@ -266,7 +266,7 @@ func TestBuildMatchingSections_SkippedResource(t *testing.T) {
 		},
 	}
 
-	md, _ := buildMatchingSections(diffs, "")
+	md, _ := buildMatchingSections(diffs, "", false)
 	if len(md) != 1 || len(md[0].resources) != 1 {
 		t.Fatalf("expected 1 section with 1 resource")
 	}
@@ -284,7 +284,7 @@ func TestBuildMatchingSections_NoURL(t *testing.T) {
 		},
 	}
 
-	md, _ := buildMatchingSections(diffs, "")
+	md, _ := buildMatchingSections(diffs, "", false)
 	if md[0].appURL != "" {
 		t.Errorf("expected empty appURL when no argocdUIURL, got %q", md[0].appURL)
 	}

@@ -9,11 +9,12 @@ import (
 )
 
 type MarkdownSection struct {
-	appName     string
-	filePath    string
-	appURL      string
-	resources   []ResourceSection
-	emptyReason matching.EmptyReason
+	appName      string
+	appNamespace string
+	filePath     string
+	appURL       string
+	resources    []ResourceSection
+	emptyReason  matching.EmptyReason
 }
 
 // emptyReasonMarkdown returns the markdown-formatted message for an EmptyReason
@@ -30,12 +31,17 @@ func emptyReasonMarkdown(reason matching.EmptyReason) string {
 	}
 }
 
-func markdownSectionHeader(appName, filePath, appURL string) string {
+func markdownSectionHeader(appName, appNamespace, filePath, appURL string) string {
+	namespaceText := ""
+	if appNamespace != "" {
+		namespaceText = fmt.Sprintf(" (%s)", appNamespace)
+	}
+
 	var summary string
 	if appURL != "" {
-		summary = fmt.Sprintf("%s [<a href=\"%s\">link</a>] (%s)", appName, appURL, filePath)
+		summary = fmt.Sprintf("%s%s [<a href=\"%s\">link</a>] (%s)", appName, namespaceText, appURL, filePath)
 	} else {
-		summary = fmt.Sprintf("%s (%s)", appName, filePath)
+		summary = fmt.Sprintf("%s%s (%s)", appName, namespaceText, filePath)
 	}
 	return fmt.Sprintf("<details>\n<summary>%s</summary>\n<br>\n\n", summary)
 }
@@ -58,7 +64,7 @@ const (
 
 // build returns the section content and a boolean indicating if the section was truncated
 func (m *MarkdownSection) build(maxSize int) (string, bool) {
-	header := markdownSectionHeader(m.appName, m.filePath, m.appURL)
+	header := markdownSectionHeader(m.appName, m.appNamespace, m.filePath, m.appURL)
 	footer := markdownSectionFooter()
 
 	var body strings.Builder

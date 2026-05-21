@@ -91,11 +91,12 @@ pre {
 `
 
 type HTMLSection struct {
-	appName     string
-	filePath    string
-	appURL      string
-	resources   []ResourceSection
-	emptyReason matching.EmptyReason
+	appName      string
+	appNamespace string
+	filePath     string
+	appURL       string
+	resources    []ResourceSection
+	emptyReason  matching.EmptyReason
 }
 
 // emptyReasonHTML returns the HTML-formatted message for an EmptyReason
@@ -128,15 +129,22 @@ func (h *HTMLSection) printHTMLSection() string {
 	s := htmlSectionTemplate
 
 	// Build summary with optional link
+	namespaceText := ""
+	if h.appNamespace != "" {
+		namespaceText = fmt.Sprintf(" (%s)", html.EscapeString(h.appNamespace))
+	}
+
 	var summary string
 	if h.appURL != "" {
-		summary = fmt.Sprintf(`%s [<a href="%s">link</a>] (%s)`,
+		summary = fmt.Sprintf(`%s%s [<a href="%s">link</a>] (%s)`,
 			html.EscapeString(h.appName),
+			namespaceText,
 			html.EscapeString(h.appURL),
 			html.EscapeString(h.filePath))
 	} else {
-		summary = fmt.Sprintf(`%s (%s)`,
+		summary = fmt.Sprintf(`%s%s (%s)`,
 			html.EscapeString(h.appName),
+			namespaceText,
 			html.EscapeString(h.filePath))
 	}
 	s = strings.ReplaceAll(s, "%summary%", summary)

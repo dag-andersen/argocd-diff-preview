@@ -7,7 +7,7 @@ Modified (1):
 ```
 
 <details>
-<summary>internal-chart-example (examples/internal-chart/app.yaml)</summary>
+<summary>internal-chart-example (argocd) (examples/internal-chart/app.yaml)</summary>
 <br>
 
 #### Deployment: default/super-app-name → default/new-app-name

@@ -337,6 +337,7 @@ func generateAppsFromAppSet(
 
 		docCopy := doc.DeepCopy()
 		app := NewArgoResource(docCopy, Application, name, name, appSet.FileName, branch.Type())
+		app.Namespace = appSet.Namespace
 		apps = append(apps, *app)
 	}
 

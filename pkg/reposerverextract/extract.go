@@ -188,7 +188,7 @@ func RenderApplicationsFromBothBranches(
 			}
 
 			renderedApps.Add(1)
-			results <- result{app: extract.CreateExtractedApp(app.Id, app.Name, app.FileName, manifests, app.Branch)}
+			results <- result{app: extract.CreateExtractedApp(app.Id, app.Name, app.Namespace, app.FileName, manifests, app.Branch)}
 		}(app)
 	}
 

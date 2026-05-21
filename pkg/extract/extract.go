@@ -290,7 +290,7 @@ func getResourcesFromApp(
 		// If we got manifests with no error, return the extracted app.Ignore all errors
 		if err == nil && len(manifestsContent) > 0 {
 			log.Debug().Str("loop", strconv.Itoa(loopCount)).Str("App", app.GetLongName()).Msgf("Successfully extracted %d manifests from application", len(manifestsContent))
-			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
+			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.Namespace, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
 		}
 
@@ -327,7 +327,7 @@ func getResourcesFromApp(
 		// If still got no error anywhere and already tried refreshing, return the extracted app. We assume the application was just empty.
 		if err == nil {
 			log.Warn().Str("App", app.GetLongName()).Msg("⚠️ No manifests found for application")
-			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.FileName, manifestsContent, app.Branch)
+			extractedApp := CreateExtractedApp(uniqueIdBeforeModifications, app.Name, app.Namespace, app.FileName, manifestsContent, app.Branch)
 			return extractedApp, k8sName, nil
 		}
 

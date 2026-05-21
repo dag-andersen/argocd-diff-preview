@@ -360,7 +360,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 
 			renderedApps.Add(1)
 			results <- renderResult{
-				extracted: extract.CreateExtractedApp(item.app.Id, item.app.Name, item.app.FileName, manifests, item.app.Branch),
+				extracted: extract.CreateExtractedApp(item.app.Id, item.app.Name, item.app.Namespace, item.app.FileName, manifests, item.app.Branch),
 				childApps: childApps,
 				depth:     item.depth,
 			}
