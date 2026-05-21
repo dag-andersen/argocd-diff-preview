@@ -105,6 +105,8 @@ func emptyReasonHTML(reason matching.EmptyReason) string {
 		return "<p><em>Application rendered no resources</em></p>"
 	case matching.EmptyReasonHiddenDiff:
 		return "<p><em>Diff hidden because <code>--hide-deleted-app-diff</code> is enabled</em></p>"
+	case matching.EmptyReasonNameOnlyChange:
+		return "<p><em>Application name changed, but rendered resources are unchanged</em></p>"
 	default:
 		return "<p><em>Empty for unknown reason</em></p>"
 	}
