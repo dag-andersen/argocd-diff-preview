@@ -70,6 +70,8 @@ func (r *ResourceDiff) Header() string {
 type AppDiff struct {
 	OldName       string // Name in base branch (empty if added)
 	NewName       string // Name in target branch (empty if deleted)
+	OldNamespace  string // Namespace in base branch
+	NewNamespace  string // Namespace in target branch
 	OldSourcePath string // Source path in base branch
 	NewSourcePath string // Source path in target branch
 	Action        DiffAction
@@ -77,6 +79,20 @@ type AppDiff struct {
 	AddedLines    int
 	DeletedLines  int
 	EmptyReason   EmptyReason // Why Resources is empty (only meaningful when len(Resources) == 0)
+}
+
+// PrettyNamespace returns a display namespace for the diff.
+func (d *AppDiff) PrettyNamespace() string {
+	switch {
+	case d.NewNamespace != "" && d.OldNamespace != "" && d.NewNamespace != d.OldNamespace:
+		return fmt.Sprintf("%s -> %s", d.OldNamespace, d.NewNamespace)
+	case d.NewNamespace != "":
+		return d.NewNamespace
+	case d.OldNamespace != "":
+		return d.OldNamespace
+	default:
+		return ""
+	}
 }
 
 // EmptyReason describes why an application section has no resource diffs
@@ -221,10 +237,12 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *regexp.Regexp,
 	// Set names and paths
 	if pair.Base != nil {
 		diff.OldName = pair.Base.Name
+		diff.OldNamespace = pair.Base.Namespace
 		diff.OldSourcePath = pair.Base.SourcePath
 	}
 	if pair.Target != nil {
 		diff.NewName = pair.Target.Name
+		diff.NewNamespace = pair.Target.Namespace
 		diff.NewSourcePath = pair.Target.SourcePath
 	}
 

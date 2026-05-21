@@ -11,11 +11,12 @@ import (
 
 func TestMarkdownSectionHeader(t *testing.T) {
 	tests := []struct {
-		name     string
-		appName  string
-		filePath string
-		appURL   string
-		expected string
+		name         string
+		appName      string
+		appNamespace string
+		filePath     string
+		appURL       string
+		expected     string
 	}{
 		{
 			name:     "Simple app and file without URL",
@@ -32,6 +33,14 @@ func TestMarkdownSectionHeader(t *testing.T) {
 			expected: "<details>\n<summary>app-v2 [<a href=\"https://argocd.example.com/applications/app-v2\">link</a>] (path/to/app)</summary>\n<br>\n\n",
 		},
 		{
+			name:         "App with namespace",
+			appName:      "internal-chart-example",
+			appNamespace: "preview-apps",
+			filePath:     "examples/internal-chart/app.yaml",
+			appURL:       "",
+			expected:     "<details>\n<summary>internal-chart-example (preview-apps) (examples/internal-chart/app.yaml)</summary>\n<br>\n\n",
+		},
+		{
 			name:     "Empty app name without URL",
 			appName:  "",
 			filePath: "path/to/app",
@@ -42,7 +51,7 @@ func TestMarkdownSectionHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := markdownSectionHeader(tt.appName, tt.filePath, tt.appURL)
+			got := markdownSectionHeader(tt.appName, tt.appNamespace, tt.filePath, tt.appURL)
 			if got != tt.expected {
 				t.Errorf("markdownSectionHeader() = %q, want %q", got, tt.expected)
 			}
@@ -349,7 +358,7 @@ func TestMarkdownOutput_PrintDiff_EdgeCases(t *testing.T) {
 }
 
 func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
-	header := markdownSectionHeader("App", "path.yaml", "")
+	header := markdownSectionHeader("App", "", "path.yaml", "")
 	footer := markdownSectionFooter()
 	headerFooterLen := len(header) + len(footer)
 

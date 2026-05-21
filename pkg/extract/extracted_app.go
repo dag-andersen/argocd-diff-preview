@@ -17,16 +17,18 @@ import (
 type ExtractedApp struct {
 	Id         string
 	Name       string
+	Namespace  string
 	SourcePath string
 	Manifests  []unstructured.Unstructured
 	Branch     git.BranchType
 }
 
 // CreateExtractedApp creates an ExtractedApp from an ArgoResource
-func CreateExtractedApp(id string, name string, sourcePath string, manifest []unstructured.Unstructured, branch git.BranchType) ExtractedApp {
+func CreateExtractedApp(id string, name string, namespace string, sourcePath string, manifest []unstructured.Unstructured, branch git.BranchType) ExtractedApp {
 	return ExtractedApp{
 		Id:         id,
 		Name:       name,
+		Namespace:  namespace,
 		SourcePath: sourcePath,
 		Manifests:  manifest,
 		Branch:     branch,

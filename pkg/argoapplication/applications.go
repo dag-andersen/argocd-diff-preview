@@ -16,23 +16,30 @@ import (
 
 // ArgoResource represents an Argo CD Application or ApplicationSet
 type ArgoResource struct {
-	Yaml     *unstructured.Unstructured
-	Kind     ApplicationKind
-	Id       string // The ID is the name of the k8s resource
-	Name     string // The name is the original name of the Application
-	FileName string
-	Branch   git.BranchType
+	Yaml      *unstructured.Unstructured
+	Kind      ApplicationKind
+	Id        string // The ID is the name of the k8s resource
+	Name      string // The name is the original name of the Application
+	Namespace string // The namespace is the original namespace of the Application
+	FileName  string
+	Branch    git.BranchType
 }
 
 // NewArgoResource creates a new ArgoResource
 func NewArgoResource(yaml *unstructured.Unstructured, kind ApplicationKind, id string, name string, fileName string, branch git.BranchType) *ArgoResource {
+	namespace := ""
+	if yaml != nil {
+		namespace = yaml.GetNamespace()
+	}
+
 	return &ArgoResource{
-		Yaml:     yaml,
-		Kind:     kind,
-		Id:       id,
-		Name:     name,
-		FileName: fileName,
-		Branch:   branch,
+		Yaml:      yaml,
+		Kind:      kind,
+		Id:        id,
+		Name:      name,
+		Namespace: namespace,
+		FileName:  fileName,
+		Branch:    branch,
 	}
 }
 

@@ -13,7 +13,7 @@ Modified (7):
 ```
 
 <details>
-<summary>app1 (examples/duplicate-names/app/app-set-1.yaml)</summary>
+<summary>app1 (argocd) (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
 #### Deployment: deploy-from-folder-one
@@ -34,7 +34,7 @@ Modified (7):
 </details>
 
 <details>
-<summary>app1 (examples/duplicate-names/app/app-set-2.yaml)</summary>
+<summary>app1 (argocd) (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
 #### Deployment: deploy-from-folder-one
@@ -55,7 +55,7 @@ Modified (7):
 </details>
 
 <details>
-<summary>app2 (examples/duplicate-names/app/app-set-1.yaml)</summary>
+<summary>app2 (argocd) (examples/duplicate-names/app/app-set-1.yaml)</summary>
 <br>
 
 #### Deployment: deploy-from-folder-one
@@ -76,7 +76,7 @@ Modified (7):
 </details>
 
 <details>
-<summary>app2 (examples/duplicate-names/app/app-set-2.yaml)</summary>
+<summary>app2 (argocd) (examples/duplicate-names/app/app-set-2.yaml)</summary>
 <br>
 
 #### Deployment: deploy-from-folder-one
@@ -97,7 +97,7 @@ Modified (7):
 </details>
 
 <details>
-<summary>my-app -> my-super-app (examples/helm/applications/my-app.yaml)</summary>
+<summary>my-app -> my-super-app (argocd) (examples/helm/applications/my-app.yaml)</summary>
 <br>
 
 #### Deployment: default/super-app-name
@@ -182,7 +182,7 @@ Modified (7):
 </details>
 
 <details>
-<summary>my-service-staging (examples/kustomize/applications/my-service-staging.yaml)</summary>
+<summary>my-service-staging (argocd) (examples/kustomize/applications/my-service-staging.yaml)</summary>
 <br>
 
 #### Deployment: default/staging-myapp
@@ -203,7 +203,7 @@ Modified (7):
 </details>
 
 <details>
-<summary>nginx-ingress (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
+<summary>nginx-ingress (argocd) (examples/helm/applications/nginx.yaml -> examples/helm/applications/nginx-new-path.yaml)</summary>
 <br>
 
 #### Deployment: default/nginx-ingress-ingress-nginx-controller
