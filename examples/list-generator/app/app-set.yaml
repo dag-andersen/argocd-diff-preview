@@ -9,7 +9,7 @@ spec:
   generators:
     - list:
         elements:
-          - name: app1
+          - name: app2
             path: examples/list-generator/resources
   template:
     metadata:
