@@ -5,7 +5,8 @@ Summary:
 Deleted (1):
 - folder2 (-19)
 
-Modified (1):
+Modified (2):
+± app1 -> app2
 ± multi-source-app (+1|-1)
 ```
 
@@ -35,6 +36,14 @@ Modified (1):
 -        ports:
 -        - containerPort: 80
 ```
+</details>
+
+<details>
+<summary>app1 -> app2 (examples/list-generator/app/app-set.yaml)</summary>
+<br>
+
+_Application name changed, but rendered resources are unchanged_
+
 </details>
 
 <details>
