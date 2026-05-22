@@ -97,6 +97,16 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
 	}
 
+	kubeVersion, err := argocd.K8sClient.GetServerVersion()
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get server version: %w", err)
+	}
+
+	apiVersions, err := argocd.K8sClient.GetAPIVersions()
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get API versions: %w", err)
+	}
+
 	// Collect all unique repository URLs referenced by the Applications so that
 	// FetchRepoCreds can enrich them with credentials from repo-creds templates.
 	appRepoURLs := collectRepoURLs(baseApps, targetApps)
@@ -176,7 +186,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector)
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector, kubeVersion, apiVersions)
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -251,6 +261,8 @@ func renderApp(
 	namespacedScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
 	repoSelector *repository.Selector,
+	kubeVersion string,
+	apiVersions []string,
 ) ([]unstructured.Unstructured, error) {
 	branchFolder, ok := branchFolderByType[app.Branch]
 	if !ok {
@@ -265,7 +277,7 @@ func renderApp(
 	var allManifestStrings []string
 
 	for i, contentSource := range contentSources {
-		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, repoSelector)
+		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, repoSelector, kubeVersion, apiVersions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
 		}
@@ -502,6 +514,8 @@ func buildManifestRequestForSource(
 	branchFolder string,
 	creds *RepoCreds,
 	repoSelector *repository.Selector,
+	kubeVersion string,
+	apiVersions []string,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
 	obj := app.Yaml.Object
 
@@ -524,6 +538,8 @@ func buildManifestRequestForSource(
 			AppName:            app.Id,
 			Namespace:          namespace,
 			ApplicationSource:  source,
+			KubeVersion:        kubeVersion,
+			ApiVersions:        apiVersions,
 			HasMultipleSources: hasMultipleSources,
 			// Applications are patched to the default project before rendering. We
 			// allow all source repos here so repo-server does not replace Helm

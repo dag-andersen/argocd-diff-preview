@@ -166,6 +166,16 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
 	}
 
+	kubeVersion, err := argocd.K8sClient.GetServerVersion()
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get server version: %w", err)
+	}
+
+	apiVersions, err := argocd.K8sClient.GetAPIVersions()
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get API versions: %w", err)
+	}
+
 	// Collect all unique repository URLs referenced by the Applications so that
 	// FetchRepoCreds can enrich them with credentials from repo-creds templates.
 	appRepoURLs := collectRepoURLs(baseApps, targetApps)
@@ -347,7 +357,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth)
+			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions)
 			if err != nil {
 				results <- renderResult{err: fmt.Errorf("failed to render app %s: %w", item.app.GetLongName(), err)}
 				return
@@ -412,8 +422,10 @@ func renderAppWithChildDiscovery(
 	argocdNamespace string,
 	tempFolder string,
 	depth int,
+	kubeVersion string,
+	apiVersions []string,
 ) ([]unstructured.Unstructured, []argoapplication.ArgoResource, error) {
-	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, repoSelector)
+	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, repoSelector, kubeVersion, apiVersions)
 	if err != nil {
 		return nil, nil, err
 	}
