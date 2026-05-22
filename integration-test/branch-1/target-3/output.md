@@ -5,7 +5,8 @@ Summary:
 Deleted (1):
 - folder2
 
-Modified (2):
+Modified (3):
+± app1 -> app2
 ± multi-source-app (+2|-2)
 ± nginx-ingress (+1|-1)
 ```
@@ -15,6 +16,14 @@ Modified (2):
 <br>
 
 _Diff hidden because `--hide-deleted-app-diff` is enabled_
+
+</details>
+
+<details>
+<summary>app1 -> app2 [<a href="https://argocd.example.com/applications/app1">link</a>] (examples/list-generator/app/app-set.yaml)</summary>
+<br>
+
+_Application name changed, but rendered resources are unchanged_
 
 </details>
 

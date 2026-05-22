@@ -373,6 +373,23 @@ func TestMarkdownSection_Build_EdgeCases(t *testing.T) {
 		}
 	})
 
+	t.Run("Name-only change", func(t *testing.T) {
+		section := MarkdownSection{
+			appName:     "old-app -> new-app",
+			filePath:    "path.yaml",
+			appURL:      "",
+			resources:   []ResourceSection{},
+			emptyReason: matching.EmptyReasonNameOnlyChange,
+		}
+		content, truncated := section.build(1000)
+		if truncated {
+			t.Errorf("Name-only change should not be truncated")
+		}
+		if !strings.Contains(content, "_Application name changed, but rendered resources are unchanged_") {
+			t.Errorf("Should contain name-only change explanation")
+		}
+	})
+
 	t.Run("Content with trailing newlines", func(t *testing.T) {
 		section := MarkdownSection{
 			appName:  "App",

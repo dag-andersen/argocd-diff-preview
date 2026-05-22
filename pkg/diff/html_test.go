@@ -78,6 +78,21 @@ func TestHTMLSection_PrintHTMLSection_EmptyResources(t *testing.T) {
 	}
 }
 
+func TestHTMLSection_PrintHTMLSection_NameOnlyChange(t *testing.T) {
+	section := HTMLSection{
+		appName:     "old-app -> new-app",
+		filePath:    "path/to/app",
+		resources:   []ResourceSection{},
+		emptyReason: matching.EmptyReasonNameOnlyChange,
+	}
+
+	result := section.printHTMLSection()
+
+	if !strings.Contains(result, "Application name changed, but rendered resources are unchanged") {
+		t.Errorf("expected name-only change message, got:\n%s", result)
+	}
+}
+
 func TestHTMLSection_PrintHTMLSection_SkippedResource(t *testing.T) {
 	section := HTMLSection{
 		appName:  "my-app",
