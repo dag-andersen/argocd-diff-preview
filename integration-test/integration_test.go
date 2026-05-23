@@ -63,6 +63,7 @@ type TestCase struct {
 	RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global flag
 	DisableClusterRoles        string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
 	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
+	ArgocdConfigDirAPIMode     string // Custom argocd-config directory for API render modes; falls back to ArgocdConfigDir when empty
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
 	RepoRegex                  string // If set, use --repo-regex instead of --repo
@@ -259,6 +260,8 @@ var testCases = []TestCase{
 		Suffix:                     "-1",
 		DiffIgnore:                 "annotations",
 		WatchIfNoWatchPatternFound: "false",
+		ArgocdConfigDir:            "with-servicemonitor-crd",
+		ArgocdConfigDirAPIMode:     "with-servicemonitor-crd-no-cluster-roles",
 	},
 	{
 		Name:                       "branch-12/target-2",
@@ -268,6 +271,8 @@ var testCases = []TestCase{
 		DiffIgnore:                 "annotations",
 		WatchIfNoWatchPatternFound: "false",
 		IgnoreResources:            "*:CustomResourceDefinition:*,:ConfigMap:argocd-cm",
+		ArgocdConfigDir:            "with-servicemonitor-crd",
+		ArgocdConfigDirAPIMode:     "with-servicemonitor-crd-no-cluster-roles",
 	},
 	{
 		Name:         "branch-13/target-1",
@@ -366,6 +371,13 @@ func effectiveRenderMethod(tc TestCase) string {
 func isAPIMode(tc TestCase) bool {
 	m := effectiveRenderMethod(tc)
 	return m == "server-api" || m == "repo-server-api"
+}
+
+func effectiveArgocdConfigDir(tc TestCase) string {
+	if isAPIMode(tc) && tc.ArgocdConfigDirAPIMode != "" {
+		return tc.ArgocdConfigDirAPIMode
+	}
+	return tc.ArgocdConfigDir
 }
 
 // timePattern matches timing information in output that varies between runs
@@ -861,8 +873,8 @@ func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 	// When using a custom ArgoCD config directory, mount the entire directory.
 	// Otherwise, when using API mode or DisableClusterRoles is set, mount only the values.yaml file
 	// (which sets createClusterRoles: false) into the default argocd-config path in the container.
-	if tc.ArgocdConfigDir != "" {
-		args = append(args, "-v", fmt.Sprintf("%s/integration-test/%s:/argocd-config", repoRoot, tc.ArgocdConfigDir))
+	if argocdConfigDir := effectiveArgocdConfigDir(tc); argocdConfigDir != "" {
+		args = append(args, "-v", fmt.Sprintf("%s/integration-test/%s:/argocd-config", repoRoot, argocdConfigDir))
 	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
 		args = append(args, "-v", fmt.Sprintf("%s/integration-test/no-cluster-roles/values.yaml:/argocd-config/values.yaml", repoRoot))
 	}
@@ -1051,8 +1063,8 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 	// pass --argocd-config-dir pointing at the no-cluster-roles directory (createClusterRoles: false).
 	// If ArgocdConfigDir is explicitly set, use that directory instead.
 	// This avoids mutating the shared argocd-config/values.yaml on disk.
-	if tc.ArgocdConfigDir != "" {
-		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", tc.ArgocdConfigDir))
+	if argocdConfigDir := effectiveArgocdConfigDir(tc); argocdConfigDir != "" {
+		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", argocdConfigDir))
 	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
 		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", "no-cluster-roles"))
 	}
