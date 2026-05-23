@@ -272,7 +272,19 @@ func renderApp(
 	var allManifestStrings []string
 
 	for i, contentSource := range contentSources {
-		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, repoSelector, kubeVersion, apiVersions)
+		request, streamDir, cleanup, err := buildManifestRequestForSource(
+			app,
+			contentSource,
+			refSources,
+			hasMultipleSources,
+			branchFolder,
+			creds,
+			manifestRequestRenderContext{
+				repoSelector: repoSelector,
+				kubeVersion:  kubeVersion,
+				apiVersions:  apiVersions,
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
 		}
@@ -501,6 +513,12 @@ func splitSources(app argoapplication.ArgoResource) (
 //
 // cleanup must be called by the caller when the stream directory is no longer
 // needed.
+type manifestRequestRenderContext struct {
+	repoSelector *repository.Selector
+	kubeVersion  string
+	apiVersions  []string
+}
+
 func buildManifestRequestForSource(
 	app argoapplication.ArgoResource,
 	primarySource v1alpha1.ApplicationSource,
@@ -508,10 +526,11 @@ func buildManifestRequestForSource(
 	hasMultipleSources bool,
 	branchFolder string,
 	creds *RepoCreds,
-	repoSelector *repository.Selector,
-	kubeVersion string,
-	apiVersions []string,
+	renderContext manifestRequestRenderContext,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
+	repoSelector := renderContext.repoSelector
+	kubeVersion := renderContext.kubeVersion
+	apiVersions := renderContext.apiVersions
 	obj := app.Yaml.Object
 
 	var specPath []string

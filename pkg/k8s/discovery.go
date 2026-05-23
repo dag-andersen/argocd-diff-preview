@@ -42,8 +42,7 @@ func (c *Client) GetNamespacedScopedResourcesAndAPIVersions() (map[schema.GroupK
 	seen := make(map[string]bool)
 	var apiVersions []string
 	for _, apiResourceList := range apiResourceLists {
-		if seen[apiResourceList.GroupVersion] {
-		} else {
+		if !seen[apiResourceList.GroupVersion] {
 			seen[apiResourceList.GroupVersion] = true
 			apiVersions = append(apiVersions, apiResourceList.GroupVersion)
 		}

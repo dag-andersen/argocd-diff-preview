@@ -107,7 +107,21 @@ spec:
 	require.Empty(t, refSources)
 	assert.False(t, hasMultipleSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+	kubeVersion := "v1.30.1"
+	apiVersions := []string{"apps/v1", "v1"}
+	req, streamDir, cleanup, err := buildManifestRequestForSource(
+		app,
+		contentSources[0],
+		refSources,
+		hasMultipleSources,
+		branchFolder,
+		nil,
+		manifestRequestRenderContext{
+			repoSelector: testRepoSelector(t, ""),
+			kubeVersion:  kubeVersion,
+			apiVersions:  apiVersions,
+		},
+	)
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -118,6 +132,8 @@ spec:
 	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
 	assert.Empty(t, req.ApplicationSource.Chart, "should not have a Chart field")
 	assert.Equal(t, "production", req.Namespace)
+	assert.Equal(t, kubeVersion, req.KubeVersion)
+	assert.Equal(t, apiVersions, req.ApiVersions)
 	assert.Nil(t, req.RefSources)
 	assertDefaultProjectFields(t, req)
 }
@@ -149,7 +165,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -217,7 +234,8 @@ spec:
 	require.Len(t, contentSources, 1, "only the chart source is a content source")
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -299,7 +317,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	require.NotEmpty(t, streamDir, "local chart with refs must stream a temp dir")
 	defer cleanup()
@@ -410,7 +429,8 @@ spec:
 	}
 	require.NotEmpty(t, chartSource.Chart, "should find the chart content source")
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -470,7 +490,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -555,7 +576,8 @@ spec:
 	// Capture requests so we can verify per-source paths without duplicate calls.
 	reqs := make([]struct{ path string }, len(contentSources))
 	for i, cs := range contentSources {
-		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""), "", nil)
+		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+			repoSelector: testRepoSelector(t, "")})
 		require.NoError(t, buildErr, "content source %d should not error", i)
 		if cleanup != nil {
 			defer cleanup()
@@ -615,7 +637,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Empty(t, refSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -665,7 +688,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -706,7 +730,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -753,7 +778,9 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo),
+	})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -859,7 +886,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo), "", nil)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
