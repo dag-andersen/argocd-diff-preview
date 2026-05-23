@@ -16,7 +16,7 @@ spec:
         - name: controller.metrics.serviceMonitor.enabled
           value: "true"
         - name: controller.metrics.serviceMonitor.interval
-          value: "30s"
+          value: "15s"
   destination:
     namespace: argocd
     server: https://kubernetes.default.svc
