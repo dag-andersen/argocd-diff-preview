@@ -24,7 +24,6 @@ import (
 	"github.com/argoproj/argo-cd/v3/util/db"
 	helmutil "github.com/argoproj/argo-cd/v3/util/helm"
 	argosettings "github.com/argoproj/argo-cd/v3/util/settings"
-	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/rs/zerolog/log"
 	"k8s.io/client-go/kubernetes"
 
@@ -193,18 +192,6 @@ func normalizeRepoURL(u string) string {
 	u = strings.ToLower(u)
 	u = strings.TrimSuffix(u, ".git")
 	return u
-}
-
-// repoURLContains reports whether repoURL identifies the same repository as
-// substr. This is used to match source repoURLs against the --repo flag value
-// which can be either a full URL
-// ("https://github.com/org/repo.git") or a short slug ("org/repo").
-//
-// The comparison is provider-agnostic, but it must compare complete path
-// segments so repos like org/foo and org/foo-deploy are not treated as the
-// same repository.
-func repoURLContains(repoURL, substr string) bool {
-	return repository.MatchesRepo(repoURL, substr)
 }
 
 // HelmRepos returns the Helm + OCI repository lists to pass as

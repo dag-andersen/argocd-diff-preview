@@ -84,7 +84,7 @@ func TestMatchesRepo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, MatchesRepo(tc.repoURL, tc.repo), "repoURL=%q repo=%q", tc.repoURL, tc.repo)
+			assert.Equal(t, tc.want, matchesRepo(tc.repoURL, tc.repo), "repoURL=%q repo=%q", tc.repoURL, tc.repo)
 		})
 	}
 }

@@ -32,7 +32,7 @@ func (s *Selector) Matches(repoURL string) bool {
 	if s.Repo == "" {
 		return true
 	}
-	return MatchesRepo(repoURL, s.Repo)
+	return matchesRepo(repoURL, s.Repo)
 }
 
 func (s *Selector) String() string {
@@ -45,21 +45,40 @@ func (s *Selector) String() string {
 	return s.Repo
 }
 
-// MatchesRepo reports whether repoURL contains repo as complete repository path
+// matchesRepo reports whether repoURL contains repo as complete repository path
 // segments. repo can be either a full URL or a short path such as owner/repo.
 //
 // This intentionally uses bounded matching instead of strings.Contains so
 // owner/repo matches https://example.com/owner/repo.git, but does not match
 // https://example.com/owner/repo-deploy.git.
-func MatchesRepo(repoURL, repo string) bool {
+func matchesRepo(repoURL, repo string) bool {
 	normalizedURL := normalizeRepoMatchInput(repoURL)
 	normalizedRepo := normalizeRepoMatchInput(repo)
 	if normalizedURL == "" || normalizedRepo == "" {
 		return false
 	}
 
-	pattern := `(^|[:/])` + regexp.QuoteMeta(normalizedRepo) + `($|/)`
-	return regexp.MustCompile(pattern).MatchString(normalizedURL)
+	if normalizedURL == normalizedRepo {
+		return true
+	}
+
+	start := 0
+	for {
+		index := strings.Index(normalizedURL[start:], normalizedRepo)
+		if index == -1 {
+			return false
+		}
+		index += start
+
+		beforeMatches := index == 0 || normalizedURL[index-1] == ':' || normalizedURL[index-1] == '/'
+		afterIndex := index + len(normalizedRepo)
+		afterMatches := afterIndex == len(normalizedURL) || normalizedURL[afterIndex] == '/'
+		if beforeMatches && afterMatches {
+			return true
+		}
+
+		start = index + 1
+	}
 }
 
 func normalizeRepoMatchInput(input string) string {

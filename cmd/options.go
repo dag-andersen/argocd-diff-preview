@@ -304,7 +304,7 @@ func Parse() *Config {
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
-	rootCmd.Flags().String("repo", "", "Git Repository. Format: OWNER/REPO (required)")
+	rootCmd.Flags().String("repo", "", "Git repository. Format: OWNER/REPO. Mutually exclusive with --repo-regex")
 	rootCmd.Flags().String("repo-regex", "", "Regex matched against normalized Argo CD repoURL values for templated repository URLs. Mutually exclusive with --repo")
 
 	// Folders
@@ -330,7 +330,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("auto-detect-files-changed", DefaultAutoDetectFilesChanged, "Auto detect files changed between branches")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().Bool("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound, "Render applications without watch pattern")
-	rootCmd.Flags().String("redirect-target-revisions", "", "Comma-separated target revisions to redirect to the target branch. Example: main,HEAD. By default, all target revisions are redirected")
+	rootCmd.Flags().String("redirect-target-revisions", "", "Comma-separated source targetRevision values to redirect to the target branch. Example: main,HEAD. By default, every targetRevision in matching repositories is redirected")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
@@ -454,7 +454,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 
 	cfg.RepoSelector, err = o.parseRepositorySelector()
 	if err != nil {
-		return nil, fmt.Errorf("invalid repo-regex: %w", err)
+		return nil, err
 	}
 
 	// Parse selectors
@@ -673,7 +673,9 @@ func (o *Config) LogConfig() {
 	if o.ArgocdConfigPath != DefaultArgocdConfigPath {
 		log.Info().Msgf("✨ - argocd-config-dir: %s", o.ArgocdConfigPath)
 	}
-	log.Info().Msgf("✨ - repo: %s", o.RepoSelector.Repo)
+	if o.RepoSelector.Repo != "" {
+		log.Info().Msgf("✨ - repo: %s", o.RepoSelector.Repo)
+	}
 	if o.RepoSelector.Regex != nil {
 		log.Info().Msgf("✨ - repo-regex: %s", o.RepoSelector.Regex.String())
 	}
