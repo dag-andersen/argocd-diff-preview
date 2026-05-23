@@ -765,4 +765,7 @@ func (o *Config) LogConfig() {
 	if o.FailOnDuplicateGeneratedApplications {
 		log.Info().Msgf("✨ - fail-on-duplicate-generated-applications: %t", o.FailOnDuplicateGeneratedApplications)
 	}
+	if o.DisableDefaultIgnorePatterns {
+		log.Info().Msgf("✨ - disable-default-ignore-patterns: %t", o.DisableDefaultIgnorePatterns)
+	}
 }
