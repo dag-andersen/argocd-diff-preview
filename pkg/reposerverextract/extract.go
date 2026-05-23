@@ -92,19 +92,14 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
-	namespacedScopedResources, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
+	namespacedScopedResources, apiVersions, err := argocd.K8sClient.GetNamespacedScopedResourcesAndAPIVersions()
 	if err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to discover API resources: %w", err)
 	}
 
 	kubeVersion, err := argocd.K8sClient.GetServerVersion()
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get server version: %w", err)
-	}
-
-	apiVersions, err := argocd.K8sClient.GetAPIVersions()
-	if err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get API versions: %w", err)
 	}
 
 	// Collect all unique repository URLs referenced by the Applications so that
