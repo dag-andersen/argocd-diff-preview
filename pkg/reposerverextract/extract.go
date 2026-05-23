@@ -36,6 +36,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/reposerver"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 )
 
 // resourceInfoProvider implements kubeutil.ResourceInfoProvider to supply
@@ -71,7 +72,7 @@ func RenderApplicationsFromBothBranches(
 	maxConcurrency uint,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
-	prRepo string,
+	repoSelector repository.Selector,
 ) ([]extract.ExtractedApp, []extract.ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
@@ -175,7 +176,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, prRepo)
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector)
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -249,7 +250,7 @@ func renderApp(
 	branchFolderByType map[git.BranchType]string,
 	namespacedScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
-	prRepo string,
+	repoSelector *repository.Selector,
 ) ([]unstructured.Unstructured, error) {
 	branchFolder, ok := branchFolderByType[app.Branch]
 	if !ok {
@@ -264,7 +265,7 @@ func renderApp(
 	var allManifestStrings []string
 
 	for i, contentSource := range contentSources {
-		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, prRepo)
+		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, repoSelector)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
 		}
@@ -500,7 +501,7 @@ func buildManifestRequestForSource(
 	hasMultipleSources bool,
 	branchFolder string,
 	creds *RepoCreds,
-	prRepo string,
+	repoSelector *repository.Selector,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
 	obj := app.Yaml.Object
 
@@ -553,11 +554,11 @@ func buildManifestRequestForSource(
 		// repository than the PR repo. Those files are not checked out
 		// locally, so we cannot stream them. Fall back to the remote
 		// GenerateManifest RPC and let the repo server fetch them itself.
-		if prRepo != "" && !repoURLContains(primarySource.RepoURL, prRepo) {
+		if !repoSelector.Matches(primarySource.RepoURL) {
 			log.Debug().
 				Str("App", app.GetLongName()).
 				Str("sourceRepoURL", primarySource.RepoURL).
-				Str("prRepo", prRepo).
+				Str("prRepo", repoSelector.String()).
 				Msg("Source repoURL does not match PR repo - using remote RPC")
 			return newManifestRequest(&primarySource), "", nil, nil
 		}
@@ -592,11 +593,11 @@ func buildManifestRequestForSource(
 	// The same applies when a ref source lives outside the PR repository. Copying
 	// the local branch folder into .refs would provide the wrong repository
 	// content, especially for ref-only sources whose Path is empty.
-	if prRepo != "" && (!repoURLContains(primarySource.RepoURL, prRepo) || hasExternalRefSource(refSources, prRepo)) {
+	if !repoSelector.Matches(primarySource.RepoURL) || hasExternalRefSource(refSources, repoSelector) {
 		log.Debug().
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).
-			Str("prRepo", prRepo).
+			Str("prRepo", repoSelector.String()).
 			Msg("Source or ref repoURL does not match PR repo (slow path) - using remote RPC")
 		request = newManifestRequest(&primarySource)
 		request.RefSources = buildRefSourcesMap(refSources, creds)
@@ -706,9 +707,9 @@ func buildRefSourcesMap(refSources []v1alpha1.ApplicationSource, creds *RepoCred
 	return refSourcesMap
 }
 
-func hasExternalRefSource(refSources []v1alpha1.ApplicationSource, prRepo string) bool {
+func hasExternalRefSource(refSources []v1alpha1.ApplicationSource, repoSelector *repository.Selector) bool {
 	for _, ref := range refSources {
-		if !repoURLContains(ref.RepoURL, prRepo) {
+		if !repoSelector.Matches(ref.RepoURL) {
 			return true
 		}
 	}

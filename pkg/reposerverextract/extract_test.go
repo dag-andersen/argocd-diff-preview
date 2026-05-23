@@ -25,6 +25,7 @@ import (
 	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -72,6 +73,13 @@ func assertDefaultProjectFields(t *testing.T, req *repoapiclient.ManifestRequest
 	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "source repos must be permissive so helm build errors are not masked as permission errors")
 }
 
+func testRepoSelector(t *testing.T, repo string) *repository.Selector {
+	t.Helper()
+	selector, err := repository.NewSelector(repo, "")
+	require.NoError(t, err)
+	return selector
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1.  Single-source, local chart (fast path, no refs)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,7 +107,7 @@ spec:
 	require.Empty(t, refSources)
 	assert.False(t, hasMultipleSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -141,7 +149,7 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -209,7 +217,7 @@ spec:
 	require.Len(t, contentSources, 1, "only the chart source is a content source")
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -291,7 +299,7 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 	require.NoError(t, err)
 	require.NotEmpty(t, streamDir, "local chart with refs must stream a temp dir")
 	defer cleanup()
@@ -402,7 +410,7 @@ spec:
 	}
 	require.NotEmpty(t, chartSource.Chart, "should find the chart content source")
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -462,7 +470,7 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -547,7 +555,7 @@ spec:
 	// Capture requests so we can verify per-source paths without duplicate calls.
 	reqs := make([]struct{ path string }, len(contentSources))
 	for i, cs := range contentSources {
-		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, "")
+		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, ""))
 		require.NoError(t, buildErr, "content source %d should not error", i)
 		if cleanup != nil {
 			defer cleanup()
@@ -607,7 +615,7 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Empty(t, refSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -657,7 +665,7 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -698,7 +706,7 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -713,6 +721,51 @@ spec:
 	require.True(t, ok)
 	assert.Equal(t, "https://github.com/org/app-values.git", refTarget.Repo.Repo)
 	assert.Equal(t, "main", refTarget.TargetRevision)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SameRepoPrimaryWithPrefixExternalRef_UsesRemoteRPC(t *testing.T) {
+	prRepo := "org/helm-charts"
+	branchFolder := makeBranchFolder(t, "charts/my-chart")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  sources:
+    - repoURL: https://github.com/org/helm-charts.git
+      path: charts/my-chart
+      targetRevision: main
+      helm:
+        valueFiles:
+          - $helm-values-repo/imageTag.yaml
+    - repoURL: https://github.com/org/helm-charts-deploy.git
+      targetRevision: main
+      ref: helm-values-repo
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo))
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir,
+		"ref repo sharing the PR repo prefix must still be treated as external")
+	assert.Equal(t, []string{"$helm-values-repo/imageTag.yaml"}, req.ApplicationSource.Helm.ValueFiles)
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$helm-values-repo"]
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/org/helm-charts-deploy.git", refTarget.Repo.Repo)
 	assertDefaultProjectFields(t, req)
 }
 
@@ -771,85 +824,11 @@ func TestNormalizeRepoURL(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// repoURLContains - substring match used for prRepo comparisons
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestRepoURLContains(t *testing.T) {
-	cases := []struct {
-		name    string
-		repoURL string
-		substr  string
-		want    bool
-	}{
-		{
-			name:    "full URL matches full URL",
-			repoURL: "https://github.com/org/repo.git",
-			substr:  "https://github.com/org/repo.git",
-			want:    true,
-		},
-		{
-			name:    "slug matches full URL",
-			repoURL: "https://github.com/org/repo.git",
-			substr:  "org/repo",
-			want:    true,
-		},
-		{
-			name:    "slug matches full URL without .git",
-			repoURL: "https://github.com/org/repo",
-			substr:  "org/repo",
-			want:    true,
-		},
-		{
-			name:    "case insensitive",
-			repoURL: "https://github.com/Org/Repo.git",
-			substr:  "org/repo",
-			want:    true,
-		},
-		{
-			name:    "different repos do not match",
-			repoURL: "https://github.com/org/repo-a.git",
-			substr:  "org/repo-b",
-			want:    false,
-		},
-		{
-			name:    "different orgs do not match",
-			repoURL: "https://github.com/org-a/repo.git",
-			substr:  "org-b/repo",
-			want:    false,
-		},
-		{
-			name:    "GitLab full URL with slug",
-			repoURL: "https://gitlab.com/company/project.git",
-			substr:  "company/project",
-			want:    true,
-		},
-		{
-			name:    "Bitbucket full URL with slug",
-			repoURL: "https://bitbucket.org/team/repo.git",
-			substr:  "team/repo",
-			want:    true,
-		},
-		{
-			name:    "empty substr matches anything",
-			repoURL: "https://github.com/org/repo.git",
-			substr:  "",
-			want:    true,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, repoURLContains(tc.repoURL, tc.substr), "repoURL=%q substr=%q", tc.repoURL, tc.substr)
-		})
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 10. Same-repo source with prRepo as owner/repo slug → streams locally
 //
 //	When the user passes --repo=owner/repo (the documented format), the
 //	source repoURL is a full URL like "https://github.com/owner/repo.git".
-//	The comparison must use substring matching so the slug is recognised as
-//	belonging to the same repository.
+//	The comparison must recognise the slug as belonging to the same repository.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 func TestBuildManifestRequest_SameRepoSource_WithSlugPrRepo_StreamsLocally(t *testing.T) {
@@ -880,7 +859,7 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, prRepo))
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()

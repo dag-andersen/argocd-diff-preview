@@ -11,6 +11,7 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argocd"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 )
 
@@ -20,7 +21,7 @@ func ConvertAppSetsToAppsInBothBranches(
 	targetApps *ArgoSelection,
 	baseBranch *git.Branch,
 	targetBranch *git.Branch,
-	repo string,
+	repoSelector repository.Selector,
 	tempFolder string,
 	redirectRevisions []string,
 	debug bool,
@@ -40,7 +41,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		debug,
 		failOnDuplicateGeneratedApplications,
 		appSelectionOptions,
-		repo,
+		repoSelector,
 		redirectRevisions,
 	)
 
@@ -58,7 +59,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		debug,
 		failOnDuplicateGeneratedApplications,
 		appSelectionOptions,
-		repo,
+		repoSelector,
 		redirectRevisions,
 	)
 	if err != nil {
@@ -79,7 +80,7 @@ func processAppSets(
 	debug bool,
 	failOnDuplicateGeneratedApplications bool,
 	appSelectionOptions ApplicationSelectionOptions,
-	repo string,
+	repoSelector repository.Selector,
 	redirectRevisions []string,
 ) (*ArgoSelection, error) {
 
@@ -150,7 +151,7 @@ func processAppSets(
 		argocd.Namespace,
 		selection.SelectedApps,
 		branch,
-		repo,
+		repoSelector,
 		redirectRevisions,
 	)
 	if err != nil {

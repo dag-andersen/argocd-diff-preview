@@ -65,6 +65,7 @@ type TestCase struct {
 	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
+	RepoRegex                  string // If set, use --repo-regex instead of --repo
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
@@ -234,6 +235,7 @@ var testCases = []TestCase{
 		BaseBranch:    "integration-test/branch-9/base",
 		Suffix:        "-3",
 		MaxDiffLength: "400",
+		RepoRegex:     "go.*diff-pre",
 	},
 	{
 		Name:                       "branch-10/target-1",
@@ -272,6 +274,7 @@ var testCases = []TestCase{
 		TargetBranch: "integration-test/branch-13/target",
 		BaseBranch:   "integration-test/branch-13/base",
 		Suffix:       "-1",
+		RepoRegex:    "-diff-",
 	},
 	{
 		Name:         "branch-13/target-2",
@@ -872,7 +875,11 @@ func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 	// Add environment variables
 	args = append(args, "-e", fmt.Sprintf("BASE_BRANCH=%s", tc.BaseBranch))
 	args = append(args, "-e", fmt.Sprintf("TARGET_BRANCH=%s", tc.TargetBranch))
-	args = append(args, "-e", fmt.Sprintf("REPO=%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
+	if tc.RepoRegex != "" {
+		args = append(args, "-e", fmt.Sprintf("REPO_REGEX=%s", tc.RepoRegex))
+	} else {
+		args = append(args, "-e", fmt.Sprintf("REPO=%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
+	}
 	args = append(args, "-e", fmt.Sprintf("TIMEOUT=%s", defaultTimeout))
 	args = append(args, "-e", fmt.Sprintf("LINE_COUNT=%s", getLineCount(tc)))
 	args = append(args, "-e", fmt.Sprintf("MAX_DIFF_LENGTH=%s", getMaxDiffLength(tc)))
@@ -964,7 +971,6 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 	args := []string{
 		"--base-branch", tc.BaseBranch,
 		"--target-branch", tc.TargetBranch,
-		"--repo", fmt.Sprintf("%s/%s", defaultGitHubOrg, defaultGitOpsRepo),
 		"--argocd-namespace", argocdNamespace,
 		"--timeout", defaultTimeout,
 		"--line-count", getLineCount(tc),
@@ -972,6 +978,11 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 		"--title", getTitle(tc),
 		"--keep-cluster-alive",
 		"--disable-client-throttling",
+	}
+	if tc.RepoRegex != "" {
+		args = append(args, "--repo-regex", tc.RepoRegex)
+	} else {
+		args = append(args, "--repo", fmt.Sprintf("%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
 	}
 
 	// Don't keep cluster alive for tests that expect failure (cluster may be in broken state)

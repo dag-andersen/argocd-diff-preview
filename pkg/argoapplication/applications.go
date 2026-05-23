@@ -9,6 +9,7 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/fileparsing"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/utils"
 	"sigs.k8s.io/yaml"
 )
@@ -74,14 +75,14 @@ func GetApplicationsForBranches(
 	baseBranch *git.Branch,
 	targetBranch *git.Branch,
 	appSelectionOptions ApplicationSelectionOptions,
-	repo string,
+	repoSelector repository.Selector,
 	redirectRevisions []string,
 ) (*ArgoSelection, *ArgoSelection, error) {
 	baseApps, err := getApplications(
 		argocdNamespace,
 		baseBranch,
 		appSelectionOptions,
-		repo,
+		repoSelector,
 		redirectRevisions,
 	)
 	if err != nil {
@@ -92,7 +93,7 @@ func GetApplicationsForBranches(
 		argocdNamespace,
 		targetBranch,
 		appSelectionOptions,
-		repo,
+		repoSelector,
 		redirectRevisions,
 	)
 	if err != nil {
@@ -107,7 +108,7 @@ func getApplications(
 	argocdNamespace string,
 	branch *git.Branch,
 	appSelectionOptions ApplicationSelectionOptions,
-	repo string,
+	repoSelector repository.Selector,
 	redirectRevisions []string,
 ) (*ArgoSelection, error) {
 	log.Info().Str("branch", branch.Name).Msg("🤖 Fetching all files for branch")
@@ -156,7 +157,7 @@ func getApplications(
 		argocdNamespace,
 		selection.SelectedApps,
 		branch,
-		repo,
+		repoSelector,
 		redirectRevisions,
 	)
 	if err != nil {
