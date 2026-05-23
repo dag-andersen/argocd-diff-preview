@@ -513,6 +513,10 @@ func splitSources(app argoapplication.ArgoResource) (
 //
 // cleanup must be called by the caller when the stream directory is no longer
 // needed.
+// manifestRequestRenderContext groups render-run settings that every
+// ManifestRequest needs but that are not specific to a single source. Keeping
+// these values together avoids a long positional parameter list where adjacent
+// strings or slices can be accidentally swapped at call sites.
 type manifestRequestRenderContext struct {
 	repoSelector *repository.Selector
 	kubeVersion  string
@@ -528,9 +532,6 @@ func buildManifestRequestForSource(
 	creds *RepoCreds,
 	renderContext manifestRequestRenderContext,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
-	repoSelector := renderContext.repoSelector
-	kubeVersion := renderContext.kubeVersion
-	apiVersions := renderContext.apiVersions
 	obj := app.Yaml.Object
 
 	var specPath []string
@@ -552,8 +553,8 @@ func buildManifestRequestForSource(
 			AppName:            app.Id,
 			Namespace:          namespace,
 			ApplicationSource:  source,
-			KubeVersion:        kubeVersion,
-			ApiVersions:        apiVersions,
+			KubeVersion:        renderContext.kubeVersion,
+			ApiVersions:        renderContext.apiVersions,
 			HasMultipleSources: hasMultipleSources,
 			// Applications are patched to the default project before rendering. We
 			// allow all source repos here so repo-server does not replace Helm
@@ -584,11 +585,11 @@ func buildManifestRequestForSource(
 		// repository than the PR repo. Those files are not checked out
 		// locally, so we cannot stream them. Fall back to the remote
 		// GenerateManifest RPC and let the repo server fetch them itself.
-		if !repoSelector.Matches(primarySource.RepoURL) {
+		if !renderContext.repoSelector.Matches(primarySource.RepoURL) {
 			log.Debug().
 				Str("App", app.GetLongName()).
 				Str("sourceRepoURL", primarySource.RepoURL).
-				Str("prRepo", repoSelector.String()).
+				Str("prRepo", renderContext.repoSelector.String()).
 				Msg("Source repoURL does not match PR repo - using remote RPC")
 			return newManifestRequest(&primarySource), "", nil, nil
 		}
@@ -623,11 +624,11 @@ func buildManifestRequestForSource(
 	// The same applies when a ref source lives outside the PR repository. Copying
 	// the local branch folder into .refs would provide the wrong repository
 	// content, especially for ref-only sources whose Path is empty.
-	if !repoSelector.Matches(primarySource.RepoURL) || hasExternalRefSource(refSources, repoSelector) {
+	if !renderContext.repoSelector.Matches(primarySource.RepoURL) || hasExternalRefSource(refSources, renderContext.repoSelector) {
 		log.Debug().
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).
-			Str("prRepo", repoSelector.String()).
+			Str("prRepo", renderContext.repoSelector.String()).
 			Msg("Source or ref repoURL does not match PR repo (slow path) - using remote RPC")
 		request = newManifestRequest(&primarySource)
 		request.RefSources = buildRefSourcesMap(refSources, creds)
