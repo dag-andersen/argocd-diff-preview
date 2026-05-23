@@ -9,6 +9,14 @@ spec:
     chart: argo-cd
     repoURL: https://argoproj.github.io/argo-helm
     targetRevision: 7.7.7
+    helm:
+      parameters:
+        - name: controller.metrics.enabled
+          value: "true"
+        - name: controller.metrics.serviceMonitor.enabled
+          value: "true"
+        - name: controller.metrics.serviceMonitor.interval
+          value: "30s"
   destination:
     namespace: argocd
     server: https://kubernetes.default.svc
