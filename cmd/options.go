@@ -452,11 +452,10 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid file-regex: %w", err)
 	}
 
-	repoSelector, err := repository.NewSelector(o.Repo, o.RepoRegex)
+	cfg.RepoSelector, err = o.parseRepositorySelector()
 	if err != nil {
 		return nil, fmt.Errorf("invalid repo-regex: %w", err)
 	}
-	cfg.RepoSelector = *repoSelector
 
 	// Parse selectors
 	cfg.Selectors, err = o.parseSelectors()
@@ -530,6 +529,15 @@ func (o *RawOptions) parseFileRegex() (*regexp.Regexp, error) {
 		return nil, nil
 	}
 	return regexp.Compile(o.FileRegex)
+}
+
+// parseRepositorySelector returns a Repository Selector based on the repo or repo-regex flags
+func (o *RawOptions) parseRepositorySelector() (repository.Selector, error) {
+	repoSelector, err := repository.NewSelector(o.Repo, o.RepoRegex)
+	if err != nil {
+		return repository.Selector{}, fmt.Errorf("invalid repo-regex: %w", err)
+	}
+	return *repoSelector, nil
 }
 
 // parseRedirectRevisions parses the redirect-target-revisions string into a slice of strings
