@@ -103,8 +103,8 @@ Tests can run in three modes, controlled by the `--render-method` flag:
 
 | Mode                                   | Cluster Roles | How it works                                   |
 | -------------------------------------- | ------------- | ---------------------------------------------- |
-| **`cli`** (default)                    | Enabled       | Uses `argocd` CLI to render manifests           |
-| **`server-api`**                       | Disabled      | Uses Argo CD REST API directly                 |
+| **`cli`**                              | Enabled       | Uses `argocd` CLI to render manifests           |
+| **`server-api`** (default)             | Disabled      | Uses Argo CD REST API directly                 |
 | **`repo-server-api`** (experimental)   | Disabled      | Calls the Argo CD repo-server gRPC API directly |
 
 When switching between modes that require different RBAC configurations, the cluster is automatically deleted and recreated.

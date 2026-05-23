@@ -212,7 +212,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 		if result == "false" {
 			log.Info().Msgf("Installing with 'createClusterRoles: %s'", result)
 			if a.RenderMethod() == vars.RenderMethodCLI {
-				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work when using '--render-method=cli' (default)")
+				log.Warn().Msgf("⚠️ Running Argo CD in locked-down mode. This will not work when using '--render-method=cli'")
 			}
 		}
 	}
