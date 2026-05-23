@@ -7,7 +7,7 @@ Modified (1):
 ```
 
 <details>
-<summary>argocd-helm-chart (examples/with-crds/applicaiton.yaml)</summary>
+<summary>argocd-helm-chart (examples/with-crds/application.yaml)</summary>
 <br>
 
 #### Deployment: argocd/argocd-helm-chart-applicationset-controller
