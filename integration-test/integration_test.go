@@ -380,6 +380,16 @@ func effectiveArgocdConfigDir(tc TestCase) string {
 	return tc.ArgocdConfigDir
 }
 
+func effectiveClusterConfig(tc TestCase) string {
+	if argocdConfigDir := effectiveArgocdConfigDir(tc); argocdConfigDir != "" {
+		return argocdConfigDir
+	}
+	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
+		return "no-cluster-roles"
+	}
+	return "default"
+}
+
 // timePattern matches timing information in output that varies between runs
 // Matches patterns like "1m10s]", "24s]", "110s]"
 var timePattern = regexp.MustCompile(`\d+m?\d*s\]`)
@@ -432,6 +442,7 @@ func TestIntegration(t *testing.T) {
 
 	// Track how many tests since last cluster creation
 	testsSinceClusterCreation := 0
+	currentClusterConfig := ""
 
 	// Run each test case
 	for i, tc := range shuffledCases {
@@ -442,18 +453,25 @@ func TestIntegration(t *testing.T) {
 
 		// Check current cluster state
 		clusterExists := kindClusterExists()
+		requiredClusterConfig := effectiveClusterConfig(tc)
 
-		// Check for RBAC mismatch (only relevant if cluster exists)
+		// Check for cluster configuration mismatch (only relevant if cluster exists)
 		if clusterExists {
 			clusterHasRoles := clusterHasArgocdClusterRoles()
 			// Mismatch if: test wants roles disabled but cluster has them, OR
 			//              test wants roles enabled but cluster doesn't have them
 			rbacMismatch := testNeedsRolesDisabled == clusterHasRoles
+			configMismatch := currentClusterConfig != "" && currentClusterConfig != requiredClusterConfig
 
-			if rbacMismatch {
-				printToTTY("🔄 Deleting cluster due to RBAC configuration mismatch...\n")
+			if rbacMismatch || configMismatch {
+				reason := "RBAC configuration mismatch"
+				if configMismatch {
+					reason = fmt.Sprintf("Argo CD config mismatch: current=%s, required=%s", currentClusterConfig, requiredClusterConfig)
+				}
+				printToTTY(fmt.Sprintf("🔄 Deleting cluster due to %s...\n", reason))
 				_ = deleteKindCluster()
 				clusterExists = false
+				currentClusterConfig = ""
 			}
 		}
 
@@ -461,6 +479,7 @@ func TestIntegration(t *testing.T) {
 		createCluster := testsSinceClusterCreation >= 15 || !clusterExists || tc.CreateCluster == "true"
 		if createCluster {
 			testsSinceClusterCreation = 0
+			currentClusterConfig = requiredClusterConfig
 		}
 
 		// Print separator to TTY for visibility between test runs

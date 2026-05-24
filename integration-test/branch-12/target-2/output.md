@@ -3,7 +3,7 @@
 Summary:
 ```yaml
 Modified (1):
-± argocd-helm-chart (+212|-48)
+± argocd-helm-chart (+215|-51)
 ```
 
 <details>
@@ -929,6 +929,31 @@ Modified (1):
            - key: ca.crt
              path: ca.crt
            optional: true
+```
+#### ServiceMonitor: argocd/argocd-helm-chart-application-controller
+```diff
+     app.kubernetes.io/part-of: argocd
+-    app.kubernetes.io/version: v2.13.1
+-    helm.sh/chart: argo-cd-7.7.7
++    app.kubernetes.io/version: v3.2.0
++    helm.sh/chart: argo-cd-9.1.4
+   name: argocd-helm-chart-application-controller
+   namespace: argocd
+ spec:
+   endpoints:
+   - honorLabels: false
+-    interval: 30s
++    interval: 15s
+     path: /metrics
+     port: http-metrics
+   namespaceSelector:
+     matchNames:
+     - argocd
+   selector:
+     matchLabels:
+       app.kubernetes.io/component: application-controller
+       app.kubernetes.io/instance: argocd-helm-chart
+       app.kubernetes.io/name: argocd-metrics
 ```
 #### ClusterRole: argocd-helm-chart-server
 ```diff
