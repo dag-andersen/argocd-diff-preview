@@ -455,13 +455,15 @@ func TestIntegration(t *testing.T) {
 		clusterExists := kindClusterExists()
 		requiredClusterConfig := effectiveClusterConfig(tc)
 
-		// Check for cluster configuration mismatch (only relevant if cluster exists)
+		// Check for cluster configuration mismatch (only relevant if cluster exists).
+		// An empty currentClusterConfig means this test process did not create the
+		// existing cluster, so the Argo CD values are unknown and must not be reused.
 		if clusterExists {
 			clusterHasRoles := clusterHasArgocdClusterRoles()
 			// Mismatch if: test wants roles disabled but cluster has them, OR
 			//              test wants roles enabled but cluster doesn't have them
 			rbacMismatch := testNeedsRolesDisabled == clusterHasRoles
-			configMismatch := currentClusterConfig != "" && currentClusterConfig != requiredClusterConfig
+			configMismatch := currentClusterConfig != requiredClusterConfig
 
 			if rbacMismatch || configMismatch {
 				reason := "RBAC configuration mismatch"

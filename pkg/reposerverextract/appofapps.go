@@ -163,7 +163,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 
 	namespacedScopedResources, apiVersions, err := argocd.K8sClient.GetNamespacedScopedResourcesAndAPIVersions()
 	if err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to discover API resources: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to initialize render context: %w", err)
 	}
 
 	kubeVersion, err := argocd.K8sClient.GetServerVersion()
