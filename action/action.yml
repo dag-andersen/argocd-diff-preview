@@ -1,0 +1,252 @@
+name: Argocd Diff Preview
+description: Render argo diff between two branches in a repository
+inputs:
+  version:
+    type: string
+    description: The version of argocd-diff-preview to use
+    required: true
+    default: "0.1.23"
+  os:
+    type: choice
+    description: "Runner operating system, options are 'Darwin-aarch64', 'Darwin-x86_64', 'Linux-aarch64', 'Linux-x86_64. defaults to: 'Linux-x86_64'."
+    required: false
+    default: Linux-x86_64
+    options:
+      - Darwin-aarch64
+      - Darwin-x86_64
+      - Linux-x86_64
+      - Linux-aarch64
+  github_token:
+    type: string
+    description: GitHub Authentication Token
+    required: true
+  repo:
+    type: string
+    description: Git Repository in format OWNER/REPO (e.g., dag-andersen/argocd-diff-preview)
+    required: true
+
+  target-branch:
+    type: string
+    description: Target branch name (the branch you want to compare with the base branch)
+    required: true
+
+  create-cluster:
+    type: boolean
+    description: "Create a new cluster if it doesn't exist (defaults to: true)"
+    required: false
+
+  disable-client-throttling:
+    type: boolean
+    description: "Disable client-side throttling (rely on API Priority and Fairness instead) (defaults to: false)"
+    required: false
+
+  auto-detect-file-change:
+    type: boolean
+    description: "Auto detect files changed between branches (defaults to: false)"
+    required: false
+
+  watch-if-no-match-pattern-found:
+    type: boolean
+    description: "Render applications without watch-pattern annotation (defaults to: false)"
+    required: false
+  
+  debug:
+    type: boolean
+    description: "Activate debug mode (defaults to: false)"
+    required: false
+
+  dry-run:
+    type: boolean
+    description: "Show which applications would be processed without creating a cluster or generating a diff (defaults to: false)"
+    required: false
+
+  hide-deleted-app-diff:
+    type: boolean
+    description: "Hide diff content for deleted applications (only show deletion header) (defaults to: false)" 
+    required: false
+
+  ignore-invalid-watch-pattern:
+    type: boolean
+    description: "Ignore invalid watch-pattern Regex on Applications (defaults to: false)"
+    required: false
+
+  keep-cluster-alive:
+    type: boolean
+    description: "Keep cluster alive after the tool finishes (defaults to: false)"
+    required: false
+
+  kind-internal:
+    type: boolean
+    description: "Use the kind cluster's internal address in the kubeconfig (allows connecting to the cluster when running the CLI in a container) (defaults to: false)"
+    required: false
+
+  use-argocd-api:
+    type: boolean
+    description: "Use Argo CD API instead of CLI (useful for namespace-scoped Argo CD installations) (defaults to: false)"
+    required: false
+
+  # --- options --- #
+  argocd-chart-version:
+    type: string
+    required: false
+    description: Argo CD Helm Chart version (defaults to 'latest')
+
+  argocd-chart-name:
+    type: string
+    required: false
+    description: Argo CD Helm Chart name (defaults to 'argo')
+
+  argocd-chart-url:
+    type: string
+    required: false
+    description: Argo CD Helm Chart URL (defaults to 'https://argoproj.github.io/argo-helm')
+
+  argocd-chart-repo-username:
+    type: string
+    required: false
+    description: Argo CD Helm Chart Private repository username
+
+  argocd-chart-repo-password:
+    type: string
+    required: false
+    description: Argo CD Helm Chart Private repository password
+
+  argocd-login-options:
+    type: string
+    required: false
+    description: Additional options to pass to argocd login command
+
+  argocd-auth-token:
+    type: string
+    required: false
+    description: Argo CD authentication token (skips default admin login)
+
+  argocd-namespace:
+    type: string
+    required: false
+    description: Namespace to use for Argo CD (defaults to 'argocd')
+
+  base-branch:
+    type: string
+    required: false
+    description: Base branch name (defaults to 'main')
+
+  cluster:
+    type: string
+    required: false
+    description: 'Local cluster tool. Options: kind, minikube, k3d, auto (defaults to "auto")'
+
+  cluster-name:
+    type: string
+    required: false
+    description: Cluster name (only for kind & k3d) (defaults to argocd-diff-preview)
+
+  diff-ignore:
+    type: string
+    required: false
+    description: 'Ignore lines in diff. Example: v[1,9]+.[1,9]+.[1,9]+ for ignoring version changes'
+
+  file-regex:
+    type: string
+    required: false
+    description: 'Regex to filter files. Example: /apps_.*\.yaml'
+
+  files-changed:
+    type: string
+    required: false
+    description: 'List of files changed between branches (comma, space or newline separated)'
+
+  ignore-resources:
+    type: string
+    required: false
+    description: "Ignore resources in diff. Format: group:kind:name (comma-separated, * wildcard)"
+  
+  k3d-options:
+    type: string
+    required: false
+    description: k3d options (only for k3d)
+
+  kind-options:
+    type: string
+    required: false
+    description: kind options (only for kind)
+
+  line-count:
+    type: number
+    required: false
+    description: Generate diffs with \<n> lines of context (defaults to 7)
+
+  log-format:
+    type: string
+    required: false
+    description: Log format. (Options 'human', 'json') (defaults to 'human')
+
+  max-diff-length:
+    type: number
+    required: false
+    description: Max diff message character count (only limits the generated Markdown file) (defaults to 65536)
+
+  output-folder:
+    type: string
+    required: false
+    description: Output folder where the diff will be saved (defaults to ./output)
+
+  redirect-target-revisions:
+    type: string
+    required: false
+    description: List of target revisions to redirect
+
+  secrets-folder:
+    type: string
+    required: false
+    description: Secrets folder where the secrets are read from (defaults to ./secrets)
+  
+  selector:
+    type: string
+    required: false
+    description: Label selector to filter on (e.g., key1=value1,key2=value2)
+  
+  timeout:
+    type: number
+    description: Set timeout in seconds (defaults to 100)
+    required: false
+
+  title:
+    type: string
+    description: Custom title for the markdown output (defaults to 'Argo CD Diff Preview')
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install argocd-diff-preview
+      shell: bash
+      run: |
+        curl -LJO https://github.com/dag-andersen/argocd-diff-preview/releases/download/v${{ inputs.version }}/argocd-diff-preview-${{ inputs.os }}.tar.gz
+        tar -xvf argocd-diff-preview-${{ inputs.os }}.tar.gz
+        sudo mv argocd-diff-preview /usr/local/bin
+        echo "Verifying Installation..."
+        argocd-diff-preview -v
+
+    - name: Run argocd-diff-preview
+      shell: bash
+      run: |
+        input_json='${{ toJSON(inputs) }}'
+        filtered_json=$(echo $input_json | jq 'del(.[] | select(. == "")) | del(.github_token) | del(.os) | del(.version)')
+        echo "argcd-diff-preview flags and options from input: $filtered_json"
+        input_keys=$(echo $filtered_json | jq 'keys')
+        options_str=""
+        echo "Raw input keys: $input_keys"
+        # converting the json array into a bash array
+        input_keys=$(echo $input_keys | sed -e 's/\[ //g' -e 's/\ ]//g' -e 's/\,//g')
+        
+        echo "Parsing input keys: $input_keys"
+        for key in ${input_keys[@]}; do
+          key=${key//\"}
+          raw_flag_str=" --$key=$(echo $filtered_json | jq --arg k $key '.[$k]')"
+          formatted_flag_str=${raw_flag_str//\"}
+          options_str+=$formatted_flag_str
+        done
+        echo "Running argocd diff preview with flags and options: $options_str"
+        argocd-diff-preview $options_str
+
