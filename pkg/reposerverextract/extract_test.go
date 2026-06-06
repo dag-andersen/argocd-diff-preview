@@ -1317,22 +1317,22 @@ func compressAndListEntries(t *testing.T, dir string) []string {
 //     - $values/envs/prod/values.yaml
 //
 // The pipeline runs RedirectSources BEFORE buildManifestRequestForSource.
-// RedirectSources rewrites the same-repo ref source's targetRevision from
-// "main" to the local working branch "pr" (that branch only exists on disk in
-// the checked-out branch folder; it was never pushed to the remote).
+// RedirectSources rewrites same-repo sources from the configured remote
+// revision ("main" here) to the branch currently being rendered ("pr" here).
+// That is how the repo-server-api render path makes base/target comparisons
+// use the local branch folders passed to the tool.
 //
-// buildManifestRequestForSource then hits the `primarySource.Chart != ""`
-// short-circuit in extract.go and routes to the REMOTE GenerateManifest RPC,
-// populating RefSources with {Repo: github.com/org/charts.git, TargetRevision: "pr"}.
-// The repo server then tries to `git fetch pr` from the REMOTE
-// github.com/org/charts.git - but "pr" does not exist there - so the render
-// fails and aborts the whole env.
+// Before the fix, buildManifestRequestForSource treated every remote `chart:`
+// source as remote-only and returned streamDir="". That made repo-server fetch
+// the $values ref from the git remote instead of reading it from the local
+// branch folder. Depending on the environment, that could either fail during
+// git fetch or render stale/wrong values that do not match the checked-out
+// base/target files.
 //
-// This test CHARACTERISES the current (buggy) routing. When the fix lands
-// (pull the remote chart and stream it together with the local $ref files via
-// GenerateManifestWithFiles) the assertions marked BUG below must be inverted:
-// streamDir must be non-empty (local streaming) so the $values files come from
-// the checked-out PR branch, not from the remote.
+// Correct behaviour is to pull the remote chart locally, copy the same-repo ref
+// files from the checked-out branch into .refs, rewrite $values paths to
+// relative filesystem paths, and stream that complete temp tree with
+// GenerateManifestWithFiles.
 // ─────────────────────────────────────────────────────────────────────────────
 func TestBuildManifestRequest_Issue441_SameRepoRefWithRemoteChart(t *testing.T) {
 	prRepo := "org/charts"
@@ -1368,7 +1368,8 @@ spec:
 	selector := testRepoSelector(t, prRepo)
 
 	// Reproduce the real pipeline ordering: RedirectSources runs first and
-	// rewrites the same-repo ref source from "main" to the working branch "pr".
+	// rewrites the same-repo ref source from the configured revision ("main") to
+	// the branch currently being rendered ("pr").
 	require.NoError(t, app.RedirectSources(selector, "pr", []string{"main"}))
 
 	contentSources, refSources, hasMultipleSources, err := splitSources(app)
@@ -1376,8 +1377,8 @@ spec:
 	require.Len(t, contentSources, 1, "only the chart source is a content source")
 	require.Len(t, refSources, 1)
 
-	// Sanity: RedirectSources rewrote the same-repo ref to "pr" but left the
-	// remote chart's targetRevision untouched.
+	// Sanity: RedirectSources rewrote the same-repo ref to the rendered branch
+	// but left the remote chart's targetRevision untouched.
 	require.Equal(t, "pr", refSources[0].TargetRevision,
 		"RedirectSources must rewrite the same-repo ref to the working branch")
 
@@ -1391,8 +1392,8 @@ spec:
 	}
 
 	// Fixed behaviour: same-repo refs with a remote chart use local streaming so
-	// the value files come from the checked-out PR branch, not from a remote git
-	// fetch of the local-only branch name.
+	// the value files come from the checked-out branch folder, not from a remote
+	// git fetch performed by repo-server.
 	require.NotEmpty(t, streamDir,
 		"same-repo $ref with a remote chart must stream the pulled chart plus local ref files")
 	assert.Nil(t, req.RefSources,

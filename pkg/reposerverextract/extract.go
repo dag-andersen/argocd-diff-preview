@@ -629,11 +629,13 @@ func buildManifestRequestForSource(
 	// empty (the chart lives in an external registry, not in the tarball).
 	//
 	// When every ref source lives in the PR repo (issue #441), the value files
-	// only exist on the locally checked-out branch. RedirectSources has pointed
-	// those refs at the working branch, which was never pushed, so the unary
-	// GenerateManifest RPC cannot fetch them. Instead we pull the chart locally
-	// and stream it alongside the ref directories (see
-	// buildRemoteChartLocalRefsRequest), rendering with the PR's value files.
+	// must come from the local base/target checkout so the diff reflects exactly
+	// what this run is comparing. The unary GenerateManifest RPC would make the
+	// repo server resolve those refs by fetching from the remote git repository,
+	// bypassing the local checkout and risking missing local or not-yet-fetched
+	// changes. Instead we pull the chart locally and stream it alongside the ref
+	// directories (see buildRemoteChartLocalRefsRequest), rendering with the
+	// checked-out value files.
 	//
 	// When a ref source lives in a different repository (issue #428), its files
 	// are not checked out locally, so we keep using the unary GenerateManifest

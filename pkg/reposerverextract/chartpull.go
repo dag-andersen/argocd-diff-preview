@@ -4,12 +4,12 @@ package reposerverextract
 //
 // Some multi-source Applications use a remote Helm chart (an external Helm
 // registry, HTTP or OCI) whose value files come from a $ref source that lives
-// in the same repository as the pull request (e.g. cert-manager + an
-// envs/<env>/values.yaml file checked out from the PR branch).
+// in the same repository being compared (e.g. cert-manager + an
+// envs/<env>/values.yaml file checked out in the base or target branch folder).
 //
 // The repo server's file-streaming RPC (GenerateManifestWithFiles) resolves the
 // chart from the streamed tarball and never pulls it from a registry. To render
-// such an Application with the PR's local value files we therefore pull the
+// such an Application with the checked-out value files we therefore pull the
 // remote chart ourselves and place it inside the streamed tree alongside the
 // ref directories. From there the repo server renders it as an ordinary local
 // path chart. See buildManifestRequestForSource for how the result is used.
