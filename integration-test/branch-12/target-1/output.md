@@ -3,7 +3,7 @@
 Summary:
 ```yaml
 Modified (1):
-± argocd-helm-chart (+2434|-62)
+± argocd-helm-chart (+2437|-65)
 ```
 
 <details>
@@ -930,6 +930,31 @@ Modified (1):
              path: ca.crt
            optional: true
 ```
+#### ServiceMonitor: argocd/argocd-helm-chart-application-controller
+```diff
+     app.kubernetes.io/part-of: argocd
+-    app.kubernetes.io/version: v2.13.1
+-    helm.sh/chart: argo-cd-7.7.7
++    app.kubernetes.io/version: v3.2.0
++    helm.sh/chart: argo-cd-9.1.4
+   name: argocd-helm-chart-application-controller
+   namespace: argocd
+ spec:
+   endpoints:
+   - honorLabels: false
+-    interval: 30s
++    interval: 15s
+     path: /metrics
+     port: http-metrics
+   namespaceSelector:
+     matchNames:
+     - argocd
+   selector:
+     matchLabels:
+       app.kubernetes.io/component: application-controller
+       app.kubernetes.io/instance: argocd-helm-chart
+       app.kubernetes.io/name: argocd-metrics
+```
 #### ClusterRole: argocd-helm-chart-server
 ```diff
    name: argocd-helm-chart-server
@@ -1621,18 +1646,7 @@ Modified (1):
                            description: Images is a list of Kustomize image override
                              specifications
                            items:
-                             description: KustomizeImage represents a Kustomize image
-                               definition in the format [old_image_name=]<image_name>:<image_tag>
-                             type: string
-                           type: array
-                         kubeVersion:
-                           description: |-
-                             KubeVersion specifies the Kubernetes API version to pass to Helm when templating manifests. By default, Argo CD
-                             uses the Kubernetes version of the target cluster.
-                           type: string
-+                        labelIncludeTemplates:
-+                          description: LabelIncludeTemplates specifies whether to
-+
+                             description
 ```
 
 🚨 Diff is too long
