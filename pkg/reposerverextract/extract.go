@@ -565,12 +565,14 @@ func buildManifestRequestForSource(
 		}
 	}
 
-	// ── Fast path: no ref sources → stream the whole branch folder ────────────
-	// The repo server resolves ApplicationSource.Path relative to the stream
-	// root (workDir), so streaming the entire branch folder and setting Path
-	// correctly is sufficient. This also handles kustomize overlays that
-	// reference sibling directories (e.g. ../../base) which would be missing
-	// if we only copied the leaf path into a temp dir.
+	// Fast path: no ref sources.
+	// The repo server resolves ApplicationSource.Path relative to the stream root
+	// (workDir). For local Helm charts, stream the chart directory as the workDir
+	// root and clear Path in the request. This avoids sending unrelated monorepo
+	// files to the repo server, which can otherwise fail Argo CD's symlink safety
+	// checks before rendering even starts. If a path also contains a kustomization
+	// file, keep the branch root because Argo CD discovers it as Kustomize even
+	// when Chart.yaml exists for kustomize helmCharts support.
 	//
 	// Special case: if the primary source has a Chart field (external Helm
 	// registry chart) there are no local files to stream. We signal this by
@@ -578,7 +580,7 @@ func buildManifestRequestForSource(
 	// (non-file-streaming) GenerateManifest RPC instead.
 	if len(refSources) == 0 {
 		if primarySource.Chart != "" {
-			// Remote Helm chart – no local files to stream.
+			// Remote Helm chart - no local files to stream.
 			return newManifestRequest(&primarySource), "", nil, nil
 		}
 		// Cross-repo source: the source's repoURL points at a different
@@ -593,7 +595,15 @@ func buildManifestRequestForSource(
 				Msg("Source repoURL does not match PR repo - using remote RPC")
 			return newManifestRequest(&primarySource), "", nil, nil
 		}
-		return newManifestRequest(&primarySource), branchFolder, nil, nil
+		streamDir, cleanup, err := buildStreamDirForLocalSource(branchFolder, primarySource)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		requestSource := primarySource
+		if streamDir != branchFolder {
+			requestSource.Path = ""
+		}
+		return newManifestRequest(&requestSource), streamDir, cleanup, nil
 	}
 	// Slow path: ref sources present
 	//
@@ -705,6 +715,37 @@ func buildManifestRequestForSource(
 
 	request = newManifestRequest(&rewrittenSource)
 	return request, tempDir, cleanup, nil
+}
+
+func buildStreamDirForLocalSource(branchFolder string, source v1alpha1.ApplicationSource) (streamDir string, cleanup func(), err error) {
+	if source.Path == "" {
+		return branchFolder, nil, nil
+	}
+
+	sourceDir := filepath.Join(branchFolder, source.Path)
+	if _, err := os.Stat(sourceDir); err != nil {
+		return "", nil, fmt.Errorf("failed to inspect source dir %q: %w", sourceDir, err)
+	}
+	if isLocalHelmChart(sourceDir) && !isKustomizeSource(sourceDir) {
+		return sourceDir, nil, nil
+	}
+
+	return branchFolder, nil, nil
+}
+
+func isLocalHelmChart(sourceDir string) bool {
+	info, err := os.Stat(filepath.Join(sourceDir, "Chart.yaml"))
+	return err == nil && !info.IsDir()
+}
+
+func isKustomizeSource(sourceDir string) bool {
+	for _, filename := range []string{"kustomization.yaml", "kustomization.yml", "Kustomization"} {
+		info, err := os.Stat(filepath.Join(sourceDir, filename))
+		if err == nil && !info.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // splitRefPath splits a $refName/path/to/file value-file string into

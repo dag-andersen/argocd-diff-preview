@@ -100,26 +100,23 @@ run-unit-tests:
 # go test -coverprofile=coverage.out ./...
 # go tool cover -html=coverage.out
 
-# New Go-based integration tests
+# Go-based integration tests. The default targets use the tool default render method.
 run-integration-tests-go: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration ./...
 
 run-integration-tests-docker: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker ./...
 
-# Run integration tests with the Argo CD server API
-run-integration-tests-go-with-api: go-build
-	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=server-api ./...
-
-run-integration-tests-docker-with-api: go-build
-	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -render-method=server-api ./...
+# Run integration tests with the Argo CD CLI renderer
+run-integration-tests-go-with-cli: go-build
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=cli ./...
 
 # Run integration tests with the Argo CD repo server API
 run-integration-tests-go-with-repo-server-api: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=repo-server-api ./...
 
 run-integration-tests-docker-with-repo-server-api: go-build
-	cd integration-test && go test -v -timeout 60m -run TestIntegration -docker -render-method=repo-server-api ./...
+	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=repo-server-api -docker ./...
 
 # Update golden files for integration tests
 update-integration-tests: go-build
@@ -130,15 +127,16 @@ update-integration-tests-docker: go-build
 
 # Run before release
 check-release: run-lint run-unit-tests
-	$(MAKE) run-integration-tests-go
 	$(MAKE) run-integration-tests-go-with-repo-server-api
-	$(MAKE) run-integration-tests-docker-with-api
+	$(MAKE) run-integration-tests-go-with-cli
+	$(MAKE) run-integration-tests-docker
 
 # Loop the above commands until one fails
 check-release-repeat:
 	@i=1; while true; do \
 		echo "⭐⭐⭐⭐⭐ Iteration $$i ⭐⭐⭐⭐⭐"; \
-		$(MAKE) run-integration-tests-go || exit 1; \
-		$(MAKE) run-integration-tests-docker-with-api || exit 1; \
+		$(MAKE) run-integration-tests-go-with-repo-server-api || exit 1; \
+		$(MAKE) run-integration-tests-go-with-cli || exit 1; \
+		$(MAKE) run-integration-tests-docker || exit 1; \
 		i=$$((i + 1)); \
 	done

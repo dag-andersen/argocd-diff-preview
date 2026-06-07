@@ -17,12 +17,17 @@ package reposerverextract
 // resolve the $ref value files from its own git cache.
 
 import (
+	"archive/tar"
+	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
+	"github.com/argoproj/argo-cd/v3/util/tgzstream"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
@@ -61,6 +66,7 @@ func makeBranchFolder(t *testing.T, relPath string) string {
 	if relPath != "" {
 		full := filepath.Join(dir, relPath)
 		require.NoError(t, os.MkdirAll(full, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(full, "Chart.yaml"), []byte("apiVersion: v2\nname: test\nversion: 0.1.0\n"), 0o644))
 		// Write a dummy file so the directory is non-empty and copyDir works.
 		require.NoError(t, os.WriteFile(filepath.Join(full, "values.yaml"), []byte("key: value\n"), 0o644))
 	}
@@ -127,9 +133,10 @@ spec:
 		defer cleanup()
 	}
 
-	// Fast path: streamDir == branchFolder, no temp dir created.
-	assert.Equal(t, branchFolder, streamDir, "should stream the full branch folder for local charts")
-	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	// Fast path: stream only the source directory and clear Path so unrelated
+	// monorepo files are not included in the streamed tarball.
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "my-app"), streamDir, "should stream only the local source directory")
+	assert.Empty(t, req.ApplicationSource.Path)
 	assert.Empty(t, req.ApplicationSource.Chart, "should not have a Chart field")
 	assert.Equal(t, "production", req.Namespace)
 	assert.Equal(t, kubeVersion, req.KubeVersion)
@@ -574,7 +581,6 @@ spec:
 
 	// Build a request for each content source – this must not error.
 	// Capture requests so we can verify per-source paths without duplicate calls.
-	reqs := make([]struct{ path string }, len(contentSources))
 	for i, cs := range contentSources {
 		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
 			repoSelector: testRepoSelector(t, "")})
@@ -583,17 +589,13 @@ spec:
 			defer cleanup()
 		}
 
-		// Both are local path sources with no refs → fast path (stream branchFolder).
-		assert.Equal(t, branchFolder, streamDir, "content source %d should stream the branch folder", i)
+		// Multiple local path sources without Helm charts keep the branch root.
+		assert.Equal(t, branchFolder, streamDir, "content source %d should stream the branch root", i)
+		assert.Equal(t, cs.Path, req.ApplicationSource.Path)
 		assert.True(t, req.HasMultipleSources, "HasMultipleSources must be true for both requests")
 		assert.Equal(t, "argocd", req.Namespace)
 		assertDefaultProjectFields(t, req)
-		reqs[i].path = req.ApplicationSource.Path
 	}
-
-	// Verify the paths are correctly assigned to each request.
-	assert.Equal(t, "management-prod/applicationsets", reqs[0].path)
-	assert.Equal(t, "management-prod/root", reqs[1].path)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -695,9 +697,9 @@ spec:
 		defer cleanup()
 	}
 
-	// Same repo - should stream the branch folder, not use remote RPC.
-	assert.Equal(t, branchFolder, streamDir, "same-repo source must still stream locally even when prRepo is set")
-	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	// Same repo - should stream the source directory, not use remote RPC.
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "my-app"), streamDir, "same-repo source must still stream locally even when prRepo is set")
+	assert.Empty(t, req.ApplicationSource.Path)
 	assertDefaultProjectFields(t, req)
 }
 
@@ -896,10 +898,220 @@ spec:
 	// CRITICAL: must stream locally — the source is in the same repo.
 	// Before the fix, the slug format caused a mismatch and fell into the
 	// remote RPC path, which failed with "authentication required".
-	assert.Equal(t, branchFolder, streamDir,
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "debezium", "debezium"), streamDir,
 		"REGRESSION: same-repo source with slug-format prRepo must stream locally, not use remote RPC")
-	assert.Equal(t, "apps/debezium/debezium", req.ApplicationSource.Path)
+	assert.Empty(t, req.ApplicationSource.Path)
 	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SingleSource_Kustomize_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-app")
+	require.NoError(t, os.Remove(filepath.Join(branchFolder, "apps", "my-app", "Chart.yaml")))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "apps", "my-app", "kustomization.yaml"), []byte("resources: []\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, branchFolder, streamDir, "kustomize sources should keep branch root so sibling references still work")
+	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SingleSource_KustomizeWithHelm_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-app")
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "apps", "my-app", "kustomization.yaml"), []byte(`
+helmCharts:
+  - name: nginx
+    repo: https://charts.bitnami.com/bitnami
+    version: 15.0.0
+`), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+    targetRevision: HEAD
+    kustomize:
+      version: v5.0.0
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, branchFolder, streamDir, "kustomize sources with helmCharts should not be mistaken for local Helm charts")
+	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SingleSource_LocalChart_DoesNotStreamUnrelatedSymlinks(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "infra/charts/argocd")
+	relatedAssetDir := filepath.Join(branchFolder, "assets", "co")
+	relatedAppDir := filepath.Join(branchFolder, "src", "apps", "web", "public", "avatars")
+	require.NoError(t, os.MkdirAll(relatedAssetDir, 0o755))
+	require.NoError(t, os.MkdirAll(relatedAppDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(relatedAssetDir, "avatar.png"), []byte("png"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join("..", "..", "..", "..", "..", "assets", "co", "avatar.png"), filepath.Join(relatedAppDir, "avatar.png")))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+spec:
+  destination:
+    namespace: argocd
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: infra/charts/argocd
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, filepath.Join(branchFolder, "infra", "charts", "argocd"), streamDir)
+	assert.Empty(t, req.ApplicationSource.Path)
+	assert.NoDirExists(t, filepath.Join(streamDir, "src"), "unrelated top-level repo paths must not be streamed")
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_LocalHelmChart_TarballExcludesUnrelatedRepoSymlinks(t *testing.T) {
+	baseFolder := createIssue438BranchFolder(t, "base")
+	targetFolder := createIssue438BranchFolder(t, "target")
+
+	for _, tc := range []struct {
+		name         string
+		branchFolder string
+	}{
+		{name: "base", branchFolder: baseFolder},
+		{name: "target", branchFolder: targetFolder},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+spec:
+  destination:
+    namespace: argocd
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: infra/charts/argocd
+    targetRevision: HEAD
+`)
+
+			contentSources, refSources, hasMultipleSources, err := splitSources(app)
+			require.NoError(t, err)
+			require.Len(t, contentSources, 1)
+
+			req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, tc.branchFolder, nil,
+				manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+			require.NoError(t, err)
+			if cleanup != nil {
+				defer cleanup()
+			}
+
+			assert.Equal(t, filepath.Join(tc.branchFolder, "infra", "charts", "argocd"), streamDir)
+			assert.Empty(t, req.ApplicationSource.Path)
+
+			tarEntries := compressAndListEntries(t, streamDir)
+			assert.Contains(t, tarEntries, "Chart.yaml")
+			assert.Contains(t, tarEntries, "values.yaml")
+			assert.NotContains(t, tarEntries, "src/apps/web/public/avatars/avatar.png")
+			assert.NotContains(t, tarEntries, "assets/co/avatar.png")
+		})
+	}
+}
+
+func createIssue438BranchFolder(t *testing.T, name string) string {
+	t.Helper()
+	branchFolder := filepath.Join(t.TempDir(), name)
+	chartDir := filepath.Join(branchFolder, "infra", "charts", "argocd")
+	assetDir := filepath.Join(branchFolder, "assets", "co")
+	avatarDir := filepath.Join(branchFolder, "src", "apps", "web", "public", "avatars")
+	require.NoError(t, os.MkdirAll(chartDir, 0o755))
+	require.NoError(t, os.MkdirAll(assetDir, 0o755))
+	require.NoError(t, os.MkdirAll(avatarDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(chartDir, "Chart.yaml"), []byte("apiVersion: v2\nname: argocd\nversion: 0.1.0\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(chartDir, "values.yaml"), []byte("replicas: 1\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(assetDir, "avatar.png"), []byte("png"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join("..", "..", "..", "..", "..", "assets", "co", "avatar.png"), filepath.Join(avatarDir, "avatar.png")))
+	return branchFolder
+}
+
+func compressAndListEntries(t *testing.T, dir string) []string {
+	t.Helper()
+	tgzFile, _, _, err := tgzstream.CompressFiles(dir, []string{"*"}, []string{".git"})
+	require.NoError(t, err)
+	defer tgzstream.CloseAndDelete(tgzFile)
+
+	_, err = tgzFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	gzipReader, err := gzip.NewReader(tgzFile)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, gzipReader.Close())
+	}()
+
+	tarReader := tar.NewReader(gzipReader)
+	var entries []string
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		entries = append(entries, header.Name)
+	}
+	sort.Strings(entries)
+	return entries
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
