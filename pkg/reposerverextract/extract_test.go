@@ -1096,7 +1096,9 @@ func compressAndListEntries(t *testing.T, dir string) []string {
 	require.NoError(t, err)
 	gzipReader, err := gzip.NewReader(tgzFile)
 	require.NoError(t, err)
-	defer gzipReader.Close()
+	defer func() {
+		require.NoError(t, gzipReader.Close())
+	}()
 
 	tarReader := tar.NewReader(gzipReader)
 	var entries []string
