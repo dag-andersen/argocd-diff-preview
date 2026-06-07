@@ -9,15 +9,14 @@ This directory contains integration tests for `argocd-diff-preview`. These tests
 ### Quick Reference
 
 ```bash
-# Build and run all integration tests with Go binary (CLI mode)
+# Build and run all integration tests with Go binary using the default render method
 make run-integration-tests-go
 
-# Build and run all integration tests with Docker
+# Build and run all integration tests with Docker using the default render method
 make run-integration-tests-docker
 
-# Run with Argo CD server API mode
-make run-integration-tests-go-with-api
-make run-integration-tests-docker-with-api
+# Run with Argo CD CLI mode
+make run-integration-tests-go-with-cli
 
 # Run with Argo CD repo server API mode (experimental)
 make run-integration-tests-go-with-repo-server-api
@@ -35,14 +34,13 @@ make check-release
 
 | Make Target                                    | Description                                                                                   |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `run-integration-tests-go`                     | Builds Go binary, runs all tests in CLI mode                                                  |
-| `run-integration-tests-docker`                 | Builds Docker image, runs all tests using Docker                                              |
-| `run-integration-tests-go-with-api`            | Runs all tests forcing `--render-method=server-api`                                           |
-| `run-integration-tests-docker-with-api`        | Runs all tests with Docker + `--render-method=server-api`                                     |
+| `run-integration-tests-go`                     | Builds Go binary, runs all tests using the default render method                              |
+| `run-integration-tests-docker`                 | Builds Docker image, runs all tests using Docker and the default render method                 |
+| `run-integration-tests-go-with-cli`            | Runs all tests forcing `--render-method=cli`                                                  |
 | `run-integration-tests-go-with-repo-server-api`| Runs all tests forcing `--render-method=repo-server-api`                                      |
 | `run-integration-tests-docker-with-repo-server-api` | Runs all tests with Docker + `--render-method=repo-server-api`                          |
 | `update-integration-tests`                     | Regenerates expected output files (use after intentional changes)                             |
-| `check-release`                                | Full pre-release validation: lint → unit tests → Go (CLI) → Go (repo-server-api) → Docker (server-api) |
+| `check-release`                                | Full pre-release validation: lint → unit tests → Go (repo-server-api) → Go (CLI) → Docker default |
 | `check-release-repeat`                         | Runs `check-release` in a loop until failure (for catching flaky tests)                       |
 
 ### Running a Single Test
