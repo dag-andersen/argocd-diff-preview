@@ -927,7 +927,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, "https://github.com/org/repo.git"))
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -967,7 +968,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, "https://github.com/org/repo.git"))
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -1006,7 +1008,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Empty(t, refSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, testRepoSelector(t, "https://github.com/org/repo.git"))
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -1048,7 +1051,8 @@ spec:
 			require.NoError(t, err)
 			require.Len(t, contentSources, 1)
 
-			req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, tc.branchFolder, nil, testRepoSelector(t, "https://github.com/org/repo.git"))
+			req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, tc.branchFolder, nil,
+				manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
 			require.NoError(t, err)
 			if cleanup != nil {
 				defer cleanup()
