@@ -17,6 +17,8 @@ RUN go mod download
 RUN apt-get update && apt-get install -y curl
 RUN curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-${TARGETARCH} && \
     chmod +x ./kind
+RUN curl -Lo ./k3d https://github.com/k3d-io/k3d/releases/download/v5.9.0/k3d-linux-${TARGETARCH} && \
+    chmod +x ./k3d
 
 # Copy source code - only what's needed
 COPY cmd/ ./cmd/
@@ -38,6 +40,7 @@ FROM gcr.io/distroless/static-debian12 AS final
 
 # Copy necessary binaries from the build stage
 COPY --from=build /argocd-diff-preview/kind /usr/local/bin/kind
+COPY --from=build /argocd-diff-preview/k3d /usr/local/bin/k3d
 COPY --from=build /argocd-diff-preview/argocd-diff-preview .
 
 # Copy docker from the docker image
