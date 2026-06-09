@@ -128,6 +128,28 @@ spec:
 
 For more details on this annotation, see the [Argo CD documentation](https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/#manifest-paths-annotation).
 
+### Option C: Automatic Dependency Inference
+
+Both options above require you to declare each application's dependencies via annotations. The `--infer-app-dependencies` flag removes that requirement: instead of reading annotations, the tool inspects each application's own spec and derives the repository files it depends on, then renders the application only when one of those files changes.
+
+**What is inferred (for sources that live in the repository being diffed):**
+
+- `spec.source.path` / `spec.sources[*].path` — the application is rendered when any changed file falls under that directory. This is source-type agnostic: it works for Helm, Kustomize, plain manifest directories, jsonnet, etc.
+- `helm.valueFiles` — individual values files, resolved relative to the source path. References to another source via `$ref/...` (for example `$values/env/prod.yaml`) are resolved against that ref source, so a **remote Helm chart whose values come from a local source** is still rendered when the local values file changes.
+
+**What is not inferred:** files that do not live in this repository (remote chart contents, cross-repo sources) cannot be tracked — the tool only has this repository checked out. Such applications fall back to the `--watch-if-no-watch-pattern-found` setting. Kustomize bases referenced via `../` outside `source.path` are also not traced.
+
+Inferred dependencies are combined with any `watch-pattern` / `manifest-generate-paths` annotations (union — an application renders if either matches), and the application is always rendered if its own manifest file changes.
+
+**Usage** — combine with `--watch-if-no-watch-pattern-found=false` so applications with no changed dependencies are skipped:
+
+```bash
+argocd-diff-preview --infer-app-dependencies --watch-if-no-watch-pattern-found=false
+```
+
+!!! note "ApplicationSets"
+    When `--infer-app-dependencies` is enabled, ApplicationSets are always generated (they are not pre-filtered by changed files), and the resulting Applications are then filtered by their inferred dependencies. This means you no longer need `watch-pattern` annotations on the ApplicationSet template — but every non-excluded ApplicationSet is generated on each run (generation is cheap relative to rendering). `render: "never"`, the `ignore` annotation, and label selectors still apply to ApplicationSets as usual.
+
 ### Implementing Changed File Detection in CI/CD
 
 Once you've added watch-pattern annotations to your applications, configure your CI/CD pipeline to detect changed files and use them for filtering. Here are two approaches:
