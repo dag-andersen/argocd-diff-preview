@@ -1,0 +1,9 @@
+# Default values for the out-of-chart-values chart.
+# These are intentionally overridden by the out-of-chart value file
+# (env/values.yaml), which lives OUTSIDE this chart directory and is
+# referenced via a repo-root-absolute valueFiles path.
+replicas: 1
+
+image:
+  repository: nginx
+  tag: "1.25"

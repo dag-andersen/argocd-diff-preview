@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: out-of-chart-values
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/out-of-chart-values/.*"
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  source:
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview
+    # The chart lives in this directory (it has a Chart.yaml).
+    path: examples/out-of-chart-values/chart
+    helm:
+      # The value file lives OUTSIDE the chart directory. A leading slash makes
+      # Argo CD resolve it relative to the repository root, not the chart dir.
+      # With --render-method repo-server-api the tool must stream the whole
+      # branch folder so this file is present in the rendered tarball.
+      valueFiles:
+        - /examples/out-of-chart-values/env/values.yaml

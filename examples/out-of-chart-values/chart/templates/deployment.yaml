@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: out-of-chart-values
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: out-of-chart-values
+  template:
+    metadata:
+      labels:
+        app: out-of-chart-values
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - containerPort: 80

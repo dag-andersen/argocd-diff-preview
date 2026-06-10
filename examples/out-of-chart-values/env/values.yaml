@@ -1,0 +1,7 @@
+# This value file lives OUTSIDE the chart directory
+# (examples/out-of-chart-values/chart). The Application references it via a
+# repo-root-absolute path: /examples/out-of-chart-values/env/values.yaml
+replicas: 2
+
+image:
+  tag: "1.25"

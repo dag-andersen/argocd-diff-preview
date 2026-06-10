@@ -1,0 +1,11 @@
+apiVersion: v2
+name: out-of-chart-values
+description: |
+  A minimal local Helm chart used to reproduce the case where a single-source
+  Application reads its Helm valueFiles from a path OUTSIDE the chart directory
+  (a repo-root-absolute "/examples/..." path). With --render-method
+  repo-server-api the tool must stream the whole branch folder so the
+  out-of-chart value file is reachable.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
