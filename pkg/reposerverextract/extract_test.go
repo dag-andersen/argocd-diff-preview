@@ -980,6 +980,157 @@ spec:
 	assertDefaultProjectFields(t, req)
 }
 
+// REGRESSION (v0.2.9 / PR #443): a local Helm chart whose helm.valueFiles
+// reference files OUTSIDE the chart directory via a leading-slash
+// repo-root-absolute path (e.g. "/clusters/<cluster>/config.yaml"). Argo CD
+// resolves leading-slash value files relative to the repo root (the stream
+// root), so narrowing the stream to only the chart directory drops the value
+// file from the tarball and the repo server fails with:
+//
+//	helm template ... --values /tmp/<uuid>/clusters/.../config.yaml: no such file or directory
+//
+// Real-world example: egmontadministration/argo-management-cluster
+// hotel-tenant-external-secrets and hotel-tenant-namespace-peerings
+// ApplicationSets, where source.path is the chart dir but valueFiles point at
+// sibling clusters/<cluster>/... config files.
+//
+// Fix: keep streaming the branch root (with Path set) whenever any value file
+// escapes the chart directory, so the out-of-chart files remain reachable.
+func TestBuildManifestRequest_SingleSource_LocalChart_OutOfChartAbsoluteValueFile_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "management-prod/hotel/per-tenant-installed/charts/external-secrets")
+	// The value file lives in a sibling directory tree, outside the chart dir.
+	valuesDir := filepath.Join(branchFolder, "management-prod", "hotel", "clusters", "eks-hotel-a-nonprod", "companies", "egmont-it", "daip")
+	require.NoError(t, os.MkdirAll(valuesDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(valuesDir, "config.yaml"), []byte("tenant:\n  slug: egmont-it-daip\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eks-hotel-a-nonprod-eso
+spec:
+  destination:
+    namespace: external-secrets
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: management-prod/hotel/per-tenant-installed/charts/external-secrets
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - /management-prod/hotel/clusters/eks-hotel-a-nonprod/companies/egmont-it/daip/config.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Must stream the branch root (with Path set) so the out-of-chart value
+	// file resolves correctly relative to the repo root.
+	assert.Equal(t, branchFolder, streamDir,
+		"REGRESSION: local Helm chart with an out-of-chart value file must stream the branch root so the value file is reachable")
+	assert.Equal(t, "management-prod/hotel/per-tenant-installed/charts/external-secrets", req.ApplicationSource.Path)
+
+	// The streamed tarball must contain the out-of-chart value file.
+	tarEntries := compressAndListEntries(t, streamDir)
+	assert.Contains(t, tarEntries, "management-prod/hotel/clusters/eks-hotel-a-nonprod/companies/egmont-it/daip/config.yaml",
+		"the out-of-chart value file must be present in the streamed tarball")
+	assertDefaultProjectFields(t, req)
+}
+
+// REGRESSION (v0.2.9 / PR #443): same class of bug as the absolute case, but
+// the value file escapes the chart directory via a relative "../" path. The
+// fix must also keep the branch root in this case.
+func TestBuildManifestRequest_SingleSource_LocalChart_OutOfChartRelativeValueFile_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-chart")
+	// Value file is a sibling of the chart dir: apps/shared/values.yaml.
+	sharedDir := filepath.Join(branchFolder, "apps", "shared")
+	require.NoError(t, os.MkdirAll(sharedDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "values.yaml"), []byte("key: value\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-chart
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-chart
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - ../shared/values.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, branchFolder, streamDir,
+		"REGRESSION: local Helm chart with a ../ value file must stream the branch root so the value file is reachable")
+	assert.Equal(t, "apps/my-chart", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+// A local Helm chart whose value files all stay INSIDE the chart directory
+// must keep the optimised behaviour: stream only the chart dir and clear Path.
+func TestBuildManifestRequest_SingleSource_LocalChart_InChartValueFile_StreamsChartDir(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-chart")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-chart
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-chart
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - values.yaml
+        - overrides/prod.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "my-chart"), streamDir,
+		"local Helm chart with only in-chart value files should still stream just the chart dir")
+	assert.Empty(t, req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
 func TestBuildManifestRequest_SingleSource_LocalChart_DoesNotStreamUnrelatedSymlinks(t *testing.T) {
 	branchFolder := makeBranchFolder(t, "infra/charts/argocd")
 	relatedAssetDir := filepath.Join(branchFolder, "assets", "co")

@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -572,7 +573,10 @@ func buildManifestRequestForSource(
 	// files to the repo server, which can otherwise fail Argo CD's symlink safety
 	// checks before rendering even starts. If a path also contains a kustomization
 	// file, keep the branch root because Argo CD discovers it as Kustomize even
-	// when Chart.yaml exists for kustomize helmCharts support.
+	// when Chart.yaml exists for kustomize helmCharts support. We also keep the
+	// branch root when the chart's helm.valueFiles reference files outside the
+	// chart directory, because those files would otherwise be missing from the
+	// narrowed stream (see buildStreamDirForLocalSource).
 	//
 	// Special case: if the primary source has a Chart field (external Helm
 	// registry chart) there are no local files to stream. We signal this by
@@ -726,11 +730,72 @@ func buildStreamDirForLocalSource(branchFolder string, source v1alpha1.Applicati
 	if _, err := os.Stat(sourceDir); err != nil {
 		return "", nil, fmt.Errorf("failed to inspect source dir %q: %w", sourceDir, err)
 	}
-	if isLocalHelmChart(sourceDir) && !isKustomizeSource(sourceDir) {
+	if isLocalHelmChart(sourceDir) && !isKustomizeSource(sourceDir) && !hasOutOfChartValueFile(branchFolder, sourceDir, source) {
 		return sourceDir, nil, nil
 	}
 
 	return branchFolder, nil, nil
+}
+
+// hasOutOfChartValueFile reports whether any of the source's Helm valueFiles
+// resolves to a path outside the chart directory (sourceDir). Argo CD resolves
+// a leading-slash value file relative to the repository root and a relative
+// value file relative to the chart (app) directory, so a value file can escape
+// the chart directory either via an absolute "/path" or a relative "../path".
+//
+// When a value file lives outside the chart directory, narrowing the repo
+// server stream to only the chart directory would drop that file from the
+// tarball and the render would fail with "no such file or directory". In that
+// case the caller must keep streaming the whole branch folder so the
+// out-of-chart value files remain reachable. URL value files (e.g. https://…)
+// are remote and never force the branch root.
+func hasOutOfChartValueFile(branchFolder, sourceDir string, source v1alpha1.ApplicationSource) bool {
+	if source.Helm == nil {
+		return false
+	}
+
+	absSourceDir, err := filepath.Abs(sourceDir)
+	if err != nil {
+		// If we cannot reason about the path, fall back to the safe behaviour
+		// of streaming the whole branch folder.
+		return true
+	}
+	chartRoot := absSourceDir + string(os.PathSeparator)
+
+	for _, vf := range source.Helm.ValueFiles {
+		if vf == "" {
+			continue
+		}
+		// Skip $ref value files - this function is only reached on the fast
+		// path where there are no ref sources, but be defensive.
+		if strings.HasPrefix(vf, "$") {
+			continue
+		}
+		// Skip remote URL value files (e.g. https://...). A URL has a scheme
+		// and is fetched by the repo server, not read from the tarball.
+		if u, parseErr := url.Parse(vf); parseErr == nil && u.Scheme != "" {
+			continue
+		}
+
+		var resolved string
+		if filepath.IsAbs(vf) {
+			// Leading-slash value files are resolved relative to the repo root.
+			abs, absErr := filepath.Abs(branchFolder)
+			if absErr != nil {
+				return true
+			}
+			resolved = filepath.Join(abs, vf)
+		} else {
+			// Relative value files are resolved relative to the chart directory.
+			resolved = filepath.Join(absSourceDir, vf)
+		}
+
+		if resolved != absSourceDir && !strings.HasPrefix(resolved+string(os.PathSeparator), chartRoot) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isLocalHelmChart(sourceDir string) bool {
