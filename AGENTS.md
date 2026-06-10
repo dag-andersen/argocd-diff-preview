@@ -47,6 +47,77 @@ make update-integration-tests 2>&1 | tail -50
 make run-integration-tests-go 2>&1 | tail -50
 ```
 
+## How to Create an Integration Test
+
+This is the stuff that would have saved time when getting started. An integration
+test runs the real tool against a real kind cluster + Argo CD and compares the
+generated diff against a saved "golden" file.
+
+### How it works (the mental model)
+
+- Each test case clones **two real Git branches** from the upstream repo
+  (`dag-andersen/argocd-diff-preview`): a `base` branch and a `target` branch.
+  These branches are full snapshots of the whole repo. The tool diffs them.
+- The test data lives in branches named `integration-test/branch-N/base` and
+  `integration-test/branch-N/target`. The example apps the tool renders live
+  under `examples/` on those branches.
+- The expected output lives **in this repo** (not on the data branches), under
+  `integration-test/branch-N/target<suffix>/{output.md,output.html}`. This is
+  the golden file the actual run is compared against.
+- Test cases are defined as `TestCase` structs in
+  `integration-test/integration_test.go` (see the big `testCases` slice).
+
+### Steps to add a new test
+
+1. **Pick the next free branch number.** Run
+   `git ls-remote --heads origin 'refs/heads/integration-test/*'` and pick the
+   next `branch-N`. (Note: some numbers may exist on the remote but not in
+   `testCases` - check both.)
+
+2. **Create the two data branches from `main`, then edit the example files.**
+   The branches are just `main` with example files changed:
+   ```bash
+   git checkout main
+   git checkout -b integration-test/branch-N/base
+   # add/modify files under examples/ that the test should render
+   git commit -am "Tests | Add branch-N base: <what it tests>"
+
+   git checkout -b integration-test/branch-N/target   # branches off base
+   # change ONLY the file(s) whose diff you want to verify
+   git commit -am "Tests | Add branch-N target: <what changed>"
+
+   git push -u origin integration-test/branch-N/base integration-test/branch-N/target
+   ```
+   Keep `base` and `target` nearly identical - they should differ only in the
+   file(s) under test, so the diff output stays small and focused. (Look at how
+   an existing pair like `branch-16` differs by a single file.)
+
+3. **Add the `TestCase`** to the `testCases` slice in `integration_test.go`.
+   The expected-output directory is derived from `TargetBranch` + `Suffix`
+   (e.g. `TargetBranch: integration-test/branch-N/target`, `Suffix: "-1"` ->
+   `branch-N/target-1/`). Useful fields:
+   - `RenderMethod`: `"cli"`, `"server-api"`, or `"repo-server-api"` (omit to use the default).
+   - `FileRegex` / `FilesChanged`: limit which changed files are considered.
+   - `WatchIfNoWatchPatternFound: "false"` + an `argocd-diff-preview/watch-pattern`
+     annotation on the app limits rendering to **just that app**, even though the
+     branch is a full repo snapshot. This is the easiest way to keep output focused.
+
+4. **Generate the golden output** by running the single test once with `-update`.
+   The first run for a new case must use `-update` (there is no golden file to
+   compare against yet). This needs Docker running:
+   ```bash
+   make go-build
+   cd integration-test
+   TEST_CASE="branch-N/target" go test -v -timeout 20m -run TestSingleCase -update ./...
+   ```
+   This writes `output.md` / `output.html`. Read them and sanity-check the diff.
+   Timing values are auto-normalized to `Xs`, so the golden file is stable.
+
+5. **Verify it actually passes** in compare mode (no `-update`):
+   ```bash
+   TEST_CASE="branch-N/target" go test -v -timeout 20m -run TestSingleCase ./...
+   ```
+
 ### Commit Messages and PR Titles
 
 Use the format: `<Prefix> | <message>`
@@ -68,17 +139,6 @@ Chore | Update ArgoCD dependency to v3.0
 ```
 
 **Do NOT add issue numbers in parentheses to commit messages or PR titles.** The `(#123)` format is what GitHub automatically adds when merging/squashing PRs (and it refers to the PR number, not the issue).
-
-## Project Structure
-
-```
-argocd-diff-preview/
-├── cmd/               # CLI entry point (main.go, options.go)
-├── pkg/               # Core go logic
-├── integration-test/  # Integration tests and expected outputs
-├── docs/              # MkDocs documentation
-└── examples/          # Test fixtures
-```
 
 ## Main Challenges when building a tool like this
 
