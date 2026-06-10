@@ -60,6 +60,14 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) (time.Dur
 			log.Error().Msgf("❌ Failed to create cluster with options: %s", k3dOptions)
 		}
 		return time.Since(startTime), fmt.Errorf("failed to create cluster: %s", output)
+	} else {
+		log.Debug().Msgf("k3d cluster create output: %s", output)
+	}
+
+	// k3d's end-of-create kubeconfig merge is best-effort: on failure it only
+	// logs a warning and still exits 0. Merge explicitly so a failure surfaces.
+	if output, err := runCommand("k3d", "kubeconfig", "merge", clusterName, "--kubeconfig-merge-default"); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to write kubeconfig: %s", output)
 	}
 
 	duration := time.Since(startTime)
