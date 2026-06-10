@@ -326,6 +326,19 @@ var testCases = []TestCase{
 		FileRegex:         "examples/app-of-apps/.*",
 		TraverseAppOfApps: "true",
 	},
+	// Regression test for a single-source local Helm chart whose helm.valueFiles
+	// reference a file OUTSIDE the chart directory via a repo-root-absolute path
+	// (/examples/out-of-chart-values/env/values.yaml). With repo-server-api the
+	// tool must stream the whole branch folder so the out-of-chart value file is
+	// reachable; otherwise the render fails with "no such file or directory".
+	{
+		Name:                       "branch-18/target",
+		TargetBranch:               "integration-test/branch-18/target",
+		BaseBranch:                 "integration-test/branch-18/base",
+		RenderMethod:               "repo-server-api",
+		FileRegex:                  "examples/out-of-chart-values/.*",
+		WatchIfNoWatchPatternFound: "false",
+	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.
