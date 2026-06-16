@@ -137,6 +137,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 	repoSelector repository.Selector,
 	appSelectionOptions argoapplication.ApplicationSelectionOptions,
 	tempFolder string,
+	redirectRevisions []string,
 ) ([]extract.ExtractedApp, []extract.ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
@@ -352,7 +353,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions)
+			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions, redirectRevisions)
 			if err != nil {
 				results <- renderResult{err: fmt.Errorf("failed to render app %s: %w", item.app.GetLongName(), err)}
 				return
@@ -388,6 +389,29 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 	return extractedBaseApps, extractedTargetApps, time.Since(startTime), nil
 }
 
+// buildChildApplication deep-copies a discovered Application manifest, wraps it
+// in an ArgoResource, and patches it. The deep copy ensures PatchApplication
+// (which mutates the Yaml pointer in-place) does not modify the manifest that
+// remains in the parent's diff output.
+//
+// redirectRevisions is threaded through to PatchApplication so that child
+// Applications honor --redirect-target-revisions exactly like seed Applications:
+// a source whose targetRevision is not in the list is left untouched rather than
+// being unconditionally redirected to the base/target branch.
+func buildChildApplication(
+	argocdNamespace string,
+	m unstructured.Unstructured,
+	fileName string,
+	branchType git.BranchType,
+	branch *git.Branch,
+	repoSelector repository.Selector,
+	redirectRevisions []string,
+) (*argoapplication.ArgoResource, error) {
+	name := m.GetName()
+	resource := argoapplication.NewArgoResource(m.DeepCopy(), argoapplication.Application, name, name, fileName, branchType)
+	return argoapplication.PatchApplication(argocdNamespace, *resource, branch, repoSelector, redirectRevisions)
+}
+
 // renderAppWithChildDiscovery renders a single application and returns:
 //
 //  1. All rendered manifests to include in the diff (returned as the first
@@ -419,6 +443,7 @@ func renderAppWithChildDiscovery(
 	depth int,
 	kubeVersion string,
 	apiVersions []string,
+	redirectRevisions []string,
 ) ([]unstructured.Unstructured, []argoapplication.ArgoResource, error) {
 	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, repoSelector, kubeVersion, apiVersions)
 	if err != nil {
@@ -446,9 +471,9 @@ func renderAppWithChildDiscovery(
 			}
 			fileName := fmt.Sprintf("parent: %s", app.Name)
 			// Deep copy so PatchApplication mutates the copy, leaving m in
-			// allManifests (the diff) untouched.
-			resource := argoapplication.NewArgoResource(m.DeepCopy(), argoapplication.Application, name, name, fileName, app.Branch)
-			child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branchByType[app.Branch], *repoSelector, nil)
+			// allManifests (the diff) untouched. redirectRevisions is threaded
+			// through so children honor --redirect-target-revisions like seed apps.
+			child, err := buildChildApplication(argocdNamespace, m, fileName, app.Branch, branchByType[app.Branch], *repoSelector, redirectRevisions)
 			if err != nil {
 				log.Warn().Err(err).
 					Str("parentApp", app.Name).
@@ -477,7 +502,7 @@ func renderAppWithChildDiscovery(
 			// Deep copy so PatchApplication mutates the copy, leaving m in
 			// allManifests (the diff) untouched.
 			appSetResource := argoapplication.NewArgoResource(m.DeepCopy(), argoapplication.ApplicationSet, appSetName, appSetName, app.FileName, app.Branch)
-			patchedAppSet, err := argoapplication.PatchApplication(argocdNamespace, *appSetResource, branch, *repoSelector, nil)
+			patchedAppSet, err := argoapplication.PatchApplication(argocdNamespace, *appSetResource, branch, *repoSelector, redirectRevisions)
 			if err != nil {
 				log.Warn().Err(err).
 					Str("parentApp", app.Name).
@@ -509,8 +534,7 @@ func renderAppWithChildDiscovery(
 					log.Warn().Str("appSet", appSetName).Msg("⚠️ ApplicationSet-generated Application has no name; skipping")
 					continue
 				}
-				resource := argoapplication.NewArgoResource(&genDoc, argoapplication.Application, name, name, breadcrumb, app.Branch)
-				child, err := argoapplication.PatchApplication(argocdNamespace, *resource, branch, *repoSelector, nil)
+				child, err := buildChildApplication(argocdNamespace, genDoc, breadcrumb, app.Branch, branch, *repoSelector, redirectRevisions)
 				if err != nil {
 					log.Warn().Err(err).
 						Str("parentApp", app.Name).

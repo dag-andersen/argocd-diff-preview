@@ -17,7 +17,9 @@ import (
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -161,4 +163,90 @@ func TestSpecHashOf_NoSpec(t *testing.T) {
 func TestSpecHashOf_NilYaml(t *testing.T) {
 	// Should not panic.
 	assert.NotPanics(t, func() { specHashOf(nil) })
+}
+
+// ── buildChildApplication: --redirect-target-revisions threading ────────────────
+//
+// Regression tests for https://github.com/dag-andersen/argocd-diff-preview/issues/446
+//
+// Child Applications discovered during app-of-apps traversal must honor
+// --redirect-target-revisions exactly like seed Applications: a source whose
+// targetRevision is NOT in the configured list must be left untouched and
+// fetched from its real ref, instead of being unconditionally redirected to the
+// base/target branch.
+
+// childAppManifest builds a minimal discovered child Application manifest whose
+// single source points at the matched repo and is pinned to targetRevision.
+func childAppManifest(repoURL, targetRevision string) unstructured.Unstructured {
+	return unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "argoproj.io/v1alpha1",
+		"kind":       "Application",
+		"metadata":   map[string]any{"name": "child-app"},
+		"spec": map[string]any{
+			"source": map[string]any{
+				"repoURL":        repoURL,
+				"path":           "apps/child",
+				"targetRevision": targetRevision,
+			},
+		},
+	}}
+}
+
+func childSourceTargetRevision(t *testing.T, child unstructured.Unstructured) string {
+	t.Helper()
+	rev, found, err := unstructured.NestedString(child.Object, "spec", "source", "targetRevision")
+	require.NoError(t, err)
+	require.True(t, found, "child source must have a targetRevision")
+	return rev
+}
+
+func TestBuildChildApplication_LeavesUnlistedRevisionUntouched(t *testing.T) {
+	const repoURL = "https://github.com/example/repo"
+	selector, err := repository.NewSelector(repoURL, "")
+	require.NoError(t, err)
+	targetBranch := git.NewBranch("target", git.Target)
+
+	// targetRevision "feature-branch" is NOT in the redirect list, so the child
+	// must keep its pinned ref.
+	manifest := childAppManifest(repoURL, "feature-branch")
+	child, err := buildChildApplication("argocd", manifest, "parent: root", git.Target, targetBranch, *selector, []string{"main", "HEAD"})
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	assert.Equal(t, "feature-branch", childSourceTargetRevision(t, *child.Yaml),
+		"child source pinned to a revision outside --redirect-target-revisions must not be redirected")
+}
+
+func TestBuildChildApplication_RedirectsListedRevision(t *testing.T) {
+	const repoURL = "https://github.com/example/repo"
+	selector, err := repository.NewSelector(repoURL, "")
+	require.NoError(t, err)
+	targetBranch := git.NewBranch("target", git.Target)
+
+	// targetRevision "main" IS in the redirect list, so the child must be
+	// redirected to the target branch.
+	manifest := childAppManifest(repoURL, "main")
+	child, err := buildChildApplication("argocd", manifest, "parent: root", git.Target, targetBranch, *selector, []string{"main", "HEAD"})
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	assert.Equal(t, "target", childSourceTargetRevision(t, *child.Yaml),
+		"child source pinned to a revision listed in --redirect-target-revisions must be redirected")
+}
+
+func TestBuildChildApplication_EmptyListRedirectsAll(t *testing.T) {
+	const repoURL = "https://github.com/example/repo"
+	selector, err := repository.NewSelector(repoURL, "")
+	require.NoError(t, err)
+	targetBranch := git.NewBranch("target", git.Target)
+
+	// An empty redirect list preserves the original "redirect everything"
+	// default behavior.
+	manifest := childAppManifest(repoURL, "feature-branch")
+	child, err := buildChildApplication("argocd", manifest, "parent: root", git.Target, targetBranch, *selector, nil)
+	require.NoError(t, err)
+	require.NotNil(t, child)
+
+	assert.Equal(t, "target", childSourceTargetRevision(t, *child.Yaml),
+		"with no --redirect-target-revisions configured, every matching source is redirected")
 }

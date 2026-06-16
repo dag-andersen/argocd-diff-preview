@@ -333,6 +333,7 @@ func run(cfg *Config) error {
 				cfg.RepoSelector,
 				appSelectionOptions,
 				tempFolder,
+				redirectRevisions,
 			)
 		} else {
 			baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranches(
