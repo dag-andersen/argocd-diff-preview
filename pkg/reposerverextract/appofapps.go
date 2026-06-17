@@ -471,8 +471,7 @@ func renderAppWithChildDiscovery(
 			}
 			fileName := fmt.Sprintf("parent: %s", app.Name)
 			// Deep copy so PatchApplication mutates the copy, leaving m in
-			// allManifests (the diff) untouched. redirectRevisions is threaded
-			// through so children honor --redirect-target-revisions like seed apps.
+			// allManifests (the diff) untouched.
 			child, err := buildChildApplication(argocdNamespace, m, fileName, app.Branch, branchByType[app.Branch], *repoSelector, redirectRevisions)
 			if err != nil {
 				log.Warn().Err(err).

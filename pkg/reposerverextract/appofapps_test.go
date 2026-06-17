@@ -165,15 +165,12 @@ func TestSpecHashOf_NilYaml(t *testing.T) {
 	assert.NotPanics(t, func() { specHashOf(nil) })
 }
 
-// ── buildChildApplication: --redirect-target-revisions threading ────────────────
+// ── buildChildApplication ───────────────────────────────────────────────────────
 //
-// Regression tests for https://github.com/dag-andersen/argocd-diff-preview/issues/446
-//
-// Child Applications discovered during app-of-apps traversal must honor
-// --redirect-target-revisions exactly like seed Applications: a source whose
-// targetRevision is NOT in the configured list must be left untouched and
-// fetched from its real ref, instead of being unconditionally redirected to the
-// base/target branch.
+// Regression tests for https://github.com/dag-andersen/argocd-diff-preview/issues/446:
+// discovered child Applications must honor --redirect-target-revisions exactly like
+// seed Applications (a source whose targetRevision is not in the list is left
+// untouched rather than redirected to the base/target branch).
 
 // childAppManifest builds a minimal discovered child Application manifest whose
 // single source points at the matched repo and is pinned to targetRevision.
