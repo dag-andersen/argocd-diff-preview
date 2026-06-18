@@ -867,6 +867,27 @@ func copyDir(src, dst string) error {
 		if info.IsDir() {
 			return os.MkdirAll(dstPath, 0o755)
 		}
+		// filepath.Walk does not follow symlinks, so info describes the link
+		// itself (IsDir() is false even when it points at a directory). Passing
+		// such a link to copyFile would os.Open() the target directory and
+		// io.Copy() it, which fails with EISDIR ("is a directory"). Resolve the
+		// link and, when it targets a directory, recurse so the directory's
+		// contents are materialized at the destination — matching how Argo CD's
+		// repo-server reads a chart's on-disk content. This is common in charts
+		// that vendor assets via directory symlinks (e.g. files/sql -> ../../sql).
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Stat(srcPath)
+			if err != nil {
+				return err
+			}
+			if target.IsDir() {
+				resolved, err := filepath.EvalSymlinks(srcPath)
+				if err != nil {
+					return err
+				}
+				return copyDir(resolved, dstPath)
+			}
+		}
 		return copyFile(srcPath, dstPath)
 	})
 }
