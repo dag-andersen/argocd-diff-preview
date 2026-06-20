@@ -1,10 +1,11 @@
 # Repo-server-api source-combination matrix (test coverage spec)
 
-> Status: **IMPLEMENTED** - this map is now backed by a complete test suite.
-> Every row below (A1-A15, B1-B11, C1-C3, D1-D3, E1-E3) has a named test in
-> `source_matrix_a_test.go`, `source_matrix_b_test.go`, and
-> `source_matrix_cde_test.go`. Integration-only rows (**I**) are present as
-> skipped placeholders so the suite stays 1:1 with this table.
+> Status: **PARTIAL - gaps found.** Tables A-E (35 rows) are implemented and
+> backed by named tests. However, a subsequent audit of the **actual repo-server
+> source** (`argo-cd/reposerver/repository/repository.go`) found several input
+> dimensions the original axes missed - including **two confirmed latent bugs**
+> in our own routing. Those are captured in tables **F-H** and the
+> "Repo-server audit findings" section below; they are **not yet implemented**.
 >
 > Goal: enumerate every *valid* way an Argo CD Application can describe its
 > `source` / `sources`, decide the expected behaviour of the repo-server-api
@@ -13,9 +14,9 @@
 > combinations so we stop discovering broken-but-valid cases one GitHub issue
 > at a time.
 >
-> Test-name convention: each row maps to `TestSourceMatrix_Table<N>...`, keyed
-> by the row id (e.g. A11 -> `TestSourceMatrix_TableA11_*`, the B-table rows are
-> subtests named `B1`/`B2`/... inside `TestSourceMatrix_TableB_MultiSource_Routing`).
+> Test-name convention: each implemented row maps to `TestSourceMatrix_Table<N>...`,
+> keyed by the row id (e.g. A11 -> `TestSourceMatrix_TableA11_*`, the B-table rows
+> are subtests named `B1`/`B2`/... inside `TestSourceMatrix_TableB_MultiSource_Routing`).
 
 ## Why this exists
 
@@ -79,8 +80,39 @@ valid; invalid ones are noted.
 8. **Revision redirection** - top-level app vs app-of-apps **child**, with /
    without `--redirect-target-revisions` (#446).
 
+The following axes were **added after the repo-server audit** (they were missing
+from the original list and are the source of the F-H tables):
+
+9. **Explicit type vs on-disk type** - a source may set an explicit `helm:` /
+   `kustomize:` / `directory:` / `plugin:` block. `ExplicitType()`
+   (`types.go:3799`) **overrides** on-disk marker-file detection, and **two**
+   explicit blocks is a hard error ("multiple application sources defined"). Our
+   `isLocalHelmChart` / `isKustomizeSource` only look at on-disk files, so they
+   can disagree with the repo server.
+10. **`.argocd-source.yaml` override files** - `.argocd-source.yaml` and
+    `.argocd-source-<appName>.yaml` are read **from the app/chart dir** and
+    merge-patched onto the source **before** type detection
+    (`mergeSourceParameters`, `repository.go:1872`). They can inject
+    `helm.valueFiles` (incl. out-of-chart!), `helm.parameters`,
+    `directory.recurse`, or even a whole tool block. Our tool does not read them
+    at all.
+11. **`helm.fileParameters`** - `fileParameters[].path` is a **first-class ref
+    candidate** exactly like `valueFiles` (`repository.go:571-575`) and can be
+    `$ref/...`, out-of-chart, or remote. Our `rewriteRefValueFiles` only rewrites
+    `ValueFiles`.
+12. **value-file resolution variants** (Helm) beyond axis 6: env-var
+    placeholders (`env.Envsubst`), glob patterns (lexical order = merge order),
+    disallowed URL scheme (hard error), `ignoreMissingValueFiles` true/false
+    (zero-glob -> gRPC NotFound). Allowed schemes come from
+    `HelmOptions.ValuesFileSchemes` (argocd-cm); nil = **no** remote allowed.
+13. **Kustomize / Directory external-file pulls** - Kustomize `components:` may
+    reference dirs **outside** the app dir and are **not** repoRoot-bounded
+    (unlike value files); `--enable-helm` build option pulls remote charts;
+    jsonnet `libs:` are **repoRoot-relative** and can import cross-app.
+
 Axes 6-8 only bite once a case is already on a **Stream** strategy, which is
-why they produced separate bugs.
+why they produced separate bugs. Axes 9-13 can bite on **any** strategy and are
+largely unmodeled today.
 
 ## Legend
 
@@ -159,16 +191,90 @@ why they produced separate bugs.
 
 ---
 
+## Repo-server audit findings (NEW - not yet implemented)
+
+The tables above were derived from *our* model of the repo server. Reading the
+actual repo-server source (`argo-cd/reposerver/repository/repository.go`)
+surfaced input dimensions the original axes missed. Tables **F-H** below
+enumerate them. **Two rows (F4, H1) are confirmed latent bugs in our tool**, not
+just coverage gaps.
+
+> ⚠️ None of the F-H rows have tests yet. They are the real output of "does the
+> matrix cover all cases?" - the answer was **no**.
+
+### F. Source-type detection / overrides
+
+| # | Case | Expected | Test | Status | Notes (repo-server ref) |
+| --- | --- | --- | --- | --- | --- |
+| F1 | dir has `Chart.yaml` but manifest sets `directory:` explicitly | render as **Directory**, not Helm | U | ⬜ | `ExplicitType()` wins over on-disk (`types.go:3799`). Our `isLocalHelmChart` ignores the explicit block -> may narrow to chart dir wrongly. |
+| F2 | dir has `kustomization.yaml` but manifest sets `helm:` explicitly | render as **Helm** | U | ⬜ | Same precedence. Our `isKustomizeSource` would keep branch root; repo server renders Helm. |
+| F3 | manifest sets **both** `helm:` and `kustomize:` | **hard error** "multiple application sources defined" | U/I | ⬜ | `ExplicitType()` errors (`types.go:3816`). Our tool streams something instead of failing. Negative case. |
+| F4 | **`.argocd-source.yaml` in chart dir adds out-of-chart `helm.valueFiles`** | must stream **branch root** (file is outside chart) | U+I | 🟥 | **CONFIRMED BUG.** `mergeSourceParameters` (`repository.go:1872`) injects valueFiles our `hasOutOfChartValueFile` never sees (it reads only the manifest). We narrow to chart dir -> repo server render fails (missing file). Same class as #444. |
+| F5 | `.argocd-source-<appName>.yaml` injects a `helm:`/`kustomize:` block | type changes accordingly | U+I | ⬜ | Override applied **before** type detection. Our tool ignores override files entirely. |
+| F6 | dir has **both** `Chart.yaml` and `kustomization.yaml` | repo-server discovery picks **Kustomize** | U | ⬜ | `discovery.go:65` overwrites Helm with Kustomize. Our `buildStreamDirForLocalSource` checks Kustomize first too (branch root) - verify parity. |
+| F7 | source type disabled via `EnabledSourceTypes` | falls back to **Directory** | I | ⬜ | `IsManifestGenerationEnabled` (`repository.go:1938`). We never set EnabledSourceTypes; document behavior. |
+
+### G. Helm value-file resolution variants (extends axis 6)
+
+| # | Case | Expected | Test | Status | Notes (repo-server ref) |
+| --- | --- | --- | --- | --- | --- |
+| G1 | valueFile with env placeholder `$ENV/x.yaml` (via `helm.valuesObject`/env) | resolved after `env.Envsubst` | U+I | ⬜ | `repository.go:1502`. Our `hasOutOfChartValueFile` does not envsubst before classifying -> could misjudge chart-dir vs branch-root. |
+| G2 | valueFile **glob** `env/*.yaml` | expanded lexically; order = merge precedence | U+I | ⬜ | `isGlobPath` + `doublestar` (`repository.go:1516`). A glob can match out-of-chart files -> our narrowing logic ignores globs. |
+| G3 | valueFile remote URL with **disallowed** scheme | **hard error** | I | ⬜ | `isURLSchemeAllowed` (`resolved.go:53`). Schemes from `HelmOptions.ValuesFileSchemes`; nil = none allowed. |
+| G4 | missing valueFile, `ignoreMissingValueFiles: true` vs `false` | skip vs fail | U+I | ⬜ | `repository.go:1542`. Affects whether a missing out-of-chart file even matters. |
+| G5 | valueFile leading-slash `/env/x.yaml` (repo-root relative) | resolved from repo root | U | ⚠️ | Covered by A5/B8 for the *routing* outcome, but not the resolution semantics directly. |
+
+### H. Helm `fileParameters` (parallel to valueFiles - largely unmodeled)
+
+| # | Case | Expected | Test | Status | Notes (repo-server ref) |
+| --- | --- | --- | --- | --- | --- |
+| H1 | multi-source, **`helm.fileParameters[].path: $ref/foo`** | path rewritten like a valueFile; ref staged | U+I | 🟥 | **CONFIRMED BUG.** Repo server treats fileParameters as ref candidates (`repository.go:571-575`); our `rewriteRefValueFiles` only rewrites `ValueFiles`, never `FileParameters` -> ref staged but path unrewritten -> render fails. Same class as #441/#426. |
+| H2 | `fileParameters[].path` out-of-chart relative `../x` | branch root must be streamed | U+I | ⬜ | fileParameters resolve like valueFiles (`repository.go:1343`). Our `hasOutOfChartValueFile` ignores fileParameters -> may narrow wrongly. |
+| H3 | `fileParameters[].path` remote URL | fetched by repo server | I | ⬜ | Same scheme rules as valueFiles. |
+
+### I. Kustomize / Directory external pulls (extends axis 13)
+
+| # | Case | Expected | Test | Status | Notes (repo-server ref) |
+| --- | --- | --- | --- | --- | --- |
+| I1 | Kustomize `components:` referencing `../other-dir` (outside app) | branch root must be streamed | U+I | ⬜ | components are **not** repoRoot-bounded (`kustomize.go:337`). We always stream branch root for Kustomize, so this likely works - but unverified. |
+| I2 | Kustomize `--enable-helm` build option + `helmCharts:` | pulls remote chart during build | I | ⬜ | `isHelmEnabled` (`kustomize.go:427`). Needs build options + network. |
+| I3 | Directory jsonnet `libs:` referencing another repo dir | imports resolved repoRoot-relative | U+I | ⬜ | `repository.go:2263`. Cross-app import; branch root must be streamed. |
+
+### Negative / invalid combinations (document, don't "fix")
+
+| # | Case | Expected | Notes |
+| --- | --- | --- | --- |
+| N1 | a `$ref` source that itself sets `chart:` | repo server **rejects** | "Helm charts are not yet not supported for 'ref' sources" (`repository.go:594`). |
+| N2 | raw streamed single-source with `$ref` value file, no `.refs` staging | fails "failed to find repo" | Streaming path does not populate `gitRepoPaths` (`repository.go:1565`). Validates *why* our `.refs` staging + rewrite mechanism exists - and why it must cover fileParameters too (H1). |
+
+---
+
 ## What we found (honest summary)
 
-The suite is **complete and 1:1 with this table**: 35 rows, each with a named
+Tables A-E are **complete and 1:1 with their rows**: 35 rows, each with a named
 test. 9 passing test functions cover the unit rows; 3 skipped placeholders mark
 the integration-only rows (A10, D3, E3).
 
-**New product bugs found proactively: 0.** Every unit row passed against `main`,
-or was an already-tracked issue. The routing code is currently in good shape.
+**Bugs found by the unit matrix alone (A-E): 0.** Every unit row passed against
+`main`, or was an already-tracked issue.
 
-What the exercise actually bought us:
+**Bugs found by the repo-server audit (F-H): 2 confirmed, plus several
+unmodeled dimensions.** This is the real payoff and it only appeared once we
+stopped trusting our own model and read the repo-server source:
+
+- **F4** - `.argocd-source.yaml` can add out-of-chart `helm.valueFiles` that our
+  `hasOutOfChartValueFile` never sees (it inspects only the manifest), so we
+  narrow the stream to the chart dir and the render fails on the missing file.
+  Same class as #444.
+- **H1** - `helm.fileParameters[].path: $ref/...` is a first-class ref candidate
+  in the repo server, but our `rewriteRefValueFiles` only rewrites `ValueFiles`,
+  so the ref is staged into `.refs/` while the fileParameter path is left
+  unrewritten and unresolvable. Same class as #441/#426.
+
+Both are **latent** (no open issue yet) - exactly the "broken-but-valid case we
+discover one GitHub issue at a time" this exercise was meant to pre-empt.
+
+What the A-E exercise bought us regardless:
 
 1. **Regression net for recently-merged fixes.** Several fixes had no dedicated
    regression test before; the matrix now pins them so they cannot silently
