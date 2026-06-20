@@ -1,10 +1,10 @@
 package reposerverextract
 
-// Source-combination matrix - Table B (multi-source `spec.sources`).
+// Source-combination matrix - REF (ref handling) category.
 //
-// Companion to SOURCE_MATRIX.md, section B. Each row is one valid way a
-// multi-source Application can describe its content + $ref sources. Like Table
-// A, the test asserts the ROUTING OUTCOME only:
+// Companion to SOURCE_MATRIX.md, section REF. Each row is one valid way a
+// multi-source Application can describe its content + $ref sources. Like the STR
+// table, the test asserts the ROUTING OUTCOME only:
 //
 //   - strategy per content source: remote / stream(chart-dir) /
 //     stream(branch-root) / stream(.refs).
@@ -15,11 +15,11 @@ package reposerverextract
 //     for #432, ProjectName/ProjectSourceRepos for #416) on EVERY strategy.
 //
 // The split (content vs ref-only) is exercised by feeding the whole Application
-// through splitSources and then routing each content source, so rows B9/B10
+// through splitSources and then routing each content source, so rows REF10/REF11
 // (multiple content sources) assert per-source outcomes.
 //
-// See SOURCE_MATRIX.md for the issue cross-references (B3/#426, B5/#441,
-// B6/#428, etc.).
+// See SOURCE_MATRIX.md for the issue cross-references (REF3/#426, REF5/#441,
+// REF7/#428, etc.).
 
 import (
 	"os"
@@ -65,7 +65,7 @@ type multiSourceCase struct {
 	prRepo string
 
 	// withPuller supplies a fakeChartPuller so the remote-chart-with-local-refs
-	// path (B5/#441) streams the pulled chart instead of falling back to remote.
+	// path (REF5/#441) streams the pulled chart instead of falling back to remote.
 	withPuller bool
 
 	// expectations is keyed implicitly by iteration; each entry is matched to a
@@ -73,12 +73,12 @@ type multiSourceCase struct {
 	expectations []contentExpectation
 }
 
-func TestSourceMatrix_TableB_MultiSource_Routing(t *testing.T) {
+func TestSourceMatrix_Refs_Routing(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 
 	cases := []multiSourceCase{
 		{
-			name: "B1 local chart + one local $ref -> stream(.refs), values rewritten",
+			name: "REF1 local chart + one local $ref -> stream(.refs), values rewritten",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -108,7 +108,7 @@ spec:
 			}},
 		},
 		{
-			name: "B2 local chart + ref-with-both-ref+path (GH401) -> stream(.refs)",
+			name: "REF2 local chart + ref-with-both-ref+path (GH401) -> stream(.refs)",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -150,7 +150,7 @@ spec:
 			},
 		},
 		{
-			name: "B3 local chart + one external $ref -> remote RPC + RefSources",
+			name: "REF3 local chart + one external $ref -> remote RPC + RefSources",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -180,7 +180,7 @@ spec:
 			}},
 		},
 		{
-			name: "B4 local plain dir (non-chart) + local $ref -> stream(.refs)",
+			name: "REF4 local plain dir (non-chart) + local $ref -> stream(.refs)",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -208,7 +208,7 @@ spec:
 			}},
 		},
 		{
-			name: "B5 remote chart + one local $ref (#441) -> stream(.refs) via puller",
+			name: "REF5 remote chart + one local $ref (#441) -> stream(.refs) via puller",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -241,7 +241,7 @@ spec:
 			}},
 		},
 		{
-			name: "B5b remote chart + one local $ref, NO puller -> remote RPC + RefSources",
+			name: "REF6 remote chart + one local $ref, NO puller -> remote RPC + RefSources",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -273,7 +273,7 @@ spec:
 			}},
 		},
 		{
-			name: "B6 remote chart + one external $ref -> remote RPC + RefSources",
+			name: "REF7 remote chart + one external $ref -> remote RPC + RefSources",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -301,7 +301,7 @@ spec:
 			}},
 		},
 		{
-			name: "B7 remote chart + local ref-with-both-ref+path -> remote RPC + RefSources",
+			name: "REF8 remote chart + local ref-with-both-ref+path -> remote RPC + RefSources",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -338,7 +338,7 @@ spec:
 			},
 		},
 		{
-			name: "B8 local chart + local $ref AND out-of-chart abs value -> stream(.refs)",
+			name: "REF9 local chart + local $ref AND out-of-chart abs value -> stream(.refs)",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -374,7 +374,7 @@ spec:
 			}},
 		},
 		{
-			name: "B9 two local content sources, no ref -> stream each independently",
+			name: "REF10 two local content sources, no ref -> stream each independently",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -399,7 +399,7 @@ spec:
 			},
 		},
 		{
-			name: "B10 local content + external content (mixed) -> stream local, remote external",
+			name: "REF11 local content + external content (mixed) -> stream local, remote external",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -423,7 +423,7 @@ spec:
 			},
 		},
 		{
-			name: "B11 ref-only source with no path (points at repo root) -> stream(.refs)",
+			name: "REF12 ref-only source with no path (points at repo root) -> stream(.refs)",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application

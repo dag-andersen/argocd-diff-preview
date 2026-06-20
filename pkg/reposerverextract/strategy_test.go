@@ -1,10 +1,10 @@
 package reposerverextract
 
-// Source-combination matrix - Table A (single-source `spec.source`).
+// Source-combination matrix - STR (strategy selection), TYP (source-type
+// resolution, on-disk), and REACH (file reachability) categories.
 //
-// This is the table-driven companion to SOURCE_MATRIX.md. Each row below is one
-// valid way a single-source Application can describe its source. The test feeds
-// the Application through buildManifestRequestForSource and asserts the ROUTING
+// This is the table-driven companion to SOURCE_MATRIX.md. Each row below feeds
+// an Application through buildManifestRequestForSource and asserts the ROUTING
 // OUTCOME only:
 //
 //   - strategy: which RPC the caller will use (remote vs streamed tarball),
@@ -18,11 +18,11 @@ package reposerverextract
 // table stays valid if the routing is ever simplified (e.g. "always stream the
 // branch root"). See SOURCE_MATRIX.md for the issue cross-references.
 //
-// Rows A9/A10/A11 (symlink behavior) are split out into their own tests at the
-// bottom of this file (TestSourceMatrix_TableA9/A10/A11_*) because they need
-// on-disk symlinks and tarball/copyDir-level assertions rather than the plain
-// routing table. A10 is integration-only (skipped placeholder); A9 and A11 are
-// unit-testable. Every A-row therefore has a named test in this file.
+// The REACH symlink rows (REACH13/REACH14/REACH15) are split into their own
+// tests at the bottom of this file because they need on-disk symlinks and
+// tarball/copyDir-level assertions rather than the plain routing table.
+// REACH14 is integration-only (skipped placeholder); REACH13 and REACH15 are
+// unit-testable.
 
 import (
 	"os"
@@ -69,10 +69,11 @@ func (s streamStrategy) String() string {
 	}
 }
 
-// singleSourceCase is one row of Table A: a single-source Application plus the
-// on-disk files it needs and the routing outcome we expect.
+// singleSourceCase is one row of the STR/TYP/REACH routing table: a single
+// content source plus the on-disk files it needs and the routing outcome we
+// expect.
 type singleSourceCase struct {
-	name string // matrix id + description, e.g. "A2 local chart, no values"
+	name string // matrix id + description, e.g. "STR1 local chart, no values"
 
 	// appYAML is the Application manifest under test. Use {{REPO}} as a
 	// placeholder for the PR repo URL so cross-repo rows are explicit.
@@ -83,21 +84,20 @@ type singleSourceCase struct {
 	files map[string]string
 
 	// prRepo is what --repo resolves to. Defaults to the same repo the source
-	// uses; set to a different value to model a cross-repo source (A15).
-	prRepo string
-
+	// uses; set to a different value to model a cross-repo source (STR4).
 	want       streamStrategy
 	wantChart  string // expected request.ApplicationSource.Chart
 	wantPath   string // expected request.ApplicationSource.Path ("" => cleared)
 	wantNoRefs bool   // RefSources must be nil for single-source rows
+	prRepo     string
 }
 
-func TestSourceMatrix_TableA_SingleSource_Routing(t *testing.T) {
+func TestSourceMatrix_Strategy_Routing(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 
 	cases := []singleSourceCase{
 		{
-			name: "A1 plain local dir (manifests) -> stream branch root",
+			name: "TYP1 plain local dir (manifests) -> stream branch root",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -115,7 +115,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A2 local Helm chart, no values -> stream chart dir",
+			name: "STR1 local Helm chart, no values -> stream chart dir",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -133,7 +133,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A3 local Helm chart, in-chart values -> stream chart dir",
+			name: "REACH1 local Helm chart, in-chart values -> stream chart dir",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -159,7 +159,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A4 local Helm chart, out-of-chart relative values -> stream branch root",
+			name: "REACH2 local Helm chart, out-of-chart relative values -> stream branch root",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -183,7 +183,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A5 local Helm chart, out-of-chart absolute values -> stream branch root",
+			name: "REACH3 local Helm chart, out-of-chart absolute values -> stream branch root",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -207,7 +207,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A6 local Helm chart, remote-URL values -> stream chart dir (URL ignored)",
+			name: "REACH4 local Helm chart, remote-URL values -> stream chart dir (URL ignored)",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -228,7 +228,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A7 local Kustomize -> stream branch root",
+			name: "TYP2 local Kustomize -> stream branch root",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -246,7 +246,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A8 local Kustomize with helmCharts (Chart.yaml present) -> stream branch root",
+			name: "TYP3 local Kustomize with helmCharts (Chart.yaml present) -> stream branch root",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -267,7 +267,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A12 local plugin (CMP) path -> stream branch root",
+			name: "TYP4 local plugin (CMP) path -> stream branch root",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -287,7 +287,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A13 remote Helm chart -> remote RPC",
+			name: "STR2 remote Helm chart -> remote RPC",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -305,7 +305,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A14 remote Helm chart (OCI) -> remote RPC",
+			name: "STR3 remote Helm chart (OCI) -> remote RPC",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -323,7 +323,7 @@ spec:
 			wantNoRefs: true,
 		},
 		{
-			name: "A15 local path source but cross-repo -> remote RPC",
+			name: "STR4 local path source but cross-repo -> remote RPC",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -428,7 +428,7 @@ func replaceRepo(yaml, repo string) string {
 	return strings.ReplaceAll(yaml, "{{REPO}}", repo)
 }
 
-// ── A9: local chart with an unrelated in-bounds symlink elsewhere in the repo ──
+// ── REACH13: local chart with an unrelated in-bounds symlink elsewhere in repo ─
 //
 // Routing a local chart must succeed even when the surrounding repo contains
 // symlinks, and narrowing the stream to the chart dir must keep those unrelated
@@ -437,7 +437,7 @@ func replaceRepo(yaml, repo string) string {
 // own symlink safety gate (#438) is the part that only a real render exercises;
 // that is the I half of this U+I row and lives in the integration suite (see
 // also TestBuildManifestRequest_LocalHelmChart_TarballExcludesUnrelatedRepoSymlinks).
-func TestSourceMatrix_TableA9_InBoundsSymlink_RoutesAndExcludesUnrelated(t *testing.T) {
+func TestSourceMatrix_Strategy_InBoundsSymlink_RoutesAndExcludesUnrelated(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 
 	branchFolder := t.TempDir()
@@ -492,7 +492,7 @@ spec:
 	assert.NotContains(t, entries, "assets/logo.png", "unrelated repo asset must not be in the chart tarball")
 }
 
-// ── A10: local chart with an OUT-OF-BOUNDS file symlink (#438) ────────────────
+// ── REACH14: local chart with an OUT-OF-BOUNDS file symlink (#438) ────────────
 //
 // A symlink that escapes the repository (e.g. /etc/passwd or ../../outside) is
 // rejected by the repo server's symlink safety check during render. That
@@ -501,11 +501,11 @@ spec:
 // as a skipped integration placeholder so the matrix has a named entry for it;
 // the real coverage belongs in the integration suite (branch-N) with an
 // out-of-bounds symlink fixture.
-func TestSourceMatrix_TableA10_OutOfBoundsSymlink_Integration(t *testing.T) {
-	t.Skip("A10 is integration-only (#438): the repo server's out-of-bounds symlink gate is only exercised by a real render (branch-N)")
+func TestSourceMatrix_Strategy_OutOfBoundsSymlink_Integration(t *testing.T) {
+	t.Skip("REACH14 is integration-only (#438): the repo server's out-of-bounds symlink gate is only exercised by a real render (branch-N)")
 }
 
-// ── A11: local chart containing a DIRECTORY symlink (#448, fixed by #449) ──────
+// ── REACH15: local chart containing a DIRECTORY symlink (#448, fixed by #449) ──
 //
 // A chart that contains a directory symlink must route successfully (it used to
 // fail at the copyDir level with EISDIR because filepath.Walk+Lstat treated the
@@ -514,7 +514,7 @@ func TestSourceMatrix_TableA10_OutOfBoundsSymlink_Integration(t *testing.T) {
 // a symlink entry; the important assertion is that routing SUCCEEDS rather than
 // erroring. The copyDir directory-symlink-following behavior used on the ref
 // slow path is additionally covered by TestCopyDir_FollowsDirectorySymlink.
-func TestSourceMatrix_TableA11_DirectorySymlinkInChart_RoutesSuccessfully(t *testing.T) {
+func TestSourceMatrix_Strategy_DirectorySymlinkInChart_RoutesSuccessfully(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 
 	branchFolder := t.TempDir()

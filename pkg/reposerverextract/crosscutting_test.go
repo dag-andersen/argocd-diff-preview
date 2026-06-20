@@ -10,7 +10,7 @@ package reposerverextract
 //     source, all-ref-only) fail loudly?
 //   - Table D: app-of-apps traversal. A discovered child Application must route
 //     through buildManifestRequestForSource exactly like a seed Application.
-//     (The --redirect-target-revisions behavior for children, D2/D3 / #446, is
+//     (The --redirect-target-revisions behavior for children, TRV2/TRV3 / #446, is
 //     already covered by appofapps_test.go's BuildChildApplication_* tests and
 //     is NOT duplicated here.)
 //   - Table E: cross-cutting request-content correctness. The repo-server-api
@@ -18,9 +18,9 @@ package reposerverextract
 //     ProjectName/ProjectSourceRepos) must hold on ALL THREE strategies, not
 //     just the streamed local-chart one that historically asserted them.
 //
-// E3 (transient helm-dep build error surfaced, #416) only fails inside a real
+// REQ3 (transient helm-dep build error surfaced, #416) only fails inside a real
 // repo server and is an integration concern; it is represented below as a
-// skipped integration placeholder (TestSourceMatrix_TableE3_*) so every E-row
+// skipped integration placeholder (TestSourceMatrix_RequestInvariants_HelmDepBuildErrorSurfaced_*) so every E-row
 // has a named test.
 
 import (
@@ -35,11 +35,11 @@ import (
 
 // ── Table C: cardinality / kind ─────────────────────────────────────────────
 
-// C1: an ApplicationSet whose sources live under spec.template.spec must split
+// STR5: an ApplicationSet whose sources live under spec.template.spec must split
 // and route identically to the equivalent Application. We build the same
 // logical multi-source app in both shapes and assert the routing outcome
 // matches source-for-source.
-func TestSourceMatrix_TableC1_ApplicationSet_RoutesLikeApplication(t *testing.T) {
+func TestSourceMatrix_Strategy_AppSetRoutesLikeApp(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 
 	applicationYAML := `
@@ -122,15 +122,15 @@ spec:
 	assert.ElementsMatch(t, []string{"$ext"}, appRefKeys)
 }
 
-// C2/C3: degenerate source topologies must fail loudly in splitSources rather
+// NEG1/NEG2: degenerate source topologies must fail loudly in splitSources rather
 // than silently producing an empty/invalid request.
-func TestSourceMatrix_TableC_DegenerateTopologies_Error(t *testing.T) {
+func TestSourceMatrix_Negatives_DegenerateTopologies(t *testing.T) {
 	cases := []struct {
 		name    string
 		appYAML string
 	}{
 		{
-			name: "C2 neither source nor sources -> error",
+			name: "NEG1 neither source nor sources -> error",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -140,7 +140,7 @@ spec:
 `,
 		},
 		{
-			name: "C3 all sources are ref-only (no content) -> error",
+			name: "NEG2 all sources are ref-only (no content) -> error",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -157,7 +157,7 @@ spec:
 `,
 		},
 		{
-			name: "C3b empty sources list -> error",
+			name: "NEG3 empty sources list -> error",
 			appYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -180,17 +180,17 @@ spec:
 
 // ── Table D: app-of-apps traversal ──────────────────────────────────────────
 
-// D1: a discovered child Application must route through
+// TRV1: a discovered child Application must route through
 // buildManifestRequestForSource exactly like a seed Application. This ties the
 // app-of-apps path back into the source matrix: whatever a child's source is,
 // the same routing rules (stream local chart dir, remote chart -> remote RPC,
 // etc.) apply.
 //
-// (D2 and D3 below cover the --redirect-target-revisions behavior for children,
+// (TRV2 and TRV3 below cover the --redirect-target-revisions behavior for children,
 // #446. There is overlapping coverage in appofapps_test.go's
 // TestBuildChildApplication_* tests, but the matrix rows are kept here so every
 // row in SOURCE_MATRIX.md has a corresponding, named test in the matrix suite.)
-func TestSourceMatrix_TableD1_ChildApplication_RoutesLikeSeed(t *testing.T) {
+func TestSourceMatrix_Traversal_ChildRoutesLikeSeed(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 
 	cases := []struct {
@@ -201,7 +201,7 @@ func TestSourceMatrix_TableD1_ChildApplication_RoutesLikeSeed(t *testing.T) {
 		wantChart string
 	}{
 		{
-			name: "D1a child local chart -> stream(chart-dir)",
+			name: "TRV1a child local chart -> stream(chart-dir)",
 			childYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -220,7 +220,7 @@ spec:
 			wantChart: "",
 		},
 		{
-			name: "D1b child remote chart -> remote RPC",
+			name: "TRV1b child remote chart -> remote RPC",
 			childYAML: `
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -270,16 +270,16 @@ spec:
 	}
 }
 
-// D2: a discovered child Application must honor --redirect-target-revisions
+// TRV2: a discovered child Application must honor --redirect-target-revisions
 // exactly like a seed Application (#446, fixed by #447). A child source whose
 // targetRevision is in the redirect list is redirected to the target branch; a
 // source pinned to a revision outside the list is left untouched; an empty list
 // preserves the "redirect everything" default.
 //
-// childAppManifestD2 builds a minimal discovered child whose single source is
-// pinned to targetRevision. (Named with a D2 suffix to avoid colliding with the
+// childAppManifestTRV2 builds a minimal discovered child whose single source is
+// pinned to targetRevision. (Named with a TRV2 suffix to avoid colliding with the
 // childAppManifest helper in appofapps_test.go.)
-func childAppManifestD2(repoURL, targetRevision string) unstructured.Unstructured {
+func childAppManifestTRV2(repoURL, targetRevision string) unstructured.Unstructured {
 	return unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",
 		"kind":       "Application",
@@ -294,7 +294,7 @@ func childAppManifestD2(repoURL, targetRevision string) unstructured.Unstructure
 	}}
 }
 
-func TestSourceMatrix_TableD2_ChildHonorsRedirectTargetRevisions(t *testing.T) {
+func TestSourceMatrix_Traversal_ChildHonorsRedirectTargetRevisions(t *testing.T) {
 	const repoURL = "https://github.com/example/repo"
 
 	cases := []struct {
@@ -304,19 +304,19 @@ func TestSourceMatrix_TableD2_ChildHonorsRedirectTargetRevisions(t *testing.T) {
 		wantRevision      string
 	}{
 		{
-			name:              "D2a revision in list -> redirected to target branch",
+			name:              "TRV2a revision in list -> redirected to target branch",
 			pinnedRevision:    "main",
 			redirectRevisions: []string{"main", "HEAD"},
 			wantRevision:      "target",
 		},
 		{
-			name:              "D2b revision NOT in list -> left untouched",
+			name:              "TRV2b revision NOT in list -> left untouched",
 			pinnedRevision:    "feature-branch",
 			redirectRevisions: []string{"main", "HEAD"},
 			wantRevision:      "feature-branch",
 		},
 		{
-			name:              "D2c empty list -> redirect everything (default)",
+			name:              "TRV2c empty list -> redirect everything (default)",
 			pinnedRevision:    "feature-branch",
 			redirectRevisions: nil,
 			wantRevision:      "target",
@@ -329,7 +329,7 @@ func TestSourceMatrix_TableD2_ChildHonorsRedirectTargetRevisions(t *testing.T) {
 			require.NoError(t, err)
 			targetBranch := git.NewBranch("target", git.Target)
 
-			manifest := childAppManifestD2(repoURL, tc.pinnedRevision)
+			manifest := childAppManifestTRV2(repoURL, tc.pinnedRevision)
 			child, err := buildChildApplication(
 				"argocd", manifest, "parent: root", git.Target, targetBranch, *selector, tc.redirectRevisions)
 			require.NoError(t, err)
@@ -344,26 +344,26 @@ func TestSourceMatrix_TableD2_ChildHonorsRedirectTargetRevisions(t *testing.T) {
 	}
 }
 
-// D3: a child Application whose source is pinned to a ref that only exists on
+// TRV3: a child Application whose source is pinned to a ref that only exists on
 // the remote (not in the local checkout) must render from the remote rather
-// than being redirected to the local branch. This is a consequence of D2/#446,
+// than being redirected to the local branch. This is a consequence of TRV2/#446,
 // but the failure mode (the repo server cloning a remote-only ref) is only
 // observable against a real repo server, so it is an INTEGRATION row, not a
 // unit row. It is recorded here as a skipped placeholder so the matrix has a
 // named entry for every row in SOURCE_MATRIX.md; the real coverage lives in the
 // integration suite (branch-N).
-func TestSourceMatrix_TableD3_ChildRemoteOnlyRef_Integration(t *testing.T) {
-	t.Skip("D3 is integration-only: a remote-only child ref must be rendered by a real repo server (branch-N), not a unit test")
+func TestSourceMatrix_Traversal_ChildRemoteOnlyRef_Integration(t *testing.T) {
+	t.Skip("TRV3 is integration-only: a remote-only child ref must be rendered by a real repo server (branch-N), not a unit test")
 }
 
 // ── Table E: cross-cutting request-content correctness ───────────────────────
 
-// E1/E2: the repo-server-api request invariants must hold on EVERY strategy.
+// REQ1/REQ2: the repo-server-api request invariants must hold on EVERY strategy.
 // Historically only the streamed local-chart path asserted KubeVersion/
 // ApiVersions (#432) and ProjectName/ProjectSourceRepos (#416); this test
 // pins them across remote, stream(chart-dir) and stream(.refs) so a future
 // routing change cannot drop them on one path.
-func TestSourceMatrix_TableE_RequestInvariants_AllStrategies(t *testing.T) {
+func TestSourceMatrix_RequestInvariants_AllStrategies(t *testing.T) {
 	const repo = "https://github.com/org/repo.git"
 	const kubeVersion = "v1.31.2"
 	apiVersions := []string{"apps/v1", "networking.k8s.io/v1", "v1"}
@@ -461,11 +461,11 @@ spec:
 			require.Equal(t, tc.want, classifyStrategy(streamDir, branchFolder),
 				"row must exercise its declared strategy")
 
-			// E1 (#432): cluster version info present on every strategy.
+			// REQ1 (#432): cluster version info present on every strategy.
 			assert.Equal(t, kubeVersion, req.KubeVersion, "KubeVersion must be set (#432)")
 			assert.Equal(t, apiVersions, req.ApiVersions, "ApiVersions must be set (#432)")
 
-			// E2 (#416): permissive project so helm-build errors are not masked
+			// REQ2 (#416): permissive project so helm-build errors are not masked
 			// as permission errors. assertDefaultProjectFields checks both
 			// ProjectName=default and ProjectSourceRepos=["*"].
 			assertDefaultProjectFields(t, req)
@@ -473,14 +473,14 @@ spec:
 	}
 }
 
-// E3: a transient Helm dependency build error must be surfaced with its original
+// REQ3: a transient Helm dependency build error must be surfaced with its original
 // message rather than swallowed or masked (#416). The error originates inside
 // the repo server while it builds chart dependencies, so it is only observable
 // against a real repo server - the permissive ProjectSourceRepos asserted in
-// E2 is the unit-level precondition that keeps the repo server from replacing it
+// REQ2 is the unit-level precondition that keeps the repo server from replacing it
 // with a misleading permission error, but verifying the surfaced message is an
 // integration concern. Recorded as a skipped placeholder so the matrix has a
-// named entry for E3; real coverage belongs in the integration suite (branch-N).
-func TestSourceMatrix_TableE3_HelmDepBuildErrorSurfaced_Integration(t *testing.T) {
-	t.Skip("E3 is integration-only (#416): a swallowed helm-dependency build error is only observable against a real repo server (branch-N)")
+// named entry for REQ3; real coverage belongs in the integration suite (branch-N).
+func TestSourceMatrix_RequestInvariants_HelmDepBuildErrorSurfaced_Integration(t *testing.T) {
+	t.Skip("REQ3 is integration-only (#416): a swallowed helm-dependency build error is only observable against a real repo server (branch-N)")
 }
