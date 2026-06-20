@@ -1354,3 +1354,31 @@ func TestCollectRepoURLs_Empty(t *testing.T) {
 	urls := collectRepoURLs([]argoapplication.ArgoResource{})
 	assert.Empty(t, urls)
 }
+
+// copyDir must follow a symlink that points at a directory and materialize its
+// contents at the destination. Before the fix it byte-copied the link, which
+// os.Open()-ed the target directory and failed with EISDIR ("is a directory").
+// Charts commonly vendor assets this way (e.g. files/sql -> ../../farm-api/sql).
+func TestCopyDir_FollowsDirectorySymlink(t *testing.T) {
+	root := t.TempDir()
+
+	// The symlink target: a real directory (outside the chart) with a file in it.
+	external := filepath.Join(root, "external", "sql")
+	require.NoError(t, os.MkdirAll(external, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(external, "V1__init.sql"), []byte("SELECT 1;"), 0o644))
+
+	// The chart dir: a regular file plus files/sql -> the external directory.
+	chart := filepath.Join(root, "chart")
+	require.NoError(t, os.MkdirAll(filepath.Join(chart, "files"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(chart, "Chart.yaml"), []byte("name: c\n"), 0o644))
+	require.NoError(t, os.Symlink(external, filepath.Join(chart, "files", "sql")))
+
+	dst := filepath.Join(root, "dst")
+	require.NoError(t, copyDir(chart, dst))
+
+	// The regular file and the symlinked directory's contents are both present.
+	assert.FileExists(t, filepath.Join(dst, "Chart.yaml"))
+	got, err := os.ReadFile(filepath.Join(dst, "files", "sql", "V1__init.sql"))
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT 1;", string(got))
+}
