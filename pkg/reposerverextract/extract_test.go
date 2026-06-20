@@ -22,6 +22,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sort"
 	"testing"
 
@@ -84,6 +85,38 @@ func testRepoSelector(t *testing.T, repo string) *repository.Selector {
 	selector, err := repository.NewSelector(repo, "")
 	require.NoError(t, err)
 	return selector
+}
+
+// fakeChartPuller is a chartPuller test double that writes a minimal chart to
+// disk instead of contacting a Helm registry, so buildManifestRequestForSource
+// can be exercised without network access. It records the sources it is asked
+// to pull.
+type fakeChartPuller struct {
+	// files maps chart-relative paths to file contents. When nil, a minimal
+	// Chart.yaml is written so the streamed chart directory is valid.
+	files  map[string]string
+	pulled []v1alpha1.ApplicationSource
+}
+
+func (f *fakeChartPuller) Pull(source v1alpha1.ApplicationSource, _ *RepoCreds, destDir string) (string, error) {
+	f.pulled = append(f.pulled, source)
+	chartDir := filepath.Join(destDir, "chart", source.Chart)
+	files := f.files
+	if files == nil {
+		files = map[string]string{
+			"Chart.yaml": "apiVersion: v2\nname: " + source.Chart + "\nversion: 0.0.0\n",
+		}
+	}
+	for rel, content := range files {
+		full := filepath.Join(chartDir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			return "", err
+		}
+	}
+	return chartDir, nil
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1263,6 +1296,201 @@ func compressAndListEntries(t *testing.T, dir string) []string {
 	}
 	sort.Strings(entries)
 	return entries
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//  11. BUG #441: remote Helm chart whose value files come from a $ref source in
+//     the SAME repo as the PR.
+//
+//     https://github.com/dag-andersen/argocd-diff-preview/issues/441
+//
+//     sources:
+//     - repoURL: https://github.com/org/charts.git   ← ref source, SAME repo as --repo
+//     ref: values
+//     targetRevision: main
+//     - chart: cert-manager                          ← primary (REMOTE registry chart)
+//     repoURL: https://charts.jetstack.io
+//     targetRevision: v1.14.5
+//     helm:
+//     valueFiles:
+//     - $values/envs/prod/values.yaml
+//
+// The pipeline runs RedirectSources BEFORE buildManifestRequestForSource.
+// RedirectSources rewrites same-repo sources from the configured remote
+// revision ("main" here) to the branch currently being rendered ("pr" here).
+// That is how the repo-server-api render path makes base/target comparisons
+// use the local branch folders passed to the tool.
+//
+// Before the fix, buildManifestRequestForSource treated every remote `chart:`
+// source as remote-only and returned streamDir="". That made repo-server fetch
+// the $values ref from the git remote instead of reading it from the local
+// branch folder. Depending on the environment, that could either fail during
+// git fetch or render stale/wrong values that do not match the checked-out
+// base/target files.
+//
+// Correct behaviour is to pull the remote chart locally, copy the same-repo ref
+// files from the checked-out branch into .refs, rewrite $values paths to
+// relative filesystem paths, and stream that complete temp tree with
+// GenerateManifestWithFiles.
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_Issue441_SameRepoRefWithRemoteChart(t *testing.T) {
+	prRepo := "org/charts"
+
+	// The PR branch is checked out locally and holds the value file the chart
+	// reads via $values. The ref source has no path, so it points at the repo
+	// root and the value file resolves under it.
+	branchFolder := t.TempDir()
+	stagedSrc := filepath.Join(branchFolder, "envs", "prod", "values.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stagedSrc), 0o755))
+	require.NoError(t, os.WriteFile(stagedSrc, []byte("replicaCount: 2\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-prod
+spec:
+  destination:
+    namespace: cert-manager
+  sources:
+    - repoURL: https://github.com/org/charts.git
+      ref: values
+      targetRevision: main
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.14.5
+      helm:
+        valueFiles:
+          - $values/envs/prod/values.yaml
+`)
+
+	selector := testRepoSelector(t, prRepo)
+
+	// Reproduce the real pipeline ordering: RedirectSources runs first and
+	// rewrites the same-repo ref source from the configured revision ("main") to
+	// the branch currently being rendered ("pr").
+	require.NoError(t, app.RedirectSources(selector, "pr", []string{"main"}))
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1, "only the chart source is a content source")
+	require.Len(t, refSources, 1)
+
+	// Sanity: RedirectSources rewrote the same-repo ref to the rendered branch
+	// but left the remote chart's targetRevision untouched.
+	require.Equal(t, "pr", refSources[0].TargetRevision,
+		"RedirectSources must rewrite the same-repo ref to the working branch")
+
+	puller := &fakeChartPuller{}
+	req, streamDir, cleanup, err := buildManifestRequestForSource(
+		app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: selector, puller: puller})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Fixed behaviour: same-repo refs with a remote chart use local streaming so
+	// the value files come from the checked-out branch folder, not from a remote
+	// git fetch performed by repo-server.
+	require.NotEmpty(t, streamDir,
+		"same-repo $ref with a remote chart must stream the pulled chart plus local ref files")
+	assert.Nil(t, req.RefSources,
+		"local streaming rewrites $ref value files and must not ask repo-server to fetch refs remotely")
+	require.Len(t, puller.pulled, 1)
+	assert.Equal(t, "cert-manager", puller.pulled[0].Chart)
+	assert.Equal(t, "https://charts.jetstack.io", puller.pulled[0].RepoURL)
+	assert.Equal(t, "v1.14.5", puller.pulled[0].TargetRevision)
+
+	require.NotNil(t, req.ApplicationSource)
+	assert.Empty(t, req.ApplicationSource.Chart, "pulled chart must be rendered as a local path chart")
+	assert.Equal(t, "https://github.com/org/charts.git", req.ApplicationSource.RepoURL,
+		"streamed chart source should identify the PR repo, not the chart registry")
+	assert.NotEmpty(t, req.ApplicationSource.Path)
+	assert.FileExists(t, filepath.Join(streamDir, req.ApplicationSource.Path, "Chart.yaml"))
+	assert.FileExists(t, filepath.Join(streamDir, ".refs", "values", "envs", "prod", "values.yaml"))
+
+	require.NotNil(t, req.ApplicationSource.Helm)
+	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
+	rewrittenValueFile := req.ApplicationSource.Helm.ValueFiles[0]
+	assert.False(t, strings.HasPrefix(rewrittenValueFile, "$"),
+		"$ref value file should be rewritten to a relative filesystem path")
+	assert.Contains(t, rewrittenValueFile, filepath.Join(".refs", "values", "envs", "prod", "values.yaml"))
+	assertDefaultProjectFields(t, req)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  12. GUARD (issue #428): remote Helm chart whose value files come from a $ref
+//     source in a DIFFERENT repo than the PR.
+//
+// This is the case #428 fixed and it is CORRECT today: an external ref is not
+// checked out locally, so the repo server must fetch it itself via the remote
+// RPC, using the ref's real remote targetRevision (NOT rewritten - the source
+// lives outside the PR repo, so RedirectSources leaves it alone).
+//
+// The #441 fix must keep this behaviour intact: only SAME-repo refs should
+// switch to local streaming; external refs must stay on the remote RPC. This
+// test guards against the fix over-reaching and regressing #428.
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_ExternalRefWithRemoteChart_StaysRemote(t *testing.T) {
+	prRepo := "org/charts"
+	branchFolder := t.TempDir()
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-prod
+spec:
+  destination:
+    namespace: cert-manager
+  sources:
+    - repoURL: https://github.com/other-org/app-values.git
+      ref: values
+      targetRevision: main
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.14.5
+      helm:
+        valueFiles:
+          - $values/envs/prod/values.yaml
+`)
+
+	selector := testRepoSelector(t, prRepo)
+
+	// RedirectSources must leave the external ref alone (different repo).
+	require.NoError(t, app.RedirectSources(selector, "pr", []string{"main"}))
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	require.Equal(t, "main", refSources[0].TargetRevision,
+		"external ref must NOT be redirected - it lives outside the PR repo")
+
+	puller := &fakeChartPuller{}
+	req, streamDir, cleanup, err := buildManifestRequestForSource(
+		app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: selector, puller: puller})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Correct behaviour that must NOT regress when #441 is fixed: external ref
+	// stays on the remote RPC with its real remote targetRevision.
+	assert.Empty(t, streamDir,
+		"external $ref with a remote chart must keep using the remote RPC")
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$values"]
+	require.True(t, ok, "RefSources must contain '$values'")
+	assert.Equal(t, "https://github.com/other-org/app-values.git", refTarget.Repo.Repo)
+	assert.Equal(t, "main", refTarget.TargetRevision,
+		"external ref must keep its real remote revision so the repo server can fetch it")
+	assert.Empty(t, puller.pulled, "external refs must not trigger local chart pulling")
+	assertDefaultProjectFields(t, req)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
