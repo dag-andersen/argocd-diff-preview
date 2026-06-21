@@ -188,7 +188,13 @@ Rendering manifests for all applications in your repository on every pull reques
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=dag-andersen/argocd-diff-preview&type=date&legend=top-left)](https://www.star-history.com/#dag-andersen/argocd-diff-preview&type=date&legend=top-left)
+<a href="https://www.star-history.com/?repos=dag-andersen%2Fargocd-diff-preview&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=dag-andersen/argocd-diff-preview&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=dag-andersen/argocd-diff-preview&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=dag-andersen/argocd-diff-preview&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## Contributing
 
