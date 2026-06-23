@@ -18,8 +18,8 @@ type DiffResult struct {
 // For added resources (Base is nil), shows all lines as additions.
 // For deleted resources (Target is nil), shows all lines as deletions.
 // For modified resources, shows a unified diff with context.
-func (rp *ResourcePair) Diff(contextLines uint) (DiffResult, error) {
-	return generateResourceDiff(*rp, contextLines, nil)
+func (rp *ResourcePair) Diff(contextLines uint, disableDefaultIgnorePatterns bool) (DiffResult, error) {
+	return generateResourceDiff(*rp, contextLines, nil, disableDefaultIgnorePatterns)
 }
 
 // resourceToYAML converts an unstructured resource to YAML string.
