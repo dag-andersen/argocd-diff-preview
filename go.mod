@@ -1,6 +1,6 @@
 module github.com/dag-andersen/argocd-diff-preview
 
-go 1.25.5
+go 1.26.5
 
 require (
 	github.com/argoproj/argo-cd/v3 v3.3.8
