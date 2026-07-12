@@ -90,6 +90,8 @@ func run(cfg *Config) error {
 		FilesChanged:               filesChanged,
 		IgnoreInvalidWatchPattern:  cfg.IgnoreInvalidWatchPattern,
 		WatchIfNoWatchPatternFound: cfg.WatchIfNoWatchPatternFound,
+		InferAppDependencies:       cfg.InferAppDependencies,
+		RepoSelector:               cfg.RepoSelector,
 	}
 
 	// Get applications for both branches

@@ -72,6 +72,7 @@ var (
 	DefaultDryRun                               = false
 	DefaultAutoDetectFilesChanged               = true
 	DefaultWatchIfNoWatchPatternFound           = true
+	DefaultInferAppDependencies                 = false
 	DefaultIgnoreInvalidWatchPattern            = false
 	DefaultHideDeletedAppDiff                   = false
 	DefaultIgnoreResourceRules                  = ""
@@ -113,6 +114,7 @@ type RawOptions struct {
 	FilesChanged                         string `mapstructure:"files-changed"`
 	IgnoreInvalidWatchPattern            bool   `mapstructure:"ignore-invalid-watch-pattern"`
 	WatchIfNoWatchPatternFound           bool   `mapstructure:"watch-if-no-watch-pattern-found"`
+	InferAppDependencies                 bool   `mapstructure:"infer-app-dependencies"`
 	AutoDetectFilesChanged               bool   `mapstructure:"auto-detect-files-changed"`
 	KeepClusterAlive                     bool   `mapstructure:"keep-cluster-alive"`
 	ArgocdNamespace                      string `mapstructure:"argocd-namespace"`
@@ -160,6 +162,7 @@ type Config struct {
 	MaxDiffLength                        uint
 	IgnoreInvalidWatchPattern            bool
 	WatchIfNoWatchPatternFound           bool
+	InferAppDependencies                 bool
 	AutoDetectFilesChanged               bool
 	KeepClusterAlive                     bool
 	ArgocdNamespace                      string
@@ -253,6 +256,7 @@ func Parse() *Config {
 	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
 	viper.SetDefault("create-cluster", DefaultCreateCluster)
 	viper.SetDefault("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound)
+	viper.SetDefault("infer-app-dependencies", DefaultInferAppDependencies)
 	viper.SetDefault("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern)
 	viper.SetDefault("keep-cluster-alive", DefaultKeepClusterAlive)
 	viper.SetDefault("cluster", DefaultCluster)
@@ -331,6 +335,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("auto-detect-files-changed", DefaultAutoDetectFilesChanged, "Auto detect files changed between branches")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().Bool("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound, "Render applications without watch pattern")
+	rootCmd.Flags().Bool("infer-app-dependencies", DefaultInferAppDependencies, "Infer each application's local-repo file dependencies (spec.source.path and helm.valueFiles) and render it only when those files change. Combine with --watch-if-no-watch-pattern-found=false to render only affected applications")
 	rootCmd.Flags().String("redirect-target-revisions", "", "Comma-separated source targetRevision values to redirect to the target branch. Example: main,HEAD. By default, every targetRevision in matching repositories is redirected")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
@@ -407,6 +412,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		MaxDiffLength:                        o.MaxDiffLength,
 		IgnoreInvalidWatchPattern:            o.IgnoreInvalidWatchPattern,
 		WatchIfNoWatchPatternFound:           o.WatchIfNoWatchPatternFound,
+		InferAppDependencies:                 o.InferAppDependencies,
 		AutoDetectFilesChanged:               o.AutoDetectFilesChanged,
 		KeepClusterAlive:                     o.KeepClusterAlive,
 		ArgocdNamespace:                      o.ArgocdNamespace,
@@ -723,6 +729,9 @@ func (o *Config) LogConfig() {
 			log.Info().Msgf("✨ --- Include applications with no watch-pattern annotation")
 		} else {
 			log.Info().Msgf("✨ --- Skip applications with no watch-pattern annotation")
+		}
+		if o.InferAppDependencies {
+			log.Info().Msgf("✨ --- Infer application dependencies from spec.source.path and helm.valueFiles")
 		}
 	}
 	if len(o.Selectors) > 0 {

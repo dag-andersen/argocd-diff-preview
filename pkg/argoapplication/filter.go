@@ -10,6 +10,7 @@ import (
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -38,6 +39,11 @@ type ApplicationSelectionOptions struct {
 	FilesChanged               []string
 	IgnoreInvalidWatchPattern  bool
 	WatchIfNoWatchPatternFound bool
+	// InferAppDependencies enables deriving each application's local-repo file dependencies
+	// (spec.source.path and helm.valueFiles) so it is rendered only when those files change.
+	InferAppDependencies bool
+	// RepoSelector identifies the repository under diff; used to decide which sources are local.
+	RepoSelector repository.Selector
 }
 
 const maxFilesChangedDisplay = 20
@@ -84,6 +90,10 @@ func (appSelectionOptions ApplicationSelectionOptions) LogRules() {
 			"🤖 Will only select Application[Sets] that watch these files: %s",
 			formatFilesChanged(appSelectionOptions.FilesChanged),
 		)
+	}
+
+	if appSelectionOptions.InferAppDependencies {
+		log.Info().Msg("🤖 Inferring application dependencies from spec.source.path and helm.valueFiles")
 	}
 }
 
@@ -143,7 +153,14 @@ func (a *ArgoResource) Filter(
 
 	// Then check files changed
 	if len(appSelectionOptions.FilesChanged) > 0 {
-		selected, reason := a.filterByFilesChanged(appSelectionOptions.FilesChanged, appSelectionOptions.IgnoreInvalidWatchPattern, appSelectionOptions.WatchIfNoWatchPatternFound)
+		// When inferring dependencies, ApplicationSets bypass the files-changed filter so they are
+		// always generated; their generated Applications are then filtered by inferred dependencies
+		// (and by their own watch-pattern/manifest-generate-paths annotations) in the re-filter step.
+		if appSelectionOptions.InferAppDependencies && a.Kind == ApplicationSet {
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s bypasses files-changed filter because dependency inference is enabled; generated Applications are filtered instead", a.Kind.ShortName())
+			return true
+		}
+		selected, reason := a.filterByFilesChanged(appSelectionOptions.FilesChanged, appSelectionOptions.IgnoreInvalidWatchPattern, appSelectionOptions.WatchIfNoWatchPatternFound, appSelectionOptions.InferAppDependencies, appSelectionOptions.RepoSelector)
 		if !selected {
 			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
 			return false
@@ -222,7 +239,7 @@ func (a *ArgoResource) filterBySelectors(selectors []app_selector.Selector) (boo
 }
 
 // filterByFilesChanged checks if the application watches any of the changed files and returns a reason for the selection
-func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalidWatchPattern bool, watchIfNoWatchPatternFound bool) (bool, string) {
+func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalidWatchPattern bool, watchIfNoWatchPatternFound bool, inferAppDependencies bool, repoSelector repository.Selector) (bool, string) {
 	if len(filesChanged) == 0 {
 		return false, "no files changed"
 	}
@@ -232,32 +249,46 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 		return true, "application itself is in the list of files changed"
 	}
 
-	// Get annotations directly from unstructured
-	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
-	if err != nil || !found || len(annotations) == 0 {
-		return watchIfNoWatchPatternFound, "no watch-pattern or manifest-generate-paths annotation found"
+	// Inferred local-repo dependency paths (only when enabled).
+	var inferredPaths []string
+	if inferAppDependencies {
+		inferredPaths = a.inferLocalWatchPaths(repoSelector)
 	}
 
-	watchPattern, watchPatternExists := annotations[annotationWatchPattern]
-	manifestGeneratePaths, manifestGeneratePathsExists := annotations[v1alpha1.AnnotationKeyManifestGeneratePaths]
-
-	// Check if we effectively have no watch patterns (either no annotation or empty/whitespace-only values)
-	effectiveWatchPattern := strings.TrimSpace(watchPattern)
-	effectiveManifestGeneratePaths := strings.TrimSpace(manifestGeneratePaths)
-
-	if (!watchPatternExists || effectiveWatchPattern == "") && (!manifestGeneratePathsExists || effectiveManifestGeneratePaths == "") {
-		return watchIfNoWatchPatternFound, "no effective watch-pattern or manifest-generate-paths annotation found"
+	// Read the watch-pattern / manifest-generate-paths annotations (if any).
+	var effectiveWatchPattern, effectiveManifestGeneratePaths string
+	if annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations"); err == nil && found && len(annotations) > 0 {
+		effectiveWatchPattern = strings.TrimSpace(annotations[annotationWatchPattern])
+		effectiveManifestGeneratePaths = strings.TrimSpace(annotations[v1alpha1.AnnotationKeyManifestGeneratePaths])
 	}
 
-	if selectedWatchPattern, reasonWatchPattern := a.filterByAnnotationWatchPattern(effectiveWatchPattern, filesChanged, ignoreInvalidWatchPattern); selectedWatchPattern {
-		return true, reasonWatchPattern
+	hasWatchPattern := effectiveWatchPattern != ""
+	hasManifestGeneratePaths := effectiveManifestGeneratePaths != ""
+	hasInferredPaths := len(inferredPaths) > 0
+
+	// If there is nothing to match against (no annotations and no inferred dependencies),
+	// fall back to the watch-if-no-watch-pattern-found setting.
+	if !hasWatchPattern && !hasManifestGeneratePaths && !hasInferredPaths {
+		return watchIfNoWatchPatternFound, "no watch-pattern, manifest-generate-paths annotation, or inferred dependencies found"
 	}
 
-	if selectedManifestGeneratePaths, reasonManifestGeneratePaths := a.filterByManifestGeneratePaths(effectiveManifestGeneratePaths, filesChanged); selectedManifestGeneratePaths {
-		return true, reasonManifestGeneratePaths
+	if hasWatchPattern {
+		if selected, reason := a.filterByAnnotationWatchPattern(effectiveWatchPattern, filesChanged, ignoreInvalidWatchPattern); selected {
+			return true, reason
+		}
 	}
 
-	return false, "files changed does not match watch-pattern or manifest-generate-paths"
+	if hasManifestGeneratePaths {
+		if selected, reason := a.filterByManifestGeneratePaths(effectiveManifestGeneratePaths, filesChanged); selected {
+			return true, reason
+		}
+	}
+
+	if hasInferredPaths && anyFileChangedUnderPaths(filesChanged, inferredPaths) {
+		return true, "files changed match inferred application dependencies"
+	}
+
+	return false, "files changed does not match watch-pattern, manifest-generate-paths, or inferred dependencies"
 }
 
 func (a *ArgoResource) filterByAnnotationWatchPattern(watchPattern string, filesChanged []string, ignoreInvalidWatchPattern bool) (bool, string) {
@@ -337,23 +368,172 @@ func (a *ArgoResource) filterByManifestGeneratePaths(manifestGeneratePaths strin
 
 	log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Paths to compare with files changed: %v", refreshPaths)
 
+	if anyFileChangedUnderPaths(filesChanged, refreshPaths) {
+		return true, fmt.Sprintf("files changed match manifest-generate-paths: '%s'", manifestGeneratePaths)
+	}
+
+	return false, fmt.Sprintf("no files changed match manifest-generate-paths: '%s'", manifestGeneratePaths)
+}
+
+// anyFileChangedUnderPaths reports whether any changed file equals, is contained within, or
+// glob-matches any of the given paths. Paths may be directories (containment match) or specific
+// files (exact match); all entries and changed files are treated as repo-root-relative.
+func anyFileChangedUnderPaths(filesChanged []string, paths []string) bool {
 	for _, f := range filesChanged {
 		if !filepath.IsAbs(f) {
 			f = string(filepath.Separator) + f
 		}
-		for _, item := range refreshPaths {
+		f = filepath.Clean(f)
+		for _, item := range paths {
 			if !filepath.IsAbs(item) {
 				item = string(filepath.Separator) + item
 			}
+			item = filepath.Clean(item)
 			if f == item {
-				return true, fmt.Sprintf("file '%s' matches manifest-generate-paths: '%s'", f, manifestGeneratePaths)
+				return true
 			} else if _, err := argocdsecurity.EnforceToCurrentRoot(item, f); err == nil {
-				return true, fmt.Sprintf("file '%s' matches manifest-generate-paths: '%s'", f, manifestGeneratePaths)
+				return true
 			} else if matched, err := filepath.Match(item, f); err == nil && matched {
-				return true, fmt.Sprintf("file '%s' matches manifest-generate-paths: '%s'", f, manifestGeneratePaths)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// inferLocalWatchPaths derives the repo-relative paths (source directories and Helm value files)
+// that an application depends on within the local repository, based on its sources. It returns
+// nil when the application has no local dependencies (e.g. only remote sources). The result is
+// used as an implicit watch-pattern so the application is rendered only when one of these files
+// changes. It is source-type agnostic (Helm, Kustomize, plain directory, jsonnet, ...).
+func (a *ArgoResource) inferLocalWatchPaths(repoSelector repository.Selector) []string {
+	if a.Yaml == nil {
+		return nil
+	}
+
+	var specPath []string
+	switch a.Kind {
+	case Application:
+		specPath = []string{"spec"}
+	case ApplicationSet:
+		specPath = []string{"spec", "template", "spec"}
+	default:
+		return nil
+	}
+
+	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
+	if !found {
+		return nil
+	}
+
+	// Collect sources (single source and multi-source forms).
+	var sources []map[string]any
+	if source, ok := specMap["source"].(map[string]any); ok {
+		sources = append(sources, source)
+	}
+	if rawSources, ok := specMap["sources"].([]any); ok {
+		for _, s := range rawSources {
+			if source, ok := s.(map[string]any); ok {
+				sources = append(sources, source)
+			}
+		}
+	}
+	if len(sources) == 0 {
+		return nil
+	}
+
+	// Build a map of ref name -> ref source base path, for sources pointing at the local repo.
+	// Ref sources supply the files referenced by "$ref/..." Helm value files.
+	type refInfo struct {
+		local bool
+		path  string
+	}
+	refs := map[string]refInfo{}
+	for _, source := range sources {
+		ref, _ := source["ref"].(string)
+		if ref == "" {
+			continue
+		}
+		repoURL, _ := source["repoURL"].(string)
+		path, _ := source["path"].(string)
+		refs[ref] = refInfo{local: repoSelector.Matches(repoURL), path: path}
+	}
+
+	var paths []string
+	for _, source := range sources {
+		repoURL, _ := source["repoURL"].(string)
+		_, hasChart := source["chart"]
+		sourcePath, _ := source["path"].(string)
+		ref, _ := source["ref"].(string)
+		localSource := repoSelector.Matches(repoURL)
+
+		// A ref-only source (ref set, no path) produces no manifests; it only supplies files
+		// for "$ref/..." value-file references, so it contributes no directory watch.
+		refOnly := ref != "" && sourcePath == ""
+
+		// Directory watch: a local, non-chart, non-ref-only source contributes its path.
+		if localSource && !hasChart && !refOnly {
+			paths = append(paths, normalizeWatchPath(sourcePath))
+		}
+
+		// Value-files watch: resolve helm.valueFiles to repo-relative file paths. This runs
+		// regardless of whether this source is a remote chart, so a remote chart whose values
+		// come from a local "$ref" source is still tracked.
+		helm, ok := source["helm"].(map[string]any)
+		if !ok {
+			continue
+		}
+		valueFiles, ok := helm["valueFiles"].([]any)
+		if !ok {
+			continue
+		}
+		for _, vfRaw := range valueFiles {
+			vf, ok := vfRaw.(string)
+			if !ok || strings.TrimSpace(vf) == "" {
+				continue
+			}
+			if strings.HasPrefix(vf, "$") {
+				refName, refPath, ok := splitRefPath(vf)
+				if !ok {
+					continue
+				}
+				info, known := refs[refName]
+				if !known || !info.local {
+					continue
+				}
+				// Ref sources usually have no path (repo root); join is robust either way.
+				paths = append(paths, normalizeWatchPath(filepath.Join(info.path, refPath)))
+				continue
+			}
+			// Plain relative value file: meaningful only for a local source, resolved relative
+			// to that source's path.
+			if localSource {
+				paths = append(paths, normalizeWatchPath(filepath.Join(sourcePath, vf)))
 			}
 		}
 	}
 
-	return false, fmt.Sprintf("no files changed match manifest-generate-paths: '%s'", manifestGeneratePaths)
+	return paths
+}
+
+// normalizeWatchPath cleans a repo-relative path, mapping empty/"." to the repo root (".").
+func normalizeWatchPath(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" || p == "." {
+		return "."
+	}
+	return filepath.Clean(p)
+}
+
+// splitRefPath splits a "$refName/path/to/file" Helm value-file reference into the ref name and
+// the path within that ref source. Returns ok=false when there is no path component.
+func splitRefPath(vf string) (refName string, refPath string, ok bool) {
+	if !strings.HasPrefix(vf, "$") {
+		return "", "", false
+	}
+	name, path, found := strings.Cut(vf[1:], "/")
+	if !found || name == "" || path == "" {
+		return "", "", false
+	}
+	return name, path, true
 }

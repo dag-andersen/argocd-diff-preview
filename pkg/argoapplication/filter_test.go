@@ -6,6 +6,7 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -583,7 +584,7 @@ metadata:
 			}
 
 			// Run filter
-			got, _ := app.filterByFilesChanged(tt.filesChanged, tt.ignoreInvalidWatchPattern, tt.watchIfNoWatchPatternFound)
+			got, _ := app.filterByFilesChanged(tt.filesChanged, tt.ignoreInvalidWatchPattern, tt.watchIfNoWatchPatternFound, false, repository.Selector{})
 
 			// Check result
 			assert.Equal(t, tt.want, got)
@@ -1045,6 +1046,227 @@ metadata:
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestFilterByFilesChangedInferDependencies(t *testing.T) {
+
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	// localSelector matches the repo under diff; non-matching repoURLs are treated as remote.
+	localSelector := repository.Selector{Repo: "myorg/myrepo"}
+	localURL := "https://github.com/myorg/myrepo"
+	remoteURL := "https://github.com/other/charts"
+
+	tests := []struct {
+		name                       string
+		yaml                       string
+		filesChanged               []string
+		watchIfNoWatchPatternFound bool
+		want                       bool
+	}{
+		{
+			name: "source.path dir - changed file under path",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  source:
+    repoURL: ` + localURL + `
+    path: apps/backend`,
+			filesChanged:               []string{"apps/backend/deployment.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "source.path dir - changed file outside path",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  source:
+    repoURL: ` + localURL + `
+    path: apps/backend`,
+			filesChanged:               []string{"apps/frontend/deployment.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		{
+			name: "helm valueFiles relative - changed values file",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  source:
+    repoURL: ` + localURL + `
+    path: charts/myapp
+    helm:
+      valueFiles:
+        - ../../values/prod.yaml`,
+			filesChanged:               []string{"values/prod.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "multi-source - change under any local source",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  sources:
+    - repoURL: ` + localURL + `
+      path: apps/a
+    - repoURL: ` + localURL + `
+      path: apps/b`,
+			filesChanged:               []string{"apps/b/service.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "remote chart with local $ref values - changed values file",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  sources:
+    - repoURL: ` + remoteURL + `
+      chart: myapp
+      targetRevision: 1.2.3
+      helm:
+        valueFiles:
+          - $values/env/prod.yaml
+    - repoURL: ` + localURL + `
+      ref: values`,
+			filesChanged:               []string{"env/prod.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "remote chart with local $ref values - unrelated local file does not match",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  sources:
+    - repoURL: ` + remoteURL + `
+      chart: myapp
+      targetRevision: 1.2.3
+      helm:
+        valueFiles:
+          - $values/env/prod.yaml
+    - repoURL: ` + localURL + `
+      ref: values`,
+			filesChanged:               []string{"some/other/file.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+		{
+			name: "remote-only source - no local deps, watchIfNoWatchPatternFound=false skips",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  source:
+    repoURL: ` + remoteURL + `
+    chart: myapp
+    targetRevision: 1.2.3`,
+			filesChanged:               []string{"apps/backend/deployment.yaml"},
+			watchIfNoWatchPatternFound: false,
+			want:                       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var node unstructured.Unstructured
+			err := yaml.Unmarshal([]byte(tt.yaml), &node)
+			assert.NoError(t, err)
+
+			app := &ArgoResource{
+				Yaml:     &node,
+				Kind:     Application,
+				Name:     "test-app",
+				FileName: "test.yaml",
+			}
+
+			got, _ := app.filterByFilesChanged(tt.filesChanged, false, tt.watchIfNoWatchPatternFound, true, localSelector)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestFilterByFilesChangedInferDisabled is a regression guard: with inference disabled, an app
+// without watch annotations behaves exactly as before (follows watchIfNoWatchPatternFound).
+func TestFilterByFilesChangedInferDisabled(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	appYaml := `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+spec:
+  source:
+    repoURL: https://github.com/myorg/myrepo
+    path: apps/backend`
+
+	var node unstructured.Unstructured
+	assert.NoError(t, yaml.Unmarshal([]byte(appYaml), &node))
+	app := &ArgoResource{Yaml: &node, Kind: Application, Name: "test-app", FileName: "test.yaml"}
+
+	// Inference off: a change under source.path is NOT auto-matched; falls back to the flag.
+	got, _ := app.filterByFilesChanged([]string{"apps/backend/deployment.yaml"}, false, false, false, repository.Selector{Repo: "myorg/myrepo"})
+	assert.False(t, got)
+
+	got, _ = app.filterByFilesChanged([]string{"apps/backend/deployment.yaml"}, false, true, false, repository.Selector{Repo: "myorg/myrepo"})
+	assert.True(t, got)
+}
+
+// TestFilterAppSetBypassWithInference verifies an ApplicationSet is selected for generation even
+// when only a downstream file changed, provided dependency inference is enabled.
+func TestFilterAppSetBypassWithInference(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	appSetYaml := `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-appset
+spec:
+  template:
+    spec:
+      source:
+        repoURL: https://github.com/myorg/myrepo
+        path: apps/{{.name}}`
+
+	var node unstructured.Unstructured
+	assert.NoError(t, yaml.Unmarshal([]byte(appSetYaml), &node))
+	appSet := &ArgoResource{Yaml: &node, Kind: ApplicationSet, Name: "test-appset", FileName: "appset.yaml"}
+
+	opts := ApplicationSelectionOptions{
+		FilesChanged:               []string{"apps/backend/values.yaml"},
+		WatchIfNoWatchPatternFound: false,
+		InferAppDependencies:       true,
+		RepoSelector:               repository.Selector{Repo: "myorg/myrepo"},
+	}
+	assert.True(t, appSet.Filter(opts), "ApplicationSet should bypass files-changed filter when inference is enabled")
+
+	// With inference disabled, the same ApplicationSet (whose own file did not change) is skipped.
+	opts.InferAppDependencies = false
+	assert.False(t, appSet.Filter(opts), "ApplicationSet should be skipped when inference is disabled and its file did not change")
 }
 
 func TestFilterByAnnotationWatchPattern(t *testing.T) {
