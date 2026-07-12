@@ -14,6 +14,7 @@ debug ?= false
 argocd_ui_url ?= ""
 render_method ?= "server-api"
 output_app_manifests ?= false
+cluster_type ?= auto
 
 GO_TEST_FLAGS ?=
 
@@ -51,6 +52,7 @@ run-with-go: go-build pull-repository
 		--line-count="$(line_count)" \
 		--redirect-target-revisions="HEAD" \
 		--render-method="$(render_method)" \
+		--cluster="$(cluster_type)" \
 		--argocd-ui-url="${argocd_ui_url}" \
 		--output-app-manifests="$(output_app_manifests)" \
 		--debug="$(debug)"
