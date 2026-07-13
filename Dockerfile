@@ -49,5 +49,7 @@ COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 # copy argocd helm chart values
 COPY ./argocd-config/*.yaml ./argocd-config/
 
+ENV IN_CONTAINER="true"
+
 # set the startup command to run your binary
 ENTRYPOINT ["./argocd-diff-preview"]

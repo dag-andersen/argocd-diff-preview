@@ -14,6 +14,7 @@ debug ?= false
 argocd_ui_url ?= ""
 render_method ?= "server-api"
 output_app_manifests ?= false
+cluster_type ?= auto
 
 GO_TEST_FLAGS ?=
 
@@ -51,6 +52,7 @@ run-with-go: go-build pull-repository
 		--line-count="$(line_count)" \
 		--redirect-target-revisions="HEAD" \
 		--render-method="$(render_method)" \
+		--cluster="$(cluster_type)" \
 		--argocd-ui-url="${argocd_ui_url}" \
 		--output-app-manifests="$(output_app_manifests)" \
 		--debug="$(debug)"
@@ -74,6 +76,7 @@ run-with-docker: pull-repository docker-build
 		-e DIFF_IGNORE="$(diff_ignore)" \
 		-e TIMEOUT=$(timeout) \
 		-e SELECTOR="$(selector)" \
+		-e CLUSTER="$(cluster_type)" \
 		-e FILES_CHANGED="$(files_changed)" \
 		-e ARGOCD_CHART_NAME="$(argocd_chart_name)" \
 		-e ARGOCD_CHART_URL="$(argocd_chart_url)" \

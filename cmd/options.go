@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -593,7 +594,13 @@ func (o *RawOptions) parseClusterType() (cluster.Provider, error) {
 	}
 
 	if !provider.IsInstalled() {
-		return nil, fmt.Errorf("%s is not installed", o.ClusterType)
+
+		errorMessage := fmt.Sprintf("%s is not installed", o.ClusterType)
+		inContainer := strings.ToLower(os.Getenv("IN_CONTAINER")) == "true"
+		if inContainer {
+			errorMessage = fmt.Sprintf("%s is not installed in container. Please use another cluster type or run argocd-diff-preview as a binary instead of using a container runtime", o.ClusterType)
+		}
+		return nil, errors.New(errorMessage)
 	}
 
 	return provider, nil
