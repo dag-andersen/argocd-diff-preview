@@ -449,7 +449,7 @@ func writeManifests(
 		if perApp {
 			// Always write the file, even if content is empty, so the user can see that
 			// an application existed but had no rendered output.
-			filePath := fmt.Sprintf("%s/%s", perAppFolder, app.Id)
+			filePath := fmt.Sprintf("%s/%s.yaml", perAppFolder, app.Id)
 			if err := utils.WriteFile(filePath, content); err != nil {
 				return fmt.Errorf("failed to write manifest for app %s: %w", app.Name, err)
 			}
