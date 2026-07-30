@@ -168,6 +168,9 @@ This is where it gets interesting:
 - Clone the **Application Repository** (not the current repo!)
 - Provide secrets for both repositories  
 - Set `--repo` to the **Resource Repository** (where the PR is)
+- Set `--target-branch` to the Resource Repository PR branch or commit SHA
+- Disable automatic changed-file detection, because the Application Repository clone folders are both checked out from `main`
+- Use `--render-method="server-api"` because this setup does not work with the `repo-server-api` render method
 
 ```yaml title=".github/workflows/diff.yml (Resource Repository)" hl_lines="19-21 26-28 73-75"
 name: Argo CD Diff Preview
@@ -191,14 +194,14 @@ jobs:
           repository: <org>/<application-repository>
           token: ${{ secrets.APP_REPO_TOKEN }}
           ref: main
-          path: pull-request
+          path: target-branch
 
       - uses: actions/checkout@v4
         with:
           repository: <org>/<application-repository>
           token: ${{ secrets.APP_REPO_TOKEN }}
           ref: main
-          path: main
+          path: base-branch
 
       - name: Prepare secrets
         run: |
@@ -239,12 +242,14 @@ jobs:
           docker run \
             --network=host \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $(pwd)/main:/base-branch \
-            -v $(pwd)/pull-request:/target-branch \
+            -v $(pwd)/base-branch:/base-branch \
+            -v $(pwd)/target-branch:/target-branch \
             -v $(pwd)/output:/output \
             -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
             -e TARGET_BRANCH=<pr-branch> \             ⬅️ The PR branch on the Resource Repository
             -e REPO=<org>/<resource-repository> \      ⬅️ Resource Repository (where the PR is!)
+            -e AUTO_DETECT_FILES_CHANGED=false \       ⬅️ Disable auto-detection because the PR is not in the Application Repository
+            -e RENDER_METHOD=server-api \              ⬅️ This is the default. This setup does not work with RENDER_METHOD=repo-server-api
             dagandersen/argocd-diff-preview:v0.2.11
 
       - name: Post diff as comment
@@ -276,6 +281,8 @@ docker run \
     -v $(pwd)/secrets:/secrets \
     -e TARGET_BRANCH=<pr-branch> \
     -e REPO=<org>/<resource-repository> \
+    -e AUTO_DETECT_FILES_CHANGED=false \
+    -e RENDER_METHOD=server-api \
     dagandersen/argocd-diff-preview:v0.2.11
 ```
 
@@ -283,10 +290,10 @@ docker run \
 
 ## Summary
 
-| Pipeline location | Clone which repo? | `--repo` flag |
-|-------------------|-------------------|---------------|
-| Application Repository | Application Repository | Application Repository |
-| Resource Repository | Application Repository | Resource Repository |
+| Pipeline location | Clone into `/base-branch` and `/target-branch` | `--repo` flag | Changed-file detection |
+|-------------------|---------------------------------------------|---------------|------------------------|
+| Application Repository | Application Repository | Application Repository | Auto-detection works by default |
+| Resource Repository | Application Repository | Resource Repository | Disable auto-detection or pass Resource Repository changes explicitly |
 
 With pipelines in both repositories, you'll get diffs for changes to either your Applications or the resources they manage.
 
