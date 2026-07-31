@@ -144,6 +144,7 @@ Chore | Update ArgoCD dependency to v3.0
 
 - A repository can contain multiple applications and applications with the same name. We ALWAYS need to make sure the names are unique.
 - We can not make any assumption of how the code i structured and how many applications are stored in the same file.
+- Design and test with realistic scale in mind. A repository can contain around 2000 Argo CD Applications. A large run may need to process around 500 Applications, but with good watch patterns and selectors we usually expect to process around 20 Applications per run.
 
 
 ## Key Dependencies
