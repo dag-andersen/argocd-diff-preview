@@ -607,6 +607,15 @@ func buildManifestRequestForSource(
 		}
 		streamDir, cleanup, err := buildStreamDirForLocalSource(branchFolder, primarySource)
 		if err != nil {
+			if isLocalSourceMissing(err) {
+				log.Warn().
+					Str("App", app.GetLongName()).
+					Str("sourceRepoURL", primarySource.RepoURL).
+					Str("sourcePath", primarySource.Path).
+					Str("branchFolder", branchFolder).
+					Msg("⚠️ PR repo source is not present in the local branch folder - using remote RPC")
+				return newManifestRequest(&primarySource), "", nil, nil
+			}
 			return nil, "", nil, err
 		}
 		requestSource := primarySource
@@ -643,6 +652,16 @@ func buildManifestRequestForSource(
 	// from its own git cache.
 	if primarySource.Chart != "" {
 		if renderContext.puller != nil && !hasExternalRefSource(refSources, renderContext.repoSelector) {
+			if available, reason := localRefSourcesAvailable(branchFolder, primarySource, refSources); !available {
+				log.Warn().
+					Str("App", app.GetLongName()).
+					Str("branchFolder", branchFolder).
+					Str("reason", reason).
+					Msg("⚠️ PR repo ref source is not present in the local branch folder - using remote RPC")
+				request = newManifestRequest(&primarySource)
+				request.RefSources = buildRefSourcesMap(refSources, creds)
+				return request, "", nil, nil
+			}
 			return buildRemoteChartLocalRefsRequest(
 				app, primarySource, refSources, branchFolder, creds, renderContext.puller, newManifestRequest)
 		}
@@ -665,6 +684,18 @@ func buildManifestRequestForSource(
 			Str("sourceRepoURL", primarySource.RepoURL).
 			Str("prRepo", renderContext.repoSelector.String()).
 			Msg("Source or ref repoURL does not match PR repo (slow path) - using remote RPC")
+		request = newManifestRequest(&primarySource)
+		request.RefSources = buildRefSourcesMap(refSources, creds)
+		return request, "", nil, nil
+	}
+
+	if available, reason := localContentAndRefSourcesAvailable(branchFolder, primarySource, refSources); !available {
+		log.Warn().
+			Str("App", app.GetLongName()).
+			Str("sourceRepoURL", primarySource.RepoURL).
+			Str("branchFolder", branchFolder).
+			Str("reason", reason).
+			Msg("⚠️ PR repo source is not present in the local branch folder - using remote RPC")
 		request = newManifestRequest(&primarySource)
 		request.RefSources = buildRefSourcesMap(refSources, creds)
 		return request, "", nil, nil
