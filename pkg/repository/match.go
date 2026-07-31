@@ -8,6 +8,9 @@ import (
 type Selector struct {
 	Repo  string
 	Regex *regexp.Regexp
+	// IsAutoDetected reports whether Repo was inferred from the checkout's origin
+	// remote rather than provided explicitly via --repo / --repo-regex.
+	IsAutoDetected bool
 }
 
 func NewSelector(repo, regex string) (*Selector, error) {
