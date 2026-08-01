@@ -120,6 +120,9 @@ run-integration-tests-go-with-repo-server-api: go-build
 run-integration-tests-docker-with-repo-server-api: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -render-method=repo-server-api -docker ./...
 
+run-integration-tests-in-cluster:
+	cd integration-test && RUN_IN_CLUSTER_TEST=true go test -count=1 -v -timeout 25m -run TestInClusterRepoServerAPI ./...
+
 # Update golden files for integration tests
 update-integration-tests: go-build
 	cd integration-test && go test -v -timeout 60m -run TestIntegration -update ./...
@@ -132,6 +135,7 @@ check-release: run-lint run-unit-tests
 	$(MAKE) run-integration-tests-go-with-repo-server-api
 	$(MAKE) run-integration-tests-go-with-cli
 	$(MAKE) run-integration-tests-docker
+	$(MAKE) run-integration-tests-in-cluster
 
 # Loop the above commands until one fails
 check-release-repeat:
@@ -140,5 +144,6 @@ check-release-repeat:
 		$(MAKE) run-integration-tests-go-with-repo-server-api || exit 1; \
 		$(MAKE) run-integration-tests-go-with-cli || exit 1; \
 		$(MAKE) run-integration-tests-docker || exit 1; \
+		$(MAKE) run-integration-tests-in-cluster || exit 1; \
 		i=$$((i + 1)); \
 	done
