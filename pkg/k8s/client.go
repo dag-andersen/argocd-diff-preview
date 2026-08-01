@@ -22,11 +22,13 @@ type Client struct {
 	cachedDiscoveryClient *disk.CachedDiscoveryClient
 	mapper                *restmapper.DeferredDiscoveryRESTMapper
 	config                *rest.Config
+	inCluster             bool
 }
 
 func NewClient(disableClientThrottling bool) (*Client, error) {
 
 	var config *rest.Config
+	inCluster := false
 
 	// try to use kubeconfig
 	kubeConfigPath, exists := GetKubeConfigPath()
@@ -50,6 +52,7 @@ func NewClient(disableClientThrottling bool) (*Client, error) {
 			log.Debug().Err(err).Msg("Failed to create k8s client from service account")
 		} else {
 			config = c
+			inCluster = true
 			log.Info().Msg("📡 Using service account and environment variables to connect to cluster")
 		}
 	}
@@ -96,12 +99,23 @@ func NewClient(disableClientThrottling bool) (*Client, error) {
 		cachedDiscoveryClient: cachedDiscoveryClient,
 		mapper:                mapper,
 		config:                config,
+		inCluster:             inCluster,
 	}, nil
 }
 
 // GetConfig returns the rest.Config used by the client
 func (c *Client) GetConfig() *rest.Config {
 	return c.config
+}
+
+// IsInCluster reports whether the client was configured from an in-cluster
+// service account instead of an external kubeconfig.
+func (c *Client) IsInCluster() bool {
+	if c == nil {
+		return false
+	}
+
+	return c.inCluster
 }
 
 // GetKubeConfigPath returns the path to the kubeconfig file and a boolean indicating if the file exists
