@@ -74,7 +74,6 @@ func TestInClusterRepoServerAPI(t *testing.T) {
 	}
 
 	for _, renderMethod := range inClusterRenderMethods {
-		renderMethod := renderMethod
 		t.Run(renderMethod, func(t *testing.T) {
 			runInClusterRenderMethod(t, tc, renderMethod, outputDir)
 		})
@@ -335,7 +334,7 @@ func yamlStringList(values []string, indent int) string {
 	for _, value := range values {
 		b.WriteString(padding)
 		b.WriteString("- ")
-		b.WriteString(fmt.Sprintf("%q", value))
+		fmt.Fprintf(&b, "%q", value)
 		b.WriteString("\n")
 	}
 	return b.String()
