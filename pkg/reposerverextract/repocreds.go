@@ -32,7 +32,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 )
 
-const repoCredsFetchTimeout = 10 * time.Second
+const repoCredsFetchTimeout = 30 * time.Second
 
 // RepoCreds is a pre-fetched snapshot of all repository credentials registered
 // in the ArgoCD installation. It is built once and shared across all concurrent
