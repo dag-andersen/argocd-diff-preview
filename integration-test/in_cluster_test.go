@@ -172,18 +172,11 @@ func findTestCase(t *testing.T, name string) TestCase {
 }
 
 func installArgoCDForInClusterTest(repoRoot string) error {
-	if err := runCommandStreaming("helm", "repo", "add", "argo", "https://argoproj.github.io/argo-helm", "--force-update"); err != nil {
-		return fmt.Errorf("failed to add Argo CD Helm repo: %w", err)
-	}
-
-	if err := runCommandStreaming("helm", "repo", "update"); err != nil {
-		return fmt.Errorf("failed to update Helm repos: %w", err)
-	}
-
 	valuesPath := filepath.Join(repoRoot, "integration-test", "no-cluster-roles", "values.yaml")
 	overridePath := filepath.Join(repoRoot, "argocd-config", "values-override.yaml")
 	if err := runCommandStreaming(
-		"helm", "install", "argocd", "argo/argo-cd",
+		"helm", "install", "argocd", "argo-cd",
+		"--repo", "https://argoproj.github.io/argo-helm",
 		"--create-namespace",
 		"--namespace", argocdNamespace,
 		"--values", valuesPath,
