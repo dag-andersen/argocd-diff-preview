@@ -33,11 +33,6 @@ var inClusterRenderMethods = []string{"server-api", "repo-server-api"}
 //
 //	cd integration-test
 //	RUN_IN_CLUSTER_TEST=true go test -v -timeout 20m -run TestInClusterRepoServerAPI ./...
-//
-// Set REQUIRE_REPO_SERVER_SERVICE_ADDRESS=true to additionally require the
-// repo-server-api run to use direct repo-server Service DNS instead of a
-// port-forward. This is intentionally not required by default so the test can
-// live independently from the implementation branch that adds that behavior.
 func TestInClusterRepoServerAPI(t *testing.T) {
 	if os.Getenv("RUN_IN_CLUSTER_TEST") != "true" {
 		t.Skip("Skipping in-cluster integration test. Set RUN_IN_CLUSTER_TEST=true to run.")
@@ -124,26 +119,21 @@ func runInClusterRenderMethod(t *testing.T, tc TestCase, renderMethod, outputRoo
 		t.Fatalf("In-cluster runner failed: %v\nRunner logs:\n%s", err, logs)
 	}
 
-	logs := kubectlLogs(argocdNamespace, runnerName, "runner")
-	if renderMethod == "repo-server-api" {
-		if strings.Contains(logs, inClusterRunnerLogProbe) {
-			t.Logf("Runner logs showed repo-server Service DNS auto-detection")
-		} else if requireRepoServerServiceAddress() {
-			t.Fatalf("Runner logs did not show repo-server Service DNS auto-detection. Missing %q\nRunner logs:\n%s", inClusterRunnerLogProbe, logs)
-		} else {
-			t.Logf("Runner logs did not show repo-server Service DNS auto-detection. Set REQUIRE_REPO_SERVER_SERVICE_ADDRESS=true to require it.")
-		}
-	}
+	// TODO: Re-enable this assertion when repo-server Service DNS auto-detection
+	// is merged. The test-only branch is expected to pass before that
+	// implementation lands, so for now it only verifies that in-cluster
+	// repo-server-api rendering works.
+	//
+	// logs := kubectlLogs(argocdNamespace, runnerName, "runner")
+	// if renderMethod == "repo-server-api" && !strings.Contains(logs, inClusterRunnerLogProbe) {
+	// 	t.Fatalf("Runner logs did not show repo-server Service DNS auto-detection. Missing %q\nRunner logs:\n%s", inClusterRunnerLogProbe, logs)
+	// }
 
 	t.Logf("Copying output artifacts from in-cluster runner for %s", renderMethod)
 	copyFromPod(t, runnerName, filepath.Join(outputDir, "diff.md"), "/work/output/diff.md")
 	copyFromPod(t, runnerName, filepath.Join(outputDir, "diff.html"), "/work/output/diff.html")
 
 	compareOutput(t, tc, getExpectedDir(tc), outputDir)
-}
-
-func requireRepoServerServiceAddress() bool {
-	return os.Getenv("REQUIRE_REPO_SERVER_SERVICE_ADDRESS") == "true"
 }
 
 func ensureIntegrationTestDir(t *testing.T) {
