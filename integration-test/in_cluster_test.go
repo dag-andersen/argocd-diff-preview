@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	inClusterClusterName    = "argocd-diff-preview-in-cluster"
 	inClusterTestName       = "branch-5/target-2"
 	inClusterRunnerName     = "argocd-diff-preview-in-cluster"
 	inClusterArtifactName   = "argocd-diff-preview-artifacts"
@@ -40,7 +41,6 @@ func TestInClusterRepoServerAPI(t *testing.T) {
 	ensureIntegrationTestDir(t)
 
 	tc := findTestCase(t, inClusterTestName)
-	clusterName := fmt.Sprintf("argocd-diff-preview-in-cluster-%d", time.Now().Unix())
 	repoRoot := repoRootFromIntegrationDir(t)
 	runDirs := newRunDirs(repoRoot)
 	outputDir := filepath.Join(runDirs.Root, "in-cluster-output")
@@ -50,23 +50,21 @@ func TestInClusterRepoServerAPI(t *testing.T) {
 		t.Fatalf("Failed to create output dir: %v", err)
 	}
 
-	t.Cleanup(func() {
-		t.Logf("Cleaning up in-cluster kind cluster %s", clusterName)
-		_ = runCommandStreaming("kind", "delete", "cluster", "--name", clusterName)
-	})
+	cleanupInClusterKindCluster(t)
+	t.Cleanup(func() { cleanupInClusterKindCluster(t) })
 
 	t.Log("Building Docker image for in-cluster run")
 	if err := buildDockerImage(); err != nil {
 		t.Fatalf("Failed to build Docker image: %v", err)
 	}
 
-	t.Logf("Creating kind cluster %s", clusterName)
-	if err := runCommandStreaming("kind", "create", "cluster", "--name", clusterName); err != nil {
+	t.Logf("Creating kind cluster %s", inClusterClusterName)
+	if err := runCommandStreaming("kind", "create", "cluster", "--name", inClusterClusterName); err != nil {
 		t.Fatalf("Failed to create kind cluster: %v", err)
 	}
 
 	t.Logf("Loading Docker image %s into kind", *dockerImage)
-	if err := runCommandStreaming("kind", "load", "docker-image", *dockerImage, "--name", clusterName); err != nil {
+	if err := runCommandStreaming("kind", "load", "docker-image", *dockerImage, "--name", inClusterClusterName); err != nil {
 		t.Fatalf("Failed to load Docker image into kind: %v", err)
 	}
 
@@ -80,6 +78,15 @@ func TestInClusterRepoServerAPI(t *testing.T) {
 		t.Run(renderMethod, func(t *testing.T) {
 			runInClusterRenderMethod(t, tc, renderMethod, outputDir)
 		})
+	}
+}
+
+func cleanupInClusterKindCluster(t *testing.T) {
+	t.Helper()
+
+	t.Logf("Cleaning up in-cluster kind cluster %s", inClusterClusterName)
+	if err := runCommandStreaming("kind", "delete", "cluster", "--name", inClusterClusterName); err != nil {
+		t.Logf("Warning: failed to delete in-cluster kind cluster %s: %v", inClusterClusterName, err)
 	}
 }
 
