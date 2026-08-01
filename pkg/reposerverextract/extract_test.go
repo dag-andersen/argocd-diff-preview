@@ -22,8 +22,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
@@ -305,6 +305,102 @@ spec:
 	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
 	assert.Equal(t, "$local/clusters/prod/cert-manager-values.yaml", req.ApplicationSource.Helm.ValueFiles[0],
 		"value file path must remain as a $ref path for the remote RPC")
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_MatchingPRRepoMissingLocalPath_UsesRemoteRPC(t *testing.T) {
+	branchFolder := t.TempDir()
+	// Simulate a resource-repo pipeline where the branch folder contains the
+	// Application repository checkout, not the PR resource repository files.
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "preview", "applicationsets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "clusters", "preview", "applicationsets", "apps.yaml"), []byte("kind: ApplicationSet\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: preview-worker
+spec:
+  destination:
+    namespace: workers
+  source:
+    repoURL: https://github.com/example/resource-config.git
+    path: environments/preview/apps/worker
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "example/resource-config"),
+	})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir, "missing local PR repo source path should fall back to remote RPC")
+	assert.Equal(t, "https://github.com/example/resource-config.git", req.Repo.Repo)
+	assert.Equal(t, "environments/preview/apps/worker", req.ApplicationSource.Path)
+	assert.Nil(t, req.RefSources)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_ExternalChart_WithMissingLocalRefValueFile_UsesRemoteRPC(t *testing.T) {
+	branchFolder := t.TempDir()
+	// Simulate a resource-repo pipeline where $local points at the PR repo, but the
+	// local checkout is the Application repository and lacks resource values.
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "preview", "applicationsets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "clusters", "preview", "applicationsets", "charts-from-list.yaml"), []byte("kind: ApplicationSet\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: preview-cache
+spec:
+  destination:
+    namespace: cache
+  sources:
+    - repoURL: https://github.com/example/resource-config.git
+      targetRevision: HEAD
+      ref: local
+    - chart: redis
+      repoURL: https://charts.example.invalid
+      targetRevision: 1.2.3
+      helm:
+        valueFiles:
+          - $local/environments/preview/charts/values/redis.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+	puller := &fakeChartPuller{}
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "example/resource-config"),
+		puller:       puller,
+	})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir, "missing local PR repo ref value file should fall back to remote RPC")
+	assert.Empty(t, puller.pulled, "remote fallback should not pull and stream the chart locally")
+	assert.Equal(t, "redis", req.ApplicationSource.Chart)
+	require.NotNil(t, req.ApplicationSource.Helm)
+	assert.Equal(t, []string{"$local/environments/preview/charts/values/redis.yaml"}, req.ApplicationSource.Helm.ValueFiles)
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$local"]
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/example/resource-config.git", refTarget.Repo.Repo)
+	assert.Equal(t, "HEAD", refTarget.TargetRevision)
 	assertDefaultProjectFields(t, req)
 }
 
