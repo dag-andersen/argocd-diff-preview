@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 
 	"github.com/rs/zerolog/log"
 	corev1 "k8s.io/api/core/v1"
@@ -90,28 +91,92 @@ func (c *Client) PortForwardToPod(namespace, podName string, localPort, remotePo
 // GetServiceNameByLabel finds a service in the namespace with the specified label selector
 // Returns the name of the first matching service, or an error if no service is found
 func (c *Client) GetServiceNameByLabel(namespace, labelSelector string) (string, error) {
-	// Create a Kubernetes clientset
-	clientset, err := kubernetes.NewForConfig(c.config)
+	service, err := c.GetServiceByLabel(namespace, labelSelector)
 	if err != nil {
-		return "", fmt.Errorf("failed to create kubernetes clientset: %w", err)
+		return "", err
 	}
 
-	// List services matching the label selector
+	serviceName := service.Name
+	log.Debug().Msgf("Found service %s with label %s in namespace %s", serviceName, labelSelector, namespace)
+	return serviceName, nil
+}
+
+// GetServiceByLabel finds a service in the namespace with the specified label selector.
+// If multiple services match, it returns the lexicographically first service name so
+// address discovery is deterministic.
+func (c *Client) GetServiceByLabel(namespace, labelSelector string) (*corev1.Service, error) {
+	clientset, err := kubernetes.NewForConfig(c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernetes clientset: %w", err)
+	}
+
 	services, err := clientset.CoreV1().Services(namespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to list services with label %s: %w", labelSelector, err)
+		return nil, fmt.Errorf("failed to list services with label %s: %w", labelSelector, err)
 	}
 
 	if len(services.Items) == 0 {
-		return "", fmt.Errorf("no services found with label %s in namespace %s", labelSelector, namespace)
+		return nil, fmt.Errorf("no services found with label %s in namespace %s", labelSelector, namespace)
 	}
 
-	// Return the first matching service name
-	serviceName := services.Items[0].Name
-	log.Debug().Msgf("Found service %s with label %s in namespace %s", serviceName, labelSelector, namespace)
-	return serviceName, nil
+	sort.Slice(services.Items, func(i, j int) bool {
+		return services.Items[i].Name < services.Items[j].Name
+	})
+
+	return &services.Items[0], nil
+}
+
+// GetServiceAddressByLabel builds an in-cluster DNS address for a service
+// selected by label, using the preferred named port when available, then the
+// preferred numeric port, then the first service port.
+func (c *Client) GetServiceAddressByLabel(namespace, labelSelector, preferredPortName string, preferredPort int32) (string, error) {
+	service, err := c.GetServiceByLabel(namespace, labelSelector)
+	if err != nil {
+		return "", err
+	}
+
+	port, err := chooseServicePort(service, preferredPortName, preferredPort)
+	if err != nil {
+		return "", err
+	}
+
+	address := serviceDNSAddress(service.Name, namespace, port)
+	log.Debug().Msgf("Found service address %s with label %s in namespace %s", address, labelSelector, namespace)
+	return address, nil
+}
+
+func chooseServicePort(service *corev1.Service, preferredPortName string, preferredPort int32) (int32, error) {
+	if service == nil {
+		return 0, fmt.Errorf("service is nil")
+	}
+
+	if len(service.Spec.Ports) == 0 {
+		return 0, fmt.Errorf("service %s has no ports", service.Name)
+	}
+
+	if preferredPortName != "" {
+		for _, port := range service.Spec.Ports {
+			if port.Name == preferredPortName {
+				return port.Port, nil
+			}
+		}
+	}
+
+	if preferredPort > 0 {
+		for _, port := range service.Spec.Ports {
+			if port.Port == preferredPort {
+				return port.Port, nil
+			}
+		}
+	}
+
+	return service.Spec.Ports[0].Port, nil
+}
+
+func serviceDNSAddress(serviceName, namespace string, port int32) string {
+	return fmt.Sprintf("%s.%s.svc:%d", serviceName, namespace, port)
 }
 
 // PortForwardToService sets up a port forward to a service by finding a pod for that service
