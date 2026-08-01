@@ -815,9 +815,11 @@ func buildDockerImage() error {
 	}
 	cmd := exec.Command("docker", "build", "-f", "Dockerfile", "-t", *dockerImage, ".")
 	cmd.Dir = repoRoot
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker build failed: %w\nDocker build output:\n%s", err, output)
+	}
+	return nil
 }
 
 // runWithGoBinary executes the test using the Go binary
