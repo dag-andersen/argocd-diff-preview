@@ -20,6 +20,7 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k3d"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
@@ -377,9 +378,6 @@ func (o *RawOptions) checkRequired() []string {
 	if o.TargetBranch == "" {
 		errors = append(errors, "target-branch")
 	}
-	if o.Repo == "" && o.RepoRegex == "" {
-		errors = append(errors, "repo or repo-regex")
-	}
 	if o.Repo != "" && o.RepoRegex != "" {
 		errors = append(errors, "repo and repo-regex are mutually exclusive")
 	}
@@ -453,7 +451,9 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid file-regex: %w", err)
 	}
 
-	cfg.RepoSelector, err = o.parseRepositorySelector()
+	// Resolve the repository selector, auto-detecting from the checkout
+	// folders when neither --repo nor --repo-regex is provided.
+	cfg.RepoSelector, err = o.parseRepositorySelector(cfg.BaseBranch, cfg.TargetBranch)
 	if err != nil {
 		return nil, err
 	}
@@ -532,12 +532,39 @@ func (o *RawOptions) parseFileRegex() (*regexp.Regexp, error) {
 	return regexp.Compile(o.FileRegex)
 }
 
-// parseRepositorySelector returns a Repository Selector based on the repo or repo-regex flags
-func (o *RawOptions) parseRepositorySelector() (repository.Selector, error) {
+// parseRepositorySelector returns a Repository Selector based on the repo or
+// repo-regex flags. When neither is set, it auto-detects the repository from
+// the base and target checkout folders (both must share the same origin
+// remote).
+func (o *RawOptions) parseRepositorySelector(baseBranch, targetBranch string) (repository.Selector, error) {
+	if o.Repo == "" && o.RepoRegex == "" {
+		return autoDetectRepositorySelector(baseBranch, targetBranch)
+	}
+
 	repoSelector, err := repository.NewSelector(o.Repo, o.RepoRegex)
 	if err != nil {
 		return repository.Selector{}, fmt.Errorf("invalid repo-regex: %w", err)
 	}
+	return *repoSelector, nil
+}
+
+// autoDetectRepositorySelector returns the owner/repo detected from the origin
+// remote shared by the base and target checkout folders.
+func autoDetectRepositorySelector(baseBranch, targetBranch string) (repository.Selector, error) {
+	baseFolder := git.NewBranch(baseBranch, git.Base).FolderName()
+	targetFolder := git.NewBranch(targetBranch, git.Target).FolderName()
+
+	repo, ok := repository.DetectMatchingOriginRepo(baseFolder, targetFolder)
+	if !ok {
+		return repository.Selector{}, fmt.Errorf("could not auto-detect repository. please provide --repo or --repo-regex")
+	}
+
+	repoSelector, err := repository.NewSelector(repo, "")
+	if err != nil {
+		return repository.Selector{}, fmt.Errorf("invalid auto-detected repository: %w", err)
+	}
+	repoSelector.IsAutoDetected = true
+
 	return *repoSelector, nil
 }
 
@@ -681,7 +708,11 @@ func (o *Config) LogConfig() {
 		log.Info().Msgf("✨ - argocd-config-dir: %s", o.ArgocdConfigPath)
 	}
 	if o.RepoSelector.Repo != "" {
-		log.Info().Msgf("✨ - repo: %s", o.RepoSelector.Repo)
+		if o.RepoSelector.IsAutoDetected {
+			log.Info().Msgf("✨ - repo: %s (auto-detected)", o.RepoSelector.Repo)
+		} else {
+			log.Info().Msgf("✨ - repo: %s", o.RepoSelector.Repo)
+		}
 	}
 	if o.RepoSelector.Regex != nil {
 		log.Info().Msgf("✨ - repo-regex: %s", o.RepoSelector.Regex.String())

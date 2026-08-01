@@ -138,3 +138,9 @@ func TestNewSelectorInvalidRegex(t *testing.T) {
 	_, err := NewSelector("org/repo", "[")
 	assert.Error(t, err)
 }
+
+func TestNewSelectorNotAutoDetectedByDefault(t *testing.T) {
+	selector, err := NewSelector("org/repo", "")
+	assert.NoError(t, err)
+	assert.False(t, selector.IsAutoDetected, "explicitly provided selectors must not be marked auto-detected")
+}
