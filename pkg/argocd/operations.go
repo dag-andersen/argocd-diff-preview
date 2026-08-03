@@ -57,7 +57,8 @@ type apiConnection struct {
 	portForwardActive    bool
 	portForwardMutex     sync.Mutex
 	portForwardStopChan  chan struct{}
-	portForwardLocalPort int // Local port for port forwarding (e.g., 8081)
+	portForwardLocalPort int  // Local port for port forwarding (e.g., 8081)
+	serviceResolved      bool // apiServerURL points at the Service; no port-forward needed
 }
 
 // NewOperations creates the appropriate Operations implementation based on the renderMode.
