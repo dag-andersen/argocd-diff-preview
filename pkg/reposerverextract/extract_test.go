@@ -480,6 +480,54 @@ spec:
 	assertDefaultProjectFields(t, req)
 }
 
+// Multi-source: a kustomize content source referencing files outside its own directory must stage the whole branch folder
+// (as the no-refs fast path does), or the escaping reference fails with "no such file or directory".
+func TestBuildManifestRequest_MultiSource_Kustomize_WithRef_StagesBranchRoot(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "dev", "my-app"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(branchFolder, "clusters", "dev", "my-app", "kustomization.yaml"),
+		[]byte("resources:\n  - ../../../base/my-app\n"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "base", "my-app"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(branchFolder, "base", "my-app", "kustomization.yaml"),
+		[]byte("resources: []\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("a: 1\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app-dev
+spec:
+  destination:
+    namespace: production
+  sources:
+    - repoURL: https://github.com/org/repo.git
+      ref: values
+      targetRevision: HEAD
+    - repoURL: https://github.com/org/repo.git
+      path: clusters/dev/my-app
+      targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, ""),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, streamDir)
+	defer cleanup()
+
+	assert.Equal(t, "clusters/dev/my-app", req.ApplicationSource.Path)
+	_, statErr := os.Stat(filepath.Join(streamDir, "base", "my-app", "kustomization.yaml"))
+	assert.NoError(t, statErr, "files referenced outside the kustomize source dir must be staged")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4b. Multi-source: external chart with a ref+path dual-purpose source (GH #401)
 //
