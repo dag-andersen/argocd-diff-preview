@@ -13,7 +13,7 @@ import (
 
 const (
 	inClusterClusterName    = "argocd-diff-preview-in-cluster"
-	inClusterTestName       = "branch-5/target-2"
+	inClusterTestName       = "branch-5/target-9"
 	inClusterRunnerName     = "argocd-diff-preview-in-cluster"
 	inClusterArtifactName   = "argocd-diff-preview-artifacts"
 	inClusterGitImage       = "alpine/git:latest"
@@ -23,8 +23,8 @@ const (
 
 var inClusterRenderMethods = []string{"server-api", "repo-server-api"}
 
-// TestInClusterRepoServerAPI verifies that argocd-diff-preview can run as a Pod
-// inside the same cluster as Argo CD and talk to the repo-server via Service DNS.
+// TestInClusterRenderMethods verifies that argocd-diff-preview can run as a Pod
+// inside the same cluster as Argo CD using the supported in-cluster render methods.
 //
 // This is intentionally opt-in because it creates a kind cluster, installs Argo CD,
 // builds and loads a Docker image, and needs network access from the test cluster.
@@ -32,8 +32,8 @@ var inClusterRenderMethods = []string{"server-api", "repo-server-api"}
 // Usage:
 //
 //	cd integration-test
-//	RUN_IN_CLUSTER_TEST=true go test -v -timeout 20m -run TestInClusterRepoServerAPI ./...
-func TestInClusterRepoServerAPI(t *testing.T) {
+//	RUN_IN_CLUSTER_TEST=true go test -v -timeout 20m -run TestInClusterRenderMethods ./...
+func TestInClusterRenderMethods(t *testing.T) {
 	if os.Getenv("RUN_IN_CLUSTER_TEST") != "true" {
 		t.Skip("Skipping in-cluster integration test. Set RUN_IN_CLUSTER_TEST=true to run.")
 	}
@@ -113,9 +113,11 @@ func runInClusterRenderMethod(t *testing.T, tc TestCase, renderMethod, outputRoo
 	})
 
 	t.Logf("Waiting for in-cluster runner to finish for %s", renderMethod)
-	if err := waitForContainerExit(argocdNamespace, runnerName, "runner", 10*time.Minute); err != nil {
-		logs := kubectlLogs(argocdNamespace, runnerName, "runner")
-		t.Fatalf("In-cluster runner failed: %v\nRunner logs:\n%s", err, logs)
+	err := waitForContainerExit(argocdNamespace, runnerName, "runner", 10*time.Minute)
+	logs := kubectlLogs(argocdNamespace, runnerName, "runner")
+	t.Logf("In-cluster runner output for %s:\n%s", renderMethod, logs)
+	if err != nil {
+		t.Fatalf("In-cluster runner failed: %v", err)
 	}
 
 	// TODO: Re-enable this assertion when repo-server Service DNS auto-detection
@@ -209,7 +211,6 @@ func inClusterRunnerYAML(tc TestCase, runnerName, renderMethod string) string {
 		"--max-diff-length", getMaxDiffLength(tc),
 		"--title", getTitle(tc),
 		"--output-folder", "/work/output",
-		"--debug",
 	}
 
 	if tc.FileRegex != "" {
