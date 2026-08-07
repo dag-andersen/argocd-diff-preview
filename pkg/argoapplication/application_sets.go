@@ -26,6 +26,7 @@ func ConvertAppSetsToAppsInBothBranches(
 	redirectRevisions []string,
 	debug bool,
 	failOnDuplicateGeneratedApplications bool,
+	skipAppSetGenerationErrors bool,
 	appSelectionOptions ApplicationSelectionOptions,
 ) (*ArgoSelection, *ArgoSelection, time.Duration, error) {
 	startTime := time.Now()
@@ -40,6 +41,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		baseTempFolder,
 		debug,
 		failOnDuplicateGeneratedApplications,
+		skipAppSetGenerationErrors,
 		appSelectionOptions,
 		repoSelector,
 		redirectRevisions,
@@ -58,6 +60,7 @@ func ConvertAppSetsToAppsInBothBranches(
 		targetTempFolder,
 		debug,
 		failOnDuplicateGeneratedApplications,
+		skipAppSetGenerationErrors,
 		appSelectionOptions,
 		repoSelector,
 		redirectRevisions,
@@ -79,6 +82,7 @@ func processAppSets(
 	tempFolder string,
 	debug bool,
 	failOnDuplicateGeneratedApplications bool,
+	skipAppSetGenerationErrors bool,
 	appSelectionOptions ApplicationSelectionOptions,
 	repoSelector repository.Selector,
 	redirectRevisions []string,
@@ -91,6 +95,7 @@ func processAppSets(
 		tempFolder,
 		debug,
 		failOnDuplicateGeneratedApplications,
+		skipAppSetGenerationErrors,
 	)
 	if err != nil {
 		log.Error().Str("branch", branch.Name).Msg("❌ Failed to generate apps")
@@ -207,6 +212,7 @@ func convertAppSetsToApps(
 	tempFolder string,
 	debug bool,
 	failOnDuplicateGeneratedApplications bool,
+	skipAppSetGenerationErrors bool,
 ) (*AppSetConversionResult, error) {
 
 	log.Debug().Str("branch", branch.Name).Msg("🤖 Generating Applications from ApplicationSets")
@@ -270,9 +276,19 @@ func convertAppSetsToApps(
 	// the original onlyAppSets slice, regardless of goroutine scheduling.
 	orderedResults := make([][]ArgoResource, len(onlyAppSets))
 
+	skippedAppSetsCount := 0
 	for res := range results {
 		if res.err != nil {
-			return nil, res.err
+			if !skipAppSetGenerationErrors {
+				return nil, res.err
+			}
+			log.Warn().
+				Err(res.err).
+				Str("branch", branch.Name).
+				Str(onlyAppSets[res.index].Kind.ShortName(), onlyAppSets[res.index].GetLongName()).
+				Msg("⚠️ Skipping ApplicationSet that failed to generate because --skip-appset-generation-errors is enabled")
+			skippedAppSetsCount++
+			continue
 		}
 		generatedApplicationsCount += len(res.apps)
 		orderedResults[res.index] = res.apps
@@ -285,7 +301,7 @@ func convertAppSetsToApps(
 	}
 
 	return &AppSetConversionResult{
-		appSetsProcessedCount:      len(onlyAppSets),
+		appSetsProcessedCount:      len(onlyAppSets) - skippedAppSetsCount,
 		originalApplicationsCount:  len(plainApps),
 		generatedApplicationsCount: generatedApplicationsCount,
 		argoResource:               appsNew,

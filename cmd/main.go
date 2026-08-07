@@ -251,6 +251,7 @@ func run(cfg *Config) error {
 		redirectRevisions,
 		cfg.Debug,
 		cfg.FailOnDuplicateGeneratedApplications,
+		cfg.SkipAppSetGenerationErrors,
 		appSelectionOptions,
 	)
 	if err != nil {
