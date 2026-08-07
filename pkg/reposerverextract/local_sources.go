@@ -48,8 +48,19 @@ func localRefSourcesAvailable(branchFolder string, primarySource v1alpha1.Applic
 			continue
 		}
 		checkedRefs[refName] = true
-		if ok, reason := localPathExists(filepath.Join(localRefSourceRoot(branchFolder, ref), refPath), fmt.Sprintf("ref value file %q", valueFile)); !ok {
-			return false, reason
+		valueFilePath := filepath.Join(localRefSourceRoot(branchFolder, ref), refPath)
+		if _, err := os.Stat(valueFilePath); err != nil {
+			// With ignoreMissingValueFiles a nonexistent file is optional by
+			// declaration, and Argo CD skips it when rendering. The branch folder is
+			// a full checkout of the commit being rendered, so falling back to the
+			// remote RPC cannot make the file appear.
+			if primarySource.Helm.IgnoreMissingValueFiles && errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if errors.Is(err, os.ErrNotExist) {
+				return false, fmt.Sprintf("ref value file %q path %q does not exist", valueFile, valueFilePath)
+			}
+			return false, fmt.Sprintf("failed to inspect ref value file %q path %q: %v", valueFile, valueFilePath, err)
 		}
 	}
 
