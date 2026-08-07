@@ -1194,7 +1194,7 @@ func TestResourcePair_Diff_ModifiedResource(t *testing.T) {
 	})
 
 	rp := ResourcePair{Base: &baseResource, Target: &targetResource}
-	result, err := rp.Diff(3)
+	result, err := rp.Diff(3, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1219,7 +1219,7 @@ func TestResourcePair_Diff_AddedResource(t *testing.T) {
 	})
 
 	rp := ResourcePair{Base: nil, Target: &targetResource}
-	result, err := rp.Diff(3)
+	result, err := rp.Diff(3, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1249,7 +1249,7 @@ func TestResourcePair_Diff_DeletedResource(t *testing.T) {
 	})
 
 	rp := ResourcePair{Base: &baseResource, Target: nil}
-	result, err := rp.Diff(3)
+	result, err := rp.Diff(3, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1273,7 +1273,7 @@ func TestResourcePair_Diff_DeletedResource(t *testing.T) {
 
 func TestResourcePair_Diff_BothNil(t *testing.T) {
 	rp := ResourcePair{Base: nil, Target: nil}
-	result, err := rp.Diff(3)
+	result, err := rp.Diff(3, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1294,7 +1294,7 @@ func TestResourcePair_Diff_IdenticalResources(t *testing.T) {
 	})
 
 	rp := ResourcePair{Base: &resource, Target: &resource}
-	result, err := rp.Diff(3)
+	result, err := rp.Diff(3, false)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1367,9 +1367,9 @@ func TestResourcePair_Diff_ContextLines(t *testing.T) {
 	rp := ResourcePair{Base: &baseResource, Target: &targetResource}
 
 	// With 0 context lines, should only show changed lines
-	result0, _ := rp.Diff(0)
+	result0, _ := rp.Diff(0, false)
 	// With 10 context lines, should show more surrounding context
-	result10, _ := rp.Diff(10)
+	result10, _ := rp.Diff(10, false)
 
 	// Both should have the same number of actual changes
 	if result0.AddedLines != result10.AddedLines {
@@ -1470,7 +1470,7 @@ func TestBuildResourceDiffs_SkippedResource(t *testing.T) {
 		{Group: "apps", Kind: "Deployment", Name: "my-deploy"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1517,7 +1517,7 @@ func TestBuildResourceDiffs_MixSkippedAndNormal(t *testing.T) {
 		{Group: "apps", Kind: "Deployment", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1570,7 +1570,7 @@ func TestBuildResourceDiffs_NoIgnoreRules(t *testing.T) {
 
 	resources := []ResourcePair{{Base: &base, Target: &target}}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, nil)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1604,7 +1604,7 @@ func TestBuildResourceDiffs_AllSkipped(t *testing.T) {
 		{Group: "*", Kind: "*", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1636,7 +1636,7 @@ func TestBuildResourceDiffs_SkippedAddedResource(t *testing.T) {
 		{Group: "*", Kind: "Secret", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1666,7 +1666,7 @@ func TestBuildResourceDiffs_SkippedDeletedResource(t *testing.T) {
 		{Group: "*", Kind: "Secret", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1694,7 +1694,7 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 		{Group: "*", Kind: "CustomResourceDefinition", Name: "*"},
 	}
 
-	result, _, _, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, _, _, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1733,7 +1733,7 @@ func TestBuildResourceDiffs_CrossKindPairSkippedByBaseIgnoreRule(t *testing.T) {
 		{Group: "", Kind: "Secret", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1761,96 +1761,156 @@ func TestShouldShowLine(t *testing.T) {
 	customPattern := regexp.MustCompile(`my-custom-ignore`)
 
 	tests := []struct {
-		name          string
-		line          string
-		isChange      bool
-		ignorePattern *regexp.Regexp
-		expected      bool
+		name                         string
+		line                         string
+		isChange                     bool
+		ignorePattern                *regexp.Regexp
+		disableDefaultIgnorePatterns bool
+		expected                     bool
 	}{
 		{
-			name:          "non-change line always shown",
-			line:          "helm.sh/chart: my-chart-1.0",
-			isChange:      false,
-			ignorePattern: nil,
-			expected:      true,
+			name:                         "non-change line always shown",
+			line:                         "helm.sh/chart: my-chart-1.0",
+			isChange:                     false,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     true,
 		},
 		{
-			name:          "change line matching default pattern is hidden",
-			line:          "helm.sh/chart: my-chart-1.0",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      false,
+			name:                         "change line matching default pattern is hidden",
+			line:                         "helm.sh/chart: my-chart-1.0",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line matching app.kubernetes.io/version is hidden",
-			line:          "app.kubernetes.io/version: 1.2.3",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      false,
+			name:                         "change line matching app.kubernetes.io/version is hidden",
+			line:                         "app.kubernetes.io/version: 1.2.3",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line matching checksum/config is hidden",
-			line:          "checksum/config: abc123def",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      false,
+			name:                         "change line matching checksum/config is hidden",
+			line:                         "checksum/config: abc123def",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line matching checksum/secret is hidden",
-			line:          "checksum/secret: abc123def",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      false,
+			name:                         "change line matching checksum/secret is hidden",
+			line:                         "checksum/secret: abc123def",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line matching caBundle is hidden",
-			line:          "caBundle: LS0tLS1CRUdJTi...",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      false,
+			name:                         "change line matching caBundle is hidden",
+			line:                         "caBundle: LS0tLS1CRUdJTi...",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "indented default pattern is hidden",
-			line:          "    helm.sh/chart: my-chart-2.0",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      false,
+			name:                         "indented default pattern is hidden",
+			line:                         "    helm.sh/chart: my-chart-2.0",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line not matching any pattern is shown",
-			line:          "replicas: 5",
-			isChange:      true,
-			ignorePattern: nil,
-			expected:      true,
+			name:                         "change line not matching any pattern is shown",
+			line:                         "replicas: 5",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: false,
+			expected:                     true,
 		},
 		{
-			name:          "change line matching custom pattern is hidden",
-			line:          "my-custom-ignore: true",
-			isChange:      true,
-			ignorePattern: customPattern,
-			expected:      false,
+			name:                         "change line matching custom pattern is hidden",
+			line:                         "my-custom-ignore: true",
+			isChange:                     true,
+			ignorePattern:                customPattern,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line not matching custom pattern but matching default is hidden",
-			line:          "helm.sh/chart: chart-1.0",
-			isChange:      true,
-			ignorePattern: customPattern,
-			expected:      false,
+			name:                         "change line not matching custom pattern but matching default is hidden",
+			line:                         "helm.sh/chart: chart-1.0",
+			isChange:                     true,
+			ignorePattern:                customPattern,
+			disableDefaultIgnorePatterns: false,
+			expected:                     false,
 		},
 		{
-			name:          "change line not matching either pattern is shown",
-			line:          "replicas: 3",
-			isChange:      true,
-			ignorePattern: customPattern,
-			expected:      true,
+			name:                         "change line not matching either pattern is shown",
+			line:                         "replicas: 3",
+			isChange:                     true,
+			ignorePattern:                customPattern,
+			disableDefaultIgnorePatterns: false,
+			expected:                     true,
+		},
+		{
+			name:                         "change line not matching either pattern is shown",
+			line:                         "replicas: 3",
+			isChange:                     true,
+			ignorePattern:                customPattern,
+			disableDefaultIgnorePatterns: false,
+			expected:                     true,
+		},
+		{
+			name:                         "change line matching default pattern is shown when disableDefaultIgnorePattern is true",
+			line:                         "helm.sh/chart: my-chart-1.0",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: true,
+			expected:                     true,
+		},
+		{
+			name:                         "change line matching app.kubernetes.io/version is shown when disableDefaultIgnorePattern is true",
+			line:                         "app.kubernetes.io/version: 1.2.3",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: true,
+			expected:                     true,
+		},
+		{
+			name:                         "change line matching checksum/config is shown when disableDefaultIgnorePattern is true",
+			line:                         "checksum/config: abc123def",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: true,
+			expected:                     true,
+		},
+		{
+			name:                         "change line matching caBundle is shown when disableDefaultIgnorePattern is true",
+			line:                         "caBundle: LS0tLS1CRUdJTi...",
+			isChange:                     true,
+			ignorePattern:                nil,
+			disableDefaultIgnorePatterns: true,
+			expected:                     true,
+		},
+		{
+			name:                         "change line is hidden when disableDefaultIgnorePattern is true and matched by ignorePattern",
+			line:                         "caBundle: LS0tLS1CRUdJTi...",
+			isChange:                     true,
+			ignorePattern:                regexp.MustCompile(`caBundle`),
+			disableDefaultIgnorePatterns: true,
+			expected:                     false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := shouldShowLine(tc.line, tc.isChange, tc.ignorePattern)
+			result := shouldShowLine(tc.line, tc.isChange, tc.ignorePattern, tc.disableDefaultIgnorePatterns)
 			if result != tc.expected {
-				t.Errorf("shouldShowLine(%q, %v, %v) = %v, want %v", tc.line, tc.isChange, tc.ignorePattern, result, tc.expected)
+				t.Errorf("shouldShowLine(%q, %v, %v, %v) = %v, want %v", tc.line, tc.isChange, tc.ignorePattern, tc.disableDefaultIgnorePatterns, result, tc.expected)
 			}
 		})
 	}

@@ -79,7 +79,7 @@ spec:
 		t.Error("expected Target to be non-nil for added resource")
 	}
 
-	diff, err := rp.Diff(3)
+	diff, err := rp.Diff(3, false)
 	if err != nil {
 		t.Fatalf("failed to generate diff: %v", err)
 	}
@@ -137,7 +137,7 @@ spec:
 		t.Fatalf("expected 1 changed resource, got %d", len(changedResources))
 	}
 
-	diff, err := changedResources[0].Diff(3)
+	diff, err := changedResources[0].Diff(3, false)
 	if err != nil {
 		t.Fatalf("failed to generate diff: %v", err)
 	}
@@ -199,7 +199,7 @@ spec:
 		t.Fatalf("expected 1 changed resource, got %d", len(changedResources))
 	}
 
-	diff, err := changedResources[0].Diff(3)
+	diff, err := changedResources[0].Diff(3, false)
 	if err != nil {
 		t.Fatalf("failed to generate diff: %v", err)
 	}
@@ -288,7 +288,7 @@ spec:
 		t.Errorf("expected target name 'new-name', got %q", rp.Target.GetName())
 	}
 
-	diff, err := rp.Diff(3)
+	diff, err := rp.Diff(3, false)
 	if err != nil {
 		t.Fatalf("failed to generate diff: %v", err)
 	}
@@ -534,7 +534,7 @@ stringData:
 
 	// Verify each resource change with exact output
 	for _, rp := range changedResources {
-		diff, err := rp.Diff(3)
+		diff, err := rp.Diff(3, false)
 		if err != nil {
 			t.Fatalf("failed to generate diff: %v", err)
 		}
@@ -707,7 +707,7 @@ spec:
 	}
 
 	// Test with 2 context lines
-	diff, err := changedResources[0].Diff(2)
+	diff, err := changedResources[0].Diff(2, false)
 	if err != nil {
 		t.Fatalf("failed to generate diff: %v", err)
 	}
@@ -783,7 +783,7 @@ data:
 		makeAppFromYAML(t, "app-1", "my-app", targetConfigYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -896,7 +896,7 @@ spec:
 		makeAppFromYAML(t, "app-1", "my-app", targetStatefulSetYAML, serviceYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -972,7 +972,7 @@ spec:
 		makeAppFromYAML(t, "app-1", "my-app", targetYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1042,7 +1042,7 @@ spec:
 		makeAppFromYAML(t, "app-1", "my-app", targetYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1132,7 +1132,7 @@ data:
 		makeAppFromYAML(t, "app-1", "my-app", targetStatefulSetYAML, targetSecretYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1211,7 +1211,7 @@ spec:
 		makeAppFromYAML(t, "app-1", "my-app", targetStatefulSetYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1315,7 +1315,7 @@ spec:
 		makeAppFromYAML(t, "app-1", "my-app", targetYAML),
 	}
 
-	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil)
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 10, nil, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

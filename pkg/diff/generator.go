@@ -30,6 +30,7 @@ func GeneratePreview(
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	disableDefaultIgnorePatterns bool,
 ) (time.Duration, error) {
 	startTime := time.Now()
 	maxDiffMessageCharCount := maxCharCount
@@ -46,7 +47,7 @@ func GeneratePreview(
 	}
 
 	// Generate diffs using the matching package
-	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules)
+	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules, disableDefaultIgnorePatterns)
 	if err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to generate matching diffs: %w", err)
 	}
