@@ -229,6 +229,25 @@ func (c *Client) GetConfigMaps(namespace string, names ...string) (string, error
 	return string(resultString), nil
 }
 
+// GetConfigMapValue returns the value of a key in a ConfigMap, or "" when the key is absent.
+// e.g. key: "kustomize.buildOptions"
+func (c *Client) GetConfigMapValue(namespace string, name string, key string) (string, error) {
+	configMapRes := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
+	result, err := c.clientSet.Resource(configMapRes).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to get ConfigMap %s: %w", name, err)
+	}
+
+	value, found, err := unstructured.NestedString(result.Object, "data", key)
+	if err != nil {
+		return "", fmt.Errorf("failed to read key %s from ConfigMap %s: %w", key, name, err)
+	}
+	if !found {
+		return "", nil
+	}
+	return value, nil
+}
+
 // get secret value from key. e.g. key: "password"
 func (c *Client) GetSecretValue(namespace string, name string, key string) (string, error) {
 	secretRes := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "secrets"}

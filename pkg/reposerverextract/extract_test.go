@@ -175,7 +175,56 @@ spec:
 	assert.Equal(t, kubeVersion, req.KubeVersion)
 	assert.Equal(t, apiVersions, req.ApiVersions)
 	assert.Nil(t, req.RefSources)
+	assert.Nil(t, req.KustomizeOptions, "no build options configured: field must stay unset")
 	assertDefaultProjectFields(t, req)
+}
+
+// Global kustomize build options from argocd-cm (e.g. --load-restrictor LoadRestrictionsNone)
+// must reach the repo server on every request, exactly like Argo CD's API server passes them;
+// the repo server never reads the ConfigMap itself.
+func TestBuildManifestRequest_KustomizeBuildOptions(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-app")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	buildOptions := "--enable-alpha-plugins --enable-exec --load-restrictor LoadRestrictionsNone"
+	req, _, cleanup, err := buildManifestRequestForSource(
+		app,
+		contentSources[0],
+		refSources,
+		hasMultipleSources,
+		branchFolder,
+		nil,
+		manifestRequestRenderContext{
+			repoSelector:          testRepoSelector(t, ""),
+			kubeVersion:           "v1.30.1",
+			apiVersions:           []string{"apps/v1", "v1"},
+			kustomizeBuildOptions: buildOptions,
+		},
+	)
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	require.NotNil(t, req.KustomizeOptions)
+	assert.Equal(t, buildOptions, req.KustomizeOptions.BuildOptions)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

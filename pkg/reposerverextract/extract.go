@@ -103,6 +103,16 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get server version: %w", err)
 	}
 
+	// Mirror Argo CD's API server: pass the global kustomize build options from argocd-cm on every request;
+	// the repo server never reads the ConfigMap.
+	kustomizeBuildOptions, err := argocd.K8sClient.GetConfigMapValue(argocd.Namespace, "argocd-cm", "kustomize.buildOptions")
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get kustomize build options from argocd-cm: %w", err)
+	}
+	if kustomizeBuildOptions != "" {
+		log.Info().Msgf("🔧 Using kustomize build options from argocd-cm: %s", kustomizeBuildOptions)
+	}
+
 	// Collect all unique repository URLs referenced by the Applications so that
 	// FetchRepoCreds can enrich them with credentials from repo-creds templates.
 	appRepoURLs := collectRepoURLs(baseApps, targetApps)
@@ -182,7 +192,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector, kubeVersion, apiVersions, helmChartPuller{})
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector, kubeVersion, apiVersions, kustomizeBuildOptions, helmChartPuller{})
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -259,6 +269,7 @@ func renderApp(
 	repoSelector *repository.Selector,
 	kubeVersion string,
 	apiVersions []string,
+	kustomizeBuildOptions string,
 	puller chartPuller,
 ) ([]unstructured.Unstructured, error) {
 	branchFolder, ok := branchFolderByType[app.Branch]
@@ -282,10 +293,11 @@ func renderApp(
 			branchFolder,
 			creds,
 			manifestRequestRenderContext{
-				repoSelector: repoSelector,
-				kubeVersion:  kubeVersion,
-				apiVersions:  apiVersions,
-				puller:       puller,
+				repoSelector:          repoSelector,
+				kubeVersion:           kubeVersion,
+				apiVersions:           apiVersions,
+				kustomizeBuildOptions: kustomizeBuildOptions,
+				puller:                puller,
 			},
 		)
 		if err != nil {
@@ -524,6 +536,10 @@ type manifestRequestRenderContext struct {
 	repoSelector *repository.Selector
 	kubeVersion  string
 	apiVersions  []string
+	// kustomizeBuildOptions holds the global `kustomize.buildOptions` value
+	// from argocd-cm. Argo CD's API server passes it to the repo server on
+	// every request; the repo server never reads the ConfigMap itself.
+	kustomizeBuildOptions string
 	// puller fetches remote Helm charts so they can be streamed to the repo
 	// server together with same-repo $ref value files. When nil, remote charts
 	// with ref sources fall back to the unary GenerateManifest RPC.
@@ -552,7 +568,7 @@ func buildManifestRequestForSource(
 	namespace, _, _ := unstructured.NestedString(obj, append(specPath, "destination", "namespace")...)
 
 	newManifestRequest := func(source *v1alpha1.ApplicationSource) *repoapiclient.ManifestRequest {
-		return &repoapiclient.ManifestRequest{
+		request := &repoapiclient.ManifestRequest{
 			Repo:               creds.GetRepo(source.RepoURL),
 			Repos:              creds.HelmRepos(source),
 			HelmRepoCreds:      creds.HelmRepoCreds(source),
@@ -570,6 +586,12 @@ func buildManifestRequestForSource(
 			ProjectName:        "default",
 			ProjectSourceRepos: []string{"*"},
 		}
+		if renderContext.kustomizeBuildOptions != "" {
+			request.KustomizeOptions = &v1alpha1.KustomizeOptions{
+				BuildOptions: renderContext.kustomizeBuildOptions,
+			}
+		}
+		return request
 	}
 
 	// Fast path: no ref sources.
