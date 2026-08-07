@@ -27,9 +27,7 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range callers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 
 			file, checksum, files, err := cache.openCachedTgz(appDir)
@@ -37,7 +35,10 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 				errs <- err
 				return
 			}
-			defer file.Close()
+			if err := file.Close(); err != nil {
+				errs <- err
+				return
+			}
 
 			if checksum != "checksum" {
 				errs <- fmt.Errorf("checksum = %q, want checksum", checksum)
@@ -47,7 +48,7 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 				errs <- fmt.Errorf("files = %d, want 7", files)
 				return
 			}
-		}()
+		})
 	}
 
 	close(start)
@@ -145,11 +146,15 @@ func createTestArchive(dir, content string) (*os.File, error) {
 		return nil, err
 	}
 	if _, err := file.WriteString(content); err != nil {
-		file.Close()
+		if closeErr := file.Close(); closeErr != nil {
+			return nil, fmt.Errorf("write archive: %w; close archive: %w", err, closeErr)
+		}
 		return nil, err
 	}
 	if _, err := file.Seek(0, 0); err != nil {
-		file.Close()
+		if closeErr := file.Close(); closeErr != nil {
+			return nil, fmt.Errorf("seek archive: %w; close archive: %w", err, closeErr)
+		}
 		return nil, err
 	}
 	return file, nil
