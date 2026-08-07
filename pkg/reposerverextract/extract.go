@@ -117,12 +117,12 @@ func RenderApplicationsFromBothBranches(
 	}
 
 	// Create a single repo server client shared across all goroutines.
-	// EnsurePortForward is idempotent and mutex-protected inside the client.
+	// EnsureConnection uses direct Service DNS in cluster and port-forwarding outside the cluster.
 	repoClient := reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
 	defer repoClient.Cleanup()
 
-	if err := repoClient.EnsurePortForward(); err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to set up port forward to repo server: %w", err)
+	if err := repoClient.EnsureConnection(); err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to connect to repo server: %w", err)
 	}
 
 	allApps := append(baseApps, targetApps...)

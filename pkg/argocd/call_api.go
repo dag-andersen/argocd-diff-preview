@@ -58,7 +58,7 @@ func parseAPIError(body []byte, statusCode int) error {
 func (a *APIOperations) Login() error {
 
 	// Set up port forward to ArgoCD server
-	if err := a.portForwardToArgoCD(); err != nil {
+	if err := a.ensureConnection(); err != nil {
 		return fmt.Errorf("failed to set up port forward: %w", err)
 	}
 
@@ -218,7 +218,7 @@ func (a *APIOperations) verifyToken() error {
 // 3. It doesn't require the application to have been synced first
 func (a *APIOperations) GetManifests(appName string) ([]unstructured.Unstructured, bool, error) {
 	// Ensure port forward is active
-	if err := a.portForwardToArgoCD(); err != nil {
+	if err := a.ensureConnection(); err != nil {
 		return nil, false, err
 	}
 
@@ -325,7 +325,7 @@ func (a *APIOperations) GetManifests(appName string) ([]unstructured.Unstructure
 // The tempFolder parameter is not used in API mode but is required by the interface.
 func (a *APIOperations) AppsetGenerate(resource *unstructured.Unstructured, tempFolder string) ([]unstructured.Unstructured, error) {
 	// Ensure port forward is active
-	if err := a.portForwardToArgoCD(); err != nil {
+	if err := a.ensureConnection(); err != nil {
 		return nil, err
 	}
 
@@ -422,7 +422,7 @@ func (a *APIOperations) AppsetGenerate(resource *unstructured.Unstructured, temp
 // AddSourceNamespaceToDefaultAppProject adds "*" to the sourceNamespaces of the default AppProject
 func (a *APIOperations) AddSourceNamespaceToDefaultAppProject() error {
 	// Ensure port forward is active
-	if err := a.portForwardToArgoCD(); err != nil {
+	if err := a.ensureConnection(); err != nil {
 		return fmt.Errorf("failed to set up port forward: %w", err)
 	}
 
@@ -567,7 +567,7 @@ func getArgoCDLibVersion() string {
 // getServerVersion fetches the ArgoCD server version via the API
 func (a *APIOperations) getServerVersion() (string, error) {
 	// Ensure port forward is active
-	if err := a.portForwardToArgoCD(); err != nil {
+	if err := a.ensureConnection(); err != nil {
 		return "", fmt.Errorf("failed to set up port forward: %w", err)
 	}
 
@@ -611,6 +611,75 @@ func (a *APIOperations) getServerVersion() (string, error) {
 	}
 
 	return versionResponse.Version, nil
+}
+
+// argocdServerLabelSelector finds the Argo CD API server Service, mirroring the
+// repo server lookup in pkg/reposerver.
+const argocdServerLabelSelector = "app.kubernetes.io/part-of=argocd,app.kubernetes.io/component=server"
+
+// ensureConnection makes the Argo CD API server reachable. In-cluster runs address
+// its Service directly; everything else keeps the port-forward.
+//
+// The scheme has to be probed rather than derived from the Service: argocd-server
+// speaks TLS unless started with --insecure, and the chart maps BOTH the http and
+// the https Service port to the same container port either way — so the port name
+// says nothing about what the server actually speaks. Guessing wrong costs a full
+// client timeout (plain HTTP against a TLS listener just waits for a ClientHello),
+// which is far more expensive than one probe.
+func (a *APIOperations) ensureConnection() error {
+	connection := a.connection
+
+	connection.portForwardMutex.Lock()
+	if connection.serviceResolved {
+		connection.portForwardMutex.Unlock()
+		return nil
+	}
+	inCluster := a.k8sClient != nil && a.k8sClient.IsInCluster()
+	connection.portForwardMutex.Unlock()
+
+	if !inCluster {
+		return a.portForwardToArgoCD()
+	}
+
+	address, err := a.k8sClient.GetServiceAddressByLabel(a.namespace, argocdServerLabelSelector, "https", 443)
+	if err != nil {
+		return fmt.Errorf("failed to find Argo CD server service address (label: %s): %w", argocdServerLabelSelector, err)
+	}
+
+	url, err := probeAPIScheme(address)
+	if err != nil {
+		return err
+	}
+
+	connection.portForwardMutex.Lock()
+	connection.apiServerURL = url
+	connection.serviceResolved = true
+	connection.portForwardMutex.Unlock()
+
+	log.Debug().Str("url", url).Msg("Using Argo CD server service address")
+	return nil
+}
+
+// probeAPIScheme returns the base URL that answers, trying https before http.
+func probeAPIScheme(address string) (string, error) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // self-signed in-cluster cert
+		},
+	}
+	var lastErr error
+	for _, scheme := range []string{"https", "http"} {
+		url := fmt.Sprintf("%s://%s", scheme, address)
+		resp, err := client.Get(url + "/api/version")
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		_ = resp.Body.Close()
+		return url, nil
+	}
+	return "", fmt.Errorf("Argo CD server at %s answered neither https nor http: %w", address, lastErr)
 }
 
 // portForwardToArgoCD sets up a port forward to the ArgoCD server if not already active
