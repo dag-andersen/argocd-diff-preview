@@ -13,7 +13,6 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
-	"github.com/argoproj/argo-cd/v3/util/tgzstream"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
@@ -67,6 +66,8 @@ type Client struct {
 	portForwardMutex    sync.Mutex
 	portForwardActive   bool
 	portForwardStopChan chan struct{}
+
+	tgzCache *tgzCache
 }
 
 // NewClient creates a new repo server Client that port-forwards to the Argo CD
@@ -81,6 +82,7 @@ func NewClient(k8sClient *k8s.Client, namespace string) *Client {
 		address:            fmt.Sprintf("localhost:%d", repoServerLocalPort),
 		disableTLS:         false,
 		insecureSkipVerify: true, // self-signed cert inside the cluster
+		tgzCache:           newTgzCache(),
 	}
 }
 
@@ -92,6 +94,7 @@ func NewClientWithAddress(address string, disableTLS bool, insecureSkipVerify bo
 		address:            address,
 		disableTLS:         disableTLS,
 		insecureSkipVerify: insecureSkipVerify,
+		tgzCache:           newTgzCache(),
 	}
 }
 
@@ -99,7 +102,7 @@ func NewClientWithAddress(address string, disableTLS bool, insecureSkipVerify bo
 // not already running. It is idempotent and safe to call concurrently.
 func (c *Client) EnsurePortForward() error {
 	if c.k8sClient == nil {
-		return fmt.Errorf("no k8s client configured – cannot port-forward")
+		return fmt.Errorf("no k8s client configured - cannot port-forward")
 	}
 
 	c.portForwardMutex.Lock()
@@ -154,6 +157,10 @@ func (c *Client) EnsurePortForward() error {
 
 // Cleanup stops the port-forward if one was started by this client.
 func (c *Client) Cleanup() {
+	if c.tgzCache != nil {
+		c.tgzCache.Cleanup()
+	}
+
 	c.portForwardMutex.Lock()
 	defer c.portForwardMutex.Unlock()
 
@@ -211,14 +218,19 @@ func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *
 	log.Debug().
 		Str("app", request.AppName).
 		Str("dir", appDir).
-		Msg("Compressing application directory for repo server")
+		Msg("Opening application directory archive for repo server")
 
-	tgzFile, filesWritten, checksum, err := tgzstream.CompressFiles(appDir, []string{"*"}, []string{".git"})
+	// Cached per directory: Applications routinely share a source path, so
+	// compressing per Application repeats identical work. Closed, not deleted -
+	// the archive is reused by the other Applications on this path.
+	tgzFile, checksum, filesWritten, err := c.tgzCache.openCachedTgz(appDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress app directory %q: %w", appDir, err)
 	}
 	defer func() {
-		tgzstream.CloseAndDelete(tgzFile)
+		if err := tgzFile.Close(); err != nil {
+			log.Debug().Err(err).Str("app", request.AppName).Msg("Failed to close archive handle")
+		}
 	}()
 
 	log.Debug().
@@ -430,7 +442,7 @@ func (c *Client) GenerateManifestsRemote(ctx context.Context, request *repoapicl
 // appDir and sends it to the repo server. It constructs a minimal
 // ManifestRequest from the provided Application object.
 //
-// This is intentionally kept simple – callers that need fine-grained control
+// This is intentionally kept simple - callers that need fine-grained control
 // over Helm repos, API versions, project settings, etc. should build the
 // ManifestRequest themselves and call GenerateManifests directly.
 func (c *Client) GenerateManifestsForApp(

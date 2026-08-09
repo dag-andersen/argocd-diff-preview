@@ -100,6 +100,13 @@ func TestInstallWithHelm_OCIRequiresExplicitVersion(t *testing.T) {
 	}
 }
 
+func TestHelmDebugLogCanBeReused(t *testing.T) {
+	logger := helmDebugLog
+
+	logger("first helm debug message")
+	logger("second helm debug message")
+}
+
 func TestFindValuesFiles(t *testing.T) {
 	tests := []struct {
 		name       string

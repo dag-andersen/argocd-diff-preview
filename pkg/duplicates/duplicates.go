@@ -17,7 +17,7 @@ func RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps *argoapplication.
 				if shouldAlwaysRender(baseApp, targetApp) {
 					log.Debug().
 						Str(baseApp.Kind.ShortName(), baseApp.Name).
-						Msg("Keeping application because `argocd-diff-preview/render=always`")
+						Msgf("Keeping application because `%s=%s`", argoapplication.AnnotationRender, argoapplication.RenderAlways)
 					break
 				}
 				log.Debug().Str(baseApp.Kind.ShortName(), baseApp.Name).Msg("Skipping application because it has not changed")

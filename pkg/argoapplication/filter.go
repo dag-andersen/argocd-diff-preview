@@ -27,9 +27,9 @@ const (
 )
 
 const (
-	annotationWatchPattern = "argocd-diff-preview/watch-pattern"
-	annotationIgnore       = "argocd-diff-preview/ignore"
-	annotationRender       = "argocd-diff-preview/render"
+	AnnotationWatchPattern = "argocd-diff-preview/watch-pattern"
+	AnnotationIgnore       = "argocd-diff-preview/ignore"
+	AnnotationRender       = "argocd-diff-preview/render"
 )
 
 type ApplicationSelectionOptions struct {
@@ -162,8 +162,8 @@ func (a *ArgoResource) filterByIgnoreAnnotation() (bool, string) {
 		return true, "no 'argocd-diff-preview/ignore' annotation found"
 	}
 
-	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
-		return false, fmt.Sprintf("application is ignored because of '%s: %s'", annotationIgnore, value)
+	if value, exists := annotations[AnnotationIgnore]; exists && value == "true" {
+		return false, fmt.Sprintf("application is ignored because of '%s: %s'", AnnotationIgnore, value)
 	}
 	return true, "application is not ignored"
 }
@@ -179,7 +179,7 @@ func (a *ArgoResource) GetRenderMode() RenderMode {
 		return RenderChanged
 	}
 
-	if value, exists := annotations[annotationRender]; exists {
+	if value, exists := annotations[AnnotationRender]; exists {
 		mode := RenderMode(strings.ToLower(strings.TrimSpace(value)))
 		switch mode {
 		case RenderAlways, RenderNever, RenderChanged:
@@ -260,7 +260,7 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 }
 
 func (a *ArgoResource) effectiveWatchAnnotations(annotations map[string]string) (watchPattern string, manifestGeneratePaths string) {
-	watchPattern = strings.TrimSpace(annotations[annotationWatchPattern])
+	watchPattern = strings.TrimSpace(annotations[AnnotationWatchPattern])
 
 	// ApplicationSet does not support manifest-generate-paths, so we only check for it on Applications.
 	if a.Kind == Application {

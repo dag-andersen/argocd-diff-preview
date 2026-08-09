@@ -167,7 +167,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Initialize the action configuration
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), a.Namespace, os.Getenv("HELM_DRIVER"), log.Debug().Msgf); err != nil {
+	if err := actionConfig.Init(settings.RESTClientGetter(), a.Namespace, os.Getenv("HELM_DRIVER"), helmDebugLog); err != nil {
 		return fmt.Errorf("failed to initialize helm configuration: %w", err)
 	}
 
@@ -247,6 +247,10 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	log.Info().Msg("🦑 Argo CD Helm chart installed successfully")
 	return nil
+}
+
+func helmDebugLog(format string, v ...any) {
+	log.Debug().Msgf(format, v...)
 }
 
 // locateHTTPChart resolves the chart path for a classic HTTP(S) Helm repo. It
