@@ -241,8 +241,10 @@ func TestFilterDuplicates_Performance(t *testing.T) {
 	assert.Len(t, result.SelectedApps, numApps-numDuplicates)
 	assert.Len(t, result.SkippedApps, numDuplicates)
 
-	// Performance should be reasonable (less than 100ms for 100 apps)
-	assert.Less(t, duration, 100*time.Millisecond,
+	// Guard against an accidental O(n*m) regression, not a benchmark: the run
+	// takes ~3ms natively but ~30ms under -race, and CI runners add multiples
+	// on top of that, so the bound must stay generous.
+	assert.Less(t, duration, 500*time.Millisecond,
 		"filterDuplicates took too long: %v", duration)
 
 	t.Logf("Filtered %d apps with %d duplicates in %v", numApps, numDuplicates, duration)
