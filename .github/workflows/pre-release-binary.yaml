@@ -43,11 +43,11 @@ jobs:
             goarch: arm64
             name: argocd-diff-preview-Darwin-aarch64.tar.gz
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # Fetch all history for all branches and tags
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: './go.mod'
       - name: Set env
@@ -69,12 +69,12 @@ jobs:
         run: |
           tar czvf ${{ matrix.platform.name }} ${{ env.BINARY_NAME }}
       - name: Publish release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: argocd-diff-preview-${{ matrix.platform.os_name }}
           path: "argocd-diff-preview-*"
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           prerelease: false
