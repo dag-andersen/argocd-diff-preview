@@ -1,0 +1,36 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # === Docker ===
+  - package-ecosystem: "docker" # See documentation for possible values
+    directory: "/" # Location of package manifests
+    schedule:
+      interval: daily
+    labels: [dependencies, docker]
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]
+
+  # === GitHub Actions ===
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    labels: [dependencies, github-actions]
+    groups:
+      actions-maj-min-pat:
+        update-types: [major, minor, patch]
+
+  # === gomod ===
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: daily
+    labels: [dependencies, gomod]
+    groups:
+      gomod-minor-patch:
+        update-types: [minor, patch]
