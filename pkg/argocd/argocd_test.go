@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	argocdconfig "github.com/dag-andersen/argocd-diff-preview/argocd-config"
-	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/cli"
 )
 
 func TestIsOCIChartURL(t *testing.T) {
@@ -98,13 +98,6 @@ func TestInstallWithHelm_OCIRequiresExplicitVersion(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestHelmDebugLogCanBeReused(t *testing.T) {
-	logger := helmDebugLog
-
-	logger("first helm debug message")
-	logger("second helm debug message")
 }
 
 func TestFindValuesFiles(t *testing.T) {

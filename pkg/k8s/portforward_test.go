@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/httpstream"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 // TestFallbackCondition validates that WebSocket failures trigger SPDY fallback

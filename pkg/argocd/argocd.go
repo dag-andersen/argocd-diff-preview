@@ -15,13 +15,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/kube"
+	"helm.sh/helm/v4/pkg/registry"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const ociScheme = "oci://"
@@ -167,7 +169,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Initialize the action configuration
 	actionConfig := new(action.Configuration)
-	if err := actionConfig.Init(settings.RESTClientGetter(), a.Namespace, os.Getenv("HELM_DRIVER"), helmDebugLog); err != nil {
+	if err := actionConfig.Init(settings.RESTClientGetter(), a.Namespace, os.Getenv("HELM_DRIVER")); err != nil {
 		return fmt.Errorf("failed to initialize helm configuration: %w", err)
 	}
 
@@ -178,7 +180,9 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	helmClient.Namespace = a.Namespace
 	helmClient.ReleaseName = "argocd"
 	helmClient.CreateNamespace = false // We already created the namespace
-	helmClient.Wait = false
+	// Don't wait for workloads to be ready (helm v3's Wait=false); we poll the
+	// argocd deployments ourselves in EnsureArgoCdIsReady.
+	helmClient.WaitStrategy = kube.HookOnlyStrategy
 	helmClient.WaitForJobs = false
 	helmClient.Timeout = timeout
 
@@ -197,9 +201,13 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}
 
 	// Load chart
-	chart, err := loader.Load(chartPath)
+	loadedChart, err := loader.Load(chartPath)
 	if err != nil {
 		return fmt.Errorf("failed to load chart: %w", err)
+	}
+	chartAccessor, err := chart.NewAccessor(loadedChart)
+	if err != nil {
+		return fmt.Errorf("failed to access chart metadata: %w", err)
 	}
 
 	chartValues, err := a.mergeValues(settings, valuesFiles)
@@ -230,7 +238,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 
 	// Install chart in go routine
 	go func() {
-		_, err = helmClient.Run(chart, chartValues)
+		_, err = helmClient.Run(loadedChart, chartValues)
 		if err != nil {
 			log.Error().Err(err).Msgf("❌ Failed to install chart")
 		}
@@ -242,15 +250,12 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	}
 
 	// Log installed versions
-	log.Info().Msgf("🦑 Installed Chart version: '%s' and App version: '%s'",
-		chart.Metadata.Version, chart.Metadata.AppVersion)
+	chartMeta := chartAccessor.MetadataAsMap()
+	log.Info().Msgf("🦑 Installed Chart version: '%v' and App version: '%v'",
+		chartMeta["version"], chartMeta["appVersion"])
 
 	log.Info().Msg("🦑 Argo CD Helm chart installed successfully")
 	return nil
-}
-
-func helmDebugLog(format string, v ...any) {
-	log.Debug().Msgf(format, v...)
 }
 
 // locateHTTPChart resolves the chart path for a classic HTTP(S) Helm repo. It

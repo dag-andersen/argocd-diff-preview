@@ -1125,7 +1125,7 @@ func removeArgoCDTrackingID(manifests []unstructured.Unstructured) error {
 	return nil
 }
 
-// normalizeNamespaces uses Argo CD's DeduplicateTargetObjects to normalise
+// normalizeNamespaces uses Argo CD's NormalizeTargetObjects to normalise
 // namespaces on manifests, mirroring the same function in pkg/extract.
 func normalizeNamespaces(
 	manifests []unstructured.Unstructured,
@@ -1143,7 +1143,9 @@ func normalizeNamespaces(
 	}
 
 	provider := &resourceInfoProvider{namespacedByGk: namespacedResources}
-	deduped, conditions, err := controller.DeduplicateTargetObjects(destNamespace, ptrManifests, provider)
+	// setAppInstance is a no-op: unlike Argo CD's controller we only normalize
+	// namespaces for diff rendering and never stamp tracking labels.
+	deduped, conditions, err := controller.NormalizeTargetObjects(destNamespace, ptrManifests, provider, func(*unstructured.Unstructured) error { return nil })
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalise namespaces: %w", err)
 	}

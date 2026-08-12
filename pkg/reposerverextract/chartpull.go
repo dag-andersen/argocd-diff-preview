@@ -24,9 +24,9 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/rs/zerolog/log"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/registry"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/registry"
 )
 
 // chartPuller fetches a remote Helm chart and extracts it into destDir,
@@ -62,6 +62,7 @@ func (helmChartPuller) Pull(source v1alpha1.ApplicationSource, creds *RepoCreds,
 	settings.RepositoryConfig = filepath.Join(helmHome, "repositories.yaml")
 	settings.RepositoryCache = filepath.Join(helmHome, "cache")
 	settings.RegistryConfig = filepath.Join(helmHome, "registry-config.json")
+	settings.ContentCache = filepath.Join(helmHome, "content-cache")
 
 	repo := creds.GetRepo(source.RepoURL)
 
@@ -71,7 +72,7 @@ func (helmChartPuller) Pull(source v1alpha1.ApplicationSource, creds *RepoCreds,
 	}
 
 	actionConfig := &action.Configuration{}
-	pull := action.NewPullWithOpts(action.WithConfig(actionConfig))
+	pull := action.NewPull(action.WithConfig(actionConfig))
 	pull.Settings = settings
 	pull.Version = source.TargetRevision
 	pull.Username = repo.Username
