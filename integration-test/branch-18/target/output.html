@@ -1,0 +1,107 @@
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Modified (1):
+± out-of-chart-values (+2|-2)</pre>
+
+<div class="diffs">
+<details>
+<summary>
+out-of-chart-values (examples/out-of-chart-values/application.yaml)
+</summary>
+
+<h4 class="resource_header">Deployment: default/out-of-chart-values</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: apps/v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: Deployment</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: out-of-chart-values</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+	<tr class="normal_line"><td><pre> spec:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  replicas: 2</pre></td></tr>
+	<tr class="added_line"><td><pre>+  replicas: 3</pre></td></tr>
+	<tr class="normal_line"><td><pre>   selector:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     matchLabels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       app: out-of-chart-values</pre></td></tr>
+	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       labels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         app: out-of-chart-values</pre></td></tr>
+	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       containers:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      - image: nginx:1.25</pre></td></tr>
+	<tr class="added_line"><td><pre>+      - image: nginx:1.27</pre></td></tr>
+	<tr class="normal_line"><td><pre>         name: app</pre></td></tr>
+	<tr class="normal_line"><td><pre>         ports:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - containerPort: 80</pre></td></tr>
+</table>
+</div>
+
+</details>
+</div>
+
+<pre>_Stats_:
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>

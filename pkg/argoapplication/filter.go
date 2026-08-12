@@ -2,16 +2,16 @@ package argoapplication
 
 import (
 	"fmt"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	argocdsecurity "github.com/argoproj/argo-cd/v3/util/security"
+	argocdpath "github.com/argoproj/argo-cd/v3/util/app/path"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // RenderMode controls whether an application should be rendered
@@ -27,9 +27,9 @@ const (
 )
 
 const (
-	annotationWatchPattern = "argocd-diff-preview/watch-pattern"
-	annotationIgnore       = "argocd-diff-preview/ignore"
-	annotationRender       = "argocd-diff-preview/render"
+	AnnotationWatchPattern = "argocd-diff-preview/watch-pattern"
+	AnnotationIgnore       = "argocd-diff-preview/ignore"
+	AnnotationRender       = "argocd-diff-preview/render"
 )
 
 type ApplicationSelectionOptions struct {
@@ -115,8 +115,17 @@ func ApplicationSelection(
 func (a *ArgoResource) Filter(
 	appSelectionOptions ApplicationSelectionOptions,
 ) bool {
+	// First check render mode annotation
+	switch a.GetRenderMode() {
+	case RenderNever:
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: application is ignored because render mode is '%s'", a.Kind.ShortName(), RenderNever)
+		return false
+	case RenderAlways:
+		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is selected because: application is forced because render mode is '%s'", a.Kind.ShortName(), RenderAlways)
+		return true
+	}
 
-	// First check selected annotation
+	// Then check legacy ignore annotation
 	selected, reason := a.filterByIgnoreAnnotation()
 	if !selected {
 		log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("%s is not selected because: %s", a.Kind.ShortName(), reason)
@@ -150,25 +159,11 @@ func (a *ArgoResource) filterByIgnoreAnnotation() (bool, string) {
 	// get annotations
 	annotations, found, err := unstructured.NestedStringMap(a.Yaml.Object, "metadata", "annotations")
 	if err != nil || !found || len(annotations) == 0 {
-		return true, "no 'argocd-diff-preview/ignore' or 'argocd-diff-preview/render' annotation found"
+		return true, "no 'argocd-diff-preview/ignore' annotation found"
 	}
 
-	// Check the new render annotation first (takes precedence)
-	if value, exists := annotations[annotationRender]; exists {
-		switch RenderMode(strings.ToLower(strings.TrimSpace(value))) {
-		case RenderNever:
-			return false, fmt.Sprintf("application is ignored because of '%s: %s'", annotationRender, value)
-		case RenderAlways, RenderChanged:
-			return true, fmt.Sprintf("application is selected because of '%s: %s'", annotationRender, value)
-		default:
-			log.Warn().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("⚠️ Unknown value '%s' for annotation '%s'. Expected 'always', 'never', or 'changed'. Defaulting to 'changed'.", value, annotationRender)
-			return true, fmt.Sprintf("unknown render annotation value '%s', defaulting to 'changed'", value)
-		}
-	}
-
-	// Fall back to legacy ignore annotation
-	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
-		return false, fmt.Sprintf("application is ignored because of '%s: %s'", annotationIgnore, value)
+	if value, exists := annotations[AnnotationIgnore]; exists && value == "true" {
+		return false, fmt.Sprintf("application is ignored because of '%s: %s'", AnnotationIgnore, value)
 	}
 	return true, "application is not ignored"
 }
@@ -184,7 +179,7 @@ func (a *ArgoResource) GetRenderMode() RenderMode {
 		return RenderChanged
 	}
 
-	if value, exists := annotations[annotationRender]; exists {
+	if value, exists := annotations[AnnotationRender]; exists {
 		mode := RenderMode(strings.ToLower(strings.TrimSpace(value)))
 		switch mode {
 		case RenderAlways, RenderNever, RenderChanged:
@@ -192,11 +187,6 @@ func (a *ArgoResource) GetRenderMode() RenderMode {
 		default:
 			return RenderChanged
 		}
-	}
-
-	// Legacy: treat ignore=true as never
-	if value, exists := annotations[annotationIgnore]; exists && value == "true" {
-		return RenderNever
 	}
 
 	return RenderChanged
@@ -248,26 +238,36 @@ func (a *ArgoResource) filterByFilesChanged(filesChanged []string, ignoreInvalid
 		return watchIfNoWatchPatternFound, "no watch-pattern or manifest-generate-paths annotation found"
 	}
 
-	watchPattern, watchPatternExists := annotations[annotationWatchPattern]
-	manifestGeneratePaths, manifestGeneratePathsExists := annotations[v1alpha1.AnnotationKeyManifestGeneratePaths]
+	effectiveWatchPattern, effectiveManifestGeneratePaths := a.effectiveWatchAnnotations(annotations)
 
-	// Check if we effectively have no watch patterns (either no annotation or empty/whitespace-only values)
-	effectiveWatchPattern := strings.TrimSpace(watchPattern)
-	effectiveManifestGeneratePaths := strings.TrimSpace(manifestGeneratePaths)
-
-	if (!watchPatternExists || effectiveWatchPattern == "") && (!manifestGeneratePathsExists || effectiveManifestGeneratePaths == "") {
+	if effectiveWatchPattern == "" && effectiveManifestGeneratePaths == "" {
 		return watchIfNoWatchPatternFound, "no effective watch-pattern or manifest-generate-paths annotation found"
 	}
 
-	if selectedWatchPattern, reasonWatchPattern := a.filterByAnnotationWatchPattern(effectiveWatchPattern, filesChanged, ignoreInvalidWatchPattern); selectedWatchPattern {
-		return true, reasonWatchPattern
+	if effectiveWatchPattern != "" {
+		if selectedWatchPattern, reasonWatchPattern := a.filterByAnnotationWatchPattern(effectiveWatchPattern, filesChanged, ignoreInvalidWatchPattern); selectedWatchPattern {
+			return true, reasonWatchPattern
+		}
 	}
 
-	if selectedManifestGeneratePaths, reasonManifestGeneratePaths := a.filterByManifestGeneratePaths(effectiveManifestGeneratePaths, filesChanged); selectedManifestGeneratePaths {
-		return true, reasonManifestGeneratePaths
+	if effectiveManifestGeneratePaths != "" {
+		if selectedManifestGeneratePaths, reasonManifestGeneratePaths := a.filterByManifestGeneratePaths(effectiveManifestGeneratePaths, filesChanged); selectedManifestGeneratePaths {
+			return true, reasonManifestGeneratePaths
+		}
 	}
 
 	return false, "files changed does not match watch-pattern or manifest-generate-paths"
+}
+
+func (a *ArgoResource) effectiveWatchAnnotations(annotations map[string]string) (watchPattern string, manifestGeneratePaths string) {
+	watchPattern = strings.TrimSpace(annotations[AnnotationWatchPattern])
+
+	// ApplicationSet does not support manifest-generate-paths, so we only check for it on Applications.
+	if a.Kind == Application {
+		manifestGeneratePaths = strings.TrimSpace(annotations[v1alpha1.AnnotationKeyManifestGeneratePaths])
+	}
+
+	return watchPattern, manifestGeneratePaths
 }
 
 func (a *ArgoResource) filterByAnnotationWatchPattern(watchPattern string, filesChanged []string, ignoreInvalidWatchPattern bool) (bool, string) {
@@ -302,68 +302,50 @@ func (a *ArgoResource) filterByAnnotationWatchPattern(watchPattern string, files
 	return false, fmt.Sprintf("no files changed match watch-pattern '%s'", watchPattern)
 }
 
-// filterByManifestGeneratePaths checks if the application manifest-generate-paths matches any of the changed files
-// Mimics the behavior of the watch pattern from ArgoCD: https://github.com/argoproj/argo-cd/blob/master/util/app/path/path.go#L122-L151
+// filterByManifestGeneratePaths checks if the application manifest-generate-paths matches any of the changed files.
+// It reuses Argo CD's own manifest-generate-paths helpers for Applications to avoid semantic drift.
 func (a *ArgoResource) filterByManifestGeneratePaths(manifestGeneratePaths string, filesChanged []string) (bool, string) {
 
-	// Split the manifest paths by semicolon
-	paths := strings.Split(manifestGeneratePaths, ";")
-
-	if len(paths) == 0 {
-		return false, fmt.Sprintf("no '%s' annotation found", v1alpha1.AnnotationKeyManifestGeneratePaths)
+	if a.Kind != Application {
+		return false, "manifest-generate-paths is ignored for non-Application resources"
 	}
 
-	var refreshPaths []string
-
-	for _, path := range paths {
-		// trim whitespace
-		path = strings.TrimSpace(path)
-
-		// If manifest path is absolute, add it to the list of refresh paths
-		if filepath.IsAbs(path) {
-			refreshPaths = append(refreshPaths, filepath.Clean(path))
-			continue
+	app, err := a.asArgoCDApplication(manifestGeneratePaths)
+	if err != nil {
+		log.Debug().Err(err).Str(a.Kind.ShortName(), a.GetLongName()).Msg("Failed to convert Application before checking manifest-generate-paths")
+		return false, fmt.Sprintf("failed to convert Application before checking manifest-generate-paths: %v", err)
+	} else {
+		sources := app.Spec.GetSources()
+		if app.Spec.SourceHydrator != nil {
+			sources = append(sources, app.Spec.SourceHydrator.GetDrySource())
 		}
 
-		// If manifest path is relative, add the spec.source.path as base and make it absolute
-		if sourcePath, found, err := unstructured.NestedString(a.Yaml.Object, "spec", "source", "path"); err == nil && found && len(sourcePath) > 0 {
-			absPath := fmt.Sprintf("%s%s%s%s", string(filepath.Separator), sourcePath, string(filepath.Separator), path)
-			refreshPaths = append(refreshPaths, filepath.Clean(absPath))
-			continue
-		}
-
-		// If manifest path is relative and no spec.source.path is found, loop on each spec.sources[*].path and make it absolute
-		// sources := yamlutil.GetYamlValue(a.Yaml, []string{"spec", "sources"})
-		if sources, found, err := unstructured.NestedSlice(a.Yaml.Object, "spec", "sources"); err == nil && found && len(sources) > 0 {
-			for _, src := range sources {
-				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("sourcePath: %v", src)
-				if sourcePath, found, err := unstructured.NestedString(src.(map[string]any), "path"); err == nil && found && len(sourcePath) > 0 {
-					absPath := fmt.Sprintf("%s%s%s%s", string(filepath.Separator), sourcePath, string(filepath.Separator), path)
-					refreshPaths = append(refreshPaths, filepath.Clean(absPath))
-				}
+		for _, source := range sources {
+			refreshPaths := argocdpath.GetSourceRefreshPaths(app, source)
+			log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Paths to compare with files changed: %v", refreshPaths)
+			if len(refreshPaths) > 0 && argocdpath.AppFilesHaveChanged(refreshPaths, filesChanged) {
+				return true, fmt.Sprintf("files changed match manifest-generate-paths: '%s'", manifestGeneratePaths)
 			}
 		}
+
+		return false, fmt.Sprintf("no files changed match manifest-generate-paths: '%s'", manifestGeneratePaths)
+	}
+}
+
+func (a *ArgoResource) asArgoCDApplication(manifestGeneratePaths string) (*v1alpha1.Application, error) {
+	if a.Yaml == nil {
+		return nil, fmt.Errorf("no YAML found")
 	}
 
-	log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Paths to compare with files changed: %v", refreshPaths)
-
-	for _, f := range filesChanged {
-		if !filepath.IsAbs(f) {
-			f = string(filepath.Separator) + f
-		}
-		for _, item := range refreshPaths {
-			if !filepath.IsAbs(item) {
-				item = string(filepath.Separator) + item
-			}
-			if f == item {
-				return true, fmt.Sprintf("file '%s' matches manifest-generate-paths: '%s'", f, manifestGeneratePaths)
-			} else if _, err := argocdsecurity.EnforceToCurrentRoot(item, f); err == nil {
-				return true, fmt.Sprintf("file '%s' matches manifest-generate-paths: '%s'", f, manifestGeneratePaths)
-			} else if matched, err := filepath.Match(item, f); err == nil && matched {
-				return true, fmt.Sprintf("file '%s' matches manifest-generate-paths: '%s'", f, manifestGeneratePaths)
-			}
-		}
+	var app v1alpha1.Application
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(a.Yaml.Object, &app); err != nil {
+		return nil, fmt.Errorf("failed to convert unstructured Application: %w", err)
 	}
 
-	return false, fmt.Sprintf("no files changed match manifest-generate-paths: '%s'", manifestGeneratePaths)
+	if app.Annotations == nil {
+		app.Annotations = map[string]string{}
+	}
+	app.Annotations[v1alpha1.AnnotationKeyManifestGeneratePaths] = manifestGeneratePaths
+
+	return &app, nil
 }

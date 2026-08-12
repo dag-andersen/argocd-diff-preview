@@ -896,6 +896,61 @@ metadata:
 			watchIfNoWatchPatternFound: false,
 			want:                       true,
 		},
+		{
+			name: "render always bypasses non-matching selector",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    team: other-team
+  annotations:
+    argocd-diff-preview/render: always`,
+			selectors: []app_selector.Selector{
+				{Key: "team", Value: "your-team", Operator: app_selector.Eq},
+			},
+			filesChanged:               []string{},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "render always bypasses non-matching watch pattern",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  annotations:
+    argocd-diff-preview/render: always
+    argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
+			selectors:                  []app_selector.Selector{},
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
+		{
+			name: "render always bypasses selector and watch pattern filters",
+			yaml: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: test-app
+  labels:
+    team: other-team
+  annotations:
+    argocd-diff-preview/render: always
+    argocd-diff-preview/watch-pattern: '.*\.yaml$'`,
+			selectors: []app_selector.Selector{
+				{Key: "team", Value: "your-team", Operator: app_selector.Eq},
+			},
+			filesChanged:               []string{"test.txt"},
+			ignoreInvalidWatchPattern:  false,
+			watchIfNoWatchPatternFound: false,
+			want:                       true,
+		},
 		// Integration tests for WatchIfNoWatchPatternFound behavior
 		{
 			name: "no watch pattern with WatchIfNoWatchPatternFound=true should include app",
@@ -1003,7 +1058,7 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 		changeExpected bool
 	}{
 		{"default no path", &unstructured.Unstructured{}, []string{"README.md"}, false},
-		{"no files changed", getYamlApp(t, ".", "source/path"), []string{}, false},
+		{"no files changed", getYamlApp(t, ".", "source/path"), []string{}, true},
 		{"relative path - matching", getYamlApp(t, ".", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
 		{"relative path, multi source - matching #1", getMultiSourceYamlApp(t, ".", "source/path", "other/path"), []string{"source/path/my-deployment.yaml"}, true},
 		{"relative path, multi source - matching #2", getMultiSourceYamlApp(t, ".", "other/path", "source/path"), []string{"source/path/my-deployment.yaml"}, true},
@@ -1061,6 +1116,39 @@ func TestFilterByAnnotationWatchPattern(t *testing.T) {
 			assert.Equal(t, ttc.changeExpected, got)
 		})
 	}
+}
+
+func TestApplicationSetIgnoresManifestGeneratePaths(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.FatalLevel)
+
+	appSetYaml := `
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-appset
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: "."
+spec:
+  template:
+    spec:
+      source:
+        path: apps/backend`
+
+	var node unstructured.Unstructured
+	assert.NoError(t, yaml.Unmarshal([]byte(appSetYaml), &node))
+
+	appSet := &ArgoResource{
+		Yaml:     &node,
+		Kind:     ApplicationSet,
+		Name:     "test-appset",
+		FileName: "appset.yaml",
+	}
+
+	got, _ := appSet.filterByFilesChanged([]string{"apps/backend/deployment.yaml"}, false, false)
+	assert.False(t, got, "ApplicationSet metadata manifest-generate-paths should not be evaluated")
+
+	got, _ = appSet.filterByFilesChanged([]string{"apps/backend/deployment.yaml"}, false, true)
+	assert.True(t, got, "ApplicationSet should fall back to watchIfNoWatchPatternFound when no supported watch annotation exists")
 }
 
 func getYamlApp(t *testing.T, annotation string, sourcePath string) *unstructured.Unstructured {

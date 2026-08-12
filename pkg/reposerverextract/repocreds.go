@@ -17,8 +17,10 @@ package reposerverextract
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	"github.com/argoproj/argo-cd/v3/util/db"
@@ -29,6 +31,8 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k8s"
 )
+
+const repoCredsFetchTimeout = 30 * time.Second
 
 // RepoCreds is a pre-fetched snapshot of all repository credentials registered
 // in the ArgoCD installation. It is built once and shared across all concurrent
@@ -53,6 +57,30 @@ type RepoCreds struct {
 	// reposByURL is a map from normalised repository URL → fully-enriched
 	// Repository struct (with credentials). Used to populate ManifestRequest.Repo.
 	reposByURL map[string]*v1alpha1.Repository
+}
+
+// FetchRepoCredsWithTimeout fetches repository credentials with a hard timeout.
+//
+// This fail-fast wrapper prevents CI from appearing stuck when Argo CD settings
+// informer sync or repository credential lookups block, usually because RBAC is
+// missing for configmaps or secrets in the Argo CD namespace.
+func FetchRepoCredsWithTimeout(ctx context.Context, timeout time.Duration, k8sClient *k8s.Client, namespace string, appRepoURLs []string) (*RepoCreds, error) {
+	fetchCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	creds, err := FetchRepoCreds(fetchCtx, k8sClient, namespace, appRepoURLs)
+	if err != nil {
+		if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("timed out after %s fetching Argo CD repository credentials: %w", timeout, err)
+		}
+		return nil, err
+	}
+
+	if errors.Is(fetchCtx.Err(), context.DeadlineExceeded) {
+		return nil, fmt.Errorf("timed out after %s fetching Argo CD repository credentials", timeout)
+	}
+
+	return creds, nil
 }
 
 // FetchRepoCreds connects to the cluster via the ArgoCD DB layer and fetches
@@ -192,17 +220,6 @@ func normalizeRepoURL(u string) string {
 	u = strings.ToLower(u)
 	u = strings.TrimSuffix(u, ".git")
 	return u
-}
-
-// repoURLContains reports whether the normalised form of repoURL contains the
-// normalised form of substr. This is used to match source repoURLs against the
-// --repo flag value which can be either a full URL
-// ("https://github.com/org/repo.git") or a short slug ("org/repo").
-//
-// Using a substring match (like the patching code's containsIgnoreCase) keeps
-// the comparison provider-agnostic — we don't assume GitHub, GitLab, etc.
-func repoURLContains(repoURL, substr string) bool {
-	return strings.Contains(normalizeRepoURL(repoURL), normalizeRepoURL(substr))
 }
 
 // HelmRepos returns the Helm + OCI repository lists to pass as

@@ -43,6 +43,8 @@ When `--traverse-app-of-apps` is enabled, the tool performs a breadth-first expa
 3. **Enqueue child applications** - each discovered child is added to the render queue as if it were a top-level application.
 4. **Repeat** - until no new child applications are found or the maximum depth is reached.
 
+Discovered children are patched exactly like top-level applications. In particular, source/generator redirection honors [`--redirect-target-revisions`](options.md): a child source whose `targetRevision` is **not** in the configured list is left untouched and fetched from its real ref, rather than being redirected to the base/target branch.
+
 ---
 
 ## Requirements

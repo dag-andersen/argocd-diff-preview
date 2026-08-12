@@ -17,14 +17,21 @@ package reposerverextract
 // resolve the $ref value files from its own git cache.
 
 import (
+	"archive/tar"
+	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
+	"github.com/argoproj/argo-cd/v3/util/tgzstream"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -60,6 +67,7 @@ func makeBranchFolder(t *testing.T, relPath string) string {
 	if relPath != "" {
 		full := filepath.Join(dir, relPath)
 		require.NoError(t, os.MkdirAll(full, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(full, "Chart.yaml"), []byte("apiVersion: v2\nname: test\nversion: 0.1.0\n"), 0o644))
 		// Write a dummy file so the directory is non-empty and copyDir works.
 		require.NoError(t, os.WriteFile(filepath.Join(full, "values.yaml"), []byte("key: value\n"), 0o644))
 	}
@@ -70,6 +78,45 @@ func assertDefaultProjectFields(t *testing.T, req *repoapiclient.ManifestRequest
 	t.Helper()
 	assert.Equal(t, "default", req.ProjectName, "project name must match the patched application project")
 	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "source repos must be permissive so helm build errors are not masked as permission errors")
+}
+
+func testRepoSelector(t *testing.T, repo string) *repository.Selector {
+	t.Helper()
+	selector, err := repository.NewSelector(repo, "")
+	require.NoError(t, err)
+	return selector
+}
+
+// fakeChartPuller is a chartPuller test double that writes a minimal chart to
+// disk instead of contacting a Helm registry, so buildManifestRequestForSource
+// can be exercised without network access. It records the sources it is asked
+// to pull.
+type fakeChartPuller struct {
+	// files maps chart-relative paths to file contents. When nil, a minimal
+	// Chart.yaml is written so the streamed chart directory is valid.
+	files  map[string]string
+	pulled []v1alpha1.ApplicationSource
+}
+
+func (f *fakeChartPuller) Pull(source v1alpha1.ApplicationSource, _ *RepoCreds, destDir string) (string, error) {
+	f.pulled = append(f.pulled, source)
+	chartDir := filepath.Join(destDir, "chart", source.Chart)
+	files := f.files
+	if files == nil {
+		files = map[string]string{
+			"Chart.yaml": "apiVersion: v2\nname: " + source.Chart + "\nversion: 0.0.0\n",
+		}
+	}
+	for rel, content := range files {
+		full := filepath.Join(chartDir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return "", err
+		}
+		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+			return "", err
+		}
+	}
+	return chartDir, nil
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -99,17 +146,34 @@ spec:
 	require.Empty(t, refSources)
 	assert.False(t, hasMultipleSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	kubeVersion := "v1.30.1"
+	apiVersions := []string{"apps/v1", "v1"}
+	req, streamDir, cleanup, err := buildManifestRequestForSource(
+		app,
+		contentSources[0],
+		refSources,
+		hasMultipleSources,
+		branchFolder,
+		nil,
+		manifestRequestRenderContext{
+			repoSelector: testRepoSelector(t, ""),
+			kubeVersion:  kubeVersion,
+			apiVersions:  apiVersions,
+		},
+	)
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	// Fast path: streamDir == branchFolder, no temp dir created.
-	assert.Equal(t, branchFolder, streamDir, "should stream the full branch folder for local charts")
-	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	// Fast path: stream only the source directory and clear Path so unrelated
+	// monorepo files are not included in the streamed tarball.
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "my-app"), streamDir, "should stream only the local source directory")
+	assert.Empty(t, req.ApplicationSource.Path)
 	assert.Empty(t, req.ApplicationSource.Chart, "should not have a Chart field")
 	assert.Equal(t, "production", req.Namespace)
+	assert.Equal(t, kubeVersion, req.KubeVersion)
+	assert.Equal(t, apiVersions, req.ApiVersions)
 	assert.Nil(t, req.RefSources)
 	assertDefaultProjectFields(t, req)
 }
@@ -141,7 +205,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -209,7 +274,8 @@ spec:
 	require.Len(t, contentSources, 1, "only the chart source is a content source")
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -239,6 +305,102 @@ spec:
 	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
 	assert.Equal(t, "$local/clusters/prod/cert-manager-values.yaml", req.ApplicationSource.Helm.ValueFiles[0],
 		"value file path must remain as a $ref path for the remote RPC")
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_MatchingPRRepoMissingLocalPath_UsesRemoteRPC(t *testing.T) {
+	branchFolder := t.TempDir()
+	// Simulate a resource-repo pipeline where the branch folder contains the
+	// Application repository checkout, not the PR resource repository files.
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "preview", "applicationsets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "clusters", "preview", "applicationsets", "apps.yaml"), []byte("kind: ApplicationSet\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: preview-worker
+spec:
+  destination:
+    namespace: workers
+  source:
+    repoURL: https://github.com/example/resource-config.git
+    path: environments/preview/apps/worker
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "example/resource-config"),
+	})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir, "missing local PR repo source path should fall back to remote RPC")
+	assert.Equal(t, "https://github.com/example/resource-config.git", req.Repo.Repo)
+	assert.Equal(t, "environments/preview/apps/worker", req.ApplicationSource.Path)
+	assert.Nil(t, req.RefSources)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_ExternalChart_WithMissingLocalRefValueFile_UsesRemoteRPC(t *testing.T) {
+	branchFolder := t.TempDir()
+	// Simulate a resource-repo pipeline where $local points at the PR repo, but the
+	// local checkout is the Application repository and lacks resource values.
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "preview", "applicationsets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "clusters", "preview", "applicationsets", "charts-from-list.yaml"), []byte("kind: ApplicationSet\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: preview-cache
+spec:
+  destination:
+    namespace: cache
+  sources:
+    - repoURL: https://github.com/example/resource-config.git
+      targetRevision: HEAD
+      ref: local
+    - chart: redis
+      repoURL: https://charts.example.invalid
+      targetRevision: 1.2.3
+      helm:
+        valueFiles:
+          - $local/environments/preview/charts/values/redis.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+	puller := &fakeChartPuller{}
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "example/resource-config"),
+		puller:       puller,
+	})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir, "missing local PR repo ref value file should fall back to remote RPC")
+	assert.Empty(t, puller.pulled, "remote fallback should not pull and stream the chart locally")
+	assert.Equal(t, "redis", req.ApplicationSource.Chart)
+	require.NotNil(t, req.ApplicationSource.Helm)
+	assert.Equal(t, []string{"$local/environments/preview/charts/values/redis.yaml"}, req.ApplicationSource.Helm.ValueFiles)
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$local"]
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/example/resource-config.git", refTarget.Repo.Repo)
+	assert.Equal(t, "HEAD", refTarget.TargetRevision)
 	assertDefaultProjectFields(t, req)
 }
 
@@ -291,7 +453,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	require.NotEmpty(t, streamDir, "local chart with refs must stream a temp dir")
 	defer cleanup()
@@ -402,7 +565,8 @@ spec:
 	}
 	require.NotEmpty(t, chartSource.Chart, "should find the chart content source")
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, chartSource, refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -462,7 +626,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Len(t, refSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, "")
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, "")})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -545,25 +710,21 @@ spec:
 
 	// Build a request for each content source – this must not error.
 	// Capture requests so we can verify per-source paths without duplicate calls.
-	reqs := make([]struct{ path string }, len(contentSources))
 	for i, cs := range contentSources {
-		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, "")
+		req, streamDir, cleanup, buildErr := buildManifestRequestForSource(app, cs, refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+			repoSelector: testRepoSelector(t, "")})
 		require.NoError(t, buildErr, "content source %d should not error", i)
 		if cleanup != nil {
 			defer cleanup()
 		}
 
-		// Both are local path sources with no refs → fast path (stream branchFolder).
-		assert.Equal(t, branchFolder, streamDir, "content source %d should stream the branch folder", i)
+		// Multiple local path sources without Helm charts keep the branch root.
+		assert.Equal(t, branchFolder, streamDir, "content source %d should stream the branch root", i)
+		assert.Equal(t, cs.Path, req.ApplicationSource.Path)
 		assert.True(t, req.HasMultipleSources, "HasMultipleSources must be true for both requests")
 		assert.Equal(t, "argocd", req.Namespace)
 		assertDefaultProjectFields(t, req)
-		reqs[i].path = req.ApplicationSource.Path
 	}
-
-	// Verify the paths are correctly assigned to each request.
-	assert.Equal(t, "management-prod/applicationsets", reqs[0].path)
-	assert.Equal(t, "management-prod/root", reqs[1].path)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -607,7 +768,8 @@ spec:
 	require.Len(t, contentSources, 1)
 	require.Empty(t, refSources)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -657,15 +819,111 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	// Same repo - should stream the branch folder, not use remote RPC.
-	assert.Equal(t, branchFolder, streamDir, "same-repo source must still stream locally even when prRepo is set")
-	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	// Same repo - should stream the source directory, not use remote RPC.
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "my-app"), streamDir, "same-repo source must still stream locally even when prRepo is set")
+	assert.Empty(t, req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SameRepoPrimaryWithExternalRef_UsesRemoteRPC(t *testing.T) {
+	prRepo := "org/helm-charts"
+	branchFolder := makeBranchFolder(t, "charts/my-chart")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  sources:
+    - repoURL: https://github.com/org/helm-charts.git
+      path: charts/my-chart
+      targetRevision: main
+      helm:
+        valueFiles:
+          - $helm-values-repo/values.yaml
+    - repoURL: https://github.com/org/app-values.git
+      targetRevision: main
+      ref: helm-values-repo
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir,
+		"external ref source must use remote RPC so repo server fetches ref repository instead of copying PR repo root")
+	assert.Equal(t, []string{"$helm-values-repo/values.yaml"}, req.ApplicationSource.Helm.ValueFiles,
+		"remote RPC must keep $ref value files unchanged")
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$helm-values-repo"]
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/org/app-values.git", refTarget.Repo.Repo)
+	assert.Equal(t, "main", refTarget.TargetRevision)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SameRepoPrimaryWithPrefixExternalRef_UsesRemoteRPC(t *testing.T) {
+	prRepo := "org/helm-charts"
+	branchFolder := makeBranchFolder(t, "charts/my-chart")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  sources:
+    - repoURL: https://github.com/org/helm-charts.git
+      path: charts/my-chart
+      targetRevision: main
+      helm:
+        valueFiles:
+          - $helm-values-repo/imageTag.yaml
+    - repoURL: https://github.com/org/helm-charts-deploy.git
+      targetRevision: main
+      ref: helm-values-repo
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo),
+	})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Empty(t, streamDir,
+		"ref repo sharing the PR repo prefix must still be treated as external")
+	assert.Equal(t, []string{"$helm-values-repo/imageTag.yaml"}, req.ApplicationSource.Helm.ValueFiles)
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$helm-values-repo"]
+	require.True(t, ok)
+	assert.Equal(t, "https://github.com/org/helm-charts-deploy.git", refTarget.Repo.Repo)
 	assertDefaultProjectFields(t, req)
 }
 
@@ -724,85 +982,11 @@ func TestNormalizeRepoURL(t *testing.T) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// repoURLContains - substring match used for prRepo comparisons
-// ─────────────────────────────────────────────────────────────────────────────
-
-func TestRepoURLContains(t *testing.T) {
-	cases := []struct {
-		name    string
-		repoURL string
-		substr  string
-		want    bool
-	}{
-		{
-			name:    "full URL matches full URL",
-			repoURL: "https://github.com/org/repo.git",
-			substr:  "https://github.com/org/repo.git",
-			want:    true,
-		},
-		{
-			name:    "slug matches full URL",
-			repoURL: "https://github.com/org/repo.git",
-			substr:  "org/repo",
-			want:    true,
-		},
-		{
-			name:    "slug matches full URL without .git",
-			repoURL: "https://github.com/org/repo",
-			substr:  "org/repo",
-			want:    true,
-		},
-		{
-			name:    "case insensitive",
-			repoURL: "https://github.com/Org/Repo.git",
-			substr:  "org/repo",
-			want:    true,
-		},
-		{
-			name:    "different repos do not match",
-			repoURL: "https://github.com/org/repo-a.git",
-			substr:  "org/repo-b",
-			want:    false,
-		},
-		{
-			name:    "different orgs do not match",
-			repoURL: "https://github.com/org-a/repo.git",
-			substr:  "org-b/repo",
-			want:    false,
-		},
-		{
-			name:    "GitLab full URL with slug",
-			repoURL: "https://gitlab.com/company/project.git",
-			substr:  "company/project",
-			want:    true,
-		},
-		{
-			name:    "Bitbucket full URL with slug",
-			repoURL: "https://bitbucket.org/team/repo.git",
-			substr:  "team/repo",
-			want:    true,
-		},
-		{
-			name:    "empty substr matches anything",
-			repoURL: "https://github.com/org/repo.git",
-			substr:  "",
-			want:    true,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, repoURLContains(tc.repoURL, tc.substr), "repoURL=%q substr=%q", tc.repoURL, tc.substr)
-		})
-	}
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 10. Same-repo source with prRepo as owner/repo slug → streams locally
 //
 //	When the user passes --repo=owner/repo (the documented format), the
 //	source repoURL is a full URL like "https://github.com/owner/repo.git".
-//	The comparison must use substring matching so the slug is recognised as
-//	belonging to the same repository.
+//	The comparison must recognise the slug as belonging to the same repository.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 func TestBuildManifestRequest_SameRepoSource_WithSlugPrRepo_StreamsLocally(t *testing.T) {
@@ -833,7 +1017,8 @@ spec:
 	require.NoError(t, err)
 	require.Len(t, contentSources, 1)
 
-	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, prRepo)
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, prRepo)})
 	require.NoError(t, err)
 	if cleanup != nil {
 		defer cleanup()
@@ -842,9 +1027,565 @@ spec:
 	// CRITICAL: must stream locally — the source is in the same repo.
 	// Before the fix, the slug format caused a mismatch and fell into the
 	// remote RPC path, which failed with "authentication required".
-	assert.Equal(t, branchFolder, streamDir,
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "debezium", "debezium"), streamDir,
 		"REGRESSION: same-repo source with slug-format prRepo must stream locally, not use remote RPC")
-	assert.Equal(t, "apps/debezium/debezium", req.ApplicationSource.Path)
+	assert.Empty(t, req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SingleSource_Kustomize_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-app")
+	require.NoError(t, os.Remove(filepath.Join(branchFolder, "apps", "my-app", "Chart.yaml")))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "apps", "my-app", "kustomization.yaml"), []byte("resources: []\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, branchFolder, streamDir, "kustomize sources should keep branch root so sibling references still work")
+	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SingleSource_KustomizeWithHelm_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-app")
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "apps", "my-app", "kustomization.yaml"), []byte(`
+helmCharts:
+  - name: nginx
+    repo: https://charts.bitnami.com/bitnami
+    version: 15.0.0
+`), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-app
+    targetRevision: HEAD
+    kustomize:
+      version: v5.0.0
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, branchFolder, streamDir, "kustomize sources with helmCharts should not be mistaken for local Helm charts")
+	assert.Equal(t, "apps/my-app", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+// REGRESSION (v0.2.9 / PR #443): a local Helm chart whose helm.valueFiles
+// reference files OUTSIDE the chart directory via a leading-slash
+// repo-root-absolute path (e.g. "/clusters/<cluster>/config.yaml"). Argo CD
+// resolves leading-slash value files relative to the repo root (the stream
+// root), so narrowing the stream to only the chart directory drops the value
+// file from the tarball and the repo server fails with:
+//
+//	helm template ... --values /tmp/<uuid>/clusters/.../config.yaml: no such file or directory
+//
+// Real-world example: egmontadministration/argo-management-cluster
+// hotel-tenant-external-secrets and hotel-tenant-namespace-peerings
+// ApplicationSets, where source.path is the chart dir but valueFiles point at
+// sibling clusters/<cluster>/... config files.
+//
+// Fix: keep streaming the branch root (with Path set) whenever any value file
+// escapes the chart directory, so the out-of-chart files remain reachable.
+func TestBuildManifestRequest_SingleSource_LocalChart_OutOfChartAbsoluteValueFile_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "management-prod/hotel/per-tenant-installed/charts/external-secrets")
+	// The value file lives in a sibling directory tree, outside the chart dir.
+	valuesDir := filepath.Join(branchFolder, "management-prod", "hotel", "clusters", "eks-hotel-a-nonprod", "companies", "egmont-it", "daip")
+	require.NoError(t, os.MkdirAll(valuesDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(valuesDir, "config.yaml"), []byte("tenant:\n  slug: egmont-it-daip\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eks-hotel-a-nonprod-eso
+spec:
+  destination:
+    namespace: external-secrets
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: management-prod/hotel/per-tenant-installed/charts/external-secrets
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - /management-prod/hotel/clusters/eks-hotel-a-nonprod/companies/egmont-it/daip/config.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Must stream the branch root (with Path set) so the out-of-chart value
+	// file resolves correctly relative to the repo root.
+	assert.Equal(t, branchFolder, streamDir,
+		"REGRESSION: local Helm chart with an out-of-chart value file must stream the branch root so the value file is reachable")
+	assert.Equal(t, "management-prod/hotel/per-tenant-installed/charts/external-secrets", req.ApplicationSource.Path)
+
+	// The streamed tarball must contain the out-of-chart value file.
+	tarEntries := compressAndListEntries(t, streamDir)
+	assert.Contains(t, tarEntries, "management-prod/hotel/clusters/eks-hotel-a-nonprod/companies/egmont-it/daip/config.yaml",
+		"the out-of-chart value file must be present in the streamed tarball")
+	assertDefaultProjectFields(t, req)
+}
+
+// REGRESSION (v0.2.9 / PR #443): same class of bug as the absolute case, but
+// the value file escapes the chart directory via a relative "../" path. The
+// fix must also keep the branch root in this case.
+func TestBuildManifestRequest_SingleSource_LocalChart_OutOfChartRelativeValueFile_StreamsBranchRoot(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-chart")
+	// Value file is a sibling of the chart dir: apps/shared/values.yaml.
+	sharedDir := filepath.Join(branchFolder, "apps", "shared")
+	require.NoError(t, os.MkdirAll(sharedDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(sharedDir, "values.yaml"), []byte("key: value\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-chart
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-chart
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - ../shared/values.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, branchFolder, streamDir,
+		"REGRESSION: local Helm chart with a ../ value file must stream the branch root so the value file is reachable")
+	assert.Equal(t, "apps/my-chart", req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+// A local Helm chart whose value files all stay INSIDE the chart directory
+// must keep the optimised behaviour: stream only the chart dir and clear Path.
+func TestBuildManifestRequest_SingleSource_LocalChart_InChartValueFile_StreamsChartDir(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "apps/my-chart")
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-chart
+spec:
+  destination:
+    namespace: production
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/my-chart
+    targetRevision: HEAD
+    helm:
+      valueFiles:
+        - values.yaml
+        - overrides/prod.yaml
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, filepath.Join(branchFolder, "apps", "my-chart"), streamDir,
+		"local Helm chart with only in-chart value files should still stream just the chart dir")
+	assert.Empty(t, req.ApplicationSource.Path)
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_SingleSource_LocalChart_DoesNotStreamUnrelatedSymlinks(t *testing.T) {
+	branchFolder := makeBranchFolder(t, "infra/charts/argocd")
+	relatedAssetDir := filepath.Join(branchFolder, "assets", "co")
+	relatedAppDir := filepath.Join(branchFolder, "src", "apps", "web", "public", "avatars")
+	require.NoError(t, os.MkdirAll(relatedAssetDir, 0o755))
+	require.NoError(t, os.MkdirAll(relatedAppDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(relatedAssetDir, "avatar.png"), []byte("png"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join("..", "..", "..", "..", "..", "assets", "co", "avatar.png"), filepath.Join(relatedAppDir, "avatar.png")))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+spec:
+  destination:
+    namespace: argocd
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: infra/charts/argocd
+    targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Empty(t, refSources)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	assert.Equal(t, filepath.Join(branchFolder, "infra", "charts", "argocd"), streamDir)
+	assert.Empty(t, req.ApplicationSource.Path)
+	assert.NoDirExists(t, filepath.Join(streamDir, "src"), "unrelated top-level repo paths must not be streamed")
+	assertDefaultProjectFields(t, req)
+}
+
+func TestBuildManifestRequest_LocalHelmChart_TarballExcludesUnrelatedRepoSymlinks(t *testing.T) {
+	baseFolder := createIssue438BranchFolder(t, "base")
+	targetFolder := createIssue438BranchFolder(t, "target")
+
+	for _, tc := range []struct {
+		name         string
+		branchFolder string
+	}{
+		{name: "base", branchFolder: baseFolder},
+		{name: "target", branchFolder: targetFolder},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+spec:
+  destination:
+    namespace: argocd
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: infra/charts/argocd
+    targetRevision: HEAD
+`)
+
+			contentSources, refSources, hasMultipleSources, err := splitSources(app)
+			require.NoError(t, err)
+			require.Len(t, contentSources, 1)
+
+			req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, tc.branchFolder, nil,
+				manifestRequestRenderContext{repoSelector: testRepoSelector(t, "https://github.com/org/repo.git")})
+			require.NoError(t, err)
+			if cleanup != nil {
+				defer cleanup()
+			}
+
+			assert.Equal(t, filepath.Join(tc.branchFolder, "infra", "charts", "argocd"), streamDir)
+			assert.Empty(t, req.ApplicationSource.Path)
+
+			tarEntries := compressAndListEntries(t, streamDir)
+			assert.Contains(t, tarEntries, "Chart.yaml")
+			assert.Contains(t, tarEntries, "values.yaml")
+			assert.NotContains(t, tarEntries, "src/apps/web/public/avatars/avatar.png")
+			assert.NotContains(t, tarEntries, "assets/co/avatar.png")
+		})
+	}
+}
+
+func createIssue438BranchFolder(t *testing.T, name string) string {
+	t.Helper()
+	branchFolder := filepath.Join(t.TempDir(), name)
+	chartDir := filepath.Join(branchFolder, "infra", "charts", "argocd")
+	assetDir := filepath.Join(branchFolder, "assets", "co")
+	avatarDir := filepath.Join(branchFolder, "src", "apps", "web", "public", "avatars")
+	require.NoError(t, os.MkdirAll(chartDir, 0o755))
+	require.NoError(t, os.MkdirAll(assetDir, 0o755))
+	require.NoError(t, os.MkdirAll(avatarDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(chartDir, "Chart.yaml"), []byte("apiVersion: v2\nname: argocd\nversion: 0.1.0\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(chartDir, "values.yaml"), []byte("replicas: 1\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(assetDir, "avatar.png"), []byte("png"), 0o644))
+	require.NoError(t, os.Symlink(filepath.Join("..", "..", "..", "..", "..", "assets", "co", "avatar.png"), filepath.Join(avatarDir, "avatar.png")))
+	return branchFolder
+}
+
+func compressAndListEntries(t *testing.T, dir string) []string {
+	t.Helper()
+	tgzFile, _, _, err := tgzstream.CompressFiles(dir, []string{"*"}, []string{".git"})
+	require.NoError(t, err)
+	defer tgzstream.CloseAndDelete(tgzFile)
+
+	_, err = tgzFile.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	gzipReader, err := gzip.NewReader(tgzFile)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, gzipReader.Close())
+	}()
+
+	tarReader := tar.NewReader(gzipReader)
+	var entries []string
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+		entries = append(entries, header.Name)
+	}
+	sort.Strings(entries)
+	return entries
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//  11. BUG #441: remote Helm chart whose value files come from a $ref source in
+//     the SAME repo as the PR.
+//
+//     https://github.com/dag-andersen/argocd-diff-preview/issues/441
+//
+//     sources:
+//     - repoURL: https://github.com/org/charts.git   ← ref source, SAME repo as --repo
+//     ref: values
+//     targetRevision: main
+//     - chart: cert-manager                          ← primary (REMOTE registry chart)
+//     repoURL: https://charts.jetstack.io
+//     targetRevision: v1.14.5
+//     helm:
+//     valueFiles:
+//     - $values/envs/prod/values.yaml
+//
+// The pipeline runs RedirectSources BEFORE buildManifestRequestForSource.
+// RedirectSources rewrites same-repo sources from the configured remote
+// revision ("main" here) to the branch currently being rendered ("pr" here).
+// That is how the repo-server-api render path makes base/target comparisons
+// use the local branch folders passed to the tool.
+//
+// Before the fix, buildManifestRequestForSource treated every remote `chart:`
+// source as remote-only and returned streamDir="". That made repo-server fetch
+// the $values ref from the git remote instead of reading it from the local
+// branch folder. Depending on the environment, that could either fail during
+// git fetch or render stale/wrong values that do not match the checked-out
+// base/target files.
+//
+// Correct behaviour is to pull the remote chart locally, copy the same-repo ref
+// files from the checked-out branch into .refs, rewrite $values paths to
+// relative filesystem paths, and stream that complete temp tree with
+// GenerateManifestWithFiles.
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_Issue441_SameRepoRefWithRemoteChart(t *testing.T) {
+	prRepo := "org/charts"
+
+	// The PR branch is checked out locally and holds the value file the chart
+	// reads via $values. The ref source has no path, so it points at the repo
+	// root and the value file resolves under it.
+	branchFolder := t.TempDir()
+	stagedSrc := filepath.Join(branchFolder, "envs", "prod", "values.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(stagedSrc), 0o755))
+	require.NoError(t, os.WriteFile(stagedSrc, []byte("replicaCount: 2\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-prod
+spec:
+  destination:
+    namespace: cert-manager
+  sources:
+    - repoURL: https://github.com/org/charts.git
+      ref: values
+      targetRevision: main
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.14.5
+      helm:
+        valueFiles:
+          - $values/envs/prod/values.yaml
+`)
+
+	selector := testRepoSelector(t, prRepo)
+
+	// Reproduce the real pipeline ordering: RedirectSources runs first and
+	// rewrites the same-repo ref source from the configured revision ("main") to
+	// the branch currently being rendered ("pr").
+	require.NoError(t, app.RedirectSources(selector, "pr", []string{"main"}))
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1, "only the chart source is a content source")
+	require.Len(t, refSources, 1)
+
+	// Sanity: RedirectSources rewrote the same-repo ref to the rendered branch
+	// but left the remote chart's targetRevision untouched.
+	require.Equal(t, "pr", refSources[0].TargetRevision,
+		"RedirectSources must rewrite the same-repo ref to the working branch")
+
+	puller := &fakeChartPuller{}
+	req, streamDir, cleanup, err := buildManifestRequestForSource(
+		app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: selector, puller: puller})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Fixed behaviour: same-repo refs with a remote chart use local streaming so
+	// the value files come from the checked-out branch folder, not from a remote
+	// git fetch performed by repo-server.
+	require.NotEmpty(t, streamDir,
+		"same-repo $ref with a remote chart must stream the pulled chart plus local ref files")
+	assert.Nil(t, req.RefSources,
+		"local streaming rewrites $ref value files and must not ask repo-server to fetch refs remotely")
+	require.Len(t, puller.pulled, 1)
+	assert.Equal(t, "cert-manager", puller.pulled[0].Chart)
+	assert.Equal(t, "https://charts.jetstack.io", puller.pulled[0].RepoURL)
+	assert.Equal(t, "v1.14.5", puller.pulled[0].TargetRevision)
+
+	require.NotNil(t, req.ApplicationSource)
+	assert.Empty(t, req.ApplicationSource.Chart, "pulled chart must be rendered as a local path chart")
+	assert.Equal(t, "https://github.com/org/charts.git", req.ApplicationSource.RepoURL,
+		"streamed chart source should identify the PR repo, not the chart registry")
+	assert.NotEmpty(t, req.ApplicationSource.Path)
+	assert.FileExists(t, filepath.Join(streamDir, req.ApplicationSource.Path, "Chart.yaml"))
+	assert.FileExists(t, filepath.Join(streamDir, ".refs", "values", "envs", "prod", "values.yaml"))
+
+	require.NotNil(t, req.ApplicationSource.Helm)
+	require.Len(t, req.ApplicationSource.Helm.ValueFiles, 1)
+	rewrittenValueFile := req.ApplicationSource.Helm.ValueFiles[0]
+	assert.False(t, strings.HasPrefix(rewrittenValueFile, "$"),
+		"$ref value file should be rewritten to a relative filesystem path")
+	assert.Contains(t, rewrittenValueFile, filepath.Join(".refs", "values", "envs", "prod", "values.yaml"))
+	assertDefaultProjectFields(t, req)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  12. GUARD (issue #428): remote Helm chart whose value files come from a $ref
+//     source in a DIFFERENT repo than the PR.
+//
+// This is the case #428 fixed and it is CORRECT today: an external ref is not
+// checked out locally, so the repo server must fetch it itself via the remote
+// RPC, using the ref's real remote targetRevision (NOT rewritten - the source
+// lives outside the PR repo, so RedirectSources leaves it alone).
+//
+// The #441 fix must keep this behaviour intact: only SAME-repo refs should
+// switch to local streaming; external refs must stay on the remote RPC. This
+// test guards against the fix over-reaching and regressing #428.
+// ─────────────────────────────────────────────────────────────────────────────
+func TestBuildManifestRequest_ExternalRefWithRemoteChart_StaysRemote(t *testing.T) {
+	prRepo := "org/charts"
+	branchFolder := t.TempDir()
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-prod
+spec:
+  destination:
+    namespace: cert-manager
+  sources:
+    - repoURL: https://github.com/other-org/app-values.git
+      ref: values
+      targetRevision: main
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.14.5
+      helm:
+        valueFiles:
+          - $values/envs/prod/values.yaml
+`)
+
+	selector := testRepoSelector(t, prRepo)
+
+	// RedirectSources must leave the external ref alone (different repo).
+	require.NoError(t, app.RedirectSources(selector, "pr", []string{"main"}))
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	require.Equal(t, "main", refSources[0].TargetRevision,
+		"external ref must NOT be redirected - it lives outside the PR repo")
+
+	puller := &fakeChartPuller{}
+	req, streamDir, cleanup, err := buildManifestRequestForSource(
+		app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+		manifestRequestRenderContext{repoSelector: selector, puller: puller})
+	require.NoError(t, err)
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	// Correct behaviour that must NOT regress when #441 is fixed: external ref
+	// stays on the remote RPC with its real remote targetRevision.
+	assert.Empty(t, streamDir,
+		"external $ref with a remote chart must keep using the remote RPC")
+	require.NotNil(t, req.RefSources)
+	refTarget, ok := req.RefSources["$values"]
+	require.True(t, ok, "RefSources must contain '$values'")
+	assert.Equal(t, "https://github.com/other-org/app-values.git", refTarget.Repo.Repo)
+	assert.Equal(t, "main", refTarget.TargetRevision,
+		"external ref must keep its real remote revision so the repo server can fetch it")
+	assert.Empty(t, puller.pulled, "external refs must not trigger local chart pulling")
 	assertDefaultProjectFields(t, req)
 }
 
@@ -936,4 +1677,32 @@ spec:
 func TestCollectRepoURLs_Empty(t *testing.T) {
 	urls := collectRepoURLs([]argoapplication.ArgoResource{})
 	assert.Empty(t, urls)
+}
+
+// copyDir must follow a symlink that points at a directory and materialize its
+// contents at the destination. Before the fix it byte-copied the link, which
+// os.Open()-ed the target directory and failed with EISDIR ("is a directory").
+// Charts commonly vendor assets this way (e.g. files/sql -> ../../farm-api/sql).
+func TestCopyDir_FollowsDirectorySymlink(t *testing.T) {
+	root := t.TempDir()
+
+	// The symlink target: a real directory (outside the chart) with a file in it.
+	external := filepath.Join(root, "external", "sql")
+	require.NoError(t, os.MkdirAll(external, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(external, "V1__init.sql"), []byte("SELECT 1;"), 0o644))
+
+	// The chart dir: a regular file plus files/sql -> the external directory.
+	chart := filepath.Join(root, "chart")
+	require.NoError(t, os.MkdirAll(filepath.Join(chart, "files"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(chart, "Chart.yaml"), []byte("name: c\n"), 0o644))
+	require.NoError(t, os.Symlink(external, filepath.Join(chart, "files", "sql")))
+
+	dst := filepath.Join(root, "dst")
+	require.NoError(t, copyDir(chart, dst))
+
+	// The regular file and the symlinked directory's contents are both present.
+	assert.FileExists(t, filepath.Join(dst, "Chart.yaml"))
+	got, err := os.ReadFile(filepath.Join(dst, "files", "sql", "V1__init.sql"))
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT 1;", string(got))
 }

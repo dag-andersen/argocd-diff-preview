@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/reposerver"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 )
 
 // resourceInfoProvider implements kubeutil.ResourceInfoProvider to supply
@@ -71,7 +73,7 @@ func RenderApplicationsFromBothBranches(
 	maxConcurrency uint,
 	baseApps []argoapplication.ArgoResource,
 	targetApps []argoapplication.ArgoResource,
-	prRepo string,
+	repoSelector repository.Selector,
 ) ([]extract.ExtractedApp, []extract.ExtractedApp, time.Duration, error) {
 	startTime := time.Now()
 
@@ -91,9 +93,14 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
-	namespacedScopedResources, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
+	namespacedScopedResources, apiVersions, err := argocd.K8sClient.GetNamespacedScopedResourcesAndAPIVersions()
 	if err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to initialize render context: %w", err)
+	}
+
+	kubeVersion, err := argocd.K8sClient.GetServerVersion()
+	if err != nil {
+		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get server version: %w", err)
 	}
 
 	// Collect all unique repository URLs referenced by the Applications so that
@@ -104,7 +111,7 @@ func RenderApplicationsFromBothBranches(
 	// The repo server has no access to Kubernetes secrets - credentials must be
 	// provided by the caller in every ManifestRequest. We mirror what the
 	// ArgoCD app controller does in controller/state.go before calling the repo server.
-	creds, err := FetchRepoCreds(context.Background(), argocd.K8sClient, argocd.Namespace, appRepoURLs)
+	creds, err := FetchRepoCredsWithTimeout(context.Background(), repoCredsFetchTimeout, argocd.K8sClient, argocd.Namespace, appRepoURLs)
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to fetch repository credentials: %w", err)
 	}
@@ -175,7 +182,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, prRepo)
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector, kubeVersion, apiVersions, helmChartPuller{})
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -249,7 +256,10 @@ func renderApp(
 	branchFolderByType map[git.BranchType]string,
 	namespacedScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
-	prRepo string,
+	repoSelector *repository.Selector,
+	kubeVersion string,
+	apiVersions []string,
+	puller chartPuller,
 ) ([]unstructured.Unstructured, error) {
 	branchFolder, ok := branchFolderByType[app.Branch]
 	if !ok {
@@ -264,7 +274,20 @@ func renderApp(
 	var allManifestStrings []string
 
 	for i, contentSource := range contentSources {
-		request, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSource, refSources, hasMultipleSources, branchFolder, creds, prRepo)
+		request, streamDir, cleanup, err := buildManifestRequestForSource(
+			app,
+			contentSource,
+			refSources,
+			hasMultipleSources,
+			branchFolder,
+			creds,
+			manifestRequestRenderContext{
+				repoSelector: repoSelector,
+				kubeVersion:  kubeVersion,
+				apiVersions:  apiVersions,
+				puller:       puller,
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
 		}
@@ -493,6 +516,20 @@ func splitSources(app argoapplication.ArgoResource) (
 //
 // cleanup must be called by the caller when the stream directory is no longer
 // needed.
+// manifestRequestRenderContext groups render-run settings that every
+// ManifestRequest needs but that are not specific to a single source. Keeping
+// these values together avoids a long positional parameter list where adjacent
+// strings or slices can be accidentally swapped at call sites.
+type manifestRequestRenderContext struct {
+	repoSelector *repository.Selector
+	kubeVersion  string
+	apiVersions  []string
+	// puller fetches remote Helm charts so they can be streamed to the repo
+	// server together with same-repo $ref value files. When nil, remote charts
+	// with ref sources fall back to the unary GenerateManifest RPC.
+	puller chartPuller
+}
+
 func buildManifestRequestForSource(
 	app argoapplication.ArgoResource,
 	primarySource v1alpha1.ApplicationSource,
@@ -500,7 +537,7 @@ func buildManifestRequestForSource(
 	hasMultipleSources bool,
 	branchFolder string,
 	creds *RepoCreds,
-	prRepo string,
+	renderContext manifestRequestRenderContext,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
 	obj := app.Yaml.Object
 
@@ -523,6 +560,8 @@ func buildManifestRequestForSource(
 			AppName:            app.Id,
 			Namespace:          namespace,
 			ApplicationSource:  source,
+			KubeVersion:        renderContext.kubeVersion,
+			ApiVersions:        renderContext.apiVersions,
 			HasMultipleSources: hasMultipleSources,
 			// Applications are patched to the default project before rendering. We
 			// allow all source repos here so repo-server does not replace Helm
@@ -533,12 +572,17 @@ func buildManifestRequestForSource(
 		}
 	}
 
-	// ── Fast path: no ref sources → stream the whole branch folder ────────────
-	// The repo server resolves ApplicationSource.Path relative to the stream
-	// root (workDir), so streaming the entire branch folder and setting Path
-	// correctly is sufficient. This also handles kustomize overlays that
-	// reference sibling directories (e.g. ../../base) which would be missing
-	// if we only copied the leaf path into a temp dir.
+	// Fast path: no ref sources.
+	// The repo server resolves ApplicationSource.Path relative to the stream root
+	// (workDir). For local Helm charts, stream the chart directory as the workDir
+	// root and clear Path in the request. This avoids sending unrelated monorepo
+	// files to the repo server, which can otherwise fail Argo CD's symlink safety
+	// checks before rendering even starts. If a path also contains a kustomization
+	// file, keep the branch root because Argo CD discovers it as Kustomize even
+	// when Chart.yaml exists for kustomize helmCharts support. We also keep the
+	// branch root when the chart's helm.valueFiles reference files outside the
+	// chart directory, because those files would otherwise be missing from the
+	// narrowed stream (see buildStreamDirForLocalSource).
 	//
 	// Special case: if the primary source has a Chart field (external Helm
 	// registry chart) there are no local files to stream. We signal this by
@@ -546,24 +590,41 @@ func buildManifestRequestForSource(
 	// (non-file-streaming) GenerateManifest RPC instead.
 	if len(refSources) == 0 {
 		if primarySource.Chart != "" {
-			// Remote Helm chart – no local files to stream.
+			// Remote Helm chart - no local files to stream.
 			return newManifestRequest(&primarySource), "", nil, nil
 		}
 		// Cross-repo source: the source's repoURL points at a different
 		// repository than the PR repo. Those files are not checked out
 		// locally, so we cannot stream them. Fall back to the remote
 		// GenerateManifest RPC and let the repo server fetch them itself.
-		if prRepo != "" && !repoURLContains(primarySource.RepoURL, prRepo) {
+		if !renderContext.repoSelector.Matches(primarySource.RepoURL) {
 			log.Debug().
 				Str("App", app.GetLongName()).
 				Str("sourceRepoURL", primarySource.RepoURL).
-				Str("prRepo", prRepo).
+				Str("prRepo", renderContext.repoSelector.String()).
 				Msg("Source repoURL does not match PR repo - using remote RPC")
 			return newManifestRequest(&primarySource), "", nil, nil
 		}
-		return newManifestRequest(&primarySource), branchFolder, nil, nil
+		streamDir, cleanup, err := buildStreamDirForLocalSource(branchFolder, primarySource)
+		if err != nil {
+			if isLocalSourceMissing(err) {
+				log.Warn().
+					Str("App", app.GetLongName()).
+					Str("sourceRepoURL", primarySource.RepoURL).
+					Str("sourcePath", primarySource.Path).
+					Str("branchFolder", branchFolder).
+					Msg("⚠️ PR repo source is not present in the local branch folder - using remote RPC")
+				return newManifestRequest(&primarySource), "", nil, nil
+			}
+			return nil, "", nil, err
+		}
+		requestSource := primarySource
+		if streamDir != branchFolder {
+			requestSource.Path = ""
+		}
+		return newManifestRequest(&requestSource), streamDir, cleanup, nil
 	}
-	// ── Slow path: ref sources present ───────────────────────────────────────
+	// Slow path: ref sources present
 	//
 	// Special case: external Helm chart primary source WITH ref sources.
 	// Example pattern (cluster-common-charts ApplicationSet):
@@ -572,45 +633,71 @@ func buildManifestRequestForSource(
 	//     - chart: cert-manager  repoURL: https://charts.jetstack.io  ← primary
 	//       helm.valueFiles: [$local/path/to/values.yaml]
 	//
-	// We cannot stream local files for a chart: source via GenerateManifestWithFiles
-	// because the repo server tries to read Chart.yaml from the tarball root and
-	// fails (the chart lives in an external registry, not in the tarball).
-	// Instead, use the unary GenerateManifest RPC and populate RefSources so the
-	// repo server fetches the ref content from its own git cache. The $ref/…
-	// value file paths are left unchanged (no rewriting needed).
+	// We cannot stream a chart: source for GenerateManifestWithFiles directly
+	// because the repo server reads Chart.yaml from the tarball root, which is
+	// empty (the chart lives in an external registry, not in the tarball).
+	//
+	// When every ref source lives in the PR repo (issue #441), the value files
+	// must come from the local base/target checkout so the diff reflects exactly
+	// what this run is comparing. The unary GenerateManifest RPC would make the
+	// repo server resolve those refs by fetching from the remote git repository,
+	// bypassing the local checkout and risking missing local or not-yet-fetched
+	// changes. Instead we pull the chart locally and stream it alongside the ref
+	// directories (see buildRemoteChartLocalRefsRequest), rendering with the
+	// checked-out value files.
+	//
+	// When a ref source lives in a different repository (issue #428), its files
+	// are not checked out locally, so we keep using the unary GenerateManifest
+	// RPC and populate RefSources so the repo server fetches the ref content
+	// from its own git cache.
 	if primarySource.Chart != "" {
-		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
-		for _, ref := range refSources {
-			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
-				Repo:           *creds.GetRepo(ref.RepoURL),
-				TargetRevision: ref.TargetRevision,
+		if renderContext.puller != nil && !hasExternalRefSource(refSources, renderContext.repoSelector) {
+			if available, reason := localRefSourcesAvailable(branchFolder, primarySource, refSources); !available {
+				log.Warn().
+					Str("App", app.GetLongName()).
+					Str("branchFolder", branchFolder).
+					Str("reason", reason).
+					Msg("⚠️ PR repo ref source is not present in the local branch folder - using remote RPC")
+				request = newManifestRequest(&primarySource)
+				request.RefSources = buildRefSourcesMap(refSources, creds)
+				return request, "", nil, nil
 			}
+			return buildRemoteChartLocalRefsRequest(
+				app, primarySource, refSources, branchFolder, creds, renderContext.puller, newManifestRequest)
 		}
 		request = newManifestRequest(&primarySource)
-		request.RefSources = refSourcesMap
+		request.RefSources = buildRefSourcesMap(refSources, creds)
 		return request, "", nil, nil
 	}
 
-	// ── Slow path: ref sources present - cross-repo primary source ────────────
+	// Slow path: ref sources present - cross-repo primary or ref source
 	// When the primary source lives in a different repository from the PR, we
 	// cannot stream its files locally. Use the remote RPC and let the repo
 	// server fetch both the primary content and the ref sources from their
 	// respective git caches. Value-file $ref/… paths are left unrewritten.
-	if prRepo != "" && !repoURLContains(primarySource.RepoURL, prRepo) {
+	// The same applies when a ref source lives outside the PR repository. Copying
+	// the local branch folder into .refs would provide the wrong repository
+	// content, especially for ref-only sources whose Path is empty.
+	if !renderContext.repoSelector.Matches(primarySource.RepoURL) || hasExternalRefSource(refSources, renderContext.repoSelector) {
 		log.Debug().
 			Str("App", app.GetLongName()).
 			Str("sourceRepoURL", primarySource.RepoURL).
-			Str("prRepo", prRepo).
-			Msg("Source repoURL does not match PR repo (slow path) - using remote RPC")
-		refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
-		for _, ref := range refSources {
-			refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
-				Repo:           *creds.GetRepo(ref.RepoURL),
-				TargetRevision: ref.TargetRevision,
-			}
-		}
+			Str("prRepo", renderContext.repoSelector.String()).
+			Msg("Source or ref repoURL does not match PR repo (slow path) - using remote RPC")
 		request = newManifestRequest(&primarySource)
-		request.RefSources = refSourcesMap
+		request.RefSources = buildRefSourcesMap(refSources, creds)
+		return request, "", nil, nil
+	}
+
+	if available, reason := localContentAndRefSourcesAvailable(branchFolder, primarySource, refSources); !available {
+		log.Warn().
+			Str("App", app.GetLongName()).
+			Str("sourceRepoURL", primarySource.RepoURL).
+			Str("branchFolder", branchFolder).
+			Str("reason", reason).
+			Msg("⚠️ PR repo source is not present in the local branch folder - using remote RPC")
+		request = newManifestRequest(&primarySource)
+		request.RefSources = buildRefSourcesMap(refSources, creds)
 		return request, "", nil, nil
 	}
 
@@ -634,8 +721,97 @@ func buildManifestRequestForSource(
 		return nil, "", nil, fmt.Errorf("failed to copy content source dir %q: %w", srcContentDir, err)
 	}
 
-	// Copy each ref source and build a ref name → local-path mapping.
-	refDirs := make(map[string]string) // ref name → absolute path inside tempDir
+	// Copy each ref source into <tempDir>/.refs/<refName>/.
+	refDirs, err := stageRefSources(tempDir, branchFolder, refSources)
+	if err != nil {
+		cleanup()
+		return nil, "", nil, err
+	}
+
+	// Rewrite $ref/… value-file paths to paths relative to the content dir.
+	appDirAbs := filepath.Join(tempDir, primarySource.Path)
+	rewrittenSource, err := rewriteRefValueFiles(primarySource, appDirAbs, refDirs, app.GetLongName())
+	if err != nil {
+		cleanup()
+		return nil, "", nil, err
+	}
+
+	request = newManifestRequest(&rewrittenSource)
+	return request, tempDir, cleanup, nil
+}
+
+// buildRemoteChartLocalRefsRequest renders a multi-source Application whose
+// primary source is a remote Helm chart and whose $ref value files all come
+// from the PR repository (issue #441). The remote chart is pulled into a temp
+// directory and streamed to the repo server together with the ref directories,
+// so the render uses the value files from the locally checked-out branch.
+//
+// The returned streamDir must be cleaned up by the caller via cleanup once the
+// repo server RPC completes.
+func buildRemoteChartLocalRefsRequest(
+	app argoapplication.ArgoResource,
+	primarySource v1alpha1.ApplicationSource,
+	refSources []v1alpha1.ApplicationSource,
+	branchFolder string,
+	creds *RepoCreds,
+	puller chartPuller,
+	newManifestRequest func(*v1alpha1.ApplicationSource) *repoapiclient.ManifestRequest,
+) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
+	tempDir, err := os.MkdirTemp("", "argocd-diff-preview-chart-*")
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	cleanup = func() {
+		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
+			log.Warn().Err(removeErr).Str("dir", tempDir).Msg("Failed to remove temp dir")
+		}
+	}
+
+	// Pull the remote chart into the streamed tree.
+	chartDir, err := puller.Pull(primarySource, creds, tempDir)
+	if err != nil {
+		cleanup()
+		return nil, "", nil, fmt.Errorf("failed to pull chart for app %s: %w", app.GetLongName(), err)
+	}
+
+	// Stage the same-repo ref sources next to the chart.
+	refDirs, err := stageRefSources(tempDir, branchFolder, refSources)
+	if err != nil {
+		cleanup()
+		return nil, "", nil, err
+	}
+
+	// Render the pulled chart as a local path chart: clear Chart, point Path at
+	// the extracted chart directory, and adopt the PR repository URL (the refs
+	// are same-repo, so they identify it) instead of the chart registry URL.
+	rewrittenSource := primarySource
+	rewrittenSource.Chart = ""
+	relChartPath, err := filepath.Rel(tempDir, chartDir)
+	if err != nil {
+		cleanup()
+		return nil, "", nil, fmt.Errorf("failed to compute chart path: %w", err)
+	}
+	rewrittenSource.Path = relChartPath
+	if len(refSources) > 0 {
+		rewrittenSource.RepoURL = refSources[0].RepoURL
+	}
+
+	// Rewrite $ref/… value-file paths to paths relative to the chart directory.
+	rewrittenSource, err = rewriteRefValueFiles(rewrittenSource, chartDir, refDirs, app.GetLongName())
+	if err != nil {
+		cleanup()
+		return nil, "", nil, err
+	}
+
+	return newManifestRequest(&rewrittenSource), tempDir, cleanup, nil
+}
+
+// stageRefSources copies each ref source's directory into
+// <tempDir>/.refs/<refName>/ and returns a map of ref name to absolute local
+// directory. A ref source with an empty Path points at the repository root
+// (branchFolder).
+func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.ApplicationSource) (map[string]string, error) {
+	refDirs := make(map[string]string, len(refSources))
 	for _, ref := range refSources {
 		refDir := filepath.Join(tempDir, ".refs", ref.Ref)
 		srcRefDir := filepath.Join(branchFolder, ref.Path)
@@ -644,46 +820,144 @@ func buildManifestRequestForSource(
 			srcRefDir = branchFolder
 		}
 		if err := copyDir(srcRefDir, refDir); err != nil {
-			cleanup()
-			return nil, "", nil, fmt.Errorf("failed to copy ref source %q: %w", ref.Ref, err)
+			return nil, fmt.Errorf("failed to copy ref source %q: %w", ref.Ref, err)
 		}
 		refDirs[ref.Ref] = refDir
 	}
+	return refDirs, nil
+}
 
-	// ── Rewrite $ref/… paths in Helm ValueFiles to relative paths ─────────────
-	rewrittenSource := primarySource
-	if rewrittenSource.Helm != nil {
-		rewritten := make([]string, len(rewrittenSource.Helm.ValueFiles))
-		copy(rewritten, rewrittenSource.Helm.ValueFiles)
-		appDirAbs := filepath.Join(tempDir, primarySource.Path)
-		for i, vf := range rewritten {
-			if !strings.HasPrefix(vf, "$") {
-				continue
-			}
-			refName, refPath, ok := splitRefPath(vf)
-			if !ok {
-				continue
-			}
-			refLocalDir, known := refDirs[refName]
-			if !known {
-				cleanup()
-				return nil, "", nil, fmt.Errorf("value file %q references unknown ref %q in app %s", vf, refName, app.GetLongName())
-			}
-			absTarget := filepath.Join(refLocalDir, refPath)
-			relPath, err := filepath.Rel(appDirAbs, absTarget)
-			if err != nil {
-				cleanup()
-				return nil, "", nil, fmt.Errorf("failed to compute relative path for ref value file: %w", err)
-			}
-			rewritten[i] = relPath
+// rewriteRefValueFiles returns a copy of source whose Helm $ref/… value-file
+// paths are rewritten to filesystem paths relative to appDirAbs, resolved
+// against the staged ref directories in refDirs. Non-$ref value files are left
+// untouched, and a source with no Helm config is returned unchanged. The
+// returned source carries a fresh Helm copy, so the caller's source is not
+// mutated.
+func rewriteRefValueFiles(
+	source v1alpha1.ApplicationSource,
+	appDirAbs string,
+	refDirs map[string]string,
+	appLongName string,
+) (v1alpha1.ApplicationSource, error) {
+	if source.Helm == nil {
+		return source, nil
+	}
+	rewritten := make([]string, len(source.Helm.ValueFiles))
+	copy(rewritten, source.Helm.ValueFiles)
+	for i, vf := range rewritten {
+		if !strings.HasPrefix(vf, "$") {
+			continue
 		}
-		helmCopy := *rewrittenSource.Helm
-		helmCopy.ValueFiles = rewritten
-		rewrittenSource.Helm = &helmCopy
+		refName, refPath, ok := splitRefPath(vf)
+		if !ok {
+			continue
+		}
+		refLocalDir, known := refDirs[refName]
+		if !known {
+			return source, fmt.Errorf("value file %q references unknown ref %q in app %s", vf, refName, appLongName)
+		}
+		relPath, err := filepath.Rel(appDirAbs, filepath.Join(refLocalDir, refPath))
+		if err != nil {
+			return source, fmt.Errorf("failed to compute relative path for ref value file: %w", err)
+		}
+		rewritten[i] = relPath
+	}
+	helmCopy := *source.Helm
+	helmCopy.ValueFiles = rewritten
+	source.Helm = &helmCopy
+	return source, nil
+}
+
+func buildStreamDirForLocalSource(branchFolder string, source v1alpha1.ApplicationSource) (streamDir string, cleanup func(), err error) {
+	if source.Path == "" {
+		return branchFolder, nil, nil
 	}
 
-	request = newManifestRequest(&rewrittenSource)
-	return request, tempDir, cleanup, nil
+	sourceDir := filepath.Join(branchFolder, source.Path)
+	if _, err := os.Stat(sourceDir); err != nil {
+		return "", nil, fmt.Errorf("failed to inspect source dir %q: %w", sourceDir, err)
+	}
+	if isLocalHelmChart(sourceDir) && !isKustomizeSource(sourceDir) && !hasOutOfChartValueFile(branchFolder, sourceDir, source) {
+		return sourceDir, nil, nil
+	}
+
+	return branchFolder, nil, nil
+}
+
+// hasOutOfChartValueFile reports whether any of the source's Helm valueFiles
+// resolves to a path outside the chart directory (sourceDir). Argo CD resolves
+// a leading-slash value file relative to the repository root and a relative
+// value file relative to the chart (app) directory, so a value file can escape
+// the chart directory either via an absolute "/path" or a relative "../path".
+//
+// When a value file lives outside the chart directory, narrowing the repo
+// server stream to only the chart directory would drop that file from the
+// tarball and the render would fail with "no such file or directory". In that
+// case the caller must keep streaming the whole branch folder so the
+// out-of-chart value files remain reachable. URL value files (e.g. https://…)
+// are remote and never force the branch root.
+func hasOutOfChartValueFile(branchFolder, sourceDir string, source v1alpha1.ApplicationSource) bool {
+	if source.Helm == nil {
+		return false
+	}
+
+	absSourceDir, err := filepath.Abs(sourceDir)
+	if err != nil {
+		// If we cannot reason about the path, fall back to the safe behaviour
+		// of streaming the whole branch folder.
+		return true
+	}
+	chartRoot := absSourceDir + string(os.PathSeparator)
+
+	for _, vf := range source.Helm.ValueFiles {
+		if vf == "" {
+			continue
+		}
+		// Skip $ref value files - this function is only reached on the fast
+		// path where there are no ref sources, but be defensive.
+		if strings.HasPrefix(vf, "$") {
+			continue
+		}
+		// Skip remote URL value files (e.g. https://...). A URL has a scheme
+		// and is fetched by the repo server, not read from the tarball.
+		if u, parseErr := url.Parse(vf); parseErr == nil && u.Scheme != "" {
+			continue
+		}
+
+		var resolved string
+		if filepath.IsAbs(vf) {
+			// Leading-slash value files are resolved relative to the repo root.
+			abs, absErr := filepath.Abs(branchFolder)
+			if absErr != nil {
+				return true
+			}
+			resolved = filepath.Join(abs, vf)
+		} else {
+			// Relative value files are resolved relative to the chart directory.
+			resolved = filepath.Join(absSourceDir, vf)
+		}
+
+		if resolved != absSourceDir && !strings.HasPrefix(resolved+string(os.PathSeparator), chartRoot) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isLocalHelmChart(sourceDir string) bool {
+	info, err := os.Stat(filepath.Join(sourceDir, "Chart.yaml"))
+	return err == nil && !info.IsDir()
+}
+
+func isKustomizeSource(sourceDir string) bool {
+	for _, filename := range []string{"kustomization.yaml", "kustomization.yml", "Kustomization"} {
+		info, err := os.Stat(filepath.Join(sourceDir, filename))
+		if err == nil && !info.IsDir() {
+			return true
+		}
+	}
+	return false
 }
 
 // splitRefPath splits a $refName/path/to/file value-file string into
@@ -706,6 +980,26 @@ func splitRefPath(valueFile string) (refName, path string, ok bool) {
 	return refName, path, true
 }
 
+func buildRefSourcesMap(refSources []v1alpha1.ApplicationSource, creds *RepoCreds) map[string]*v1alpha1.RefTarget {
+	refSourcesMap := make(map[string]*v1alpha1.RefTarget, len(refSources))
+	for _, ref := range refSources {
+		refSourcesMap["$"+ref.Ref] = &v1alpha1.RefTarget{
+			Repo:           *creds.GetRepo(ref.RepoURL),
+			TargetRevision: ref.TargetRevision,
+		}
+	}
+	return refSourcesMap
+}
+
+func hasExternalRefSource(refSources []v1alpha1.ApplicationSource, repoSelector *repository.Selector) bool {
+	for _, ref := range refSources {
+		if !repoSelector.Matches(ref.RepoURL) {
+			return true
+		}
+	}
+	return false
+}
+
 // copyDir recursively copies src into dst, creating dst if needed.
 func copyDir(src, dst string) error {
 	return filepath.Walk(src, func(srcPath string, info os.FileInfo, err error) error {
@@ -719,6 +1013,27 @@ func copyDir(src, dst string) error {
 		dstPath := filepath.Join(dst, rel)
 		if info.IsDir() {
 			return os.MkdirAll(dstPath, 0o755)
+		}
+		// filepath.Walk does not follow symlinks, so info describes the link
+		// itself (IsDir() is false even when it points at a directory). Passing
+		// such a link to copyFile would os.Open() the target directory and
+		// io.Copy() it, which fails with EISDIR ("is a directory"). Resolve the
+		// link and, when it targets a directory, recurse so the directory's
+		// contents are materialized at the destination — matching how Argo CD's
+		// repo-server reads a chart's on-disk content. This is common in charts
+		// that vendor assets via directory symlinks (e.g. files/sql -> ../../sql).
+		if info.Mode()&os.ModeSymlink != 0 {
+			target, err := os.Stat(srcPath)
+			if err != nil {
+				return err
+			}
+			if target.IsDir() {
+				resolved, err := filepath.EvalSymlinks(srcPath)
+				if err != nil {
+					return err
+				}
+				return copyDir(resolved, dstPath)
+			}
 		}
 		return copyFile(srcPath, dstPath)
 	})

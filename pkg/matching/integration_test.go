@@ -311,6 +311,86 @@ spec:
 	}
 }
 
+func TestGenerateAppDiffs_AppNameOnlyChange(t *testing.T) {
+	deploymentYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "old-app-id", "old-app-name", deploymentYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "new-app-id", "new-app-name", deploymentYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 3, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to generate app diffs: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 app diff for name-only change, got %d", len(diffs))
+	}
+
+	diff := diffs[0]
+	if diff.Action != ActionModified {
+		t.Fatalf("expected ActionModified, got %s", diff.Action)
+	}
+	if diff.PrettyName() != "old-app-name -> new-app-name" {
+		t.Fatalf("expected app rename in pretty name, got %q", diff.PrettyName())
+	}
+	if diff.EmptyReason != EmptyReasonNameOnlyChange {
+		t.Fatalf("expected EmptyReasonNameOnlyChange, got %d", diff.EmptyReason)
+	}
+	if len(diff.Resources) != 0 {
+		t.Fatalf("expected no resource diffs, got %d", len(diff.Resources))
+	}
+}
+
+func TestGenerateAppDiffs_AppIDOnlyChangeKeepsGeneratedSuffixHidden(t *testing.T) {
+	deploymentYAML := `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-app
+  namespace: default
+spec:
+  replicas: 1`
+
+	baseApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "eks-hotel-a-nonprod-tenant-egmont-it-cpt-eso", "eks-hotel-a-nonprod-tenant-egmont-it-cpt-eso", deploymentYAML),
+	}
+	targetApps := []extract.ExtractedApp{
+		makeAppFromYAML(t, "eks-hotel-a-nonprod-eso-1", "eks-hotel-a-nonprod-eso", deploymentYAML),
+	}
+
+	diffs, err := GenerateAppDiffs(baseApps, targetApps, 3, nil, nil)
+	if err != nil {
+		t.Fatalf("failed to generate app diffs: %v", err)
+	}
+
+	if len(diffs) != 1 {
+		t.Fatalf("expected 1 app diff for ID-only change, got %d", len(diffs))
+	}
+
+	diff := diffs[0]
+	if diff.Action != ActionModified {
+		t.Fatalf("expected ActionModified, got %s", diff.Action)
+	}
+	if diff.PrettyName() != "eks-hotel-a-nonprod-tenant-egmont-it-cpt-eso -> eks-hotel-a-nonprod-eso" {
+		t.Fatalf("expected app rename in pretty name, got %q", diff.PrettyName())
+	}
+	if strings.Contains(diff.PrettyName(), "-eso-1") {
+		t.Fatalf("expected generated ID suffix to stay hidden, got %q", diff.PrettyName())
+	}
+	if diff.EmptyReason != EmptyReasonNameOnlyChange {
+		t.Fatalf("expected EmptyReasonNameOnlyChange, got %d", diff.EmptyReason)
+	}
+}
+
 // TestFullFlow_UnchangedResourcesFiltered tests that identical resources don't appear in diff
 func TestFullFlow_UnchangedResourcesFiltered(t *testing.T) {
 	deploymentYAML := `apiVersion: apps/v1

@@ -5,11 +5,20 @@ import (
 	"testing"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
+
+func mustNewTestSelector(t *testing.T, repo, regex string) *repository.Selector {
+	t.Helper()
+	selector, err := repository.NewSelector(repo, regex)
+	require.NoError(t, err)
+	return selector
+}
 
 func TestRedirectGenerators(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.FatalLevel)
@@ -511,6 +520,27 @@ func TestRedirectGenerators(t *testing.T) {
 			expectErr:         nil,
 		},
 		{
+			name: "application set with git generator repoURL sharing prefix is not redirected",
+			yaml: applicationSetSpec(`
+    generators:
+        - git:
+            repoURL: https://github.com/org/repo-deploy.git
+            revision: HEAD
+            files:
+                - path: config.yaml
+`),
+			want: applicationSetSpec(`
+    generators:
+        - git:
+            repoURL: https://github.com/org/repo-deploy.git
+            revision: HEAD
+            files:
+                - path: config.yaml
+`),
+			redirectRevisions: []string{},
+			expectErr:         nil,
+		},
+		{
 			name: "application set with merge generator containing only non-git generators",
 			yaml: applicationSetSpec(`
     generators:
@@ -564,7 +594,9 @@ func TestRedirectGenerators(t *testing.T) {
 			}
 
 			// Run redirect generators
-			err = app.RedirectGenerators(repo, branch, tt.redirectRevisions)
+			repoSelector, selectorErr := repository.NewSelector(repo, "")
+			require.NoError(t, selectorErr)
+			err = app.RedirectGenerators(repoSelector, branch, tt.redirectRevisions)
 
 			// Check result
 			if tt.expectErr == nil {
@@ -1260,6 +1292,42 @@ spec:
 `,
 		},
 		{
+			name: "source revision not redirected when repoURL only shares prefix",
+			kind: Application,
+			inputYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prefix-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo-deploy.git
+    targetRevision: HEAD
+    path: apps/prefix-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+			wantYAML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prefix-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/org/repo-deploy.git
+    targetRevision: HEAD
+    path: apps/prefix-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`,
+		},
+		{
 			name: "specific redirectRevisions: only matching revision is redirected",
 			kind: Application,
 			inputYAML: `
@@ -1396,7 +1464,9 @@ spec:
 			redirectRevisions := tt.redirectRevisions
 
 			// ── Normal cases ────────────────────────────────────────────────
-			patched, err := PatchApplication(argocdNamespace, *resource, branch, prRepo, redirectRevisions)
+			repoSelector, selectorErr := repository.NewSelector(prRepo, "")
+			require.NoError(t, selectorErr)
+			patched, err := PatchApplication(argocdNamespace, *resource, branch, *repoSelector, redirectRevisions)
 			assert.NoError(t, err)
 			assert.NotNil(t, patched)
 
@@ -1410,6 +1480,48 @@ spec:
 			assert.Equal(t, normalizeYAML(tt.wantYAML), normalizeYAML(got))
 		})
 	}
+}
+
+func TestPatchApplication_RepoRegexRedirectsTemplatedSource(t *testing.T) {
+	branch := git.NewBranch("my-feature", git.Target)
+	var obj map[string]any
+	require.NoError(t, yaml.Unmarshal([]byte(`
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: templated-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: git@github.com:my-org/my-repo-{{.metadata.annotations.repo}}-overrides.git
+    targetRevision: HEAD
+    path: apps/templated-app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+`), &obj))
+	resource := &ArgoResource{
+		Yaml:     &unstructured.Unstructured{Object: obj},
+		Kind:     Application,
+		Id:       "test-id",
+		Name:     "templated-app",
+		FileName: "test.yaml",
+	}
+
+	patched, err := PatchApplication(
+		"argocd",
+		*resource,
+		branch,
+		*mustNewTestSelector(t, "my-org/my-repo", `^git@github\.com:my-org/my-repo-[^/]+-overrides$`),
+		nil,
+	)
+	require.NoError(t, err)
+
+	targetRevision, found, err := unstructured.NestedString(patched.Yaml.Object, "spec", "source", "targetRevision")
+	require.NoError(t, err)
+	require.True(t, found)
+	assert.Equal(t, "my-feature", targetRevision)
 }
 
 func TestRedirectSourceHydrator(t *testing.T) {

@@ -9,15 +9,14 @@ This directory contains integration tests for `argocd-diff-preview`. These tests
 ### Quick Reference
 
 ```bash
-# Build and run all integration tests with Go binary (CLI mode)
+# Build and run all integration tests with Go binary using the default render method
 make run-integration-tests-go
 
-# Build and run all integration tests with Docker
+# Build and run all integration tests with Docker using the default render method
 make run-integration-tests-docker
 
-# Run with Argo CD server API mode
-make run-integration-tests-go-with-api
-make run-integration-tests-docker-with-api
+# Run with Argo CD CLI mode
+make run-integration-tests-go-with-cli
 
 # Run with Argo CD repo server API mode (experimental)
 make run-integration-tests-go-with-repo-server-api
@@ -35,14 +34,13 @@ make check-release
 
 | Make Target                                    | Description                                                                                   |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `run-integration-tests-go`                     | Builds Go binary, runs all tests in CLI mode                                                  |
-| `run-integration-tests-docker`                 | Builds Docker image, runs all tests using Docker                                              |
-| `run-integration-tests-go-with-api`            | Runs all tests forcing `--render-method=server-api`                                           |
-| `run-integration-tests-docker-with-api`        | Runs all tests with Docker + `--render-method=server-api`                                     |
+| `run-integration-tests-go`                     | Builds Go binary, runs all tests using the default render method                              |
+| `run-integration-tests-docker`                 | Builds Docker image, runs all tests using Docker and the default render method                 |
+| `run-integration-tests-go-with-cli`            | Runs all tests forcing `--render-method=cli`                                                  |
 | `run-integration-tests-go-with-repo-server-api`| Runs all tests forcing `--render-method=repo-server-api`                                      |
 | `run-integration-tests-docker-with-repo-server-api` | Runs all tests with Docker + `--render-method=repo-server-api`                          |
 | `update-integration-tests`                     | Regenerates expected output files (use after intentional changes)                             |
-| `check-release`                                | Full pre-release validation: lint → unit tests → Go (CLI) → Go (repo-server-api) → Docker (server-api) |
+| `check-release`                                | Full pre-release validation: lint → unit tests → Go (repo-server-api) → Go (CLI) → Docker default |
 | `check-release-repeat`                         | Runs `check-release` in a loop until failure (for catching flaky tests)                       |
 
 ### Running a Single Test
@@ -103,8 +101,8 @@ Tests can run in three modes, controlled by the `--render-method` flag:
 
 | Mode                                   | Cluster Roles | How it works                                   |
 | -------------------------------------- | ------------- | ---------------------------------------------- |
-| **`cli`** (default)                    | Enabled       | Uses `argocd` CLI to render manifests           |
-| **`server-api`**                       | Disabled      | Uses Argo CD REST API directly                 |
+| **`cli`**                              | Enabled       | Uses `argocd` CLI to render manifests           |
+| **`server-api`** (default)             | Disabled      | Uses Argo CD REST API directly                 |
 | **`repo-server-api`** (experimental)   | Disabled      | Calls the Argo CD repo-server gRPC API directly |
 
 When switching between modes that require different RBAC configurations, the cluster is automatically deleted and recreated.
@@ -184,6 +182,11 @@ Each `branch-N/target[-suffix]/` directory contains expected output files (`outp
 
 ### Branch 15: Additional Coverage
 - `target`: Basic diff (no special options)
+
+### Branch 16-18: repo-server-api Render Method
+- `branch-16/target`: Config Management Plugin (kustomize-build-with-helm) via `repo-server-api`
+- `branch-17/target-1` / `target-2`: App-of-apps traversal via `repo-server-api`
+- `branch-18/target`: Single-source local Helm chart whose `helm.valueFiles` reference a file OUTSIDE the chart directory via a repo-root-absolute path (`/examples/out-of-chart-values/env/values.yaml`). Regression test for `repo-server-api`: the tool must stream the whole branch folder so the out-of-chart value file is reachable, otherwise the render fails with `no such file or directory`.
 
 ## Prerequisites
 

@@ -5,14 +5,14 @@ This document describes all the available options for `argocd-diff-preview`. Opt
 ## Usage
 
 ```bash
-argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-branch>
+argocd-diff-preview [FLAGS] [OPTIONS] (--repo <repo> | --repo-regex <regex>) --target-branch <target-branch>
 ```
 
 ## Required Options
 
 | Flag                                    | Environment Variable | Description                                                                      |
 | --------------------------------------- | -------------------- | -------------------------------------------------------------------------------- |
-| `--repo <repo>`                         | `REPO`               | Git Repository in format `OWNER/REPO` (e.g., `dag-andersen/argocd-diff-preview`) |
+| `--repo <repo>` or `--repo-regex <regex>` | `REPO` or `REPO_REGEX` | Git repository in format `OWNER/REPO`, or a regex for templated Argo CD repoURL values. These options are mutually exclusive |
 | `--target-branch <target-branch>`, `-t` | `TARGET_BRANCH`      | Target branch name (the branch you want to compare with the base branch)         |
 
 ## Flags
@@ -63,8 +63,9 @@ argocd-diff-preview [FLAGS] [OPTIONS] --repo <repo> --target-branch <target-bran
 | `--log-format <format>`                   | `LOG_FORMAT`                 | `human`                                | Log format. Options: `human`, `json`                                                        |
 | `--max-diff-length <length>`              | `MAX_DIFF_LENGTH`            | `65536`                                | Max diff message character count (only limits the generated Markdown file)                  |
 | `--output-folder <folder>`, `-o`          | `OUTPUT_FOLDER`              | `./output`                             | Output folder where the diff will be saved                                                  |
-| `--redirect-target-revisions <revs>`      | `REDIRECT_TARGET_REVISIONS`  | -                                      | List of target revisions to redirect                                                        |
+| `--redirect-target-revisions <revs>`      | `REDIRECT_TARGET_REVISIONS`  | -                                      | Comma-separated source targetRevision values to redirect to the target branch. Example: main,HEAD. By default, every targetRevision in matching repositories is redirected |
 | `--render-method <method>`                | `RENDER_METHOD`              | `server-api`                           | Manifest rendering method. Options: `cli`, `server-api`, `repo-server-api`                  |
+| `--repo-regex <regex>`                    | `REPO_REGEX`                 | -                                      | Advanced repository matcher for templated Argo CD repoURL values. Mutually exclusive with `--repo` |
 | `--secrets-folder <folder>`, `-s`         | `SECRETS_FOLDER`             | `./secrets`                            | Secrets folder where the secrets are read from                                              |
 | `--selector <selector>`, `-l`             | `SELECTOR`                   | -                                      | Label selector to filter on (e.g., `key1=value1,key2=value2`)                               |
 | `--timeout <seconds>`                     | `TIMEOUT`                    | `180`                                  | Set timeout in seconds                                                                      |

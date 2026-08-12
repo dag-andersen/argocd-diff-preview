@@ -35,6 +35,7 @@ const (
 	defaultMaxDiffLen = "65536"
 	defaultTitle      = "Argo CD Diff Preview"
 	argocdNamespace   = "argocd-diff-preview"
+	clusterName       = "argocd-diff-preview"
 )
 
 // TestCase defines a single integration test case
@@ -62,9 +63,21 @@ type TestCase struct {
 	RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global flag
 	DisableClusterRoles        string // Use no-cluster-roles/values.yaml (sets createClusterRoles: false)
 	ArgocdConfigDir            string // Custom argocd-config directory (relative to integration-test/); overrides auto-derived path
+	ArgocdConfigDirAPIMode     string // Custom argocd-config directory for API render modes; falls back to ArgocdConfigDir when empty
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
+	RepoRegex                  string // If set, use --repo-regex instead of --repo
 	ExpectFailure              bool   // If true, the test is expected to fail
+}
+
+type RunDirs struct {
+	Root         string
+	BaseBranch   string
+	TargetBranch string
+	Output       string
+	Secrets      string
+	Temp         string
+	KindConfig   string
 }
 
 // testCases defines all integration test cases matching the Makefile
@@ -223,6 +236,7 @@ var testCases = []TestCase{
 		BaseBranch:    "integration-test/branch-9/base",
 		Suffix:        "-3",
 		MaxDiffLength: "400",
+		RepoRegex:     "go.*diff-pre",
 	},
 	{
 		Name:                       "branch-10/target-1",
@@ -246,6 +260,8 @@ var testCases = []TestCase{
 		Suffix:                     "-1",
 		DiffIgnore:                 "annotations",
 		WatchIfNoWatchPatternFound: "false",
+		ArgocdConfigDir:            "with-servicemonitor-crd",
+		ArgocdConfigDirAPIMode:     "with-servicemonitor-crd-no-cluster-roles",
 	},
 	{
 		Name:                       "branch-12/target-2",
@@ -255,12 +271,15 @@ var testCases = []TestCase{
 		DiffIgnore:                 "annotations",
 		WatchIfNoWatchPatternFound: "false",
 		IgnoreResources:            "*:CustomResourceDefinition:*,:ConfigMap:argocd-cm",
+		ArgocdConfigDir:            "with-servicemonitor-crd",
+		ArgocdConfigDirAPIMode:     "with-servicemonitor-crd-no-cluster-roles",
 	},
 	{
 		Name:         "branch-13/target-1",
 		TargetBranch: "integration-test/branch-13/target",
 		BaseBranch:   "integration-test/branch-13/base",
 		Suffix:       "-1",
+		RepoRegex:    "-diff-",
 	},
 	{
 		Name:         "branch-13/target-2",
@@ -307,6 +326,19 @@ var testCases = []TestCase{
 		FileRegex:         "examples/app-of-apps/.*",
 		TraverseAppOfApps: "true",
 	},
+	// Regression test for a single-source local Helm chart whose helm.valueFiles
+	// reference a file OUTSIDE the chart directory via a repo-root-absolute path
+	// (/examples/out-of-chart-values/env/values.yaml). With repo-server-api the
+	// tool must stream the whole branch folder so the out-of-chart value file is
+	// reachable; otherwise the render fails with "no such file or directory".
+	{
+		Name:                       "branch-18/target",
+		TargetBranch:               "integration-test/branch-18/target",
+		BaseBranch:                 "integration-test/branch-18/base",
+		RenderMethod:               "repo-server-api",
+		FileRegex:                  "examples/out-of-chart-values/.*",
+		WatchIfNoWatchPatternFound: "false",
+	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.
@@ -340,7 +372,7 @@ var testCases = []TestCase{
 
 // effectiveRenderMethod returns the render mode that should be used for a test case.
 // tc.RenderMethod takes highest precedence, then the global -render-method flag.
-// Returns "" when the tool should use its own default (cli).
+// Returns "" when the tool should use its own default (server-api).
 func effectiveRenderMethod(tc TestCase) string {
 	if tc.RenderMethod != "" {
 		return tc.RenderMethod
@@ -352,6 +384,23 @@ func effectiveRenderMethod(tc TestCase) string {
 func isAPIMode(tc TestCase) bool {
 	m := effectiveRenderMethod(tc)
 	return m == "server-api" || m == "repo-server-api"
+}
+
+func effectiveArgocdConfigDir(tc TestCase) string {
+	if isAPIMode(tc) && tc.ArgocdConfigDirAPIMode != "" {
+		return tc.ArgocdConfigDirAPIMode
+	}
+	return tc.ArgocdConfigDir
+}
+
+func effectiveClusterConfig(tc TestCase) string {
+	if argocdConfigDir := effectiveArgocdConfigDir(tc); argocdConfigDir != "" {
+		return argocdConfigDir
+	}
+	if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
+		return "no-cluster-roles"
+	}
+	return "default"
 }
 
 // timePattern matches timing information in output that varies between runs
@@ -406,6 +455,7 @@ func TestIntegration(t *testing.T) {
 
 	// Track how many tests since last cluster creation
 	testsSinceClusterCreation := 0
+	currentClusterConfig := ""
 
 	// Run each test case
 	for i, tc := range shuffledCases {
@@ -416,18 +466,27 @@ func TestIntegration(t *testing.T) {
 
 		// Check current cluster state
 		clusterExists := kindClusterExists()
+		requiredClusterConfig := effectiveClusterConfig(tc)
 
-		// Check for RBAC mismatch (only relevant if cluster exists)
+		// Check for cluster configuration mismatch (only relevant if cluster exists).
+		// An empty currentClusterConfig means this test process did not create the
+		// existing cluster, so the Argo CD values are unknown and must not be reused.
 		if clusterExists {
 			clusterHasRoles := clusterHasArgocdClusterRoles()
 			// Mismatch if: test wants roles disabled but cluster has them, OR
 			//              test wants roles enabled but cluster doesn't have them
 			rbacMismatch := testNeedsRolesDisabled == clusterHasRoles
+			configMismatch := currentClusterConfig != requiredClusterConfig
 
-			if rbacMismatch {
-				printToTTY("🔄 Deleting cluster due to RBAC configuration mismatch...\n")
+			if rbacMismatch || configMismatch {
+				reason := "RBAC configuration mismatch"
+				if configMismatch {
+					reason = fmt.Sprintf("Argo CD config mismatch: current=%s, required=%s", currentClusterConfig, requiredClusterConfig)
+				}
+				printToTTY(fmt.Sprintf("🔄 Deleting cluster due to %s...\n", reason))
 				_ = deleteKindCluster()
 				clusterExists = false
+				currentClusterConfig = ""
 			}
 		}
 
@@ -435,6 +494,7 @@ func TestIntegration(t *testing.T) {
 		createCluster := testsSinceClusterCreation >= 15 || !clusterExists || tc.CreateCluster == "true"
 		if createCluster {
 			testsSinceClusterCreation = 0
+			currentClusterConfig = requiredClusterConfig
 		}
 
 		// Print separator to TTY for visibility between test runs
@@ -465,7 +525,7 @@ func kindClusterExists() bool {
 		return false
 	}
 	// Check if our cluster name is in the list
-	return slices.Contains(strings.Split(strings.TrimSpace(string(output)), "\n"), "argocd-diff-preview")
+	return slices.Contains(strings.Split(strings.TrimSpace(string(output)), "\n"), clusterName)
 }
 
 // clusterHasArgocdClusterRoles checks if the cluster has ArgoCD cluster roles installed.
@@ -540,7 +600,7 @@ func orderTestCases(cases []TestCase) []TestCase {
 
 // deleteKindCluster deletes the kind cluster used for testing
 func deleteKindCluster() error {
-	cmd := exec.Command("kind", "delete", "cluster", "--name", "argocd-diff-preview")
+	cmd := exec.Command("kind", "delete", "cluster", "--name", clusterName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -548,53 +608,67 @@ func deleteKindCluster() error {
 
 // runTestCase executes a single test case
 // createCluster indicates whether this test should create a new cluster (true for first test)
-// Both Go binary and Docker run from repo root for consistency
+// Both Go binary and Docker use the same isolated run directory so neither mode
+// accidentally depends on files from the repository root.
 func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 	// Force cluster creation if the test case requires it (e.g., for testing role changes)
 	if tc.CreateCluster == "true" {
 		createCluster = true
 	}
 
-	// All directories are at repo root (parent of integration-test/)
-	baseBranchDir := "../base-branch"
-	targetBranchDir := "../target-branch"
-	outputDir := "../output"
+	repoRoot, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("Failed to get repo root: %v", err)
+	}
+	runDirs := newRunDirs(repoRoot)
 
 	// Clean up from previous runs
-	cleanup(baseBranchDir, targetBranchDir, outputDir)
+	cleanup(runDirs.Root)
+	if err := os.MkdirAll(runDirs.Root, 0755); err != nil {
+		t.Fatalf("Failed to create run dir: %v", err)
+	}
+	if err := copyDir(filepath.Join(repoRoot, "integration-test", "secrets"), runDirs.Secrets); err != nil {
+		t.Fatalf("Failed to copy secrets fixture: %v", err)
+	}
+	if err := os.MkdirAll(runDirs.Temp, 0755); err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	if err := copyDir(filepath.Join(repoRoot, "kind-config"), runDirs.KindConfig); err != nil {
+		t.Fatalf("Failed to copy kind config: %v", err)
+	}
 
-	// Clone the repositories to repo root
-	if err := cloneBranch(tc.BaseBranch, baseBranchDir); err != nil {
+	// Clone the repositories to the run directory
+	if err := cloneBranch(tc.BaseBranch, runDirs.BaseBranch); err != nil {
 		t.Fatalf("Failed to clone base branch: %v", err)
 	}
-	if err := cloneBranch(tc.TargetBranch, targetBranchDir); err != nil {
+	if err := cloneBranch(tc.TargetBranch, runDirs.TargetBranch); err != nil {
 		t.Fatalf("Failed to clone target branch: %v", err)
 	}
 
 	// Run the tool
-	var err error
+	var runErr error
 	if *useDocker {
-		err = runWithDocker(tc, createCluster)
+		runErr = runWithDocker(tc, createCluster, runDirs)
 	} else {
-		err = runWithGoBinary(tc, createCluster)
+		runErr = runWithGoBinary(tc, createCluster, runDirs, repoRoot)
 	}
 
 	// Handle expected failures
 	if tc.ExpectFailure {
-		if err != nil {
-			t.Logf("Test failed as expected: %v", err)
+		if runErr != nil {
+			t.Logf("Test failed as expected: %v", runErr)
 			return // Success - we expected it to fail
 		}
 		t.Fatalf("Expected test to fail, but it succeeded")
 	}
 
-	if err != nil {
-		t.Fatalf("Failed to run tool: %v", err)
+	if runErr != nil {
+		t.Fatalf("Failed to run tool: %v", runErr)
 	}
 
 	// Check if output files were created (at repo root)
-	mdPath := filepath.Join(outputDir, "diff.md")
-	htmlPath := filepath.Join(outputDir, "diff.html")
+	mdPath := filepath.Join(runDirs.Output, "diff.md")
+	htmlPath := filepath.Join(runDirs.Output, "diff.html")
 
 	if _, err := os.Stat(mdPath); os.IsNotExist(err) {
 		t.Fatalf("Tool completed but did not create output file: %s (this may indicate the tool exited early without generating output)", mdPath)
@@ -605,7 +679,20 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 
 	// Compare outputs
 	expectedDir := getExpectedDir(tc)
-	compareOutput(t, tc, expectedDir, outputDir)
+	compareOutput(t, tc, expectedDir, runDirs.Output)
+}
+
+func newRunDirs(repoRoot string) RunDirs {
+	root := filepath.Join(repoRoot, "integration-test", "temp", "integration-run")
+	return RunDirs{
+		Root:         root,
+		BaseBranch:   filepath.Join(root, "base-branch"),
+		TargetBranch: filepath.Join(root, "target-branch"),
+		Output:       filepath.Join(root, "output"),
+		Secrets:      filepath.Join(root, "secrets"),
+		Temp:         filepath.Join(root, "temp"),
+		KindConfig:   filepath.Join(root, "kind-config"),
+	}
 }
 
 // cleanup removes directories from previous test runs
@@ -728,27 +815,25 @@ func buildDockerImage() error {
 	}
 	cmd := exec.Command("docker", "build", "-f", "Dockerfile", "-t", *dockerImage, ".")
 	cmd.Dir = repoRoot
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker build failed: %w\nDocker build output:\n%s", err, output)
+	}
+	return nil
 }
 
 // runWithGoBinary executes the test using the Go binary
-// Runs from repo root directory so it can find argocd-config/
-func runWithGoBinary(tc TestCase, createCluster bool) error {
-	args := buildArgs(tc, createCluster)
-
-	// Get repo root (parent of integration-test/)
-	repoRoot, err := filepath.Abs("..")
-	if err != nil {
-		return fmt.Errorf("failed to get repo root: %w", err)
-	}
+// Runs from a subdirectory so the binary does not accidentally depend on
+// ./argocd-config from the repository root. Tests that need custom Argo CD
+// values pass --argocd-config-dir explicitly.
+func runWithGoBinary(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string) error {
+	args := buildArgs(tc, createCluster, runDirs, repoRoot)
 
 	// Binary path is relative to repo root
 	absBinaryPath := filepath.Join(repoRoot, *binaryPath)
 
 	cmd := exec.Command(absBinaryPath, args...)
-	cmd.Dir = repoRoot // Run from repo root so it finds argocd-config/
+	cmd.Dir = runDirs.Root
 
 	// Try to get TTY for real-time output (Go test captures stdout/stderr)
 	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
@@ -788,7 +873,7 @@ func getDockerAPIVersion() string {
 
 // runWithDocker executes the test using Docker
 // Mounts volumes from repo root directory
-func runWithDocker(tc TestCase, createCluster bool) error {
+func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 	// Remove any existing container (ignore error - container may not exist)
 	_ = exec.Command("docker", "rm", "-f", "argocd-diff-preview").Run()
 
@@ -813,19 +898,19 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 		"--name=argocd-diff-preview",
 		"-v", fmt.Sprintf("%s/.kube:/root/.kube", homeDir),
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
-		"-v", fmt.Sprintf("%s/base-branch:/base-branch", repoRoot),
-		"-v", fmt.Sprintf("%s/target-branch:/target-branch", repoRoot),
-		"-v", fmt.Sprintf("%s/output:/output", repoRoot),
-		"-v", fmt.Sprintf("%s/secrets:/secrets", repoRoot),
-		"-v", fmt.Sprintf("%s/temp:/temp", repoRoot),
-		"-v", fmt.Sprintf("%s/kind-config:/kind-config", repoRoot),
+		"-v", fmt.Sprintf("%s:/base-branch", runDirs.BaseBranch),
+		"-v", fmt.Sprintf("%s:/target-branch", runDirs.TargetBranch),
+		"-v", fmt.Sprintf("%s:/output", runDirs.Output),
+		"-v", fmt.Sprintf("%s:/secrets", runDirs.Secrets),
+		"-v", fmt.Sprintf("%s:/temp", runDirs.Temp),
+		"-v", fmt.Sprintf("%s:/kind-config", runDirs.KindConfig),
 	}
 
 	// When using a custom ArgoCD config directory, mount the entire directory.
 	// Otherwise, when using API mode or DisableClusterRoles is set, mount only the values.yaml file
 	// (which sets createClusterRoles: false) into the default argocd-config path in the container.
-	if tc.ArgocdConfigDir != "" {
-		args = append(args, "-v", fmt.Sprintf("%s/integration-test/%s:/argocd-config", repoRoot, tc.ArgocdConfigDir))
+	if argocdConfigDir := effectiveArgocdConfigDir(tc); argocdConfigDir != "" {
+		args = append(args, "-v", fmt.Sprintf("%s/integration-test/%s:/argocd-config", repoRoot, argocdConfigDir))
 	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
 		args = append(args, "-v", fmt.Sprintf("%s/integration-test/no-cluster-roles/values.yaml:/argocd-config/values.yaml", repoRoot))
 	}
@@ -838,7 +923,11 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	// Add environment variables
 	args = append(args, "-e", fmt.Sprintf("BASE_BRANCH=%s", tc.BaseBranch))
 	args = append(args, "-e", fmt.Sprintf("TARGET_BRANCH=%s", tc.TargetBranch))
-	args = append(args, "-e", fmt.Sprintf("REPO=%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
+	if tc.RepoRegex != "" {
+		args = append(args, "-e", fmt.Sprintf("REPO_REGEX=%s", tc.RepoRegex))
+	} else {
+		args = append(args, "-e", fmt.Sprintf("REPO=%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
+	}
 	args = append(args, "-e", fmt.Sprintf("TIMEOUT=%s", defaultTimeout))
 	args = append(args, "-e", fmt.Sprintf("LINE_COUNT=%s", getLineCount(tc)))
 	args = append(args, "-e", fmt.Sprintf("MAX_DIFF_LENGTH=%s", getMaxDiffLength(tc)))
@@ -908,6 +997,7 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	args = append(args, *dockerImage)
 
 	cmd := exec.Command("docker", args...)
+	cmd.Dir = runDirs.Root
 
 	// Try to get TTY for real-time output (Go test captures stdout/stderr)
 	if tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
@@ -922,12 +1012,13 @@ func runWithDocker(tc TestCase, createCluster bool) error {
 	return cmd.Run()
 }
 
-// buildArgs constructs command line arguments for the Go binary
-func buildArgs(tc TestCase, createCluster bool) []string {
+// buildArgs constructs command line arguments for the Go binary.
+// The binary runs from runDirs.Root, so default branch and output folders are
+// resolved relative to that isolated integration workspace.
+func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string) []string {
 	args := []string{
 		"--base-branch", tc.BaseBranch,
 		"--target-branch", tc.TargetBranch,
-		"--repo", fmt.Sprintf("%s/%s", defaultGitHubOrg, defaultGitOpsRepo),
 		"--argocd-namespace", argocdNamespace,
 		"--timeout", defaultTimeout,
 		"--line-count", getLineCount(tc),
@@ -935,6 +1026,11 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 		"--title", getTitle(tc),
 		"--keep-cluster-alive",
 		"--disable-client-throttling",
+	}
+	if tc.RepoRegex != "" {
+		args = append(args, "--repo-regex", tc.RepoRegex)
+	} else {
+		args = append(args, "--repo", fmt.Sprintf("%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
 	}
 
 	// Don't keep cluster alive for tests that expect failure (cluster may be in broken state)
@@ -1003,10 +1099,10 @@ func buildArgs(tc TestCase, createCluster bool) []string {
 	// pass --argocd-config-dir pointing at the no-cluster-roles directory (createClusterRoles: false).
 	// If ArgocdConfigDir is explicitly set, use that directory instead.
 	// This avoids mutating the shared argocd-config/values.yaml on disk.
-	if tc.ArgocdConfigDir != "" {
-		args = append(args, "--argocd-config-dir", fmt.Sprintf("./integration-test/%s", tc.ArgocdConfigDir))
+	if argocdConfigDir := effectiveArgocdConfigDir(tc); argocdConfigDir != "" {
+		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", argocdConfigDir))
 	} else if tc.DisableClusterRoles == "true" || isAPIMode(tc) {
-		args = append(args, "--argocd-config-dir", "./integration-test/no-cluster-roles")
+		args = append(args, "--argocd-config-dir", filepath.Join(repoRoot, "integration-test", "no-cluster-roles"))
 	}
 
 	return args

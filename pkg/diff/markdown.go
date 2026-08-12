@@ -23,6 +23,8 @@ func emptyReasonMarkdown(reason matching.EmptyReason) string {
 		return "_Application rendered no resources_"
 	case matching.EmptyReasonHiddenDiff:
 		return "_Diff hidden because `--hide-deleted-app-diff` is enabled_"
+	case matching.EmptyReasonNameOnlyChange:
+		return "_Application name changed, but rendered resources are unchanged_"
 	default:
 		return "_Empty for unknown reason_"
 	}

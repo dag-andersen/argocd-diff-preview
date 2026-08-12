@@ -39,7 +39,7 @@ jobs:
             -v $(pwd)/output:/output \
             -e TARGET_BRANCH=refs/pull/${{ github.event.number }}/merge \
             -e REPO=${{ github.repository }} \
-            ghcr.io/lumyx-inc/argocd-diff-preview:v0.2.5
+            ghcr.io/lumyx-inc/argocd-diff-preview:v0.2.12
 
       - name: Post diff as comment
         run: |

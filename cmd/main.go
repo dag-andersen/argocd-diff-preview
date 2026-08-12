@@ -98,7 +98,7 @@ func run(cfg *Config) error {
 		baseBranch,
 		targetBranch,
 		appSelectionOptions,
-		cfg.Repo,
+		cfg.RepoSelector,
 		redirectRevisions,
 	)
 	if err != nil {
@@ -246,7 +246,7 @@ func run(cfg *Config) error {
 		targetApps,
 		baseBranch,
 		targetBranch,
-		cfg.Repo,
+		cfg.RepoSelector,
 		tempFolder,
 		redirectRevisions,
 		cfg.Debug,
@@ -330,9 +330,10 @@ func run(cfg *Config) error {
 				cfg.Concurrency,
 				baseApps.SelectedApps,
 				targetApps.SelectedApps,
-				cfg.Repo,
+				cfg.RepoSelector,
 				appSelectionOptions,
 				tempFolder,
+				redirectRevisions,
 			)
 		} else {
 			baseManifests, targetManifests, extractDuration, err = reposerverextract.RenderApplicationsFromBothBranches(
@@ -343,7 +344,7 @@ func run(cfg *Config) error {
 				cfg.Concurrency,
 				baseApps.SelectedApps,
 				targetApps.SelectedApps,
-				cfg.Repo,
+				cfg.RepoSelector,
 			)
 		}
 	} else {
@@ -448,7 +449,7 @@ func writeManifests(
 		if perApp {
 			// Always write the file, even if content is empty, so the user can see that
 			// an application existed but had no rendered output.
-			filePath := fmt.Sprintf("%s/%s", perAppFolder, app.Id)
+			filePath := fmt.Sprintf("%s/%s.yaml", perAppFolder, app.Id)
 			if err := utils.WriteFile(filePath, content); err != nil {
 				return fmt.Errorf("failed to write manifest for app %s: %w", app.Name, err)
 			}

@@ -6,6 +6,13 @@ This page outlines the core design principles behind `argocd-diff-preview`. Unde
     These design principles reflect our current thinking, but we're always open to discussion. If you have a different perspective, a use case we haven't considered, or ideas for improvement, please [open an issue](https://github.com/dag-andersen/argocd-diff-preview/issues) on GitHub. We welcome the discussion!
 
 
+## Avoid false negatives at almost all costs
+
+The most important thing this tool can do is earn the user's trust. A user should not look at a pull request after it has been merged and wonder: "Why did `argocd-diff-preview` not catch that?"
+
+For that reason, the tool is intentionally pessimistic when selecting and filtering Applications. It is better to render too many Applications than to accidentally miss one that should have been rendered. A noisy or slightly slower diff can usually be understood and improved, but a missed change can make users lose trust in the tool.
+
+
 ## Use Argo CD to render manifests - Don't reinvent the wheel
 
 Many alternative tools try to mimic or re-implement Argo CD's rendering logic. This is a losing battle because Argo CD's rendering logic is complex and constantly evolving. It supports Helm, Kustomize, plain YAML, Jsonnet, custom plugins, and combinations of all of these. Trying to replicate this logic outside of Argo CD inevitably leads to subtle differences that result in confusing diffs that don't reflect reality.

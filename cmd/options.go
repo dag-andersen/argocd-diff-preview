@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,9 +20,11 @@ import (
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k3d"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/kind"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/minikube"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/vars"
 )
@@ -97,6 +100,7 @@ type RawOptions struct {
 	BaseBranch                           string `mapstructure:"base-branch"`
 	TargetBranch                         string `mapstructure:"target-branch"`
 	Repo                                 string `mapstructure:"repo"`
+	RepoRegex                            string `mapstructure:"repo-regex"`
 	OutputFolder                         string `mapstructure:"output-folder"`
 	SecretsFolder                        string `mapstructure:"secrets-folder"`
 	CreateCluster                        bool   `mapstructure:"create-cluster"`
@@ -146,7 +150,7 @@ type Config struct {
 	LineCount                            uint
 	BaseBranch                           string
 	TargetBranch                         string
-	Repo                                 string
+	RepoSelector                         repository.Selector
 	OutputFolder                         string
 	SecretsFolder                        string
 	CreateCluster                        bool
@@ -302,7 +306,8 @@ func Parse() *Config {
 	// Git related
 	rootCmd.Flags().StringP("base-branch", "b", DefaultBaseBranch, "Base branch name")
 	rootCmd.Flags().StringP("target-branch", "t", "", "Target branch name (required)")
-	rootCmd.Flags().String("repo", "", "Git Repository. Format: OWNER/REPO (required)")
+	rootCmd.Flags().String("repo", "", "Git repository. Format: OWNER/REPO. Mutually exclusive with --repo-regex")
+	rootCmd.Flags().String("repo-regex", "", "Regex matched against normalized Argo CD repoURL values for templated repository URLs. Mutually exclusive with --repo")
 
 	// Folders
 	rootCmd.Flags().StringP("output-folder", "o", DefaultOutputFolder, "Output folder where the diff will be saved")
@@ -327,7 +332,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("auto-detect-files-changed", DefaultAutoDetectFilesChanged, "Auto detect files changed between branches")
 	rootCmd.Flags().Bool("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern, "Ignore invalid watch pattern Regex on Applications")
 	rootCmd.Flags().Bool("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound, "Render applications without watch pattern")
-	rootCmd.Flags().String("redirect-target-revisions", "", "List of target revisions to redirect")
+	rootCmd.Flags().String("redirect-target-revisions", "", "Comma-separated source targetRevision values to redirect to the target branch. Example: main,HEAD. By default, every targetRevision in matching repositories is redirected")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
@@ -373,8 +378,8 @@ func (o *RawOptions) checkRequired() []string {
 	if o.TargetBranch == "" {
 		errors = append(errors, "target-branch")
 	}
-	if o.Repo == "" {
-		errors = append(errors, "repo")
+	if o.Repo != "" && o.RepoRegex != "" {
+		errors = append(errors, "repo and repo-regex are mutually exclusive")
 	}
 	return errors
 }
@@ -390,7 +395,6 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		LineCount:                            o.LineCount,
 		BaseBranch:                           o.BaseBranch,
 		TargetBranch:                         o.TargetBranch,
-		Repo:                                 o.Repo,
 		OutputFolder:                         o.OutputFolder,
 		SecretsFolder:                        o.SecretsFolder,
 		CreateCluster:                        o.CreateCluster,
@@ -445,6 +449,13 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	cfg.FileRegex, err = o.parseFileRegex()
 	if err != nil {
 		return nil, fmt.Errorf("invalid file-regex: %w", err)
+	}
+
+	// Resolve the repository selector, auto-detecting from the checkout
+	// folders when neither --repo nor --repo-regex is provided.
+	cfg.RepoSelector, err = o.parseRepositorySelector(cfg.BaseBranch, cfg.TargetBranch)
+	if err != nil {
+		return nil, err
 	}
 
 	// Parse selectors
@@ -521,6 +532,42 @@ func (o *RawOptions) parseFileRegex() (*regexp.Regexp, error) {
 	return regexp.Compile(o.FileRegex)
 }
 
+// parseRepositorySelector returns a Repository Selector based on the repo or
+// repo-regex flags. When neither is set, it auto-detects the repository from
+// the base and target checkout folders (both must share the same origin
+// remote).
+func (o *RawOptions) parseRepositorySelector(baseBranch, targetBranch string) (repository.Selector, error) {
+	if o.Repo == "" && o.RepoRegex == "" {
+		return autoDetectRepositorySelector(baseBranch, targetBranch)
+	}
+
+	repoSelector, err := repository.NewSelector(o.Repo, o.RepoRegex)
+	if err != nil {
+		return repository.Selector{}, fmt.Errorf("invalid repo-regex: %w", err)
+	}
+	return *repoSelector, nil
+}
+
+// autoDetectRepositorySelector returns the owner/repo detected from the origin
+// remote shared by the base and target checkout folders.
+func autoDetectRepositorySelector(baseBranch, targetBranch string) (repository.Selector, error) {
+	baseFolder := git.NewBranch(baseBranch, git.Base).FolderName()
+	targetFolder := git.NewBranch(targetBranch, git.Target).FolderName()
+
+	repo, ok := repository.DetectMatchingOriginRepo(baseFolder, targetFolder)
+	if !ok {
+		return repository.Selector{}, fmt.Errorf("could not auto-detect repository. please provide --repo or --repo-regex")
+	}
+
+	repoSelector, err := repository.NewSelector(repo, "")
+	if err != nil {
+		return repository.Selector{}, fmt.Errorf("invalid auto-detected repository: %w", err)
+	}
+	repoSelector.IsAutoDetected = true
+
+	return *repoSelector, nil
+}
+
 // parseRedirectRevisions parses the redirect-target-revisions string into a slice of strings
 func (o *RawOptions) parseRedirectRevisions() []string {
 	if o.RedirectTargetRevisions == "" {
@@ -574,7 +621,13 @@ func (o *RawOptions) parseClusterType() (cluster.Provider, error) {
 	}
 
 	if !provider.IsInstalled() {
-		return nil, fmt.Errorf("%s is not installed", o.ClusterType)
+
+		errorMessage := fmt.Sprintf("%s is not installed", o.ClusterType)
+		inContainer := strings.ToLower(os.Getenv("IN_CONTAINER")) == "true"
+		if inContainer {
+			errorMessage = fmt.Sprintf("%s is not installed in container. Please use another cluster type or run argocd-diff-preview as a binary instead of using a container runtime", o.ClusterType)
+		}
+		return nil, errors.New(errorMessage)
 	}
 
 	return provider, nil
@@ -654,7 +707,16 @@ func (o *Config) LogConfig() {
 	if o.ArgocdConfigPath != DefaultArgocdConfigPath {
 		log.Info().Msgf("✨ - argocd-config-dir: %s", o.ArgocdConfigPath)
 	}
-	log.Info().Msgf("✨ - repo: %s", o.Repo)
+	if o.RepoSelector.Repo != "" {
+		if o.RepoSelector.IsAutoDetected {
+			log.Info().Msgf("✨ - repo: %s (auto-detected)", o.RepoSelector.Repo)
+		} else {
+			log.Info().Msgf("✨ - repo: %s", o.RepoSelector.Repo)
+		}
+	}
+	if o.RepoSelector.Regex != nil {
+		log.Info().Msgf("✨ - repo-regex: %s", o.RepoSelector.Regex.String())
+	}
 	log.Info().Msgf("✨ - timeout: %d seconds", o.Timeout)
 	if o.LogFormat != DefaultLogFormat {
 		log.Info().Msgf("✨ - log-format: %s", o.LogFormat)

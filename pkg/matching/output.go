@@ -86,6 +86,7 @@ const (
 	EmptyReasonNone        EmptyReason = iota // not empty - has resources
 	EmptyReasonNoResources                    // application genuinely rendered no resources
 	EmptyReasonHiddenDiff                     // diff hidden by --hide-deleted-app-diff
+	EmptyReasonNameOnlyChange                 // application name changed, but rendered resources did not
 )
 
 // DiffAction represents the type of change
@@ -246,7 +247,11 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *regexp.Regexp,
 	// Added/deleted apps with zero resources should still be reported.
 	if len(changedResources) == 0 {
 		if diff.Action == ActionModified {
-			diff.Action = ActionUnchanged
+			if diff.OldName != diff.NewName {
+				diff.EmptyReason = EmptyReasonNameOnlyChange
+			} else {
+				diff.Action = ActionUnchanged
+			}
 		} else {
 			diff.EmptyReason = EmptyReasonNoResources
 		}

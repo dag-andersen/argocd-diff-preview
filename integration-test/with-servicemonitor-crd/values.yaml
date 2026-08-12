@@ -1,0 +1,26 @@
+# Install the ServiceMonitor CRD in the test cluster so Argo CD discovers
+# monitoring.coreos.com/v1 and passes it to Helm as a cluster capability.
+# This lets tests cover charts that gate ServiceMonitor templates with
+# .Capabilities.APIVersions.Has "monitoring.coreos.com/v1".
+extraObjects:
+  - apiVersion: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    metadata:
+      name: servicemonitors.monitoring.coreos.com
+    spec:
+      group: monitoring.coreos.com
+      scope: Namespaced
+      names:
+        plural: servicemonitors
+        singular: servicemonitor
+        kind: ServiceMonitor
+        shortNames:
+          - smon
+      versions:
+        - name: v1
+          served: true
+          storage: true
+          schema:
+            openAPIV3Schema:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true

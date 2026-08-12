@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/repository"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -14,7 +15,7 @@ func patchApplications(
 	argocdNamespace string,
 	applications []ArgoResource,
 	branch *git.Branch,
-	repo string,
+	repoSelector repository.Selector,
 	redirectRevisions []string,
 ) ([]ArgoResource, error) {
 	var patchedApps []ArgoResource
@@ -24,7 +25,7 @@ func patchApplications(
 			argocdNamespace,
 			app,
 			branch,
-			repo,
+			repoSelector,
 			redirectRevisions,
 		)
 		if err != nil {
@@ -41,10 +42,9 @@ func PatchApplication(
 	argocdNamespace string,
 	app ArgoResource,
 	branch *git.Branch,
-	repo string,
+	repoSelector repository.Selector,
 	redirectRevisions []string,
 ) (*ArgoResource, error) {
-
 	// Chain the modifications
 	app.SetNamespace(argocdNamespace)
 
@@ -74,7 +74,7 @@ func PatchApplication(
 
 	// RedirectSourceHydrator must be called BEFORE RedirectSources so that
 	// the converted spec.source can have its targetRevision redirected
-	err = app.RedirectSourceHydrator(repo, branch.Name, redirectRevisions)
+	err = app.RedirectSourceHydrator(repoSelector.Repo, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to redirect source hydrator: %w", err)
@@ -86,13 +86,13 @@ func PatchApplication(
 		return nil, fmt.Errorf("failed to set Helm releaseName: %w", err)
 	}
 
-	err = app.RedirectSources(repo, branch.Name, redirectRevisions)
+	err = app.RedirectSources(&repoSelector, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to redirect sources: %w", err)
 	}
 
-	err = app.RedirectGenerators(repo, branch.Name, redirectRevisions)
+	err = app.RedirectGenerators(&repoSelector, branch.Name, redirectRevisions)
 	if err != nil {
 		log.Info().Msgf("❌ Failed to patch application: %s", app.GetLongName())
 		return nil, fmt.Errorf("failed to redirect generators: %w", err)
@@ -295,7 +295,7 @@ func (a *ArgoResource) RemoveSyncPolicy() error {
 }
 
 // RedirectSources updates the source/sources targetRevision to point to the specified branch
-func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []string) error {
+func (a *ArgoResource) RedirectSources(repoSelector *repository.Selector, branch string, redirectRevisions []string) error {
 	if a.Yaml == nil {
 		log.Warn().Str("patchType", "redirectSources").Str(a.Kind.ShortName(), a.GetLongName()).Msg("⚠️ No YAML for Application")
 		return nil
@@ -320,7 +320,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 
 	// Handle single source
 	if source, ok := specMap["source"].(map[string]any); ok {
-		if err := a.redirectSourceMap(source, repo, branch, redirectRevisions); err != nil {
+		if err := a.redirectSourceMap(source, repoSelector, branch, redirectRevisions); err != nil {
 			return err
 		}
 	}
@@ -330,7 +330,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 		if sources, ok := sourcesInterface.([]any); ok {
 			for _, sourceInterface := range sources {
 				if source, ok := sourceInterface.(map[string]any); ok {
-					if err := a.redirectSourceMap(source, repo, branch, redirectRevisions); err != nil {
+					if err := a.redirectSourceMap(source, repoSelector, branch, redirectRevisions); err != nil {
 						return err
 					}
 				}
@@ -347,7 +347,7 @@ func (a *ArgoResource) RedirectSources(repo, branch string, redirectRevisions []
 }
 
 // Helper function to redirect a single source
-func (a *ArgoResource) redirectSourceMap(source map[string]any, repo, branch string, redirectRevisions []string) error {
+func (a *ArgoResource) redirectSourceMap(source map[string]any, repoSelector *repository.Selector, branch string, redirectRevisions []string) error {
 	// Skip helm charts
 	if _, hasChart := source["chart"]; hasChart {
 		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msg("Found helm chart")
@@ -361,8 +361,8 @@ func (a *ArgoResource) redirectSourceMap(source map[string]any, repo, branch str
 		return nil
 	}
 
-	if !containsIgnoreCase(repoURL, repo) {
-		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
+	if !repoSelector.Matches(repoURL) {
+		log.Debug().Str("patchType", "redirectSource").Str(a.Kind.ShortName(), a.GetLongName()).Msgf("Skipping source: %s (repoURL does not match repository matcher)", repoURL)
 		return nil
 	}
 
@@ -391,7 +391,7 @@ func (a *ArgoResource) redirectSourceMap(source map[string]any, repo, branch str
 }
 
 // RedirectGenerators updates the git generator targetRevision to point to the specified branch
-func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions []string) error {
+func (a *ArgoResource) RedirectGenerators(repoSelector *repository.Selector, branch string, redirectRevisions []string) error {
 	// Only process ApplicationSets
 	if a.Kind != ApplicationSet || a.Yaml == nil {
 		return nil
@@ -405,7 +405,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 	}
 
 	// Process generators
-	if err := a.processGenerators(generators, repo, branch, redirectRevisions, "spec.generators", 0); err != nil {
+	if err := a.processGenerators(generators, repoSelector, branch, redirectRevisions, "spec.generators", 0); err != nil {
 		log.Error().Str("patchType", "redirectGenerators").Str("branch", branch).Str(a.Kind.ShortName(), a.GetLongName()).Err(err).Msg("error processing generators")
 		return err
 	}
@@ -415,7 +415,7 @@ func (a *ArgoResource) RedirectGenerators(repo, branch string, redirectRevisions
 }
 
 // processGenerators processes a slice of generators recursively
-func (a *ArgoResource) processGenerators(generators []any, repo, branch string, redirectRevisions []string, parent string, level int) error {
+func (a *ArgoResource) processGenerators(generators []any, repoSelector *repository.Selector, branch string, redirectRevisions []string, parent string, level int) error {
 	// Limit nesting level to prevent infinite recursion
 	if level > 2 {
 		return fmt.Errorf("too many levels of nested matrix generators in ApplicationSet: %s", a.Name)
@@ -458,7 +458,7 @@ func (a *ArgoResource) processGenerators(generators []any, repo, branch string, 
 
 			// Process nested generators
 			matrixParent := fmt.Sprintf("%s[%d].matrix.generators", parent, i)
-			if err := a.processGenerators(nestedGenSlice, repo, branch, redirectRevisions, matrixParent, level+1); err != nil {
+			if err := a.processGenerators(nestedGenSlice, repoSelector, branch, redirectRevisions, matrixParent, level+1); err != nil {
 				return err
 			}
 
@@ -489,7 +489,7 @@ func (a *ArgoResource) processGenerators(generators []any, repo, branch string, 
 
 			// Process nested generators
 			mergeParent := fmt.Sprintf("%s[%d].merge.generators", parent, i)
-			if err := a.processGenerators(nestedGenSlice, repo, branch, redirectRevisions, mergeParent, level+1); err != nil {
+			if err := a.processGenerators(nestedGenSlice, repoSelector, branch, redirectRevisions, mergeParent, level+1); err != nil {
 				return err
 			}
 
@@ -507,8 +507,8 @@ func (a *ArgoResource) processGenerators(generators []any, repo, branch string, 
 
 			// Check repoURL
 			repoURL, ok := gitMap["repoURL"].(string)
-			if !ok || !containsIgnoreCase(repoURL, repo) {
-				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msgf("Skipping source: %s (repoURL does not match %s)", repoURL, repo)
+			if !ok || !repoSelector.Matches(repoURL) {
+				log.Debug().Str(a.Kind.ShortName(), a.GetLongName()).Str("patchType", "redirectGenerators").Msgf("Skipping source: %s (repoURL does not match repository matcher)", repoURL)
 				continue
 			}
 
@@ -529,10 +529,6 @@ func (a *ArgoResource) processGenerators(generators []any, repo, branch string, 
 	}
 
 	return nil
-}
-
-func containsIgnoreCase(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
 
 // RedirectSourceHydrator converts sourceHydrator applications to regular applications.

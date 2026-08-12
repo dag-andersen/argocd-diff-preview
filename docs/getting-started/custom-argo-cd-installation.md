@@ -2,37 +2,102 @@
 
 Argo CD is installed using a [Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd). You can specify the Chart version with the `--argocd-chart-version` option. It defaults to the latest version.
 
-You can modify the Argo CD Helm Chart installation by providing the tool with a `values.yaml` file and mounting it in the `argocd-config` folder within the container. Check out all the available values in the [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd).
+You can modify the Argo CD Helm Chart installation by providing the tool with a `values.yaml` file in the Argo CD config directory. Check out all the available values in the [Argo CD Helm Chart](https://artifacthub.io/packages/helm/argo/argo-cd).
+
+When running through Docker, mount the file into `/argocd-config/values.yaml` inside the container. When running the standalone binary, place the file in `./argocd-config/values.yaml` or point `--argocd-config-dir` to another directory.
+
+You can see the default configuration in the repository under [`argocd-config`](https://github.com/dag-andersen/argocd-diff-preview/tree/main/argocd-config).
 
 *Example:*
 
 Here we set `configs.cm."kustomize.buildOptions"` in the Chart.
 
-```yaml title=".github/workflows/generate-diff.yml" linenums="1"
-jobs:
-  build:
-    ...
-    steps:
-      ...
-    - name: Set Argo CD Custom Values
-      run: |
-        cat > values.yaml << "EOF"
-        # set whatever helm values you want
-        configs:
-          cm:
-            kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm
-        EOF
+=== "Docker"
 
-    - name: Generate Diff
-      run: |
-        docker run \
-          --network=host \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          -v $(pwd)/main:/base-branch \
-          -v $(pwd)/pull-request:/target-branch \
-          -v $(pwd)/values.yaml:/argocd-config/values.yaml \   ⬅️ Mount values.yaml
+    ```yaml title=".github/workflows/generate-diff.yml" linenums="1"
+    jobs:
+      build:
+        ...
+        steps:
           ...
-```
+        - name: Set Argo CD Custom Values
+          run: |
+            cat > values.yaml << "EOF"
+            # set whatever helm values you want
+            configs:
+              cm:
+                kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm
+            EOF
+
+        - name: Generate Diff
+          run: |
+            docker run \
+              --network=host \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v $(pwd)/main:/base-branch \
+              -v $(pwd)/pull-request:/target-branch \
+              -v $(pwd)/values.yaml:/argocd-config/values.yaml \   ⬅️ Mount values.yaml
+              ...
+    ```
+
+=== "Binary"
+
+    The binary reads Argo CD Helm values from `./argocd-config` by default. Create that directory before running the tool:
+
+    ```yaml title=".github/workflows/generate-diff.yml" linenums="1"
+    jobs:
+      build:
+        ...
+        steps:
+          ...
+        - name: Set Argo CD Custom Values
+          run: |
+            mkdir -p argocd-config
+
+            cat > argocd-config/values.yaml << "EOF"
+            # set whatever helm values you want
+            configs:
+              cm:
+                kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm
+            EOF
+
+        - name: Generate Diff
+          run: |
+            argocd-diff-preview \
+              --repo <owner>/<repo> \
+              --base-branch <base-branch> \
+              --target-branch <target-branch>
+    ```
+
+    If you want to keep the Argo CD values file somewhere else, pass the directory with `--argocd-config-dir`:
+
+    ```yaml title=".github/workflows/generate-diff.yml" linenums="1"
+    jobs:
+      build:
+        ...
+        steps:
+          ...
+        - name: Set Argo CD Custom Values
+          run: |
+            mkdir -p custom-argocd-config
+
+            cat > custom-argocd-config/values.yaml << "EOF"
+            # set whatever helm values you want
+            configs:
+              cm:
+                kustomize.buildOptions: --load-restrictor LoadRestrictionsNone --enable-helm
+            EOF
+
+        - name: Generate Diff
+          run: |
+            argocd-diff-preview \
+              --repo <owner>/<repo> \
+              --base-branch <base-branch> \
+              --target-branch <target-branch> \
+              --argocd-config-dir ./custom-argocd-config
+    ```
+
+    The directory can contain `values.yaml` and `values-override.yaml`. If both files exist, the tool passes both files to Helm in that order, so `values-override.yaml` can override values from `values.yaml`.
 
 ---
 
@@ -44,46 +109,94 @@ You can install any [Argo CD Config Management Plugin](https://argo-cd.readthedo
 
 This example installs the [ArgoCD Lovely plugin](https://github.com/crumbhole/argocd-lovely-plugin) using the `values.yaml` file.
 
-```yaml title=".github/workflows/generate-diff.yml" linenums="1"
-jobs:
-  build:
-    ...
-    steps:
-      ...
-    - name: Set Argo CD Custom Values
-      run: |
-        cat > values.yaml << "EOF"
-        repoServer:
-          extraContainers:
-          # ArgoCD Lovely plugin - https://github.com/crumbhole/argocd-lovely-plugin
-            - name: lovely-plugin
-              image: ghcr.io/crumbhole/lovely:1.1.1
-              securityContext:  
-                runAsNonRoot: true
-                runAsUser: 999
-              volumeMounts:
-                  # Import the repo-server's plugin binary
-                - mountPath: /var/run/argocd
-                  name: var-files
-                - mountPath: /home/argocd/cmp-server/plugins
-                  name: plugins
-                - mountPath: /tmp
-                  name: lovely-tmp
-          volumes:
-            - emptyDir: {}
-              name: lovely-tmp
-        EOF
+=== "Docker"
 
-    - name: Generate Diff
-      run: |
-        docker run \
-          --network=host \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          -v $(pwd)/main:/base-branch \
-          -v $(pwd)/pull-request:/target-branch \
-          -v $(pwd)/values.yaml:/argocd-config/values.yaml \   ⬅️ Mount values.yaml
+    ```yaml title=".github/workflows/generate-diff.yml" linenums="1"
+    jobs:
+      build:
+        ...
+        steps:
           ...
-```
+        - name: Set Argo CD Custom Values
+          run: |
+            cat > values.yaml << "EOF"
+            repoServer:
+              extraContainers:
+              # ArgoCD Lovely plugin - https://github.com/crumbhole/argocd-lovely-plugin
+                - name: lovely-plugin
+                  image: ghcr.io/crumbhole/lovely:1.1.1
+                  securityContext:
+                    runAsNonRoot: true
+                    runAsUser: 999
+                  volumeMounts:
+                      # Import the repo-server's plugin binary
+                    - mountPath: /var/run/argocd
+                      name: var-files
+                    - mountPath: /home/argocd/cmp-server/plugins
+                      name: plugins
+                    - mountPath: /tmp
+                      name: lovely-tmp
+              volumes:
+                - emptyDir: {}
+                  name: lovely-tmp
+            EOF
+
+        - name: Generate Diff
+          run: |
+            docker run \
+              --network=host \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v $(pwd)/main:/base-branch \
+              -v $(pwd)/pull-request:/target-branch \
+              -v $(pwd)/values.yaml:/argocd-config/values.yaml \   ⬅️ Mount values.yaml
+              ...
+    ```
+
+=== "Binary"
+
+    Use the same Helm values, but write them to the config directory that the binary can read:
+
+    ```yaml title=".github/workflows/generate-diff.yml" linenums="1"
+    jobs:
+      build:
+        ...
+        steps:
+          ...
+        - name: Set Argo CD Custom Values
+          run: |
+            mkdir -p argocd-config
+
+            cat > argocd-config/values.yaml << "EOF"
+            repoServer:
+              extraContainers:
+              # ArgoCD Lovely plugin - https://github.com/crumbhole/argocd-lovely-plugin
+                - name: lovely-plugin
+                  image: ghcr.io/crumbhole/lovely:1.1.1
+                  securityContext:
+                    runAsNonRoot: true
+                    runAsUser: 999
+                  volumeMounts:
+                      # Import the repo-server's plugin binary
+                    - mountPath: /var/run/argocd
+                      name: var-files
+                    - mountPath: /home/argocd/cmp-server/plugins
+                      name: plugins
+                    - mountPath: /tmp
+                      name: lovely-tmp
+              volumes:
+                - emptyDir: {}
+                  name: lovely-tmp
+            EOF
+
+        - name: Generate Diff
+          run: |
+            argocd-diff-preview \
+              --repo <owner>/<repo> \
+              --base-branch <base-branch> \
+              --target-branch <target-branch>
+    ```
+
+    If the config directory is not named `argocd-config` or is not in the current working directory, add `--argocd-config-dir <path>` to the command.
 
 ---
 
@@ -91,12 +204,12 @@ jobs:
 
 If you use [KSOPS](https://github.com/viaduct-ai/kustomize-sops) as a kustomize exec plugin to generate Secrets from SOPS-encrypted files, you may run into two issues when running argocd-diff-preview in CI:
 
-1. **Kustomize build failures** — SOPS decryption keys aren't available in CI, so KSOPS generators fail.
-2. **Application CRD schema validation failures** — SOPS-encrypted Application manifests contain a top-level `.sops` metadata block that isn't part of the ArgoCD Application CRD schema.
+1. **Kustomize build failures** - SOPS decryption keys aren't available in CI, so KSOPS generators fail.
+2. **Application CRD schema validation failures** - SOPS-encrypted Application manifests contain a top-level `.sops` metadata block that isn't part of the ArgoCD Application CRD schema.
 
 ### Stub KSOPS plugin
 
-Install a fake `ksops` binary that returns an empty `ResourceList`. Kustomize treats the generator as successful, and all other resources (Deployments, Services, ConfigMaps, etc.) render correctly. Since both branches get the same stub, secrets are consistently absent from the diff — only non-secret changes show up.
+Install a fake `ksops` binary that returns an empty `ResourceList`. Kustomize treats the generator as successful, and all other resources (Deployments, Services, ConfigMaps, etc.) render correctly. Since both branches get the same stub, secrets are consistently absent from the diff - only non-secret changes show up.
 
 Add this to the `values.yaml` mounted at `--argocd-config-dir`:
 
@@ -138,7 +251,7 @@ repoServer:
 
 This workaround is only needed when the ArgoCD `Application` manifest itself is SOPS-encrypted (e.g. `my-app.sops.yaml` containing `kind: Application`). In that case, the top-level `.sops` metadata block added by SOPS isn't part of the Application CRD schema, so ArgoCD rejects it during validation.
 
-If your SOPS-encrypted files are only used as data sources for KSOPS generators (Secrets, ConfigMaps, etc.) rather than Application manifests, you don't need this step — the stub plugin above is sufficient.
+If your SOPS-encrypted files are only used as data sources for KSOPS generators (Secrets, ConfigMaps, etc.) rather than Application manifests, you don't need this step - the stub plugin above is sufficient.
 
 To fix this, strip the `.sops` block from encrypted Application files before running argocd-diff-preview:
 

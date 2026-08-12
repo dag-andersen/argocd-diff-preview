@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,13 +42,16 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) (time.Dur
 
 	log.Info().Msg("🚀 Creating k3d cluster...")
 
-	// Delete existing cluster if it exists
-	if output, err := runCommand("k3d", "cluster", "delete", clusterName); err != nil {
-		return time.Since(startTime), fmt.Errorf("failed to delete existing cluster: %s", output)
+	// Delete existing cluster if it exists.
+	if ClusterExists(clusterName) {
+		if output, err := runCommand("k3d", "cluster", "delete", clusterName); err != nil {
+			return time.Since(startTime), fmt.Errorf("failed to delete existing cluster: %s", output)
+		}
 	}
 
 	// Create new cluster
 	args := []string{"cluster", "create"}
+	args = append(args, defaultCreateOptions(wait)...)
 	if strings.TrimSpace(k3dOptions) != "" {
 		args = append(args, strings.Fields(k3dOptions)...)
 	}
@@ -66,6 +70,24 @@ func CreateCluster(clusterName, k3dOptions string, wait time.Duration) (time.Dur
 
 	log.Info().Msgf("🚀 Cluster created successfully in %s", duration.Round(time.Second))
 	return duration, nil
+}
+
+// defaultCreateOptions returns k3d options that make the local test cluster fast
+// and less sensitive to Docker Desktop disk pressure.
+func defaultCreateOptions(wait time.Duration) []string {
+	if wait <= 0 {
+		wait = 2 * time.Minute
+	}
+
+	return []string{
+		"--agents", "1",
+		"--timeout", strconv.Itoa(int(wait.Seconds())) + "s",
+		"--k3s-arg", "--disable=traefik@server:0",
+		"--k3s-arg", "--disable=servicelb@server:0",
+		"--k3s-arg", "--disable=metrics-server@server:0",
+		"--k3s-arg", "--kubelet-arg=eviction-hard=imagefs.available<100Mi,nodefs.available<100Mi@server:*;agent:*",
+		"--k3s-arg", "--kubelet-arg=eviction-minimum-reclaim=imagefs.available=50Mi,nodefs.available=50Mi@server:*;agent:*",
+	}
 }
 
 // ClusterExists checks if a cluster with the given name exists by parsing JSON output.
