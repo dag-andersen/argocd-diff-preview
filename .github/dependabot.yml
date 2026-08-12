@@ -35,11 +35,8 @@ updates:
       gomod-minor-patch:
         update-types: [minor, patch]
     ignore:
-      # k8s.io staging libs must stay on 0.34.x and Helm on 3.19.x until
-      # argo-cd (pinned to k8s.io/kubernetes v1.34.x) supports k8s 1.35+.
-      # k8s 1.35 removed legacy gogo-protobuf methods from k8s.io/api types
-      # that argo-cd v3.3.x's generated gRPC gateway code depends on.
+      # k8s.io staging libs must track the k8s.io/kubernetes minor that
+      # argo-cd pins (currently v1.36.x for argo-cd v3.5.x). Minor bumps only
+      # land together with an argo-cd upgrade, so ignore them here.
       - dependency-name: "k8s.io/*"
-        update-types: [version-update:semver-minor]
-      - dependency-name: "helm.sh/helm/v3"
         update-types: [version-update:semver-minor]

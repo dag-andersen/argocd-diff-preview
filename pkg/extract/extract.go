@@ -418,7 +418,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	return manifests, nil
 }
 
-// normalizeNamespaces uses Argo CD's DeduplicateTargetObjects to normalize namespaces on manifests.
+// normalizeNamespaces uses Argo CD's NormalizeTargetObjects to normalize namespaces on manifests.
 // This adds the destination namespace to namespaced resources that don't have one,
 // clears namespace from cluster-scoped resources, and deduplicates resources with the same key.
 // This matches the behavior of Argo CD's controller when processing target objects.
@@ -439,7 +439,9 @@ func normalizeNamespaces(
 	}
 
 	provider := &resourceInfoProvider{namespacedByGk: namespacedResources}
-	deduplicatedManifests, conditions, err := controller.DeduplicateTargetObjects(destNamespace, ptrManifests, provider)
+	// setAppInstance is a no-op: unlike Argo CD's controller we only normalize
+	// namespaces for diff rendering and never stamp tracking labels.
+	deduplicatedManifests, conditions, err := controller.NormalizeTargetObjects(destNamespace, ptrManifests, provider, func(*unstructured.Unstructured) error { return nil })
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalize namespaces: %w", err)
 	}
