@@ -846,13 +846,21 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 		return refDirs, nil
 	}
 
-	refPaths := append([]string{}, primarySource.Helm.ValueFiles...)
+	type refPathToStage struct {
+		path            string
+		ignoreIfMissing bool
+	}
+	refPaths := make([]refPathToStage, 0, len(primarySource.Helm.ValueFiles)+len(primarySource.Helm.FileParameters))
+	for _, valueFile := range primarySource.Helm.ValueFiles {
+		refPaths = append(refPaths, refPathToStage{path: valueFile, ignoreIfMissing: primarySource.Helm.IgnoreMissingValueFiles})
+	}
 	for _, fileParameter := range primarySource.Helm.FileParameters {
-		refPaths = append(refPaths, fileParameter.Path)
+		refPaths = append(refPaths, refPathToStage{path: fileParameter.Path})
 	}
 	stagedFiles := map[string]struct{}{}
 	fullyStagedRefs := map[string]struct{}{}
-	for _, refValuePath := range refPaths {
+	for _, refPathToStage := range refPaths {
+		refValuePath := refPathToStage.path
 		refName, refPath, ok := splitRefPath(refValuePath)
 		if !ok {
 			if strings.HasPrefix(refValuePath, "$") {
@@ -885,7 +893,7 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 			return nil, fmt.Errorf("invalid ref path %q for source %q: %w", refValuePath, refName, err)
 		}
 		if _, err := os.Stat(srcFile); err != nil {
-			if primarySource.Helm.IgnoreMissingValueFiles && errors.Is(err, os.ErrNotExist) {
+			if refPathToStage.ignoreIfMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			return nil, fmt.Errorf("failed to inspect ref path %q from source %q: %w", refValuePath, refName, err)

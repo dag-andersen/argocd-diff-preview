@@ -576,6 +576,16 @@ func TestStageRefSourcesDeduplicatesStaticPaths(t *testing.T) {
 	assert.FileExists(t, filepath.Join(refDirs["values"], "values.yaml"))
 }
 
+func TestStageRefSourcesDoesNotIgnoreMissingFileParameter(t *testing.T) {
+	_, err := stageRefSources(t.TempDir(), t.TempDir(), []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{
+			IgnoreMissingValueFiles: true,
+			FileParameters:          []v1alpha1.HelmFileParameter{{Name: "required", Path: "$values/missing.txt"}},
+		},
+	})
+	require.ErrorContains(t, err, "missing.txt")
+}
+
 func TestStageRefSourcesFallsBackForDynamicPaths(t *testing.T) {
 	branchFolder := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "environments"), 0o755))
