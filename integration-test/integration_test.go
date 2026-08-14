@@ -339,6 +339,18 @@ var testCases = []TestCase{
 		FileRegex:                  "examples/out-of-chart-values/.*",
 		WatchIfNoWatchPatternFound: "false",
 	},
+	// Regression test for global Kustomize build options in repo-server-api mode.
+	// The Kustomization loads a resource outside its application directory, which
+	// requires kustomize.buildOptions=--load-restrictor LoadRestrictionsNone.
+	{
+		Name:                       "branch-19/target",
+		TargetBranch:               "integration-test/branch-19/target",
+		BaseBranch:                 "integration-test/branch-19/base",
+		RenderMethod:               "repo-server-api",
+		ArgocdConfigDir:            "kustomize-build-options",
+		FileRegex:                  "examples/kustomize-build-options/.*",
+		WatchIfNoWatchPatternFound: "false",
+	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.

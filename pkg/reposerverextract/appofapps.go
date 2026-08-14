@@ -173,10 +173,12 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 	}
 
 	// Mirror Argo CD's API server: pass the global kustomize build options from argocd-cm on every request;
-	// the repo server never reads the ConfigMap.
+	// the repo server never reads the ConfigMap. Missing ConfigMap access must not prevent rendering,
+	// but applications that depend on global Kustomize options may then fail to render.
 	kustomizeBuildOptions, err := argocd.K8sClient.GetConfigMapValue(argocd.Namespace, "argocd-cm", "kustomize.buildOptions")
 	if err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get kustomize build options from argocd-cm: %w", err)
+		log.Warn().Err(err).Msg("⚠️ Unable to read kustomize.buildOptions from argocd-cm. Continuing without global Kustomize options; applications that depend on them may fail to render.")
+		kustomizeBuildOptions = ""
 	}
 
 	// Collect all unique repository URLs referenced by the Applications so that
