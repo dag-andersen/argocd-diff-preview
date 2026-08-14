@@ -310,7 +310,7 @@ func renderApp(
 			return nil, fmt.Errorf("invalid manifest request plan for content source %d: %w", i, err)
 		}
 
-		log.Info().
+		log.Debug().
 			Str("app", app.GetLongName()).
 			Int("sourceIndex", i).
 			Str("sourcePath", contentSource.Path).
