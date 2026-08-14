@@ -152,7 +152,7 @@ Each `branch-N/target[-suffix]/` directory contains expected output files (`outp
 
 ### Branch 5: Filtering Options
 - `target-1`: Filter by `--files-changed`
-- `target-2`: Filter by watch pattern in application
+- `target-2`: Filter by watch pattern in application; also verifies root `$ref` staging stays below a small repo-server archive limit
 - `target-3`: Files changed with no matching apps (empty result)
 - `target-4`: Filter by `--selector=team=my-team` with ArgoCD UI URL
 - `target-5`: Filter by selector with no matches; custom title

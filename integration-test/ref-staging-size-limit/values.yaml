@@ -1,0 +1,7 @@
+# The existing branch-5 repository compresses to roughly 2.8 MiB because it
+# contains unrelated docs assets. This test must only stream the chart and its
+# referenced $ref values.
+createClusterRoles: false
+configs:
+  params:
+    reposerver.streamed.manifest.max.tar.size: 100Ki

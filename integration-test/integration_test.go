@@ -131,6 +131,9 @@ var testCases = []TestCase{
 		FilesChanged:               "examples/helm/values/filtered.yaml",
 		WatchIfNoWatchPatternFound: "false",
 	},
+	// Also covers same-repository root $ref staging. The small repo-server
+	// archive limit only passes when the referenced values file is staged instead
+	// of copying the entire repository into .refs/local-files.
 	{
 		Name:                       "branch-5/target-2",
 		TargetBranch:               "integration-test/branch-5/target",
@@ -138,6 +141,8 @@ var testCases = []TestCase{
 		Suffix:                     "-2",
 		FilesChanged:               "examples/helm/applications/watch-pattern/valid-regex.yaml",
 		WatchIfNoWatchPatternFound: "false",
+		RenderMethod:               "repo-server-api",
+		ArgocdConfigDir:            "ref-staging-size-limit",
 	},
 	{
 		Name:                       "branch-5/target-3",
