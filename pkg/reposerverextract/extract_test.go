@@ -1745,6 +1745,8 @@ func TestCopyDir_FollowsDirectorySymlink(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(chart, "files"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(chart, "Chart.yaml"), []byte("name: c\n"), 0o644))
 	require.NoError(t, os.Symlink(external, filepath.Join(chart, "files", "sql")))
+	require.NoError(t, os.MkdirAll(filepath.Join(chart, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(chart, ".git", "config"), []byte("[core]\n"), 0o644))
 
 	dst := filepath.Join(root, "dst")
 	require.NoError(t, copyDir(chart, dst))
@@ -1754,4 +1756,5 @@ func TestCopyDir_FollowsDirectorySymlink(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(dst, "files", "sql", "V1__init.sql"))
 	require.NoError(t, err)
 	assert.Equal(t, "SELECT 1;", string(got))
+	assert.NoDirExists(t, filepath.Join(dst, ".git"), "Git metadata must not be copied into staging directories")
 }

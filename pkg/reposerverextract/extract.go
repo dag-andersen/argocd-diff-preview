@@ -1029,6 +1029,12 @@ func copyDir(src, dst string) error {
 		if err != nil {
 			return err
 		}
+		// Git metadata is never rendered and can be much larger than the
+		// working tree. The tarball compressor excludes it too, but skipping it
+		// here prevents needless temporary-disk I/O during staging.
+		if info.IsDir() && info.Name() == ".git" {
+			return filepath.SkipDir
+		}
 		rel, err := filepath.Rel(src, srcPath)
 		if err != nil {
 			return err
