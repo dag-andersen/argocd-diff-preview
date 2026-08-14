@@ -850,6 +850,8 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 	for _, fileParameter := range primarySource.Helm.FileParameters {
 		refPaths = append(refPaths, fileParameter.Path)
 	}
+	stagedFiles := map[string]struct{}{}
+	fullyStagedRefs := map[string]struct{}{}
 	for _, refValuePath := range refPaths {
 		refName, refPath, ok := splitRefPath(refValuePath)
 		if !ok {
@@ -862,8 +864,22 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 		if !found {
 			return nil, fmt.Errorf("ref path %q references unknown ref %q", refValuePath, refName)
 		}
+		if _, staged := fullyStagedRefs[refName]; staged {
+			continue
+		}
 
 		refRoot := localRefSourceRoot(branchFolder, ref)
+		// Argo CD expands variables in ref paths during rendering. Keep the
+		// existing full-ref behavior for dynamic paths because their final file
+		// name is not known while staging.
+		if strings.Contains(refPath, "$") {
+			if err := copyDir(refRoot, refDirs[refName]); err != nil {
+				return nil, fmt.Errorf("failed to stage dynamic ref source %q: %w", refName, err)
+			}
+			fullyStagedRefs[refName] = struct{}{}
+			continue
+		}
+
 		srcFile, relPath, err := resolveRefFilePath(refRoot, refPath)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ref path %q for source %q: %w", refValuePath, refName, err)
@@ -874,9 +890,14 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 			}
 			return nil, fmt.Errorf("failed to inspect ref path %q from source %q: %w", refValuePath, refName, err)
 		}
+		stagingKey := refName + "\x00" + relPath
+		if _, staged := stagedFiles[stagingKey]; staged {
+			continue
+		}
 		if err := copyFile(srcFile, filepath.Join(refDirs[refName], relPath)); err != nil {
 			return nil, fmt.Errorf("failed to stage ref path %q from source %q: %w", refValuePath, refName, err)
 		}
+		stagedFiles[stagingKey] = struct{}{}
 	}
 	return refDirs, nil
 }

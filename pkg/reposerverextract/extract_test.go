@@ -562,6 +562,34 @@ func TestStageRefSourcesRejectsMalformedRefPath(t *testing.T) {
 	require.ErrorContains(t, err, "invalid ref path")
 }
 
+func TestStageRefSourcesDeduplicatesStaticPaths(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("replicas: 2\n"), 0o644))
+
+	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{
+			ValueFiles:     []string{"$values/values.yaml", "$values/values.yaml"},
+			FileParameters: []v1alpha1.HelmFileParameter{{Name: "copy", Path: "$values/values.yaml"}},
+		},
+	})
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(refDirs["values"], "values.yaml"))
+}
+
+func TestStageRefSourcesFallsBackForDynamicPaths(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "environments"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "environments", "my-app.yaml"), []byte("replicas: 2\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "unrelated.yaml"), []byte("present: true\n"), 0o644))
+
+	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values/environments/$ARGOCD_APP_NAME.yaml"}},
+	})
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(refDirs["values"], "environments", "my-app.yaml"))
+	assert.FileExists(t, filepath.Join(refDirs["values"], "unrelated.yaml"), "dynamic paths must preserve full-ref staging")
+}
+
 func TestBuildManifestRequest_ExternalChart_WithRefAndPath_GH401(t *testing.T) {
 	// Exact reproduction of https://github.com/dag-andersen/argocd-diff-preview/issues/401
 	//
