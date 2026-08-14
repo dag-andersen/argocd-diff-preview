@@ -24,11 +24,22 @@ import (
 //
 // So compress once per directory and hand out read-only handles to the result.
 type tgzEntry struct {
-	once     sync.Once
-	path     string
-	checksum string
-	files    int
-	err      error
+	once                sync.Once
+	path                string
+	checksum            string
+	files               int
+	compressionDuration time.Duration
+	err                 error
+}
+
+type tgzArchive struct {
+	file                *os.File
+	checksum            string
+	files               int
+	bytes               int64
+	cacheHit            bool
+	compressionDuration time.Duration
+	cacheWaitDuration   time.Duration
 }
 
 type tgzCompressor func(appDir string, included []string, excluded []string) (*os.File, int, string, error)
@@ -74,7 +85,7 @@ func newTgzCacheWithCompressor(compress tgzCompressor) *tgzCache {
 //
 // The caller must open its own handle: the archive is read to EOF per request and
 // seeked back on retry, so a shared *os.File would race across goroutines.
-func (c *tgzCache) compressCached(appDir string) (*tgzEntry, error) {
+func (c *tgzCache) compressCached(appDir string) (*tgzEntry, bool, error) {
 	c.requests.Add(1)
 
 	c.mu.Lock()
@@ -92,7 +103,8 @@ func (c *tgzCache) compressCached(appDir string) (*tgzEntry, error) {
 	entry.once.Do(func() {
 		compressStart := time.Now()
 		file, files, checksum, err := c.compress(appDir, []string{"*"}, []string{".git"})
-		c.compressionNanos.Add(int64(time.Since(compressStart)))
+		entry.compressionDuration = time.Since(compressStart)
+		c.compressionNanos.Add(int64(entry.compressionDuration))
 		if err != nil {
 			entry.err = err
 			return
@@ -111,7 +123,7 @@ func (c *tgzCache) compressCached(appDir string) (*tgzEntry, error) {
 		c.hitWaitNanos.Add(int64(time.Since(waitStart)))
 	}
 
-	return entry, entry.err
+	return entry, hit, entry.err
 }
 
 func (c *tgzCache) stats() tgzCacheStats {
@@ -147,17 +159,32 @@ func (c *tgzCache) logStats() {
 
 // openCachedTgz returns a fresh read handle on the archive for appDir, compressing
 // it first if this is the first caller.
-func (c *tgzCache) openCachedTgz(appDir string) (*os.File, string, int, error) {
-	entry, err := c.compressCached(appDir)
+func (c *tgzCache) openCachedTgz(appDir string) (*tgzArchive, error) {
+	waitStart := time.Now()
+	entry, cacheHit, err := c.compressCached(appDir)
+	cacheWaitDuration := time.Since(waitStart)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, err
 	}
 
 	file, err := os.Open(entry.path)
 	if err != nil {
-		return nil, "", 0, err
+		return nil, err
 	}
-	return file, entry.checksum, entry.files, nil
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	return &tgzArchive{
+		file:                file,
+		checksum:            entry.checksum,
+		files:               entry.files,
+		bytes:               info.Size(),
+		cacheHit:            cacheHit,
+		compressionDuration: entry.compressionDuration,
+		cacheWaitDuration:   cacheWaitDuration,
+	}, nil
 }
 
 // Cleanup removes every cached archive. Safe to call more than once.

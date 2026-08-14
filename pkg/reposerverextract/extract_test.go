@@ -38,6 +38,154 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func TestManifestRequestPlanValidate(t *testing.T) {
+	request := &repoapiclient.ManifestRequest{}
+
+	tests := []struct {
+		name    string
+		plan    manifestRequestPlan
+		wantErr string
+	}{
+		{name: "remote", plan: manifestRequestPlan{request: request, route: manifestRenderRouteRemoteRPC}},
+		{name: "streamed", plan: manifestRequestPlan{request: request, streamDir: "/tmp/source", route: manifestRenderRouteSourceDirectory}},
+		{name: "missing request", plan: manifestRequestPlan{route: manifestRenderRouteRemoteRPC}, wantErr: "no request"},
+		{name: "remote with stream", plan: manifestRequestPlan{request: request, streamDir: "/tmp/source", route: manifestRenderRouteRemoteRPC}, wantErr: "unexpectedly has a stream directory"},
+		{name: "stream without directory", plan: manifestRequestPlan{request: request, route: manifestRenderRouteBranchRoot}, wantErr: "has no stream directory"},
+		{name: "unknown route", plan: manifestRequestPlan{request: request, route: "unknown"}, wantErr: "unknown route"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.plan.validate()
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestBuildManifestRequestPlanRoutes(t *testing.T) {
+	t.Run("source directory", func(t *testing.T) {
+		branchFolder := makeBranchFolder(t, "apps/chart")
+		app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-chart
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/chart
+`)
+		contentSources, refSources, hasMultipleSources, err := splitSources(app)
+		require.NoError(t, err)
+		plan, err := buildManifestRequestPlan(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+			manifestRequestRenderContext{repoSelector: testRepoSelector(t, "org/repo")})
+		require.NoError(t, err)
+		require.NoError(t, plan.validate())
+		assert.Equal(t, manifestRenderRouteSourceDirectory, plan.route)
+	})
+
+	t.Run("branch root", func(t *testing.T) {
+		branchFolder := makeBranchFolder(t, "apps/kustomize")
+		require.NoError(t, os.Remove(filepath.Join(branchFolder, "apps", "kustomize", "Chart.yaml")))
+		require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "apps", "kustomize", "kustomization.yaml"), []byte("resources: []\n"), 0o644))
+		app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kustomize
+spec:
+  source:
+    repoURL: https://github.com/org/repo.git
+    path: apps/kustomize
+`)
+		contentSources, refSources, hasMultipleSources, err := splitSources(app)
+		require.NoError(t, err)
+		plan, err := buildManifestRequestPlan(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+			manifestRequestRenderContext{repoSelector: testRepoSelector(t, "org/repo")})
+		require.NoError(t, err)
+		require.NoError(t, plan.validate())
+		assert.Equal(t, manifestRenderRouteBranchRoot, plan.route)
+	})
+
+	t.Run("remote RPC", func(t *testing.T) {
+		app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: remote-chart
+spec:
+  source:
+    repoURL: https://charts.example.com
+    chart: example
+`)
+		contentSources, refSources, hasMultipleSources, err := splitSources(app)
+		require.NoError(t, err)
+		plan, err := buildManifestRequestPlan(app, contentSources[0], refSources, hasMultipleSources, t.TempDir(), nil,
+			manifestRequestRenderContext{repoSelector: testRepoSelector(t, "org/repo")})
+		require.NoError(t, err)
+		require.NoError(t, plan.validate())
+		assert.Equal(t, manifestRenderRouteRemoteRPC, plan.route)
+	})
+
+	t.Run("local source with refs", func(t *testing.T) {
+		branchFolder := makeBranchFolder(t, "apps/chart")
+		require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("replicas: 2\n"), 0o644))
+		app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-chart-with-refs
+spec:
+  sources:
+    - repoURL: https://github.com/org/repo.git
+      ref: values
+    - repoURL: https://github.com/org/repo.git
+      path: apps/chart
+      helm:
+        valueFiles: [$values/values.yaml]
+`)
+		contentSources, refSources, hasMultipleSources, err := splitSources(app)
+		require.NoError(t, err)
+		plan, err := buildManifestRequestPlan(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+			manifestRequestRenderContext{repoSelector: testRepoSelector(t, "org/repo")})
+		require.NoError(t, err)
+		defer plan.cleanup()
+		require.NoError(t, plan.validate())
+		assert.Equal(t, manifestRenderRouteLocalSourceWithRefs, plan.route)
+	})
+
+	t.Run("remote chart with refs", func(t *testing.T) {
+		branchFolder := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("replicas: 2\n"), 0o644))
+		app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: remote-chart-with-refs
+spec:
+  sources:
+    - repoURL: https://github.com/org/repo.git
+      ref: values
+    - repoURL: https://charts.example.com
+      chart: example
+      helm:
+        valueFiles: [$values/values.yaml]
+`)
+		contentSources, refSources, hasMultipleSources, err := splitSources(app)
+		require.NoError(t, err)
+		plan, err := buildManifestRequestPlan(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil,
+			manifestRequestRenderContext{repoSelector: testRepoSelector(t, "org/repo"), puller: &fakeChartPuller{}})
+		require.NoError(t, err)
+		defer plan.cleanup()
+		require.NoError(t, plan.validate())
+		assert.Equal(t, manifestRenderRouteRemoteChartWithRefs, plan.route)
+	})
+}
+
 // makeApp is a small helper that builds an ArgoResource from a YAML string.
 func makeApp(t *testing.T, rawYAML string) argoapplication.ArgoResource {
 	t.Helper()
@@ -1745,6 +1893,8 @@ func TestCopyDir_FollowsDirectorySymlink(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(chart, "files"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(chart, "Chart.yaml"), []byte("name: c\n"), 0o644))
 	require.NoError(t, os.Symlink(external, filepath.Join(chart, "files", "sql")))
+	require.NoError(t, os.MkdirAll(filepath.Join(chart, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(chart, ".git", "config"), []byte("[core]\n"), 0o644))
 
 	dst := filepath.Join(root, "dst")
 	require.NoError(t, copyDir(chart, dst))
@@ -1754,4 +1904,5 @@ func TestCopyDir_FollowsDirectorySymlink(t *testing.T) {
 	got, err := os.ReadFile(filepath.Join(dst, "files", "sql", "V1__init.sql"))
 	require.NoError(t, err)
 	assert.Equal(t, "SELECT 1;", string(got))
+	assert.NoDirExists(t, filepath.Join(dst, ".git"), "Git metadata must not be copied into staging directories")
 }
