@@ -15,7 +15,6 @@ package reposerverextract
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -287,8 +286,7 @@ func renderApp(
 	var allManifestStrings []string
 
 	for i, contentSource := range contentSources {
-		stagingStart := time.Now()
-		plan, err := buildManifestRequestPlan(
+		request, streamDir, cleanup, err := buildManifestRequestForSource(
 			app,
 			contentSource,
 			refSources,
@@ -306,30 +304,30 @@ func renderApp(
 		if err != nil {
 			return nil, fmt.Errorf("failed to build manifest request for content source %d: %w", i, err)
 		}
-		if err := plan.validate(); err != nil {
-			return nil, fmt.Errorf("invalid manifest request plan for content source %d: %w", i, err)
-		}
+
+		// streamDir == "" signals that the primary source is a remote chart (e.g. an
+		// external Helm registry). In that case we use the regular (non-file-streaming)
+		// GenerateManifest RPC so that the repo server fetches the chart itself.
+		useRemote := streamDir == ""
 
 		log.Debug().
-			Str("app", app.GetLongName()).
+			Str("App", app.GetLongName()).
 			Int("sourceIndex", i).
-			Str("sourcePath", contentSource.Path).
-			Str("streamDir", plan.streamDir).
-			Str("renderRoute", string(plan.route)).
-			Dur("stagingDuration", time.Since(stagingStart)).
-			Bool("multiSource", plan.request.HasMultipleSources).
-			Msg("📦 Repo-server render plan prepared")
+			Str("streamDir", streamDir).
+			Bool("multiSource", request.HasMultipleSources).
+			Bool("remoteChart", useRemote).
+			Msg("Rendering application source via repo server")
 
 		var manifestStrings []string
-		if plan.usesRemoteRPC() {
-			manifestStrings, err = repoClient.GenerateManifestsRemote(ctx, plan.request)
+		if useRemote {
+			manifestStrings, err = repoClient.GenerateManifestsRemote(ctx, request)
 		} else {
-			manifestStrings, err = repoClient.GenerateManifests(ctx, plan.streamDir, plan.request)
+			manifestStrings, err = repoClient.GenerateManifests(ctx, streamDir, request)
 		}
 		// Clean up the temp dir immediately after the RPC completes - don't defer
 		// inside a loop, which would keep all temp dirs alive until renderApp returns.
-		if plan.cleanup != nil {
-			plan.cleanup()
+		if cleanup != nil {
+			cleanup()
 		}
 		if err != nil {
 			return nil, fmt.Errorf("repo server returned error for content source %d: %w", i, err)
@@ -446,52 +444,6 @@ func collectRepoURLs(appLists ...[]argoapplication.ArgoResource) []string {
 	return urls
 }
 
-// manifestRenderRoute records the transport and staging decision made while
-// building a repo-server request. The caller uses this value directly instead
-// of inferring behavior from an empty stream directory or source fields.
-type manifestRenderRoute string
-
-const (
-	manifestRenderRouteRemoteRPC           manifestRenderRoute = "remote-rpc"
-	manifestRenderRouteSourceDirectory     manifestRenderRoute = "source-directory"
-	manifestRenderRouteBranchRoot          manifestRenderRoute = "branch-root"
-	manifestRenderRouteLocalSourceWithRefs manifestRenderRoute = "local-source-with-refs"
-	manifestRenderRouteRemoteChartWithRefs manifestRenderRoute = "remote-chart-with-refs"
-)
-
-type manifestRequestPlan struct {
-	request   *repoapiclient.ManifestRequest
-	streamDir string
-	cleanup   func()
-	route     manifestRenderRoute
-}
-
-func (p manifestRequestPlan) usesRemoteRPC() bool {
-	return p.route == manifestRenderRouteRemoteRPC
-}
-
-func (p manifestRequestPlan) validate() error {
-	if p.request == nil {
-		return errors.New("manifest request plan has no request")
-	}
-	switch p.route {
-	case manifestRenderRouteRemoteRPC:
-		if p.streamDir != "" {
-			return errors.New("remote manifest request plan unexpectedly has a stream directory")
-		}
-	case manifestRenderRouteSourceDirectory,
-		manifestRenderRouteBranchRoot,
-		manifestRenderRouteLocalSourceWithRefs,
-		manifestRenderRouteRemoteChartWithRefs:
-		if p.streamDir == "" {
-			return fmt.Errorf("streamed manifest request plan %q has no stream directory", p.route)
-		}
-	default:
-		return fmt.Errorf("manifest request plan has unknown route %q", p.route)
-	}
-	return nil
-}
-
 // splitSources parses the application's spec.sources / spec.source and splits
 // them into content sources (sources that produce manifests) and ref-only
 // sources (sources whose sole purpose is to provide files referenced by $ref/…
@@ -572,8 +524,8 @@ func splitSources(app argoapplication.ArgoResource) (
 //
 // prRepo is the URL of the pull-request repository. When the primary source's
 // repoURL does not match prRepo the source files are not present locally;
-// in that case the plan explicitly selects the remote GenerateManifest RPC so
-// the repo server fetches the content itself.
+// in that case the function returns streamDir="" so the caller uses the remote
+// GenerateManifest RPC and the repo server fetches the content itself.
 //
 // cleanup must be called by the caller when the stream directory is no longer
 // needed.
@@ -604,27 +556,7 @@ func buildManifestRequestForSource(
 	creds *RepoCreds,
 	renderContext manifestRequestRenderContext,
 ) (request *repoapiclient.ManifestRequest, streamDir string, cleanup func(), err error) {
-	plan, err := buildManifestRequestPlan(app, primarySource, refSources, hasMultipleSources, branchFolder, creds, renderContext)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	if err := plan.validate(); err != nil {
-		return nil, "", nil, err
-	}
-	return plan.request, plan.streamDir, plan.cleanup, nil
-}
-
-func buildManifestRequestPlan(
-	app argoapplication.ArgoResource,
-	primarySource v1alpha1.ApplicationSource,
-	refSources []v1alpha1.ApplicationSource,
-	hasMultipleSources bool,
-	branchFolder string,
-	creds *RepoCreds,
-	renderContext manifestRequestRenderContext,
-) (*manifestRequestPlan, error) {
 	obj := app.Yaml.Object
-	var request *repoapiclient.ManifestRequest
 
 	var specPath []string
 	switch app.Kind {
@@ -676,12 +608,13 @@ func buildManifestRequestPlan(
 	// narrowed stream (see buildStreamDirForLocalSource).
 	//
 	// Special case: if the primary source has a Chart field (external Helm
-	// registry chart) there are no local files to stream. The plan selects the
-	// regular non-file-streaming GenerateManifest RPC instead.
+	// registry chart) there are no local files to stream. We signal this by
+	// returning an empty streamDir; the caller will use the regular
+	// (non-file-streaming) GenerateManifest RPC instead.
 	if len(refSources) == 0 {
 		if primarySource.Chart != "" {
 			// Remote Helm chart - no local files to stream.
-			return &manifestRequestPlan{request: newManifestRequest(&primarySource), route: manifestRenderRouteRemoteRPC}, nil
+			return newManifestRequest(&primarySource), "", nil, nil
 		}
 		// Cross-repo source: the source's repoURL points at a different
 		// repository than the PR repo. Those files are not checked out
@@ -693,7 +626,7 @@ func buildManifestRequestPlan(
 				Str("sourceRepoURL", primarySource.RepoURL).
 				Str("prRepo", renderContext.repoSelector.String()).
 				Msg("Source repoURL does not match PR repo - using remote RPC")
-			return &manifestRequestPlan{request: newManifestRequest(&primarySource), route: manifestRenderRouteRemoteRPC}, nil
+			return newManifestRequest(&primarySource), "", nil, nil
 		}
 		streamDir, cleanup, err := buildStreamDirForLocalSource(branchFolder, primarySource)
 		if err != nil {
@@ -704,17 +637,15 @@ func buildManifestRequestPlan(
 					Str("sourcePath", primarySource.Path).
 					Str("branchFolder", branchFolder).
 					Msg("⚠️ PR repo source is not present in the local branch folder - using remote RPC")
-				return &manifestRequestPlan{request: newManifestRequest(&primarySource), route: manifestRenderRouteRemoteRPC}, nil
+				return newManifestRequest(&primarySource), "", nil, nil
 			}
-			return nil, err
+			return nil, "", nil, err
 		}
 		requestSource := primarySource
-		route := manifestRenderRouteBranchRoot
 		if streamDir != branchFolder {
 			requestSource.Path = ""
-			route = manifestRenderRouteSourceDirectory
 		}
-		return &manifestRequestPlan{request: newManifestRequest(&requestSource), streamDir: streamDir, cleanup: cleanup, route: route}, nil
+		return newManifestRequest(&requestSource), streamDir, cleanup, nil
 	}
 	// Slow path: ref sources present
 	//
@@ -752,18 +683,14 @@ func buildManifestRequestPlan(
 					Msg("⚠️ PR repo ref source is not present in the local branch folder - using remote RPC")
 				request = newManifestRequest(&primarySource)
 				request.RefSources = buildRefSourcesMap(refSources, creds)
-				return &manifestRequestPlan{request: request, route: manifestRenderRouteRemoteRPC}, nil
+				return request, "", nil, nil
 			}
-			request, streamDir, cleanup, err := buildRemoteChartLocalRefsRequest(
+			return buildRemoteChartLocalRefsRequest(
 				app, primarySource, refSources, branchFolder, creds, renderContext.puller, newManifestRequest)
-			if err != nil {
-				return nil, err
-			}
-			return &manifestRequestPlan{request: request, streamDir: streamDir, cleanup: cleanup, route: manifestRenderRouteRemoteChartWithRefs}, nil
 		}
 		request = newManifestRequest(&primarySource)
 		request.RefSources = buildRefSourcesMap(refSources, creds)
-		return &manifestRequestPlan{request: request, route: manifestRenderRouteRemoteRPC}, nil
+		return request, "", nil, nil
 	}
 
 	// Slow path: ref sources present - cross-repo primary or ref source
@@ -782,7 +709,7 @@ func buildManifestRequestPlan(
 			Msg("Source or ref repoURL does not match PR repo (slow path) - using remote RPC")
 		request = newManifestRequest(&primarySource)
 		request.RefSources = buildRefSourcesMap(refSources, creds)
-		return &manifestRequestPlan{request: request, route: manifestRenderRouteRemoteRPC}, nil
+		return request, "", nil, nil
 	}
 
 	if available, reason := localContentAndRefSourcesAvailable(branchFolder, primarySource, refSources); !available {
@@ -794,16 +721,16 @@ func buildManifestRequestPlan(
 			Msg("⚠️ PR repo source is not present in the local branch folder - using remote RPC")
 		request = newManifestRequest(&primarySource)
 		request.RefSources = buildRefSourcesMap(refSources, creds)
-		return &manifestRequestPlan{request: request, route: manifestRenderRouteRemoteRPC}, nil
+		return request, "", nil, nil
 	}
 
 	//   <tempDir>/<primarySource.Path>/  ← content source files
 	//   <tempDir>/.refs/<refName>/       ← files for each ref source
 	tempDir, err := os.MkdirTemp("", "argocd-diff-preview-*")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create temp dir: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	cleanup := func() {
+	cleanup = func() {
 		if removeErr := os.RemoveAll(tempDir); removeErr != nil {
 			log.Warn().Err(removeErr).Str("dir", tempDir).Msg("Failed to remove temp dir")
 		}
@@ -814,14 +741,14 @@ func buildManifestRequestPlan(
 	dstContentDir := filepath.Join(tempDir, primarySource.Path)
 	if err := copyDir(srcContentDir, dstContentDir); err != nil {
 		cleanup()
-		return nil, fmt.Errorf("failed to copy content source dir %q: %w", srcContentDir, err)
+		return nil, "", nil, fmt.Errorf("failed to copy content source dir %q: %w", srcContentDir, err)
 	}
 
 	// Copy each ref source into <tempDir>/.refs/<refName>/.
 	refDirs, err := stageRefSources(tempDir, branchFolder, refSources)
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, "", nil, err
 	}
 
 	// Rewrite $ref/… value-file paths to paths relative to the content dir.
@@ -829,11 +756,11 @@ func buildManifestRequestPlan(
 	rewrittenSource, err := rewriteRefValueFiles(primarySource, appDirAbs, refDirs, app.GetLongName())
 	if err != nil {
 		cleanup()
-		return nil, err
+		return nil, "", nil, err
 	}
 
 	request = newManifestRequest(&rewrittenSource)
-	return &manifestRequestPlan{request: request, streamDir: tempDir, cleanup: cleanup, route: manifestRenderRouteLocalSourceWithRefs}, nil
+	return request, tempDir, cleanup, nil
 }
 
 // buildRemoteChartLocalRefsRequest renders a multi-source Application whose
