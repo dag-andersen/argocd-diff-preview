@@ -31,12 +31,23 @@ server:
     timeoutSeconds: 1
     failureThreshold: 40
 repoServer:
+  # Keep checking readiness frequently, but allow a busy repo server enough
+  # time to answer before temporarily removing it from service endpoints.
   readinessProbe:
     initialDelaySeconds: 0
     periodSeconds: 1
     successThreshold: 1
-    timeoutSeconds: 1
-    failureThreshold: 40
+    timeoutSeconds: 3
+    failureThreshold: 10
+  # Avoid restarting a healthy repo server during short periods of heavy
+  # rendering. Sustained failures for roughly one minute still cause a restart.
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 5
+    failureThreshold: 6
   # This prevents 'empty index.yaml' file corruption issues when multiple helm dependency build processes try to write the same index.yaml file
   # Setting this to false disables the shared working dir
   # Ref: https://github.com/argoproj/argo-cd/issues/12902
