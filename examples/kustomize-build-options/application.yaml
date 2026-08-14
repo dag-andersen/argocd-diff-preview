@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kustomize-build-options
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/kustomize-build-options/.*"
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  source:
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview
+    path: examples/kustomize-build-options/overlay

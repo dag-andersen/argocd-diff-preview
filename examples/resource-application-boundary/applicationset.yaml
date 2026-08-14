@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: resource-application-boundary
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/resource-application-boundary/.*"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - name: app-a
+            path: examples/resource-application-boundary/app-a
+          - name: app-b
+            path: examples/resource-application-boundary/app-b
+  template:
+    metadata:
+      name: '{{ .name }}'
+      annotations:
+        argocd-diff-preview/watch-pattern: "examples/resource-application-boundary/.*"
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        targetRevision: HEAD
+        path: '{{ .path }}'
+      destination:
+        name: in-cluster

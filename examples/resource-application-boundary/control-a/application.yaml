@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: control-a
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/resource-application-boundary/control-a/.*"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+    targetRevision: HEAD
+    path: examples/resource-application-boundary/control-a
+  destination:
+    name: in-cluster
