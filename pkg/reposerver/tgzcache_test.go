@@ -64,6 +64,22 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 	if got := compressions.Load(); got != 1 {
 		t.Fatalf("compressions = %d, want 1", got)
 	}
+	stats := cache.stats()
+	if stats.Requests != callers || stats.Misses != 1 || stats.Hits != callers-1 {
+		t.Fatalf("stats = %+v, want requests=%d misses=1 hits=%d", stats, callers, callers-1)
+	}
+	if stats.CompressedFiles != 7 {
+		t.Fatalf("compressed files = %d, want 7", stats.CompressedFiles)
+	}
+	if stats.CompressedBytes == 0 {
+		t.Fatal("compressed bytes = 0, want a non-zero archive size")
+	}
+	if stats.CompressionDuration < 20*time.Millisecond {
+		t.Fatalf("compression duration = %s, want at least 20ms", stats.CompressionDuration)
+	}
+	if stats.HitWaitDuration == 0 {
+		t.Fatal("hit wait duration = 0, want concurrent cache hits to record wait time")
+	}
 }
 
 func TestTgzCacheCleanupRemovesOnlyOwnArchives(t *testing.T) {
