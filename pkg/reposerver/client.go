@@ -233,7 +233,7 @@ func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *
 		}
 	}()
 
-	log.Info().
+	log.Debug().
 		Str("app", request.AppName).
 		Str("sourcePath", request.ApplicationSource.Path).
 		Str("streamDir", appDir).
