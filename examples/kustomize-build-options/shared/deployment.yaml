@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: kustomize-build-options
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: kustomize-build-options
@@ -14,4 +14,4 @@ spec:
     spec:
       containers:
         - name: app
-          image: nginx:1.25
+          image: nginx:1.27
