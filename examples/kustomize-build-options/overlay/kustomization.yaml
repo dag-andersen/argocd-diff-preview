@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# This resource is intentionally outside this Application's source directory.
+# Rendering requires --load-restrictor LoadRestrictionsNone from argocd-cm.
+resources:
+  - ../shared/deployment.yaml

@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kustomize-build-options
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kustomize-build-options
+  template:
+    metadata:
+      labels:
+        app: kustomize-build-options
+    spec:
+      containers:
+        - name: app
+          image: nginx:1.25
