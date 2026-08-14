@@ -1,0 +1,6 @@
+# Repo-server API integration test: this setting must be forwarded in every
+# ManifestRequest because repo-server does not read argocd-cm itself.
+createClusterRoles: false
+configs:
+  cm:
+    kustomize.buildOptions: --load-restrictor LoadRestrictionsNone
