@@ -56,6 +56,7 @@ spec:
 ✨ - base-branch: integration-test/branch-3/base
 ✨ - target-branch: integration-test/branch-3/target
 ✨ - secrets-folder: ./secrets
+✨ - preinstall-folder: ./preinstall
 ✨ - output-folder: ./output
 ✨ - argocd-namespace: argocd
 ✨ - repo: dag-andersen/argocd-diff-preview

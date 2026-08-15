@@ -28,6 +28,7 @@ nav:
   - getting-started/gitlab-cicd.md
   - Local Installation: getting-started/installation.md
   - getting-started/custom-argo-cd-installation.md
+  - Pre-installing CRDs: getting-started/pre-installing-crds.md
   - Self-hosted Github Runners: getting-started/self-hosted-gh-runner.md
 - Reusing clusters:
   - Connect to cluster with Argo CD pre-installed: reusing-clusters/connecting.md

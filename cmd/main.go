@@ -216,7 +216,7 @@ func run(cfg *Config) error {
 	var argocdInstallationDuration time.Duration
 	if cfg.CreateCluster {
 		// Install Argo CD
-		duration, err := argocd.Install(cfg.Debug, cfg.SecretsFolder)
+		duration, err := argocd.Install(cfg.Debug, cfg.PreinstallFolder, cfg.SecretsFolder)
 		if err != nil {
 			log.Error().Msgf("❌ Failed to install Argo CD")
 			return err

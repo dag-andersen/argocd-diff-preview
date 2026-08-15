@@ -54,6 +54,7 @@ var (
 	DefaultBaseBranch                           = "main"
 	DefaultOutputFolder                         = "./output"
 	DefaultSecretsFolder                        = "./secrets"
+	DefaultPreinstallFolder                     = "./preinstall"
 	DefaultCluster                              = "auto"
 	DefaultClusterName                          = "argocd-diff-preview"
 	DefaultKindOptions                          = ""
@@ -103,6 +104,7 @@ type RawOptions struct {
 	RepoRegex                            string `mapstructure:"repo-regex"`
 	OutputFolder                         string `mapstructure:"output-folder"`
 	SecretsFolder                        string `mapstructure:"secrets-folder"`
+	PreinstallFolder                     string `mapstructure:"preinstall-folder"`
 	CreateCluster                        bool   `mapstructure:"create-cluster"`
 	ClusterType                          string `mapstructure:"cluster"`
 	ClusterName                          string `mapstructure:"cluster-name"`
@@ -153,6 +155,7 @@ type Config struct {
 	RepoSelector                         repository.Selector
 	OutputFolder                         string
 	SecretsFolder                        string
+	PreinstallFolder                     string
 	CreateCluster                        bool
 	ClusterName                          string
 	KindOptions                          string
@@ -252,6 +255,7 @@ func Parse() *Config {
 	viper.SetDefault("base-branch", DefaultBaseBranch)
 	viper.SetDefault("output-folder", DefaultOutputFolder)
 	viper.SetDefault("secrets-folder", DefaultSecretsFolder)
+	viper.SetDefault("preinstall-folder", DefaultPreinstallFolder)
 	viper.SetDefault("create-cluster", DefaultCreateCluster)
 	viper.SetDefault("watch-if-no-watch-pattern-found", DefaultWatchIfNoWatchPatternFound)
 	viper.SetDefault("ignore-invalid-watch-pattern", DefaultIgnoreInvalidWatchPattern)
@@ -312,6 +316,7 @@ func Parse() *Config {
 	// Folders
 	rootCmd.Flags().StringP("output-folder", "o", DefaultOutputFolder, "Output folder where the diff will be saved")
 	rootCmd.Flags().StringP("secrets-folder", "s", DefaultSecretsFolder, "Secrets folder where the secrets are read from")
+	rootCmd.Flags().String("preinstall-folder", DefaultPreinstallFolder, "Folder containing Kubernetes manifests to apply before Argo CD is installed")
 
 	// Cluster related
 	rootCmd.Flags().Bool("create-cluster", DefaultCreateCluster, "Create a new cluster if it doesn't exist")
@@ -397,6 +402,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		TargetBranch:                         o.TargetBranch,
 		OutputFolder:                         o.OutputFolder,
 		SecretsFolder:                        o.SecretsFolder,
+		PreinstallFolder:                     o.PreinstallFolder,
 		CreateCluster:                        o.CreateCluster,
 		ClusterName:                          o.ClusterName,
 		KindOptions:                          o.KindOptions,
@@ -702,6 +708,7 @@ func (o *Config) LogConfig() {
 	log.Info().Msgf("✨ - base-branch: %s", o.BaseBranch)
 	log.Info().Msgf("✨ - target-branch: %s", o.TargetBranch)
 	log.Info().Msgf("✨ - secrets-folder: %s", o.SecretsFolder)
+	log.Info().Msgf("✨ - preinstall-folder: %s", o.PreinstallFolder)
 	log.Info().Msgf("✨ - output-folder: %s", o.OutputFolder)
 	log.Info().Msgf("✨ - argocd-namespace: %s", o.ArgocdNamespace)
 	if o.ArgocdConfigPath != DefaultArgocdConfigPath {
