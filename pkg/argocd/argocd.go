@@ -80,7 +80,7 @@ func (a *ArgoCDInstallation) RenderMethod() vars.RenderMethod {
 	return a.renderMode
 }
 
-func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Duration, error) {
+func (a *ArgoCDInstallation) Install(debug bool, preinstallFolder string, secretsFolder string) (time.Duration, error) {
 	startTime := time.Now()
 	log.Debug().Msgf("Creating namespace: %s", a.Namespace)
 
@@ -95,6 +95,12 @@ func (a *ArgoCDInstallation) Install(debug bool, secretsFolder string) (time.Dur
 		log.Debug().Msgf("Created namespace: %s", a.Namespace)
 	} else {
 		log.Debug().Msgf("Namespace already exists: %s", a.Namespace)
+	}
+
+	// Apply cluster prerequisites before installing Argo CD. This allows users
+	// to install CRDs and other resources needed during application rendering.
+	if err := ApplyPreinstallFromFolder(a.K8sClient, preinstallFolder, a.Namespace); err != nil {
+		return time.Since(startTime), fmt.Errorf("failed to apply manifests from preinstall folder %s: %w", preinstallFolder, err)
 	}
 
 	// Apply secrets before installing ArgoCD
