@@ -476,6 +476,9 @@ func TestBuildManifestRequest_MultiSource_LocalChart_WithRef_RewritesValueFiles(
 	// The ref-only source has no path (points at repo root), so we put the
 	// values file at the repo root level inside the branch folder.
 	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values-prod.yaml"), []byte("replicas: 3\n"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "secrets"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "secrets", "token.txt"), []byte("token\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "unrelated.yaml"), []byte("ignored: true\n"), 0o644))
 
 	app := makeApp(t, `
 apiVersion: argoproj.io/v1alpha1
@@ -495,6 +498,9 @@ spec:
       helm:
         valueFiles:
           - $cfg/values-prod.yaml
+        fileParameters:
+          - name: auth.token
+            path: $cfg/secrets/token.txt
 `)
 
 	contentSources, refSources, hasMultipleSources, err := splitSources(app)
@@ -526,6 +532,11 @@ spec:
 	absValueFile = filepath.Clean(absValueFile)
 	_, statErr := os.Stat(absValueFile)
 	assert.NoError(t, statErr, "rewritten value file path %q should exist on disk", absValueFile)
+	assert.NoFileExists(t, filepath.Join(streamDir, ".refs", "cfg", "unrelated.yaml"), "only referenced files should be staged")
+	require.Len(t, req.ApplicationSource.Helm.FileParameters, 1)
+	fileParameter := req.ApplicationSource.Helm.FileParameters[0]
+	assert.NotContains(t, fileParameter.Path, "$", "file parameter path must be rewritten")
+	assert.FileExists(t, filepath.Join(streamDir, "apps", "my-chart", fileParameter.Path))
 	assertDefaultProjectFields(t, req)
 }
 
@@ -539,6 +550,56 @@ spec:
 //	  "source referenced "$values", but no source has a 'ref' field defined"
 //
 // ─────────────────────────────────────────────────────────────────────────────
+func TestResolveRefFilePathRejectsTraversal(t *testing.T) {
+	_, _, err := resolveRefFilePath(t.TempDir(), "../outside.yaml")
+	require.ErrorContains(t, err, "escapes")
+}
+
+func TestStageRefSourcesRejectsMalformedRefPath(t *testing.T) {
+	_, err := stageRefSources(t.TempDir(), t.TempDir(), []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values"}},
+	})
+	require.ErrorContains(t, err, "invalid ref path")
+}
+
+func TestStageRefSourcesDeduplicatesStaticPaths(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("replicas: 2\n"), 0o644))
+
+	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{
+			ValueFiles:     []string{"$values/values.yaml", "$values/values.yaml"},
+			FileParameters: []v1alpha1.HelmFileParameter{{Name: "copy", Path: "$values/values.yaml"}},
+		},
+	})
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(refDirs["values"], "values.yaml"))
+}
+
+func TestStageRefSourcesDoesNotIgnoreMissingFileParameter(t *testing.T) {
+	_, err := stageRefSources(t.TempDir(), t.TempDir(), []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{
+			IgnoreMissingValueFiles: true,
+			FileParameters:          []v1alpha1.HelmFileParameter{{Name: "required", Path: "$values/missing.txt"}},
+		},
+	})
+	require.ErrorContains(t, err, "missing.txt")
+}
+
+func TestStageRefSourcesFallsBackForDynamicPaths(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "environments"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "environments", "my-app.yaml"), []byte("replicas: 2\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "unrelated.yaml"), []byte("present: true\n"), 0o644))
+
+	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values/environments/$ARGOCD_APP_NAME.yaml"}},
+	})
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(refDirs["values"], "environments", "my-app.yaml"))
+	assert.FileExists(t, filepath.Join(refDirs["values"], "unrelated.yaml"), "dynamic paths must preserve full-ref staging")
+}
+
 func TestBuildManifestRequest_ExternalChart_WithRefAndPath_GH401(t *testing.T) {
 	// Exact reproduction of https://github.com/dag-andersen/argocd-diff-preview/issues/401
 	//
