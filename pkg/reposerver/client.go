@@ -223,21 +223,27 @@ func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *
 	// Cached per directory: Applications routinely share a source path, so
 	// compressing per Application repeats identical work. Closed, not deleted -
 	// the archive is reused by the other Applications on this path.
-	tgzFile, checksum, filesWritten, err := c.tgzCache.openCachedTgz(appDir)
+	archive, err := c.tgzCache.openCachedTgz(appDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress app directory %q: %w", appDir, err)
 	}
 	defer func() {
-		if err := tgzFile.Close(); err != nil {
+		if err := archive.file.Close(); err != nil {
 			log.Debug().Err(err).Str("app", request.AppName).Msg("Failed to close archive handle")
 		}
 	}()
 
 	log.Debug().
 		Str("app", request.AppName).
-		Int("files", filesWritten).
-		Str("checksum", checksum).
-		Msg("Compressed application directory")
+		Str("sourcePath", request.ApplicationSource.Path).
+		Str("streamDir", appDir).
+		Int("sourceFiles", archive.files).
+		Int64("archiveBytes", archive.bytes).
+		Bool("archiveCacheHit", archive.cacheHit).
+		Dur("compressionDuration", archive.compressionDuration).
+		Dur("archiveOpenDuration", archive.cacheWaitDuration).
+		Str("checksum", archive.checksum).
+		Msg("📦 Repo-server stream staging metrics")
 
 	var lastErr error
 	for attempt := 1; attempt <= maxGenerateRetries; attempt++ {
@@ -261,12 +267,12 @@ func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *
 			}
 
 			// Seek the tgz file back to the beginning for the next attempt.
-			if _, seekErr := tgzFile.Seek(0, io.SeekStart); seekErr != nil {
+			if _, seekErr := archive.file.Seek(0, io.SeekStart); seekErr != nil {
 				return nil, fmt.Errorf("failed to seek tarball for retry: %w", seekErr)
 			}
 		}
 
-		manifests, err := c.generateManifestsOnce(ctx, tgzFile, checksum, request)
+		manifests, err := c.generateManifestsOnce(ctx, archive.file, archive.checksum, request)
 		if err == nil {
 			return manifests, nil
 		}

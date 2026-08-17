@@ -172,6 +172,15 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to get server version: %w", err)
 	}
 
+	// Mirror Argo CD's API server: pass the global kustomize build options from argocd-cm on every request;
+	// the repo server never reads the ConfigMap. Missing ConfigMap access must not prevent rendering,
+	// but applications that depend on global Kustomize options may then fail to render.
+	kustomizeBuildOptions, err := argocd.K8sClient.GetConfigMapValue(argocd.Namespace, "argocd-cm", "kustomize.buildOptions")
+	if err != nil {
+		log.Warn().Err(err).Msg("⚠️ Unable to read kustomize.buildOptions from argocd-cm. Continuing without global Kustomize options; applications that depend on them may fail to render.")
+		kustomizeBuildOptions = ""
+	}
+
 	// Collect all unique repository URLs referenced by the Applications so that
 	// FetchRepoCreds can enrich them with credentials from repo-creds templates.
 	appRepoURLs := collectRepoURLs(baseApps, targetApps)
@@ -353,7 +362,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions, redirectRevisions)
+			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions, kustomizeBuildOptions, redirectRevisions)
 			if err != nil {
 				results <- renderResult{err: fmt.Errorf("failed to render app %s: %w", item.app.GetLongName(), err)}
 				return
@@ -443,9 +452,10 @@ func renderAppWithChildDiscovery(
 	depth int,
 	kubeVersion string,
 	apiVersions []string,
+	kustomizeBuildOptions string,
 	redirectRevisions []string,
 ) ([]unstructured.Unstructured, []argoapplication.ArgoResource, error) {
-	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, repoSelector, kubeVersion, apiVersions, helmChartPuller{})
+	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, repoSelector, kubeVersion, apiVersions, kustomizeBuildOptions, helmChartPuller{})
 	if err != nil {
 		return nil, nil, err
 	}
