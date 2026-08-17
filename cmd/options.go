@@ -87,6 +87,7 @@ var (
 	DefaultOutputBranchManifests                = false
 	DefaultTraverseAppOfApps                    = false
 	DefaultFailOnDuplicateGeneratedApplications = false
+	DefaultSkipAppSetGenerationErrors           = false
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -138,6 +139,7 @@ type RawOptions struct {
 	OutputBranchManifests                bool   `mapstructure:"output-branch-manifests"`
 	TraverseAppOfApps                    bool   `mapstructure:"traverse-app-of-apps"`
 	FailOnDuplicateGeneratedApplications bool   `mapstructure:"fail-on-duplicate-generated-applications"`
+	SkipAppSetGenerationErrors           bool   `mapstructure:"skip-appset-generation-errors"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -183,6 +185,7 @@ type Config struct {
 	OutputBranchManifests                bool
 	TraverseAppOfApps                    bool
 	FailOnDuplicateGeneratedApplications bool
+	SkipAppSetGenerationErrors           bool
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -280,6 +283,7 @@ func Parse() *Config {
 	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
 	viper.SetDefault("traverse-app-of-apps", DefaultTraverseAppOfApps)
 	viper.SetDefault("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications)
+	viper.SetDefault("skip-appset-generation-errors", DefaultSkipAppSetGenerationErrors)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -340,6 +344,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
 	rootCmd.Flags().Bool("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications, "Fail when a single ApplicationSet generates multiple Applications with the same name")
+	rootCmd.Flags().Bool("skip-appset-generation-errors", DefaultSkipAppSetGenerationErrors, "Skip ApplicationSets that fail to generate (log a warning and continue) instead of aborting the whole run. Useful for ApplicationSets whose generators need cluster secrets or live data unavailable in the ephemeral cluster (e.g. pullRequest/scmProvider generators)")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -426,6 +431,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		OutputBranchManifests:                o.OutputBranchManifests,
 		TraverseAppOfApps:                    o.TraverseAppOfApps,
 		FailOnDuplicateGeneratedApplications: o.FailOnDuplicateGeneratedApplications,
+		SkipAppSetGenerationErrors:           o.SkipAppSetGenerationErrors,
 	}
 
 	var err error
@@ -820,5 +826,8 @@ func (o *Config) LogConfig() {
 	}
 	if o.FailOnDuplicateGeneratedApplications {
 		log.Info().Msgf("✨ - fail-on-duplicate-generated-applications: %t", o.FailOnDuplicateGeneratedApplications)
+	}
+	if o.SkipAppSetGenerationErrors {
+		log.Info().Msgf("✨ - skip-appset-generation-errors: %t", o.SkipAppSetGenerationErrors)
 	}
 }
