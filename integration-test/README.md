@@ -152,7 +152,7 @@ Each `branch-N/target[-suffix]/` directory contains expected output files (`outp
 
 ### Branch 5: Filtering Options
 - `target-1`: Filter by `--files-changed`
-- `target-2`: Filter by watch pattern in application
+- `target-2`: Filter by watch pattern in application; also verifies root `$ref` staging stays below a small repo-server archive limit
 - `target-3`: Files changed with no matching apps (empty result)
 - `target-4`: Filter by `--selector=team=my-team` with ArgoCD UI URL
 - `target-5`: Filter by selector with no matches; custom title
@@ -183,10 +183,11 @@ Each `branch-N/target[-suffix]/` directory contains expected output files (`outp
 ### Branch 15: Additional Coverage
 - `target`: Basic diff (no special options)
 
-### Branch 16-18: repo-server-api Render Method
+### Branch 16-19: repo-server-api Render Method
 - `branch-16/target`: Config Management Plugin (kustomize-build-with-helm) via `repo-server-api`
 - `branch-17/target-1` / `target-2`: App-of-apps traversal via `repo-server-api`
 - `branch-18/target`: Single-source local Helm chart whose `helm.valueFiles` reference a file OUTSIDE the chart directory via a repo-root-absolute path (`/examples/out-of-chart-values/env/values.yaml`). Regression test for `repo-server-api`: the tool must stream the whole branch folder so the out-of-chart value file is reachable, otherwise the render fails with `no such file or directory`.
+- `branch-19/target`: Kustomize resource outside the application directory via `repo-server-api`. It requires global `kustomize.buildOptions: --load-restrictor LoadRestrictionsNone` from `argocd-cm`, proving the direct repo-server request forwards that setting.
 
 ## Prerequisites
 

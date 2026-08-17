@@ -30,22 +30,22 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 		wg.Go(func() {
 			<-start
 
-			file, checksum, files, err := cache.openCachedTgz(appDir)
+			archive, err := cache.openCachedTgz(appDir)
 			if err != nil {
 				errs <- err
 				return
 			}
-			if err := file.Close(); err != nil {
+			if err := archive.file.Close(); err != nil {
 				errs <- err
 				return
 			}
 
-			if checksum != "checksum" {
-				errs <- fmt.Errorf("checksum = %q, want checksum", checksum)
+			if archive.checksum != "checksum" {
+				errs <- fmt.Errorf("checksum = %q, want checksum", archive.checksum)
 				return
 			}
-			if files != 7 {
-				errs <- fmt.Errorf("files = %d, want 7", files)
+			if archive.files != 7 {
+				errs <- fmt.Errorf("files = %d, want 7", archive.files)
 				return
 			}
 		})
@@ -64,6 +64,60 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 	if got := compressions.Load(); got != 1 {
 		t.Fatalf("compressions = %d, want 1", got)
 	}
+	stats := cache.stats()
+	if stats.Requests != callers || stats.Misses != 1 || stats.Hits != callers-1 {
+		t.Fatalf("stats = %+v, want requests=%d misses=1 hits=%d", stats, callers, callers-1)
+	}
+	if stats.CompressedFiles != 7 {
+		t.Fatalf("compressed files = %d, want 7", stats.CompressedFiles)
+	}
+	if stats.CompressedBytes == 0 {
+		t.Fatal("compressed bytes = 0, want a non-zero archive size")
+	}
+	if stats.CompressionDuration < 20*time.Millisecond {
+		t.Fatalf("compression duration = %s, want at least 20ms", stats.CompressionDuration)
+	}
+	if stats.HitWaitDuration == 0 {
+		t.Fatal("hit wait duration = 0, want concurrent cache hits to record wait time")
+	}
+}
+
+func TestTgzCacheOpenCachedTgzReportsArchiveMetrics(t *testing.T) {
+	appDir := t.TempDir()
+	archiveDir := t.TempDir()
+
+	cache := newTgzCacheWithCompressor(func(string, []string, []string) (*os.File, int, string, error) {
+		file, err := createTestArchive(archiveDir, "archive-content")
+		return file, 3, "checksum", err
+	})
+
+	archive, err := cache.openCachedTgz(appDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if archive.checksum != "checksum" || archive.files != 3 {
+		t.Fatalf("checksum/files = %q/%d, want checksum/3", archive.checksum, archive.files)
+	}
+	if archive.bytes != int64(len("archive-content")) {
+		t.Fatalf("archiveBytes = %d, want %d", archive.bytes, len("archive-content"))
+	}
+	if archive.cacheHit {
+		t.Fatal("first archive open unexpectedly reported a cache hit")
+	}
+
+	archive, err = cache.openCachedTgz(appDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := archive.file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !archive.cacheHit {
+		t.Fatal("second archive open did not report a cache hit")
+	}
 }
 
 func TestTgzCacheCleanupRemovesOnlyOwnArchives(t *testing.T) {
@@ -80,21 +134,21 @@ func TestTgzCacheCleanupRemovesOnlyOwnArchives(t *testing.T) {
 	cacheA := newCache("a")
 	cacheB := newCache("b")
 
-	fileA, _, _, err := cacheA.openCachedTgz(appDir)
+	archiveA, err := cacheA.openCachedTgz(appDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pathA := fileA.Name()
-	if err := fileA.Close(); err != nil {
+	pathA := archiveA.file.Name()
+	if err := archiveA.file.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	fileB, _, _, err := cacheB.openCachedTgz(appDir)
+	archiveB, err := cacheB.openCachedTgz(appDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pathB := fileB.Name()
-	if err := fileB.Close(); err != nil {
+	pathB := archiveB.file.Name()
+	if err := archiveB.file.Close(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -120,19 +174,19 @@ func TestTgzCacheOpenCachedTgzReturnsErrorForMissingArchive(t *testing.T) {
 		return file, 1, checksum, err
 	})
 
-	firstFile, _, _, err := cache.openCachedTgz(appDir)
+	archive, err := cache.openCachedTgz(appDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	firstPath := firstFile.Name()
-	if err := firstFile.Close(); err != nil {
+	firstPath := archive.file.Name()
+	if err := archive.file.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Remove(firstPath); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, _, _, err := cache.openCachedTgz(appDir); err == nil {
+	if _, err := cache.openCachedTgz(appDir); err == nil {
 		t.Fatal("expected missing cached archive to return an error")
 	}
 	if got := compressions.Load(); got != 1 {
