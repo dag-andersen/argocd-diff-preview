@@ -546,6 +546,8 @@ func (a *APIOperations) CheckVersionCompatibility() error {
 	return nil
 }
 
+var argoCDModuleRegex = regexp.MustCompile(`^github\.com/argoproj/argo-cd/v\d+$`)
+
 // getArgoCDLibVersion returns the version of the ArgoCD library from go.mod.
 // Returns "unknown" if the version cannot be determined.
 func getArgoCDLibVersion() string {
@@ -555,8 +557,10 @@ func getArgoCDLibVersion() string {
 	}
 
 	for _, dep := range info.Deps {
-		// Match github.com/argoproj/argo-cd/v2 or v3, etc.
-		if strings.HasPrefix(dep.Path, "github.com/argoproj/argo-cd/") {
+		// Match only the argo-cd module itself (github.com/argoproj/argo-cd/v2,
+		// /v3, ...), not nested modules like argo-cd/gitops-engine whose own
+		// version numbering (v0.x) would be mistaken for the library version.
+		if argoCDModuleRegex.MatchString(dep.Path) {
 			return dep.Version
 		}
 	}

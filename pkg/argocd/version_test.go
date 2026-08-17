@@ -207,3 +207,26 @@ func TestCheckVersionDrift(t *testing.T) {
 		})
 	}
 }
+
+func TestArgoCDModuleRegex(t *testing.T) {
+	tests := []struct {
+		name  string
+		path  string
+		match bool
+	}{
+		{name: "argo-cd v2 module", path: "github.com/argoproj/argo-cd/v2", match: true},
+		{name: "argo-cd v3 module", path: "github.com/argoproj/argo-cd/v3", match: true},
+		{name: "future major version", path: "github.com/argoproj/argo-cd/v10", match: true},
+		{name: "nested gitops-engine module", path: "github.com/argoproj/argo-cd/gitops-engine", match: false},
+		{name: "subpackage of argo-cd", path: "github.com/argoproj/argo-cd/v3/pkg", match: false},
+		{name: "standalone gitops-engine", path: "github.com/argoproj/gitops-engine", match: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := argoCDModuleRegex.MatchString(tt.path); got != tt.match {
+				t.Errorf("argoCDModuleRegex.MatchString(%q): got %v, want %v", tt.path, got, tt.match)
+			}
+		})
+	}
+}
