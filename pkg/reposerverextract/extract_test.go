@@ -540,6 +540,85 @@ spec:
 	assertDefaultProjectFields(t, req)
 }
 
+// Multi-source: a kustomize content source referencing files outside its own
+// directory must stage the whole checkout (like the no-refs fast path), or
+// the escaping reference fails with "no such file or directory".
+func TestBuildManifestRequest_MultiSource_Kustomize_WithRef_StagesBranchRoot(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "dev", "my-app"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(branchFolder, "clusters", "dev", "my-app", "kustomization.yaml"),
+		[]byte("resources:\n  - ../../../base/my-app\n"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "base", "my-app"), 0o755))
+	require.NoError(t, os.WriteFile(
+		filepath.Join(branchFolder, "base", "my-app", "kustomization.yaml"),
+		[]byte("resources: []\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("a: 1\n"), 0o644))
+
+	app := makeApp(t, `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app-dev
+spec:
+  destination:
+    namespace: production
+  sources:
+    - repoURL: https://github.com/org/repo.git
+      ref: values
+      targetRevision: HEAD
+    - repoURL: https://github.com/org/repo.git
+      path: clusters/dev/my-app
+      targetRevision: HEAD
+`)
+
+	contentSources, refSources, hasMultipleSources, err := splitSources(app)
+	require.NoError(t, err)
+	require.Len(t, contentSources, 1)
+	require.Len(t, refSources, 1)
+
+	req, streamDir, cleanup, err := buildManifestRequestForSource(app, contentSources[0], refSources, hasMultipleSources, branchFolder, nil, manifestRequestRenderContext{
+		repoSelector: testRepoSelector(t, ""),
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, streamDir)
+	defer cleanup()
+
+	assert.Equal(t, "clusters/dev/my-app", req.ApplicationSource.Path)
+	_, statErr := os.Stat(filepath.Join(streamDir, "base", "my-app", "kustomization.yaml"))
+	assert.NoError(t, statErr, "files referenced outside the kustomize source dir must be staged")
+}
+
+// symlinks stay symlinks (the repo server and kustomize validate them, like
+// on a real clone), files are hardlinked, .git is skipped
+func TestStageCheckout_PreservesSymlinksAndHardlinks(t *testing.T) {
+	src := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(src, "app.yaml"), []byte("a: 1"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Join(src, ".git"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(src, ".git", "HEAD"), []byte("ref"), 0o644))
+	require.NoError(t, os.Symlink("app.yaml", filepath.Join(src, "link-in.yaml")))
+	require.NoError(t, os.Symlink("../outside.yaml", filepath.Join(src, "link-out.yaml")))
+
+	dst := filepath.Join(t.TempDir(), "dst")
+	require.NoError(t, stageCheckout(src, dst))
+
+	// symlinks preserved verbatim, including ones pointing outside the tree
+	target, err := os.Readlink(filepath.Join(dst, "link-in.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "app.yaml", target)
+	target, err = os.Readlink(filepath.Join(dst, "link-out.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "../outside.yaml", target)
+
+	// regular files hardlinked, .git skipped
+	srcInfo, err := os.Stat(filepath.Join(src, "app.yaml"))
+	require.NoError(t, err)
+	dstInfo, err := os.Stat(filepath.Join(dst, "app.yaml"))
+	require.NoError(t, err)
+	assert.True(t, os.SameFile(srcInfo, dstInfo), "regular files should be hardlinked")
+	assert.NoDirExists(t, filepath.Join(dst, ".git"))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 4b. Multi-source: external chart with a ref+path dual-purpose source (GH #401)
 //
