@@ -1,0 +1,46 @@
+# Fork-only: build a test image on ghcr.io using the workflow's GITHUB_TOKEN,
+# which is scoped to this repository's packages. Drop this commit before
+# opening the upstream PR.
+name: Fork GHCR build (test image)
+
+on:
+  push:
+    branches:
+      - fork/main-plus-474
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set env
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          echo "SHA=${SHA}" >> $GITHUB_ENV
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "BUILD_DATE=${BUILD_DATE}" >> $GITHUB_ENV
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            VERSION=main-plus-474
+            COMMIT=${{ env.SHA }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+          tags: ghcr.io/${{ github.repository_owner }}/argocd-diff-preview:main-plus-474
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
