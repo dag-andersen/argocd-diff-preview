@@ -1,39 +1,62 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# Dependabot configuration for the lumyx-inc fork. PRs target this fork's
+# origin, never upstream.
+#
+# Schedule: monthly, with a 7-day cooldown so a release has to survive a
+# week in the wild before Dependabot offers it. Each ecosystem gets two
+# grouped PRs per month: `monthly-batch` (minor + patch) and
+# `monthly-majors` (major). Majors are split out because they are the
+# bumps most likely to need a deliberate review. Security updates are
+# not on this schedule -- they open as soon as an advisory lands.
 
 version: 2
 updates:
   # === Docker ===
-  - package-ecosystem: "docker" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: docker
+    directory: /
     schedule:
-      interval: daily
+      interval: monthly
     labels: [dependencies, docker]
+    cooldown:
+      default-days: 7
     groups:
-      docker-minor-patch:
+      monthly-batch:
+        patterns: ["*"]
         update-types: [minor, patch]
+      monthly-majors:
+        patterns: ["*"]
+        update-types: [major]
 
   # === GitHub Actions ===
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: daily
+      interval: monthly
     labels: [dependencies, github-actions]
+    cooldown:
+      default-days: 7
     groups:
-      actions-maj-min-pat:
-        update-types: [major, minor, patch]
+      monthly-batch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+      monthly-majors:
+        patterns: ["*"]
+        update-types: [major]
 
   # === gomod ===
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: daily
+      interval: monthly
     labels: [dependencies, gomod]
+    cooldown:
+      default-days: 7
     groups:
-      gomod-minor-patch:
+      monthly-batch:
+        patterns: ["*"]
         update-types: [minor, patch]
+      monthly-majors:
+        patterns: ["*"]
+        update-types: [major]
     ignore:
       # k8s.io staging libs must track the k8s.io/kubernetes minor that
       # argo-cd pins (currently v1.36.x for argo-cd v3.5.x). Minor bumps only
