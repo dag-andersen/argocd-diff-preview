@@ -76,8 +76,3 @@ Installing the CRDs makes their APIs available to rendering and Kubernetes disco
 - Other resources must exist before Argo CD or an Application can be rendered correctly.
 
 Without an installed CRD, an unknown custom resource is treated as namespaced. This safe default prevents namespaces from being removed and same-named resources from being silently combined. Pre-installing the CRD still provides the most accurate result because the tool can discover its actual scope.
-
-!!! note
-    Preinstall manifests are applied only to the ephemeral preview cluster. They are not synced as part of an Argo CD Application and do not modify the destination cluster.
-
-Keep repository credentials and other Argo CD secrets in the separate `/secrets` folder. The preinstall folder is intended for CRDs and other cluster prerequisites.

@@ -178,8 +178,6 @@ See [Pre-installing CRDs](./getting-started/pre-installing-crds.md) for setup in
 kubectl apply -f /preinstall
 ```
 
-!!! note "Actual execution order"
-    Preinstall manifests are applied before the credentials and Argo CD installation steps described above. This section is placed here to keep the related folder-based setup together.
 
 ---
 

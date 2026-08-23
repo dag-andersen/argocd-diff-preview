@@ -18,11 +18,9 @@ func ApplyPreinstallFromFolder(client *k8s.Client, preinstallFolder string, name
 	if err != nil {
 		return err
 	}
-	if !found {
-		log.Info().Msgf("🤷 No preinstall folder found at %s", preinstallFolder)
-	} else if count > 0 {
+	if count > 0 {
 		log.Info().Msgf("📦 Applied %d preinstall manifests", count)
-	} else {
+	} else if found {
 		log.Info().Msgf("🤷 No preinstall manifests found in %s", preinstallFolder)
 	}
 	return nil
@@ -46,6 +44,7 @@ func ApplySecretsFromFolder(client *k8s.Client, secretsFolder string, namespace 
 	return nil
 }
 
+// returns the number of manifests applied, whether the folder was found, and an error if any.
 func applyManifestsFromFolder(folder string, manifestType string, apply func(path string) (int, error)) (int, bool, error) {
 	if _, err := os.Stat(folder); err != nil {
 		if os.IsNotExist(err) {
