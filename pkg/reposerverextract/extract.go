@@ -738,12 +738,20 @@ func buildManifestRequestForSource(
 		}
 	}
 
-	// Copy the content source directory into the temp tree.
+	// Kustomize can reference files outside the source dir, so stage the
+	// whole checkout (like the no-refs fast path).
 	srcContentDir := filepath.Join(branchFolder, primarySource.Path)
-	dstContentDir := filepath.Join(tempDir, primarySource.Path)
-	if err := copyDir(srcContentDir, dstContentDir); err != nil {
-		cleanup()
-		return nil, "", nil, fmt.Errorf("failed to copy content source dir %q: %w", srcContentDir, err)
+	if isKustomizeSource(srcContentDir) {
+		if err := stageCheckout(branchFolder, tempDir); err != nil {
+			cleanup()
+			return nil, "", nil, fmt.Errorf("failed to stage branch folder %q: %w", branchFolder, err)
+		}
+	} else {
+		dstContentDir := filepath.Join(tempDir, primarySource.Path)
+		if err := copyDir(srcContentDir, dstContentDir); err != nil {
+			cleanup()
+			return nil, "", nil, fmt.Errorf("failed to copy content source dir %q: %w", srcContentDir, err)
+		}
 	}
 
 	// Copy only the ref files used by this content source into
@@ -1114,6 +1122,41 @@ func hasExternalRefSource(refSources []v1alpha1.ApplicationSource, repoSelector 
 		}
 	}
 	return false
+}
+
+// stageCheckout mirrors a checkout into dst: files are hardlinked (staging
+// is read-only), symlinks stay symlinks, .git is skipped. Links are left for
+// the repo server and kustomize to validate, like on a real clone.
+func stageCheckout(src, dst string) error {
+	return filepath.Walk(src, func(srcPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() && info.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		rel, err := filepath.Rel(src, srcPath)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, rel)
+		switch {
+		case info.IsDir():
+			return os.MkdirAll(dstPath, 0o755)
+		case info.Mode()&os.ModeSymlink != 0:
+			target, err := os.Readlink(srcPath)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(target, dstPath)
+		default:
+			// parent dirs already exist: Walk visits directories first
+			if err := os.Link(srcPath, dstPath); err == nil {
+				return nil
+			}
+			return copyFile(srcPath, dstPath)
+		}
+	})
 }
 
 // copyDir recursively copies src into dst, creating dst if needed.
