@@ -44,11 +44,12 @@ import (
 // resourceInfoProvider implements kubeutil.ResourceInfoProvider to supply
 // namespace-scope information for Kubernetes resources.
 type resourceInfoProvider struct {
-	namespacedByGk map[schema.GroupKind]bool
+	clusterScopedByGk map[schema.GroupKind]bool
 }
 
 func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
-	return p.namespacedByGk[gk], nil
+	_, isClusterScoped := p.clusterScopedByGk[gk]
+	return !isClusterScoped, nil
 }
 
 // RenderApplicationsFromBothBranches renders manifests for all supplied base
@@ -94,7 +95,7 @@ func RenderApplicationsFromBothBranches(
 		return nil, nil, time.Since(startTime), err
 	}
 
-	namespacedScopedResources, apiVersions, err := argocd.K8sClient.GetNamespacedScopedResourcesAndAPIVersions()
+	clusterScopedResources, apiVersions, err := argocd.K8sClient.GetClusterScopedResourcesAndAPIVersions()
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to initialize render context: %w", err)
 	}
@@ -194,7 +195,7 @@ func RenderApplicationsFromBothBranches(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, &repoSelector, kubeVersion, apiVersions, kustomizeBuildOptions, helmChartPuller{})
+			manifests, err := renderApp(ctx, repoClient, app, branchFolderByType, clusterScopedResources, creds, &repoSelector, kubeVersion, apiVersions, kustomizeBuildOptions, helmChartPuller{})
 			if err != nil {
 				results <- result{err: fmt.Errorf("failed to render app %s: %w", app.GetLongName(), err)}
 				return
@@ -266,7 +267,7 @@ func renderApp(
 	repoClient *reposerver.Client,
 	app argoapplication.ArgoResource,
 	branchFolderByType map[git.BranchType]string,
-	namespacedScopedResources map[schema.GroupKind]bool,
+	clusterScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
 	repoSelector *repository.Selector,
 	kubeVersion string,
@@ -380,7 +381,7 @@ func renderApp(
 	}
 
 	destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
-	manifests, err = normalizeNamespaces(manifests, destNamespace, namespacedScopedResources, app.GetLongName())
+	manifests, err = normalizeNamespaces(manifests, destNamespace, clusterScopedResources, app.GetLongName())
 	if err != nil {
 		return nil, err
 	}
@@ -1251,7 +1252,7 @@ func removeArgoCDTrackingID(manifests []unstructured.Unstructured) error {
 func normalizeNamespaces(
 	manifests []unstructured.Unstructured,
 	destNamespace string,
-	namespacedResources map[schema.GroupKind]bool,
+	clusterScopedResources map[schema.GroupKind]bool,
 	appName string,
 ) ([]unstructured.Unstructured, error) {
 	if destNamespace == "" {
@@ -1263,7 +1264,7 @@ func normalizeNamespaces(
 		ptrManifests[i] = &manifests[i]
 	}
 
-	provider := &resourceInfoProvider{namespacedByGk: namespacedResources}
+	provider := &resourceInfoProvider{clusterScopedByGk: clusterScopedResources}
 	deduped, conditions, err := controller.DeduplicateTargetObjects(destNamespace, ptrManifests, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalise namespaces: %w", err)

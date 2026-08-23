@@ -162,7 +162,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 		return nil, nil, time.Since(startTime), err
 	}
 
-	namespacedScopedResources, apiVersions, err := argocd.K8sClient.GetNamespacedScopedResourcesAndAPIVersions()
+	clusterScopedResources, apiVersions, err := argocd.K8sClient.GetClusterScopedResourcesAndAPIVersions()
 	if err != nil {
 		return nil, nil, time.Since(startTime), fmt.Errorf("failed to initialize render context: %w", err)
 	}
@@ -362,7 +362,7 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(remainingTime())*time.Second)
 			defer cancel()
 
-			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, namespacedScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions, kustomizeBuildOptions, redirectRevisions)
+			manifests, childApps, err := renderAppWithChildDiscovery(ctx, repoClient, argocd, item.app, branchFolderByType, branchByType, clusterScopedResources, creds, &repoSelector, argocd.Namespace, tempFolder, item.depth, kubeVersion, apiVersions, kustomizeBuildOptions, redirectRevisions)
 			if err != nil {
 				results <- renderResult{err: fmt.Errorf("failed to render app %s: %w", item.app.GetLongName(), err)}
 				return
@@ -444,7 +444,7 @@ func renderAppWithChildDiscovery(
 	app argoapplication.ArgoResource,
 	branchFolderByType map[git.BranchType]string,
 	branchByType map[git.BranchType]*git.Branch,
-	namespacedScopedResources map[schema.GroupKind]bool,
+	clusterScopedResources map[schema.GroupKind]bool,
 	creds *RepoCreds,
 	repoSelector *repository.Selector,
 	argocdNamespace string,
@@ -455,7 +455,7 @@ func renderAppWithChildDiscovery(
 	kustomizeBuildOptions string,
 	redirectRevisions []string,
 ) ([]unstructured.Unstructured, []argoapplication.ArgoResource, error) {
-	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, namespacedScopedResources, creds, repoSelector, kubeVersion, apiVersions, kustomizeBuildOptions, helmChartPuller{})
+	allManifests, err := renderApp(ctx, repoClient, app, branchFolderByType, clusterScopedResources, creds, repoSelector, kubeVersion, apiVersions, kustomizeBuildOptions, helmChartPuller{})
 	if err != nil {
 		return nil, nil, err
 	}

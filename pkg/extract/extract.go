@@ -23,12 +23,13 @@ import (
 // resourceInfoProvider implements kubeutil.ResourceInfoProvider interface
 // to provide namespace scope information for Kubernetes resources
 type resourceInfoProvider struct {
-	namespacedByGk map[schema.GroupKind]bool
+	clusterScopedByGk map[schema.GroupKind]bool
 }
 
 // IsNamespaced returns true if the given GroupKind is namespaced
 func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
-	return p.namespacedByGk[gk], nil
+	_, isClusterScoped := p.clusterScopedByGk[gk]
+	return !isClusterScoped, nil
 }
 
 // RenderApplicationsFromBothBranches extracts resources from both base and target branches
@@ -86,12 +87,13 @@ func getResourcesFromApps(
 ) ([]ExtractedApp, []ExtractedApp, error) {
 	startTime := time.Now()
 
-	// Get list of namespaced resources for namespace normalization
+	// Get the set of known cluster-scoped resources for namespace normalization.
+	// Kinds absent from this set default to namespaced.
 	// This is needed because `argocd app manifests --revision` returns raw manifests
 	// without namespace normalization that the controller cache would normally provide
-	namespacedScopedResources, err := argocd.K8sClient.GetListOfNamespacedScopedResources()
+	clusterScopedResources, err := argocd.K8sClient.GetListOfClusterScopedResources()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get list of namespaced scoped resources: %w", err)
+		return nil, nil, fmt.Errorf("failed to get list of cluster-scoped resources: %w", err)
 	}
 
 	log.Info().Msgf("🤖 Rendering Applications (timeout in %d seconds)", timeout)
@@ -156,7 +158,7 @@ func getResourcesFromApps(
 			}
 
 			// Get resources from application
-			result, k8sName, err := getResourcesFromApp(argocd, app, timeRemaining, prefix, namespacedScopedResources)
+			result, k8sName, err := getResourcesFromApp(argocd, app, timeRemaining, prefix, clusterScopedResources)
 			results <- struct {
 				app ExtractedApp
 				err error
@@ -231,7 +233,7 @@ func getResourcesFromApp(
 	app argoapplication.ArgoResource,
 	timeout int,
 	prefix string,
-	namespacedScopedResources map[schema.GroupKind]bool,
+	clusterScopedResources map[schema.GroupKind]bool,
 ) (ExtractedApp, string, error) {
 
 	// Store ID (kubernetes resource name) before we add a prefix and hash
@@ -285,7 +287,7 @@ func getResourcesFromApp(
 			continue
 		}
 
-		manifestsContent, err := getManifestsFromApp(argocd, app, namespacedScopedResources)
+		manifestsContent, err := getManifestsFromApp(argocd, app, clusterScopedResources)
 
 		// If we got manifests with no error, return the extracted app.Ignore all errors
 		if err == nil && len(manifestsContent) > 0 {
@@ -361,7 +363,7 @@ func getResourcesFromApp(
 	}
 }
 
-func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, namespacedScopedResources map[schema.GroupKind]bool) ([]unstructured.Unstructured, error) {
+func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplication.ArgoResource, clusterScopedResources map[schema.GroupKind]bool) ([]unstructured.Unstructured, error) {
 	log.Debug().Str("App", app.GetLongName()).Msg("Extracting manifests from Application")
 
 	extractionTimer := time.Now()
@@ -399,7 +401,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 	// This is also used as a sanity check to always verify That the API implementation matches the CLI implementation in terms of namespace handling and deduplication.
 	if argocd.RenderMethod() != vars.RenderMethodCLI {
 		destNamespace, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "destination", "namespace")
-		manifests, err = normalizeNamespaces(manifests, destNamespace, namespacedScopedResources, app.GetLongName())
+		manifests, err = normalizeNamespaces(manifests, destNamespace, clusterScopedResources, app.GetLongName())
 		if err != nil {
 			return nil, err
 		}
@@ -425,7 +427,7 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 func normalizeNamespaces(
 	manifests []unstructured.Unstructured,
 	destNamespace string,
-	namespacedResources map[schema.GroupKind]bool,
+	clusterScopedResources map[schema.GroupKind]bool,
 	appName string,
 ) ([]unstructured.Unstructured, error) {
 	if destNamespace == "" {
@@ -438,7 +440,7 @@ func normalizeNamespaces(
 		ptrManifests[i] = &manifests[i]
 	}
 
-	provider := &resourceInfoProvider{namespacedByGk: namespacedResources}
+	provider := &resourceInfoProvider{clusterScopedByGk: clusterScopedResources}
 	deduplicatedManifests, conditions, err := controller.DeduplicateTargetObjects(destNamespace, ptrManifests, provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalize namespaces: %w", err)

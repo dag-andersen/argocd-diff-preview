@@ -23,22 +23,22 @@ func (c *Client) GetServerVersion() (string, error) {
 // consumed by the Argo CD repo server's ManifestRequest.ApiVersions field and
 // exposed to Helm templates via .Capabilities.APIVersions.
 func (c *Client) GetAPIVersions() ([]string, error) {
-	_, apiVersions, err := c.GetNamespacedScopedResourcesAndAPIVersions()
+	_, apiVersions, err := c.GetClusterScopedResourcesAndAPIVersions()
 	if err != nil {
 		return nil, err
 	}
 	return apiVersions, nil
 }
 
-// GetNamespacedScopedResourcesAndAPIVersions returns metadata about all namespaced
+// GetClusterScopedResourcesAndAPIVersions returns metadata about all cluster-scoped
 // resource types and all unique GroupVersion strings in one discovery pass.
-func (c *Client) GetNamespacedScopedResourcesAndAPIVersions() (map[schema.GroupKind]bool, []string, error) {
+func (c *Client) GetClusterScopedResourcesAndAPIVersions() (map[schema.GroupKind]bool, []string, error) {
 	_, apiResourceLists, err := c.discoveryClient.ServerGroupsAndResources()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to discover API resources: %w", err)
 	}
 
-	namespacedScopedResources := make(map[schema.GroupKind]bool)
+	clusterScopedResources := make(map[schema.GroupKind]bool)
 	seen := make(map[string]bool)
 	var apiVersions []string
 	for _, apiResourceList := range apiResourceLists {
@@ -55,8 +55,9 @@ func (c *Client) GetNamespacedScopedResourcesAndAPIVersions() (map[schema.GroupK
 
 		// Check each resource in the API group
 		for _, apiResource := range apiResourceList.APIResources {
-			// Skip if this is a cluster-scoped resource (not namespaced)
-			if !apiResource.Namespaced {
+			// Only retain cluster-scoped resources. A kind missing from this map is
+			// treated as namespaced, which is the safe default for undiscovered CRDs.
+			if apiResource.Namespaced {
 				continue
 			}
 
@@ -71,21 +72,20 @@ func (c *Client) GetNamespacedScopedResourcesAndAPIVersions() (map[schema.GroupK
 				Kind:  apiResource.Kind,
 			}
 
-			// Store with value true (indicating this resource is namespaced)
-			namespacedScopedResources[gk] = true
+			clusterScopedResources[gk] = true
 		}
 	}
 	sort.Strings(apiVersions)
-	return namespacedScopedResources, apiVersions, nil
+	return clusterScopedResources, apiVersions, nil
 }
 
-// GetListOfNamespacedScopedResources returns metadata about all namespaced resource types
-// Returns a map where the key is schema.GroupKind and the value is true (indicating the resource is namespaced)
+// GetListOfClusterScopedResources returns metadata about all cluster-scoped resource types.
+// A GroupKind absent from the returned map should be treated as namespaced.
 // This format matches the interface expected by Argo CD's kubeutil.ResourceInfoProvider
-func (c *Client) GetListOfNamespacedScopedResources() (map[schema.GroupKind]bool, error) {
-	namespacedScopedResources, _, err := c.GetNamespacedScopedResourcesAndAPIVersions()
+func (c *Client) GetListOfClusterScopedResources() (map[schema.GroupKind]bool, error) {
+	clusterScopedResources, _, err := c.GetClusterScopedResourcesAndAPIVersions()
 	if err != nil {
 		return nil, err
 	}
-	return namespacedScopedResources, nil
+	return clusterScopedResources, nil
 }
