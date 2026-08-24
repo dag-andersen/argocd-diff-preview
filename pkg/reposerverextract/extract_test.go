@@ -540,10 +540,11 @@ spec:
 	assertDefaultProjectFields(t, req)
 }
 
-// Multi-source: a kustomize content source referencing files outside its own
-// directory must stage the whole checkout (like the no-refs fast path), or
-// the escaping reference fails with "no such file or directory".
-func TestBuildManifestRequest_MultiSource_Kustomize_WithRef_StagesBranchRoot(t *testing.T) {
+// Multi-source: a kustomize content source referencing a directory outside its
+// own path must stream the existing checkout, like the no-refs path. Besides
+// keeping the referenced directory available, reusing this path lets the tgz
+// cache share one compressed checkout across applications.
+func TestBuildManifestRequest_MultiSource_Kustomize_WithRef_StreamsBranchRoot(t *testing.T) {
 	branchFolder := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "clusters", "dev", "my-app"), 0o755))
 	require.NoError(t, os.WriteFile(
@@ -581,42 +582,12 @@ spec:
 		repoSelector: testRepoSelector(t, ""),
 	})
 	require.NoError(t, err)
-	require.NotEmpty(t, streamDir)
-	defer cleanup()
+	assert.Equal(t, branchFolder, streamDir)
+	assert.Nil(t, cleanup)
 
 	assert.Equal(t, "clusters/dev/my-app", req.ApplicationSource.Path)
 	_, statErr := os.Stat(filepath.Join(streamDir, "base", "my-app", "kustomization.yaml"))
-	assert.NoError(t, statErr, "files referenced outside the kustomize source dir must be staged")
-}
-
-// symlinks stay symlinks (the repo server and kustomize validate them, like
-// on a real clone), files are hardlinked, .git is skipped
-func TestStageCheckout_PreservesSymlinksAndHardlinks(t *testing.T) {
-	src := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(src, "app.yaml"), []byte("a: 1"), 0o644))
-	require.NoError(t, os.MkdirAll(filepath.Join(src, ".git"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(src, ".git", "HEAD"), []byte("ref"), 0o644))
-	require.NoError(t, os.Symlink("app.yaml", filepath.Join(src, "link-in.yaml")))
-	require.NoError(t, os.Symlink("../outside.yaml", filepath.Join(src, "link-out.yaml")))
-
-	dst := filepath.Join(t.TempDir(), "dst")
-	require.NoError(t, stageCheckout(src, dst))
-
-	// symlinks preserved verbatim, including ones pointing outside the tree
-	target, err := os.Readlink(filepath.Join(dst, "link-in.yaml"))
-	require.NoError(t, err)
-	assert.Equal(t, "app.yaml", target)
-	target, err = os.Readlink(filepath.Join(dst, "link-out.yaml"))
-	require.NoError(t, err)
-	assert.Equal(t, "../outside.yaml", target)
-
-	// regular files hardlinked, .git skipped
-	srcInfo, err := os.Stat(filepath.Join(src, "app.yaml"))
-	require.NoError(t, err)
-	dstInfo, err := os.Stat(filepath.Join(dst, "app.yaml"))
-	require.NoError(t, err)
-	assert.True(t, os.SameFile(srcInfo, dstInfo), "regular files should be hardlinked")
-	assert.NoDirExists(t, filepath.Join(dst, ".git"))
+	assert.NoError(t, statErr, "directories referenced outside the kustomize source path must remain available")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
