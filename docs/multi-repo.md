@@ -37,7 +37,7 @@ docker run \
   -v $(pwd)/output:/output \
   -e REPO=<org>/<repo-with-pr> \            ⬅️ Must match the repo with the PR
   -e TARGET_BRANCH=<pr-branch> \            ⬅️ The branch to redirect applications to
-  dagandersen/argocd-diff-preview:v0.2.13
+  dagandersen/argocd-diff-preview:v0.2.14
 ```
 
 !!! note "Why does this matter?"
@@ -130,7 +130,7 @@ jobs:
             -v $(pwd)/secrets:/secrets \               ⬅️ Mount the secrets folder
             -e TARGET_BRANCH=<pr-branch> \             ⬅️ The PR branch on the Application Repository
             -e REPO=<org>/<application-repository> \   ⬅️ Application Repository
-            dagandersen/argocd-diff-preview:v0.2.13
+            dagandersen/argocd-diff-preview:v0.2.14
 
       - name: Post diff as comment
         run: |
@@ -158,7 +158,7 @@ docker run \
     -v $(pwd)/secrets:/secrets \
     -e TARGET_BRANCH=<pr-branch> \
     -e REPO=<org>/<application-repository> \
-    dagandersen/argocd-diff-preview:v0.2.13
+    dagandersen/argocd-diff-preview:v0.2.14
 ```
 
 ### Pipeline in the Resource Repository
@@ -250,7 +250,7 @@ jobs:
             -e REPO=<org>/<resource-repository> \      ⬅️ Resource Repository (where the PR is!)
             -e AUTO_DETECT_FILES_CHANGED=false \       ⬅️ Disable auto-detection because the PR is not in the Application Repository
             -e RENDER_METHOD=server-api \              ⬅️ This is the default. This setup does not work with RENDER_METHOD=repo-server-api
-            dagandersen/argocd-diff-preview:v0.2.13
+            dagandersen/argocd-diff-preview:v0.2.14
 
       - name: Post diff as comment
         run: |
@@ -283,7 +283,7 @@ docker run \
     -e REPO=<org>/<resource-repository> \
     -e AUTO_DETECT_FILES_CHANGED=false \
     -e RENDER_METHOD=server-api \
-    dagandersen/argocd-diff-preview:v0.2.13
+    dagandersen/argocd-diff-preview:v0.2.14
 ```
 
 ---
