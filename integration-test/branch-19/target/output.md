@@ -2,9 +2,109 @@
 
 Summary:
 ```yaml
-Modified (1):
+Modified (6):
+± app-b (+25)
+± cluster-a-cluster-rbac (-25)
+± cluster-b-cluster-rbac (+12)
 ± kustomize-build-options (+2|-2)
+± owner-a (-12)
+± owner-b (+12)
 ```
+
+<details>
+<summary>app-b (examples/resource-application-boundary/applicationset.yaml)</summary>
+<br>
+
+#### ClusterRole: app-b-node-reader
+```diff
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRole
++metadata:
++  name: app-b-node-reader
++rules:
++- apiGroups:
++  - ""
++  resources:
++  - nodes
++  verbs:
++  - get
++  - list
++  - watch
+```
+#### ClusterRoleBinding: app-b-node-reader
+```diff
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRoleBinding
++metadata:
++  name: app-b-node-reader
++roleRef:
++  apiGroup: rbac.authorization.k8s.io
++  kind: ClusterRole
++  name: app-b-node-reader
++subjects:
++- apiGroup: rbac.authorization.k8s.io
++  kind: Group
++  name: app-b-readers
+```
+</details>
+
+<details>
+<summary>cluster-a-cluster-rbac (examples/cluster-rbac-repro/deployment-config/applicationsets/cluster-rbac.yaml)</summary>
+<br>
+
+#### ClusterRole: sympozium-agent-node-reader
+```diff
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRole
+-metadata:
+-  name: sympozium-agent-node-reader
+-rules:
+-- apiGroups:
+-  - ""
+-  resources:
+-  - nodes
+-  verbs:
+-  - get
+-  - list
+-  - watch
+```
+#### ClusterRoleBinding: sympozium-agent-node-reader
+```diff
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRoleBinding
+-metadata:
+-  name: sympozium-agent-node-reader
+-roleRef:
+-  apiGroup: rbac.authorization.k8s.io
+-  kind: ClusterRole
+-  name: sympozium-agent-node-reader
+-subjects:
+-- apiGroup: rbac.authorization.k8s.io
+-  kind: Group
+-  name: aks:jwt:platform-cluster:system:serviceaccount:automation:automation-agent
+```
+</details>
+
+<details>
+<summary>cluster-b-cluster-rbac (examples/cluster-rbac-repro/deployment-config/applicationsets/cluster-rbac.yaml)</summary>
+<br>
+
+#### ClusterRoleBinding: sympozium-agent-view
+```diff
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRoleBinding
++metadata:
++  name: sympozium-agent-view
++roleRef:
++  apiGroup: rbac.authorization.k8s.io
++  kind: ClusterRole
++  name: view
++subjects:
++- apiGroup: rbac.authorization.k8s.io
++  kind: Group
++  name: oidc:jwt:platform-cluster:system:serviceaccount:automation:automation-agent
+```
+</details>
 
 <details>
 <summary>kustomize-build-options (examples/kustomize-build-options/application.yaml)</summary>
@@ -35,5 +135,47 @@ Modified (1):
 ```
 </details>
 
+<details>
+<summary>owner-a (examples/resource-application-boundary/owner-a/application.yaml)</summary>
+<br>
+
+#### ClusterRole: moved-resource
+```diff
+-apiVersion: rbac.authorization.k8s.io/v1
+-kind: ClusterRole
+-metadata:
+-  name: moved-resource
+-rules:
+-- apiGroups:
+-  - ""
+-  resources:
+-  - nodes
+-  verbs:
+-  - get
+-  - list
+```
+</details>
+
+<details>
+<summary>owner-b (examples/resource-application-boundary/owner-b/application.yaml)</summary>
+<br>
+
+#### ClusterRole: moved-resource
+```diff
++apiVersion: rbac.authorization.k8s.io/v1
++kind: ClusterRole
++metadata:
++  name: moved-resource
++rules:
++- apiGroups:
++  - ""
++  resources:
++  - nodes
++  verbs:
++  - get
++  - list
+```
+</details>
+
 _Stats_:
-[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]
+[Applications: 14], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

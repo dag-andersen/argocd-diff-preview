@@ -59,10 +59,133 @@ pre {
 <h1>Argo CD Diff Preview</h1>
 
 <p>Summary:</p>
-<pre>Modified (1):
-± kustomize-build-options (+2|-2)</pre>
+<pre>Modified (6):
+± app-b (+25)
+± cluster-a-cluster-rbac (-25)
+± cluster-b-cluster-rbac (+12)
+± kustomize-build-options (+2|-2)
+± owner-a (-12)
+± owner-b (+12)</pre>
 
 <div class="diffs">
+<details>
+<summary>
+app-b (examples/resource-application-boundary/applicationset.yaml)
+</summary>
+
+<h4 class="resource_header">ClusterRole: app-b-node-reader</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ClusterRole</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: app-b-node-reader</pre></td></tr>
+	<tr class="added_line"><td><pre>+rules:</pre></td></tr>
+	<tr class="added_line"><td><pre>+- apiGroups:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - &#34;&#34;</pre></td></tr>
+	<tr class="added_line"><td><pre>+  resources:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - nodes</pre></td></tr>
+	<tr class="added_line"><td><pre>+  verbs:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - get</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - list</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - watch</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ClusterRoleBinding: app-b-node-reader</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ClusterRoleBinding</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: app-b-node-reader</pre></td></tr>
+	<tr class="added_line"><td><pre>+roleRef:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="added_line"><td><pre>+  kind: ClusterRole</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: app-b-node-reader</pre></td></tr>
+	<tr class="added_line"><td><pre>+subjects:</pre></td></tr>
+	<tr class="added_line"><td><pre>+- apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="added_line"><td><pre>+  kind: Group</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: app-b-readers</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+cluster-a-cluster-rbac (examples/cluster-rbac-repro/deployment-config/applicationsets/cluster-rbac.yaml)
+</summary>
+
+<h4 class="resource_header">ClusterRole: sympozium-agent-node-reader</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ClusterRole</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: sympozium-agent-node-reader</pre></td></tr>
+	<tr class="removed_line"><td><pre>-rules:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - nodes</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - watch</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ClusterRoleBinding: sympozium-agent-node-reader</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ClusterRoleBinding</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: sympozium-agent-node-reader</pre></td></tr>
+	<tr class="removed_line"><td><pre>-roleRef:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  kind: ClusterRole</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: sympozium-agent-node-reader</pre></td></tr>
+	<tr class="removed_line"><td><pre>-subjects:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  kind: Group</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: aks:jwt:platform-cluster:system:serviceaccount:automation:automation-agent</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+cluster-b-cluster-rbac (examples/cluster-rbac-repro/deployment-config/applicationsets/cluster-rbac.yaml)
+</summary>
+
+<h4 class="resource_header">ClusterRoleBinding: sympozium-agent-view</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ClusterRoleBinding</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: sympozium-agent-view</pre></td></tr>
+	<tr class="added_line"><td><pre>+roleRef:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="added_line"><td><pre>+  kind: ClusterRole</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: view</pre></td></tr>
+	<tr class="added_line"><td><pre>+subjects:</pre></td></tr>
+	<tr class="added_line"><td><pre>+- apiGroup: rbac.authorization.k8s.io</pre></td></tr>
+	<tr class="added_line"><td><pre>+  kind: Group</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: oidc:jwt:platform-cluster:system:serviceaccount:automation:automation-agent</pre></td></tr>
+</table>
+</div>
+
+</details>
+
 <details>
 <summary>
 kustomize-build-options (examples/kustomize-build-options/application.yaml)
@@ -96,10 +219,62 @@ kustomize-build-options (examples/kustomize-build-options/application.yaml)
 </div>
 
 </details>
+
+<details>
+<summary>
+owner-a (examples/resource-application-boundary/owner-a/application.yaml)
+</summary>
+
+<h4 class="resource_header">ClusterRole: moved-resource</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="removed_line"><td><pre>-apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="removed_line"><td><pre>-kind: ClusterRole</pre></td></tr>
+	<tr class="removed_line"><td><pre>-metadata:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  name: moved-resource</pre></td></tr>
+	<tr class="removed_line"><td><pre>-rules:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-- apiGroups:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - &#34;&#34;</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  resources:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - nodes</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  verbs:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - get</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  - list</pre></td></tr>
+</table>
+</div>
+
+</details>
+
+<details>
+<summary>
+owner-b (examples/resource-application-boundary/owner-b/application.yaml)
+</summary>
+
+<h4 class="resource_header">ClusterRole: moved-resource</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: rbac.authorization.k8s.io/v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ClusterRole</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: moved-resource</pre></td></tr>
+	<tr class="added_line"><td><pre>+rules:</pre></td></tr>
+	<tr class="added_line"><td><pre>+- apiGroups:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - &#34;&#34;</pre></td></tr>
+	<tr class="added_line"><td><pre>+  resources:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - nodes</pre></td></tr>
+	<tr class="added_line"><td><pre>+  verbs:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - get</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - list</pre></td></tr>
+</table>
+</div>
+
+</details>
 </div>
 
 <pre>_Stats_:
-[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+[Applications: 14], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
 </div>
 </body>
 </html>
