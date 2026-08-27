@@ -16,3 +16,5 @@ spec:
       helm:
         valueFiles:
           - $local-files/examples/helm/values/my-app.yaml
+        valuesObject:
+          replicaCount: 5
