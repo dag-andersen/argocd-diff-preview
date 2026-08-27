@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sympozium-agent-view
+subjects:
+  - kind: Group
+    name: "aks:jwt:eks-platformservices-prod:system:serviceaccount:sympozium-system:sympozium-agent"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io

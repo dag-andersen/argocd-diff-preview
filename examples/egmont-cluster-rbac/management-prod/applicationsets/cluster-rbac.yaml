@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-rbac
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/egmont-cluster-rbac/.*"
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                - name: in-cluster
+                - name: storyhouse-qa
+          - git:
+              repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+              revision: HEAD
+              directories:
+                - path: "examples/egmont-cluster-rbac/management-prod/cluster-rbac/{{ .name }}"
+  template:
+    metadata:
+      name: '{{ .name }}-cluster-rbac'
+      annotations:
+        argocd-diff-preview/watch-pattern: "examples/egmont-cluster-rbac/.*"
+        argocd.argoproj.io/manifest-generate-paths: .
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
+        targetRevision: HEAD
+        path: "examples/egmont-cluster-rbac/management-prod/cluster-rbac/{{ .name }}"
+      destination:
+        name: in-cluster
