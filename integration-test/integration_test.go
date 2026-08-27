@@ -347,13 +347,17 @@ var testCases = []TestCase{
 	// Regression test for global Kustomize build options in repo-server-api mode.
 	// The Kustomization loads a resource outside its application directory, which
 	// requires kustomize.buildOptions=--load-restrictor LoadRestrictionsNone.
+	// This test also covers resource ownership across Application sections:
+	// duplicate cluster-scoped resources in one Application, a resource genuinely
+	// moved from one Application to another, and an unchanged resource that must
+	// remain associated with its original Application without producing a diff.
 	{
 		Name:                       "branch-19/target",
 		TargetBranch:               "integration-test/branch-19/target",
 		BaseBranch:                 "integration-test/branch-19/base",
 		RenderMethod:               "repo-server-api",
 		ArgocdConfigDir:            "kustomize-build-options",
-		FileRegex:                  "examples/kustomize-build-options/.*",
+		FileRegex:                  "examples/(kustomize-build-options|resource-application-boundary|cluster-rbac-repro)/.*",
 		WatchIfNoWatchPatternFound: "false",
 	},
 	// This test verifies that disabling cluster roles without using the API fails.
