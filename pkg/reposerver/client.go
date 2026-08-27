@@ -37,6 +37,9 @@ const (
 	maxGenerateRetries = 5
 	// generateRetryBaseDelay is the initial backoff delay before the first retry.
 	generateRetryBaseDelay = 500 * time.Millisecond
+
+	repoServerLabelSelector   = "app.kubernetes.io/part-of=argocd,app.kubernetes.io/component=repo-server"
+	repoServerServicePortName = "server"
 )
 
 // isRetryableRenderError reports whether an error is a transient transport
@@ -98,6 +101,24 @@ func NewClientWithAddress(address string, disableTLS bool, insecureSkipVerify bo
 	}
 }
 
+// EnsureConnection makes the repo server reachable. In-cluster runs use the
+// repo-server Service DNS name directly so Kubernetes can load-balance between
+// pods. External runs keep the existing port-forward behavior.
+func (c *Client) EnsureConnection() error {
+	if c.k8sClient != nil && c.k8sClient.IsInCluster() {
+		address, err := c.k8sClient.GetServiceAddressByLabel(c.namespace, repoServerLabelSelector, repoServerServicePortName, repoServerRemotePort)
+		if err != nil {
+			return fmt.Errorf("failed to find Argo CD repo server service address (label: %s): %w", repoServerLabelSelector, err)
+		}
+
+		c.address = address
+		log.Debug().Str("address", address).Msg("Using Argo CD repo server service address")
+		return nil
+	}
+
+	return c.EnsurePortForward()
+}
+
 // EnsurePortForward starts a port-forward to the Argo CD repo server if one is
 // not already running. It is idempotent and safe to call concurrently.
 func (c *Client) EnsurePortForward() error {
@@ -118,11 +139,10 @@ func (c *Client) EnsurePortForward() error {
 	readyChan := make(chan struct{}, 1)
 	stopChan := make(chan struct{}, 1)
 
-	labelSelector := "app.kubernetes.io/part-of=argocd,app.kubernetes.io/component=repo-server"
-	serviceName, err := c.k8sClient.GetServiceNameByLabel(c.namespace, labelSelector)
+	serviceName, err := c.k8sClient.GetServiceNameByLabel(c.namespace, repoServerLabelSelector)
 	if err != nil {
 		c.portForwardMutex.Unlock()
-		return fmt.Errorf("failed to find Argo CD repo server service (label: %s): %w", labelSelector, err)
+		return fmt.Errorf("failed to find Argo CD repo server service (label: %s): %w", repoServerLabelSelector, err)
 	}
 
 	log.Debug().Msgf("Starting port forward from localhost:%d to %s:%d in namespace %s",
