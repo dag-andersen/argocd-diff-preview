@@ -1264,10 +1264,6 @@ func normalizeNamespaces(
 	clusterScopedResources map[schema.GroupKind]bool,
 	appName string,
 ) ([]unstructured.Unstructured, error) {
-	if destNamespace == "" {
-		return manifests, nil
-	}
-
 	ptrManifests := make([]*unstructured.Unstructured, len(manifests))
 	for i := range manifests {
 		ptrManifests[i] = &manifests[i]

@@ -215,6 +215,29 @@ func TestNormalizeNamespacesPreservesSameNamedUnknownResources(t *testing.T) {
 	assert.ElementsMatch(t, []string{"ns-a", "ns-b", "ns-c"}, actualNamespaces)
 }
 
+func TestNormalizeNamespacesDeduplicatesClusterScopedResourcesWithoutDestinationNamespace(t *testing.T) {
+	first := unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "rbac.authorization.k8s.io/v1",
+		"kind":       "ClusterRole",
+		"metadata": map[string]any{
+			"name": "node-reader",
+		},
+		"rules": []any{map[string]any{"verbs": []any{"get"}}},
+	}}
+	last := first.DeepCopy()
+	last.Object["rules"] = []any{map[string]any{"verbs": []any{"get", "list"}}}
+
+	result, err := normalizeNamespaces(
+		[]unstructured.Unstructured{first, *last},
+		"",
+		map[schema.GroupKind]bool{{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"}: true},
+		"test-app",
+	)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, last.Object, result[0].Object, "Argo CD deduplication should keep the last resource")
+}
+
 func TestResourceInfoProviderDefaultsUnknownKindsToNamespaced(t *testing.T) {
 	provider := &resourceInfoProvider{clusterScopedByGk: map[schema.GroupKind]bool{
 		{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"}: true,

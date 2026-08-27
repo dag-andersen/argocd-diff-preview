@@ -35,6 +35,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/yaml"
 )
 
@@ -78,6 +79,29 @@ func assertDefaultProjectFields(t *testing.T, req *repoapiclient.ManifestRequest
 	t.Helper()
 	assert.Equal(t, "default", req.ProjectName, "project name must match the patched application project")
 	assert.Equal(t, []string{"*"}, req.ProjectSourceRepos, "source repos must be permissive so helm build errors are not masked as permission errors")
+}
+
+func TestNormalizeNamespacesDeduplicatesClusterScopedResourcesWithoutDestinationNamespace(t *testing.T) {
+	first := unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "rbac.authorization.k8s.io/v1",
+		"kind":       "ClusterRole",
+		"metadata": map[string]any{
+			"name": "node-reader",
+		},
+		"rules": []any{map[string]any{"verbs": []any{"get"}}},
+	}}
+	last := first.DeepCopy()
+	last.Object["rules"] = []any{map[string]any{"verbs": []any{"get", "list"}}}
+
+	result, err := normalizeNamespaces(
+		[]unstructured.Unstructured{first, *last},
+		"",
+		map[schema.GroupKind]bool{{Group: "rbac.authorization.k8s.io", Kind: "ClusterRole"}: true},
+		"test-app",
+	)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, last.Object, result[0].Object, "Argo CD deduplication should keep the last resource")
 }
 
 func testRepoSelector(t *testing.T, repo string) *repository.Selector {
