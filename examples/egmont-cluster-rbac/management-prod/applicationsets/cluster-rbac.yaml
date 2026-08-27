@@ -35,4 +35,4 @@ spec:
         targetRevision: HEAD
         path: "examples/egmont-cluster-rbac/management-prod/cluster-rbac/{{ .name }}"
       destination:
-        name: in-cluster
+        name: "{{ .name }}"
