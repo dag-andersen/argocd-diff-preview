@@ -4,7 +4,7 @@ metadata:
   name: cluster-rbac
   namespace: argocd
   annotations:
-    argocd-diff-preview/watch-pattern: "examples/egmont-cluster-rbac/.*"
+    argocd-diff-preview/watch-pattern: "examples/cluster-rbac-repro/.*"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
@@ -15,24 +15,24 @@ spec:
         generators:
           - list:
               elements:
-                - name: in-cluster
-                - name: storyhouse-qa
+                - name: cluster-a
+                - name: cluster-b
           - git:
               repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
               revision: HEAD
               directories:
-                - path: "examples/egmont-cluster-rbac/management-prod/cluster-rbac/{{ .name }}"
+                - path: "examples/cluster-rbac-repro/deployment-config/cluster-rbac/{{ .name }}"
   template:
     metadata:
       name: '{{ .name }}-cluster-rbac'
       annotations:
-        argocd-diff-preview/watch-pattern: "examples/egmont-cluster-rbac/.*"
+        argocd-diff-preview/watch-pattern: "examples/cluster-rbac-repro/.*"
         argocd.argoproj.io/manifest-generate-paths: .
     spec:
       project: default
       source:
         repoURL: https://github.com/dag-andersen/argocd-diff-preview.git
         targetRevision: HEAD
-        path: "examples/egmont-cluster-rbac/management-prod/cluster-rbac/{{ .name }}"
+        path: "examples/cluster-rbac-repro/deployment-config/cluster-rbac/{{ .name }}"
       destination:
         name: "{{ .name }}"
