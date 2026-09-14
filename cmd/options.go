@@ -88,6 +88,7 @@ var (
 	DefaultOutputBranchManifests                = false
 	DefaultTraverseAppOfApps                    = false
 	DefaultFailOnDuplicateGeneratedApplications = false
+	DefaultRepoServerAddress                    = ""
 )
 
 // RawOptions holds the raw CLI/env inputs - used only for parsing
@@ -140,6 +141,7 @@ type RawOptions struct {
 	OutputBranchManifests                bool   `mapstructure:"output-branch-manifests"`
 	TraverseAppOfApps                    bool   `mapstructure:"traverse-app-of-apps"`
 	FailOnDuplicateGeneratedApplications bool   `mapstructure:"fail-on-duplicate-generated-applications"`
+	RepoServerAddress                    string `mapstructure:"repo-server-address"`
 }
 
 // Config is the final, validated, ready-to-use configuration
@@ -186,6 +188,7 @@ type Config struct {
 	OutputBranchManifests                bool
 	TraverseAppOfApps                    bool
 	FailOnDuplicateGeneratedApplications bool
+	RepoServerAddress                    string
 
 	// Parsed/processed fields - no "parsed" prefix needed
 	FileRegex           *regexp.Regexp
@@ -284,6 +287,7 @@ func Parse() *Config {
 	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
 	viper.SetDefault("traverse-app-of-apps", DefaultTraverseAppOfApps)
 	viper.SetDefault("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications)
+	viper.SetDefault("repo-server-address", DefaultRepoServerAddress)
 
 	// Basic flags
 	rootCmd.Flags().BoolP("debug", "d", false, "Activate debug mode")
@@ -345,6 +349,7 @@ func Parse() *Config {
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
 	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
 	rootCmd.Flags().Bool("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications, "Fail when a single ApplicationSet generates multiple Applications with the same name")
+	rootCmd.Flags().String("repo-server-address", DefaultRepoServerAddress, "Address of the Argo CD repo server (host:port). Connects directly instead of port-forwarding. Requires --render-method=repo-server-api")
 
 	// Check if version flag was specified directly
 	for _, arg := range os.Args[1:] {
@@ -432,6 +437,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		OutputBranchManifests:                o.OutputBranchManifests,
 		TraverseAppOfApps:                    o.TraverseAppOfApps,
 		FailOnDuplicateGeneratedApplications: o.FailOnDuplicateGeneratedApplications,
+		RepoServerAddress:                    o.RepoServerAddress,
 	}
 
 	var err error
@@ -500,6 +506,11 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		if _, err := exec.LookPath("argocd"); err != nil {
 			return nil, fmt.Errorf("argocd CLI is not installed. Either install the argocd CLI or use '--render-method=server-api' / '--use-argocd-api=true' to use the API instead")
 		}
+	}
+
+	// --repo-server-address is only supported with repo-server-api render method
+	if cfg.RepoServerAddress != "" && cfg.RenderMethod != RenderMethodRepoServerAPI {
+		return nil, fmt.Errorf("--repo-server-address requires --render-method=repo-server-api (current: %s)", cfg.RenderMethod)
 	}
 
 	return cfg, nil

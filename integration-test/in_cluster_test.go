@@ -23,6 +23,13 @@ const (
 
 var inClusterRenderMethods = []string{"server-api", "repo-server-api"}
 
+func TestRepoServerAdressFlag(t *testing.T) {
+	if os.Getenv("RUN_IN_CLUSTER_TEST") != "true" {
+		t.Skip("Skipping in-cluster integration test. Set RUN_IN_CLUSTER_TEST=true to run.")
+	}
+
+}
+
 // TestInClusterRenderMethods verifies that argocd-diff-preview can run as a Pod
 // inside the same cluster as Argo CD using the supported in-cluster render methods.
 //
