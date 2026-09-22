@@ -196,12 +196,16 @@ func RenderApplicationsFromBothBranchesWithAppOfApps(
 
 	// Create a single repo server client shared across all goroutines.
 	// EnsurePortForward is idempotent and mutex-protected inside the client.
-	repoClient := reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
-	defer repoClient.Cleanup()
-
-	if err := repoClient.EnsurePortForward(); err != nil {
-		return nil, nil, time.Since(startTime), fmt.Errorf("failed to set up port forward to repo server: %w", err)
+	var repoClient *reposerver.Client
+	if argocd.RepoServerAddress != "" {
+		repoClient = reposerver.NewClientWithAddress(argocd.RepoServerAddress, false, true)
+	} else {
+		repoClient = reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
+		if err := repoClient.EnsurePortForward(); err != nil {
+			return nil, nil, time.Since(startTime), fmt.Errorf("failed to set up port forward to repo server: %w", err)
+		}
 	}
+	defer repoClient.Cleanup()
 
 	log.Info().Msgf("🤖 Rendering Applications via repo server with app-of-apps traversal (timeout in %d seconds)", timeout)
 
