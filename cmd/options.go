@@ -808,6 +808,9 @@ func (o *Config) LogConfig() {
 	if o.ArgocdUIURL != DefaultArgocdUIURL {
 		log.Info().Msgf("✨ - argocd-ui-url: %s", o.ArgocdUIURL)
 	}
+	if o.RepoServerAddress != DefaultRepoServerAddress {
+		log.Info().Msgf("✨ - repo-server-address: %s", o.RepoServerAddress)
+	}
 	if o.Title != DefaultTitle {
 		log.Info().Msgf("✨ - title: %s", o.Title)
 	}

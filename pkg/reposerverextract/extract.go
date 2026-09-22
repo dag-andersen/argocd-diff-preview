@@ -133,6 +133,7 @@ func RenderApplicationsFromBothBranches(
 	// EnsurePortForward is idempotent and mutex-protected inside the client.
 	var repoClient *reposerver.Client
 	if argocd.RepoServerAddress != "" {
+		log.Info().Msgf("🔌 Connecting directly to Argo CD repo server at %s", argocd.RepoServerAddress)
 		repoClient = reposerver.NewClientWithAddress(argocd.RepoServerAddress, false, true)
 	} else {
 		repoClient = reposerver.NewClient(argocd.K8sClient, argocd.Namespace)
