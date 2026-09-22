@@ -7,22 +7,23 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
-  - list:
-      elements:
-      - env: production
-      - env: staging
+    - git:
+        repoURL: https://github.com/rklonner/argocd-diff-preview
+        revision: HEAD
+        directories:
+        - path: 'examples/use-cases/appset-refactoring/my-service/overlay/*'
   template:
     metadata:
-      name: 'refactoring-appset-example-{{.env}}'
+      name: 'refactoring-appset-example-{{.path.basename}}'
     spec:
       project: default
       destination:
         name: in-cluster
-        namespace: 'refactoring-appset-example-{{.env}}'
+        namespace: 'refactoring-appset-example-{{.path.basename}}'
       source:
-        repoURL: https://github.com/dag-andersen/argocd-diff-preview
+        repoURL: https://github.com/rklonner/argocd-diff-preview
         targetRevision: HEAD
-        path: 'examples/use-cases/appset-refactoring/my-service/overlay/{{.env}}/'
+        path: 'examples/use-cases/appset-refactoring/my-service/overlay/{{.path.basename}}/'
       syncPolicy:
         automated:
           prune: true
