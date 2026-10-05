@@ -664,23 +664,31 @@ func configureLogging(cfg *Config) {
 	// informers", "Configmap/secret informer synced" from util/settings).
 	logrus.SetOutput(io.Discard)
 
-	consoleWriter := zerolog.ConsoleWriter{Out: os.Stdout, NoColor: true}
 	if cfg.Debug {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		if cfg.LogFormat == "human" {
-			consoleWriter.TimeFormat = time.RFC1123
-		}
 	} else {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		if cfg.LogFormat == "human" {
+	}
+	log.Logger = newLogger(cfg, os.Stdout)
+}
+
+// newLogger returns a JSON logger for the json log format, and a console logger otherwise
+func newLogger(cfg *Config, out io.Writer) zerolog.Logger {
+	if cfg.LogFormat == "json" {
+		return zerolog.New(out).With().Timestamp().Logger()
+	}
+
+	consoleWriter := zerolog.ConsoleWriter{Out: out, NoColor: true}
+	if cfg.LogFormat == "human" {
+		if cfg.Debug {
+			consoleWriter.TimeFormat = time.RFC1123
+		} else {
 			consoleWriter.PartsExclude = []string{"time", "level"}
 		}
-	}
-	if cfg.LogFormat == "human" {
 		consoleWriter.FormatFieldName = func(i any) string { return fmt.Sprintf("(%s: ", i) }
 		consoleWriter.FormatFieldValue = func(i any) string { return fmt.Sprintf("%s)", i) }
 	}
-	log.Logger = log.Output(consoleWriter)
+	return log.Output(consoleWriter)
 }
 
 // LogConfig logs all the configuration values
