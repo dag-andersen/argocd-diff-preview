@@ -36,6 +36,28 @@ func TestIsOCIChartURL(t *testing.T) {
 	}
 }
 
+func TestUsesEmbeddedRedis(t *testing.T) {
+	tests := []struct {
+		name   string
+		values map[string]any
+		want   bool
+	}{
+		{name: "defaults to embedded redis", values: map[string]any{}, want: true},
+		{name: "redis disabled", values: map[string]any{"redis": map[string]any{"enabled": false}}, want: false},
+		{name: "redis ha enabled", values: map[string]any{"redis-ha": map[string]any{"enabled": true}}, want: false},
+		{name: "external redis configured", values: map[string]any{"externalRedis": map[string]any{"host": "redis.example"}}, want: false},
+		{name: "embedded redis explicitly enabled", values: map[string]any{"redis": map[string]any{"enabled": true}}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := usesEmbeddedRedis(tt.values); got != tt.want {
+				t.Errorf("usesEmbeddedRedis() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOCIHost(t *testing.T) {
 	tests := []struct {
 		name      string

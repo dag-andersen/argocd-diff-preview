@@ -12,13 +12,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CrashWatcherState tracks restart counts and CrashLoopBackOff state across polls
+// CrashWatcherState tracks restart counts and waiting states across polls
 // for the container crash watcher. Exported for testability.
 type CrashWatcherState struct {
 	// RestartCounts tracks "podName/containerName" -> last seen restart count
 	RestartCounts map[string]int32
 	// CrashLoopReported tracks whether we've already warned about CrashLoopBackOff for a given key
 	CrashLoopReported map[string]bool
+	WaitingReported   map[string]bool
 }
 
 // NewCrashWatcherState creates a new CrashWatcherState with initialized maps.
@@ -26,6 +27,7 @@ func NewCrashWatcherState() *CrashWatcherState {
 	return &CrashWatcherState{
 		RestartCounts:     make(map[string]int32),
 		CrashLoopReported: make(map[string]bool),
+		WaitingReported:   make(map[string]bool),
 	}
 }
 
@@ -33,13 +35,14 @@ func NewCrashWatcherState() *CrashWatcherState {
 type CrashEvent struct {
 	PodName       string
 	ContainerName string
-	EventType     string // "restart" or "crash-loop"
+	EventType     string // "restart", "crash-loop", or "image-pull"
+	Reason        string // waiting reason for "image-pull" events
 	PrevRestarts  int32  // only set for "restart" events
 	CurrRestarts  int32  // only set for "restart" events
 }
 
 // DetectCrashEvents inspects container statuses from a list of pods and returns
-// any new crash events (restarts or CrashLoopBackOff) since the last poll.
+// any new crash events (restarts, CrashLoopBackOff, or image pull failures) since the last poll.
 // It updates the state in-place so subsequent calls only report new events.
 func (s *CrashWatcherState) DetectCrashEvents(pods []corev1.Pod) []CrashEvent {
 	var events []CrashEvent
@@ -62,6 +65,24 @@ func (s *CrashWatcherState) DetectCrashEvents(pods []corev1.Pod) []CrashEvent {
 				})
 				// Reset CrashLoopBackOff tracking so we report it again if it recurs after a restart
 				s.CrashLoopReported[key] = false
+			}
+
+			waitingReason := ""
+			if cs.State.Waiting != nil {
+				waitingReason = cs.State.Waiting.Reason
+			}
+			if waitingReason == "ImagePullBackOff" || waitingReason == "ErrImagePull" {
+				if !s.WaitingReported[key] {
+					events = append(events, CrashEvent{
+						PodName:       pod.Name,
+						ContainerName: cs.Name,
+						EventType:     "image-pull",
+						Reason:        waitingReason,
+					})
+					s.WaitingReported[key] = true
+				}
+			} else {
+				s.WaitingReported[key] = false
 			}
 
 			// Check for CrashLoopBackOff
@@ -124,6 +145,11 @@ func (c *Client) WatchForContainerRestarts(namespace, labelSelector string, poll
 					log.Warn().Msgf(
 						"🚨🚨🚨🚨🚨 Container '%s' in pod '%s' is in CrashLoopBackOff. ArgoCD may not be functioning correctly.",
 						event.ContainerName, event.PodName,
+					)
+				case "image-pull":
+					log.Error().Msgf(
+						"🚨🚨🚨🚨🚨 Container '%s' in pod '%s' is waiting with %s. The image cannot be pulled and ArgoCD may not be functioning correctly.",
+						event.ContainerName, event.PodName, event.Reason,
 					)
 				}
 			}

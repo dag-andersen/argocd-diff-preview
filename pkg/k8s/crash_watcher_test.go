@@ -149,6 +149,52 @@ func TestDetectCrashEvents_CrashLoopNotReportedTwice(t *testing.T) {
 	}
 }
 
+func TestDetectCrashEvents_ImagePullBackOff(t *testing.T) {
+	state := NewCrashWatcherState()
+	pods := []corev1.Pod{
+		makePod("argocd-redis-abc", []corev1.ContainerStatus{
+			makeContainerStatus("redis", 0, "ImagePullBackOff"),
+		}, nil),
+	}
+
+	events := state.DetectCrashEvents(pods)
+	if len(events) != 1 {
+		t.Fatalf("Expected 1 event, got %d: %+v", len(events), events)
+	}
+	if events[0].EventType != "image-pull" {
+		t.Errorf("Expected event type 'image-pull', got '%s'", events[0].EventType)
+	}
+	if events[0].Reason != "ImagePullBackOff" {
+		t.Errorf("Expected reason 'ImagePullBackOff', got '%s'", events[0].Reason)
+	}
+
+	// A persistent image pull failure should not flood the logs.
+	if events = state.DetectCrashEvents(pods); len(events) != 0 {
+		t.Errorf("Expected no duplicate image-pull event, got %d: %+v", len(events), events)
+	}
+}
+
+func TestDetectCrashEvents_ErrImagePullReportedAfterRecovery(t *testing.T) {
+	state := NewCrashWatcherState()
+	pods := []corev1.Pod{
+		makePod("argocd-redis-abc", []corev1.ContainerStatus{
+			makeContainerStatus("redis", 0, "ErrImagePull"),
+		}, nil),
+	}
+
+	state.DetectCrashEvents(pods)
+	pods[0].Status.ContainerStatuses[0] = makeContainerStatus("redis", 0, "")
+	if events := state.DetectCrashEvents(pods); len(events) != 0 {
+		t.Fatalf("Expected no event after recovery, got %d: %+v", len(events), events)
+	}
+
+	pods[0].Status.ContainerStatuses[0] = makeContainerStatus("redis", 0, "ErrImagePull")
+	events := state.DetectCrashEvents(pods)
+	if len(events) != 1 || events[0].EventType != "image-pull" {
+		t.Fatalf("Expected image-pull event after relapse, got %d: %+v", len(events), events)
+	}
+}
+
 func TestDetectCrashEvents_CrashLoopReportedAgainAfterRecoveryAndRelapse(t *testing.T) {
 	state := NewCrashWatcherState()
 

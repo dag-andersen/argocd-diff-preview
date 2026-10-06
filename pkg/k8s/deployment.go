@@ -142,3 +142,80 @@ func (c *Client) WaitForDeploymentReady(namespace, labelSelector string, timeout
 		}
 	}
 }
+
+// WaitForWorkloadReady waits for either a Deployment or StatefulSet matching
+// the selector to become ready. This supports the application controller's
+// default StatefulSet and its optional Deployment form.
+func (c *Client) WaitForWorkloadReady(namespace, labelSelector string, timeoutSeconds int) error {
+	log.Debug().Msgf("Waiting for Deployment or StatefulSet with labels '%s' in namespace %s to be ready", labelSelector, namespace)
+
+	resources := []schema.GroupVersionResource{
+		{Group: "apps", Version: "v1", Resource: "deployments"},
+		{Group: "apps", Version: "v1", Resource: "statefulsets"},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		for _, resource := range resources {
+			workloadList, err := c.clientSet.Resource(resource).Namespace(namespace).List(ctx, metav1.ListOptions{
+				LabelSelector: labelSelector,
+			})
+			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					continue
+				}
+				return fmt.Errorf("failed to list %s with labels '%s': %w", resource.Resource, labelSelector, err)
+			}
+
+			for _, workload := range workloadList.Items {
+				if isWorkloadReady(&workload, resource.Resource) {
+					log.Debug().Msgf("Workload %s is ready", workload.GetName())
+					return nil
+				}
+				log.Debug().Msgf("Workload %s is not ready yet, waiting...", workload.GetName())
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for workload with labels '%s' to be ready", labelSelector)
+		case <-ticker.C:
+		}
+	}
+}
+
+func isWorkloadReady(workload *unstructured.Unstructured, resource string) bool {
+	desiredReplicas, found, err := unstructured.NestedInt64(workload.Object, "spec", "replicas")
+	if err != nil || !found {
+		desiredReplicas = 1
+	}
+
+	readyReplicas, found, err := unstructured.NestedInt64(workload.Object, "status", "readyReplicas")
+	if err != nil || !found || readyReplicas != desiredReplicas {
+		return false
+	}
+
+	if resource == "statefulsets" {
+		return true
+	}
+
+	availableReplicas, found, err := unstructured.NestedInt64(workload.Object, "status", "availableReplicas")
+	if err != nil || !found || availableReplicas != desiredReplicas {
+		return false
+	}
+
+	conditions, found, err := unstructured.NestedSlice(workload.Object, "status", "conditions")
+	if err != nil || !found {
+		return false
+	}
+	for _, conditionUnstructured := range conditions {
+		condition, ok := conditionUnstructured.(map[string]any)
+		if ok && condition["type"] == "Available" && condition["status"] == "True" {
+			return true
+		}
+	}
+	return false
+}
