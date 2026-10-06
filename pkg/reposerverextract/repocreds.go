@@ -14,12 +14,16 @@ package reposerverextract
 //   2. Pass the snapshot into buildManifestRequestWithPackaging so it can
 //      populate ManifestRequest.Repo, .Repos, and .HelmRepoCreds with real
 //      credentials instead of bare URLs.
+//
+// With --traverse-app-of-apps, child Applications are only discovered after
+// step 1, so GetRepo looks their URLs up with db.GetRepository() on first use.
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
@@ -34,9 +38,15 @@ import (
 
 const repoCredsFetchTimeout = 30 * time.Second
 
+// repositoryLookup is the part of db.ArgoDB that GetRepo needs.
+type repositoryLookup interface {
+	GetRepository(ctx context.Context, repoURL, project string) (*v1alpha1.Repository, error)
+}
+
 // RepoCreds is a pre-fetched snapshot of all repository credentials registered
 // in the ArgoCD installation. It is built once and shared across all concurrent
-// rendering goroutines (it is read-only after construction).
+// rendering goroutines. The snapshot is read-only after construction; only the
+// mutex-guarded cache of lookups for URLs first seen during rendering grows.
 type RepoCreds struct {
 	// helmRepos is the list of all Helm repositories registered in ArgoCD.
 	// Passed as ManifestRequest.Repos to cover Helm chart sub-dependencies.
@@ -57,6 +67,15 @@ type RepoCreds struct {
 	// reposByURL is a map from normalised repository URL → fully-enriched
 	// Repository struct (with credentials). Used to populate ManifestRequest.Repo.
 	reposByURL map[string]*v1alpha1.Repository
+
+	// lookup resolves URLs that are not in reposByURL. Its settings informers
+	// stop when FetchRepoCreds' context ends, after which it reads the secrets
+	// as synced at startup, which is all a single run needs. nil disables it.
+	lookup repositoryLookup
+
+	// lookedUp caches lookup results by normalised URL, guarded by mu.
+	mu       sync.Mutex
+	lookedUp map[string]*v1alpha1.Repository
 }
 
 // FetchRepoCredsWithTimeout fetches repository credentials with a hard timeout.
@@ -188,23 +207,44 @@ func FetchRepoCreds(ctx context.Context, k8sClient *k8s.Client, namespace string
 		helmRepoCreds: helmRepoCreds,
 		ociRepoCreds:  ociRepoCreds,
 		reposByURL:    reposByURL,
+		lookup:        argoDB,
 	}, nil
 }
 
 // GetRepo returns the credential-enriched Repository for the given URL.
-// If no registered repository matches the URL exactly, it returns a stub
-// Repository with just the URL set (the same bare-URL behaviour as before
-// this fix, so callers can always proceed).
+// URLs not seen at startup, such as those of child Applications found during
+// app-of-apps traversal, are looked up with db.GetRepository(), which applies
+// repo-creds templates the same way the Argo CD app controller does. If that
+// finds nothing, it returns a stub Repository with just the URL set, which is
+// correct for public repositories.
 func (rc *RepoCreds) GetRepo(repoURL string) *v1alpha1.Repository {
 	if rc == nil {
 		return &v1alpha1.Repository{Repo: repoURL}
 	}
-	if r, ok := rc.reposByURL[normalizeRepoURL(repoURL)]; ok {
+	key := normalizeRepoURL(repoURL)
+	if r, ok := rc.reposByURL[key]; ok {
 		return r
 	}
-	// URL not found in the registry - return a bare stub.
-	// This is correct for public repositories that don't need credentials.
-	return &v1alpha1.Repository{Repo: repoURL}
+	if rc.lookup == nil {
+		return &v1alpha1.Repository{Repo: repoURL}
+	}
+
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	if r, ok := rc.lookedUp[key]; ok {
+		return r
+	}
+	repo, err := rc.lookup.GetRepository(context.Background(), repoURL, "")
+	if err != nil || repo == nil {
+		log.Warn().Err(err).Str("repoURL", repoURL).
+			Msg("⚠️ Failed to look up repository credentials")
+		return &v1alpha1.Repository{Repo: repoURL}
+	}
+	if rc.lookedUp == nil {
+		rc.lookedUp = map[string]*v1alpha1.Repository{}
+	}
+	rc.lookedUp[key] = repo
+	return repo
 }
 
 // normalizeRepoURL returns a canonical form of a repository URL used for
