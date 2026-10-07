@@ -59,6 +59,7 @@ type ArgoCDInstallation struct {
 	renderMode        vars.RenderMethod
 	operations        Operations // CLI or API implementation
 	RepoServerAddress string
+	embeddedRedis     bool
 }
 
 func New(client *k8s.Client, namespace string, version string, repoName string, repoURL string, repoUsername string, repoPassword string, loginOptions string, renderMode vars.RenderMethod, authToken string, configPath string, repoServerAddress string) *ArgoCDInstallation {
@@ -214,6 +215,7 @@ func (a *ArgoCDInstallation) installWithHelm() error {
 	if err != nil {
 		return fmt.Errorf("failed to merge values: %w", err)
 	}
+	a.embeddedRedis = usesEmbeddedRedis(chartValues)
 
 	// look for 'createClusterRoles' in chartValues
 	if result, ok := chartValues["createClusterRoles"]; ok {
@@ -546,7 +548,39 @@ func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
 		return fmt.Errorf("failed to wait for argocd-repo-server to be ready: %w", err)
 	}
 
+	// TODO: Check Redis and the application controller in parallel to reduce startup time.
+
+	// Redis is required by the default installation, but is omitted when an
+	// external Redis instance is configured. Wait for it when the chart created
+	// the embedded deployment so ImagePullBackOff is reported during install.
+	if a.embeddedRedis {
+		if err := a.K8sClient.WaitForDeploymentReady(a.Namespace, "app.kubernetes.io/component=redis,app.kubernetes.io/part-of=argocd", int(timeout.Seconds())); err != nil {
+			return fmt.Errorf("failed to wait for argocd-redis to be ready: %w", err)
+		}
+	}
+
+	// The application controller is a StatefulSet by default. It depends on
+	// Redis and must be ready before rendering applications.
+	if err := a.K8sClient.WaitForWorkloadReady(a.Namespace, "app.kubernetes.io/component=application-controller,app.kubernetes.io/part-of=argocd", int(timeout.Seconds())); err != nil {
+		return fmt.Errorf("failed to wait for argocd-application-controller to be ready: %w", err)
+	}
+
 	return nil
+}
+
+func usesEmbeddedRedis(values map[string]any) bool {
+	redisValues, _ := values["redis"].(map[string]any)
+	redisHAValues, _ := values["redis-ha"].(map[string]any)
+	externalRedisValues, _ := values["externalRedis"].(map[string]any)
+
+	redisEnabled, redisConfigured := redisValues["enabled"].(bool)
+	if !redisConfigured {
+		redisEnabled = true
+	}
+	redisHAEnabled, _ := redisHAValues["enabled"].(bool)
+	externalRedisHost, _ := externalRedisValues["host"].(string)
+
+	return redisEnabled && !redisHAEnabled && strings.TrimSpace(externalRedisHost) == ""
 }
 
 // Cleanup performs any necessary cleanup (e.g., stopping port forwards).
