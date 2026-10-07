@@ -548,6 +548,8 @@ func (a *ArgoCDInstallation) EnsureArgoCdIsReady() error {
 		return fmt.Errorf("failed to wait for argocd-repo-server to be ready: %w", err)
 	}
 
+	// TODO: Check Redis and the application controller in parallel to reduce startup time.
+
 	// Redis is required by the default installation, but is omitted when an
 	// external Redis instance is configured. Wait for it when the chart created
 	// the embedded deployment so ImagePullBackOff is reported during install.
