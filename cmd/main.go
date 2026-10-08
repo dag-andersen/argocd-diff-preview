@@ -366,6 +366,11 @@ func run(cfg *Config) error {
 		return err
 	}
 
+	if !cfg.IncludeHelmHooks {
+		baseManifests = extract.RemoveHelmHooks(baseManifests)
+		targetManifests = extract.RemoveHelmHooks(targetManifests)
+	}
+
 	// Create info box for storing run time information
 	statsInfo := diff.StatsInfo{
 		FullDuration:               time.Since(startTime),

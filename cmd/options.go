@@ -86,6 +86,7 @@ var (
 	DefaultArgocdConfigPath                     = "./argocd-config"
 	DefaultOutputAppManifests                   = false
 	DefaultOutputBranchManifests                = false
+	DefaultIncludeHelmHooks                     = false
 	DefaultTraverseAppOfApps                    = false
 	DefaultFailOnDuplicateGeneratedApplications = false
 	DefaultRepoServerAddress                    = ""
@@ -139,6 +140,7 @@ type RawOptions struct {
 	Concurrency                          uint   `mapstructure:"concurrency"`
 	OutputAppManifests                   bool   `mapstructure:"output-app-manifests"`
 	OutputBranchManifests                bool   `mapstructure:"output-branch-manifests"`
+	IncludeHelmHooks                     bool   `mapstructure:"include-helm-hooks"`
 	TraverseAppOfApps                    bool   `mapstructure:"traverse-app-of-apps"`
 	FailOnDuplicateGeneratedApplications bool   `mapstructure:"fail-on-duplicate-generated-applications"`
 	RepoServerAddress                    string `mapstructure:"repo-server-address"`
@@ -186,6 +188,7 @@ type Config struct {
 	Concurrency                          uint
 	OutputAppManifests                   bool
 	OutputBranchManifests                bool
+	IncludeHelmHooks                     bool
 	TraverseAppOfApps                    bool
 	FailOnDuplicateGeneratedApplications bool
 	RepoServerAddress                    string
@@ -285,6 +288,7 @@ func Parse() *Config {
 	viper.SetDefault("argocd-config-dir", DefaultArgocdConfigPath)
 	viper.SetDefault("output-app-manifests", DefaultOutputAppManifests)
 	viper.SetDefault("output-branch-manifests", DefaultOutputBranchManifests)
+	viper.SetDefault("include-helm-hooks", DefaultIncludeHelmHooks)
 	viper.SetDefault("traverse-app-of-apps", DefaultTraverseAppOfApps)
 	viper.SetDefault("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications)
 	viper.SetDefault("repo-server-address", DefaultRepoServerAddress)
@@ -347,6 +351,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
 	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
+	rootCmd.Flags().Bool("include-helm-hooks", DefaultIncludeHelmHooks, "Keep resources annotated with helm.sh/hook in the diff and the manifest output files (removed by default)")
 	rootCmd.Flags().Bool("traverse-app-of-apps", DefaultTraverseAppOfApps, "Recursively render child Applications discovered in rendered manifests (app-of-apps pattern). Only supported with --render-method=repo-server-api")
 	rootCmd.Flags().Bool("fail-on-duplicate-generated-applications", DefaultFailOnDuplicateGeneratedApplications, "Fail when a single ApplicationSet generates multiple Applications with the same name")
 	rootCmd.Flags().String("repo-server-address", DefaultRepoServerAddress, "Address of the Argo CD repo server (host:port). Connects directly instead of port-forwarding. Requires --render-method=repo-server-api")
@@ -435,6 +440,7 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		Concurrency:                          o.Concurrency,
 		OutputAppManifests:                   o.OutputAppManifests,
 		OutputBranchManifests:                o.OutputBranchManifests,
+		IncludeHelmHooks:                     o.IncludeHelmHooks,
 		TraverseAppOfApps:                    o.TraverseAppOfApps,
 		FailOnDuplicateGeneratedApplications: o.FailOnDuplicateGeneratedApplications,
 		RepoServerAddress:                    o.RepoServerAddress,
@@ -843,6 +849,9 @@ func (o *Config) LogConfig() {
 	}
 	if o.OutputBranchManifests {
 		log.Info().Msgf("✨ - output-branch-manifests: %t", o.OutputBranchManifests)
+	}
+	if o.IncludeHelmHooks {
+		log.Info().Msgf("✨ - include-helm-hooks: %t", o.IncludeHelmHooks)
 	}
 	if o.TraverseAppOfApps {
 		log.Info().Msgf("✨ - traverse-app-of-apps: %t", o.TraverseAppOfApps)

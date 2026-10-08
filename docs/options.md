@@ -33,6 +33,7 @@ argocd-diff-preview [FLAGS] [OPTIONS] (--repo <repo> | --repo-regex <regex>) --t
 | `--version`, `-v`                   | -                                 | -       | Prints version information                                                                                                       |
 | `--output-app-manifests`            | `OUTPUT_APP_MANIFESTS`            | `false` | Write each application's manifests to its own file under `output/base/` and `output/target/`                                     |
 | `--output-branch-manifests`         | `OUTPUT_BRANCH_MANIFESTS`         | `false` | Write all application manifests per branch into a single file (`output/base-branch.yaml` and `output/target-branch.yaml`)        |
+| `--include-helm-hooks`              | `INCLUDE_HELM_HOOKS`              | `false` | Keep resources annotated with `helm.sh/hook` in the diff and the manifest output files                                          |
 
 ## Options
 
