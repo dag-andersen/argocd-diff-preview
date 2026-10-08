@@ -34,3 +34,9 @@ Writes each application's manifests to its own file, organised into branch-speci
 - `./output/target/<app-id>`
 
 A file is written for every application, even if it rendered to empty output - so you can see at a glance which applications existed on each branch.
+
+### `--include-helm-hooks`
+
+Resources annotated with `helm.sh/hook` are removed from the diff and from both manifest outputs by default. Set `--include-helm-hooks` to keep them. Use it when a step needs to see everything a sync can create: for example, a check that scans manifests for container images, where an image used only by a hook Job would otherwise be missed.
+
+Hooks are kept exactly as Argo CD rendered them, including types Argo CD never runs, such as Helm `test` hooks.

@@ -473,7 +473,7 @@ func renderAppWithChildDiscovery(
 	var childApps []argoapplication.ArgoResource
 
 	for _, m := range allManifests {
-		if !strings.HasPrefix(m.GetAPIVersion(), "argoproj.io/") {
+		if !strings.HasPrefix(m.GetAPIVersion(), "argoproj.io/") || !extract.HelmHookFilter(m) {
 			continue
 		}
 
