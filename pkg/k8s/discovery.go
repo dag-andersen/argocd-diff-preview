@@ -19,9 +19,11 @@ func (c *Client) GetServerVersion() (string, error) {
 }
 
 // GetAPIVersions returns all unique GroupVersion strings (e.g. "v1", "apps/v1",
-// "monitoring.coreos.com/v1") available in the cluster. This is the format
-// consumed by the Argo CD repo server's ManifestRequest.ApiVersions field and
-// exposed to Helm templates via .Capabilities.APIVersions.
+// "monitoring.coreos.com/v1") available in the cluster, plus a
+// "<GroupVersion>/<Kind>" entry for every resource kind (e.g.
+// "monitoring.coreos.com/v1/ServiceMonitor"), as Argo CD sends them. This is the
+// format consumed by the Argo CD repo server's ManifestRequest.ApiVersions field
+// and exposed to Helm templates via .Capabilities.APIVersions.
 func (c *Client) GetAPIVersions() ([]string, error) {
 	_, apiVersions, err := c.GetClusterScopedResourcesAndAPIVersions()
 	if err != nil {
@@ -31,7 +33,8 @@ func (c *Client) GetAPIVersions() ([]string, error) {
 }
 
 // GetClusterScopedResourcesAndAPIVersions returns metadata about all cluster-scoped
-// resource types and all unique GroupVersion strings in one discovery pass.
+// resource types and all unique API version strings (see GetAPIVersions) in one
+// discovery pass.
 func (c *Client) GetClusterScopedResourcesAndAPIVersions() (map[schema.GroupKind]bool, []string, error) {
 	_, apiResourceLists, err := c.discoveryClient.ServerGroupsAndResources()
 	if err != nil {
@@ -55,14 +58,22 @@ func (c *Client) GetClusterScopedResourcesAndAPIVersions() (map[schema.GroupKind
 
 		// Check each resource in the API group
 		for _, apiResource := range apiResourceList.APIResources {
-			// Only retain cluster-scoped resources. A kind missing from this map is
-			// treated as namespaced, which is the safe default for undiscovered CRDs.
-			if apiResource.Namespaced {
+			// Skip subresources (e.g., "pods/log", "deployments/scale")
+			if strings.Contains(apiResource.Name, "/") {
 				continue
 			}
 
-			// Skip subresources (e.g., "pods/log", "deployments/scale")
-			if strings.Contains(apiResource.Name, "/") {
+			// Argo CD also sends every kind as "<GroupVersion>/<Kind>", and charts gate
+			// on that form, e.g. `.Capabilities.APIVersions.Has "monitoring.coreos.com/v1/ServiceMonitor"`.
+			kindVersion := apiResourceList.GroupVersion + "/" + apiResource.Kind
+			if !seen[kindVersion] {
+				seen[kindVersion] = true
+				apiVersions = append(apiVersions, kindVersion)
+			}
+
+			// Only retain cluster-scoped resources. A kind missing from this map is
+			// treated as namespaced, which is the safe default for undiscovered CRDs.
+			if apiResource.Namespaced {
 				continue
 			}
 
