@@ -1,2 +1,2 @@
 serviceMonitor:
-  enabled: false
+  enabled: true
