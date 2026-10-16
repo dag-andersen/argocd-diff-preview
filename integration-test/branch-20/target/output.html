@@ -1,0 +1,111 @@
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Modified (1):
+± kind-level-capabilities (+12|-1)</pre>
+
+<div class="diffs">
+<details>
+<summary>
+kind-level-capabilities (examples/kind-level-capabilities/application.yaml)
+</summary>
+
+<h4 class="resource_header">ServiceMonitor: default/kind-level-capabilities</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="added_line"><td><pre>+apiVersion: monitoring.coreos.com/v1</pre></td></tr>
+	<tr class="added_line"><td><pre>+kind: ServiceMonitor</pre></td></tr>
+	<tr class="added_line"><td><pre>+metadata:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  name: kind-level-capabilities</pre></td></tr>
+	<tr class="added_line"><td><pre>+  namespace: default</pre></td></tr>
+	<tr class="added_line"><td><pre>+spec:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  endpoints:</pre></td></tr>
+	<tr class="added_line"><td><pre>+  - port: metrics</pre></td></tr>
+	<tr class="added_line"><td><pre>+  selector:</pre></td></tr>
+	<tr class="added_line"><td><pre>+    matchLabels:</pre></td></tr>
+	<tr class="added_line"><td><pre>+      app.kubernetes.io/name: kind-level-capabilities</pre></td></tr>
+</table>
+</div>
+
+<h4 class="resource_header">ConfigMap: default/kind-level-capabilities</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre> apiVersion: v1</pre></td></tr>
+	<tr class="normal_line"><td><pre> data:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-  serviceMonitorEnabled: &#34;false&#34;</pre></td></tr>
+	<tr class="added_line"><td><pre>+  serviceMonitorEnabled: &#34;true&#34;</pre></td></tr>
+	<tr class="normal_line"><td><pre> kind: ConfigMap</pre></td></tr>
+	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>   name: kind-level-capabilities</pre></td></tr>
+	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
+</table>
+</div>
+
+</details>
+</div>
+
+<pre>_Stats_:
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>
