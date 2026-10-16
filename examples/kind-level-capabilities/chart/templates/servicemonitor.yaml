@@ -1,0 +1,17 @@
+{{- /*
+Gated on the kind, not just the group version, the same way charts such as
+external-secrets do. Argo CD includes "<groupVersion>/<Kind>" entries in
+.Capabilities.APIVersions, so this renders on a cluster with the CRD.
+*/}}
+{{- if and .Values.serviceMonitor.enabled (has "monitoring.coreos.com/v1/ServiceMonitor" .Capabilities.APIVersions) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+  endpoints:
+    - port: metrics
+{{- end }}

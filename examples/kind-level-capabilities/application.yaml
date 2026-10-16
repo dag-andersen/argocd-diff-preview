@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kind-level-capabilities
+  namespace: argocd
+  annotations:
+    argocd-diff-preview/watch-pattern: "examples/kind-level-capabilities/.*"
+spec:
+  project: default
+  destination:
+    name: in-cluster
+    namespace: default
+  source:
+    repoURL: https://github.com/dag-andersen/argocd-diff-preview
+    path: examples/kind-level-capabilities/chart
