@@ -60,7 +60,7 @@ pre {
 
 <p>Summary:</p>
 <pre>Modified (1):
-± internal-chart-example (+7|-7)</pre>
+± internal-chart-example (+5|-5)</pre>
 
 <div class="diffs">
 <details>
@@ -110,36 +110,6 @@ internal-chart-example (examples/internal-chart/app.yaml)
 	<tr class="normal_line"><td><pre>       securityContext: {}</pre></td></tr>
 	<tr class="removed_line"><td><pre>-      serviceAccountName: super-app-name</pre></td></tr>
 	<tr class="added_line"><td><pre>+      serviceAccountName: new-app-name</pre></td></tr>
-</table>
-</div>
-
-<h4 class="resource_header">Pod: default/super-app-name-test-connection → default/new-app-name-test-connection</h4>
-<div class="diff_container">
-<table>
-
-	<tr class="normal_line"><td><pre> kind: Pod</pre></td></tr>
-	<tr class="normal_line"><td><pre> metadata:</pre></td></tr>
-	<tr class="normal_line"><td><pre>   annotations:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     helm.sh/hook: test</pre></td></tr>
-	<tr class="normal_line"><td><pre>   labels:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/instance: internal-chart-example</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/managed-by: Helm</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/name: myApp</pre></td></tr>
-	<tr class="normal_line"><td><pre>     app.kubernetes.io/version: 1.16.0</pre></td></tr>
-	<tr class="normal_line"><td><pre>     helm.sh/chart: myApp-0.1.0</pre></td></tr>
-	<tr class="removed_line"><td><pre>-  name: super-app-name-test-connection</pre></td></tr>
-	<tr class="added_line"><td><pre>+  name: new-app-name-test-connection</pre></td></tr>
-	<tr class="normal_line"><td><pre>   namespace: default</pre></td></tr>
-	<tr class="normal_line"><td><pre> spec:</pre></td></tr>
-	<tr class="normal_line"><td><pre>   containers:</pre></td></tr>
-	<tr class="normal_line"><td><pre>   - args:</pre></td></tr>
-	<tr class="removed_line"><td><pre>-    - super-app-name:80</pre></td></tr>
-	<tr class="added_line"><td><pre>+    - new-app-name:80</pre></td></tr>
-	<tr class="normal_line"><td><pre>     command:</pre></td></tr>
-	<tr class="normal_line"><td><pre>     - wget</pre></td></tr>
-	<tr class="normal_line"><td><pre>     image: busybox</pre></td></tr>
-	<tr class="normal_line"><td><pre>     name: wget</pre></td></tr>
-	<tr class="normal_line"><td><pre>   restartPolicy: Never</pre></td></tr>
 </table>
 </div>
 

@@ -3,7 +3,7 @@
 Summary:
 ```yaml
 Modified (1):
-± internal-chart-example (+7|-7)
+± internal-chart-example (+5|-5)
 ```
 
 <details>
@@ -50,32 +50,6 @@ Modified (1):
        securityContext: {}
 -      serviceAccountName: super-app-name
 +      serviceAccountName: new-app-name
-```
-#### Pod: default/super-app-name-test-connection → default/new-app-name-test-connection
-```diff
- kind: Pod
- metadata:
-   annotations:
-     helm.sh/hook: test
-   labels:
-     app.kubernetes.io/instance: internal-chart-example
-     app.kubernetes.io/managed-by: Helm
-     app.kubernetes.io/name: myApp
-     app.kubernetes.io/version: 1.16.0
-     helm.sh/chart: myApp-0.1.0
--  name: super-app-name-test-connection
-+  name: new-app-name-test-connection
-   namespace: default
- spec:
-   containers:
-   - args:
--    - super-app-name:80
-+    - new-app-name:80
-     command:
-     - wget
-     image: busybox
-     name: wget
-   restartPolicy: Never
 ```
 #### Service: default/super-app-name → default/new-app-name
 ```diff

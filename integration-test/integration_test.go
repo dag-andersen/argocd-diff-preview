@@ -109,18 +109,20 @@ var testCases = []TestCase{
 		ArgocdUIURL:        "https://argocd.example.com",
 	},
 	{
-		Name:         "branch-2/target",
+		Name:         "branch-2/target-1",
 		TargetBranch: "integration-test/branch-2/target",
 		BaseBranch:   "integration-test/branch-2/base",
+		Suffix:       "-1",
 	},
 	// Same branches with --include-helm-hooks: the chart's helm test hook Pod is
 	// renamed along with the Deployment and now shows up in the diff.
 	{
-		Name:             "branch-2/target-1",
+		Name:             "branch-2/target-2",
 		TargetBranch:     "integration-test/branch-2/target",
 		BaseBranch:       "integration-test/branch-2/base",
-		Suffix:           "-1",
+		Suffix:           "-2",
 		IncludeHelmHooks: "true",
+		RenderMethod:     "server-api",
 	},
 	{
 		Name:         "branch-3/target",
