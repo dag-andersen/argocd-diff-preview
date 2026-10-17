@@ -460,3 +460,49 @@ func TestApplicationSetGeneratedDuplicateNamesAreNormalizedBeforeExtract(t *test
 		assert.ElementsMatch(t, []string{"pr123-t-dupe-1", "pr123-t-dupe-2"}, yamlNames)
 	})
 }
+
+func TestRemoveHelmHooks(t *testing.T) {
+	resource := func(name string, annotations map[string]any) unstructured.Unstructured {
+		metadata := map[string]any{"name": name}
+		if annotations != nil {
+			metadata["annotations"] = annotations
+		}
+		return unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   metadata,
+		}}
+	}
+
+	apps := []ExtractedApp{
+		{
+			Id:   "app-1",
+			Name: "app-1",
+			Manifests: []unstructured.Unstructured{
+				resource("plain", nil),
+				resource("annotated", map[string]any{"example.com/note": "x"}),
+				resource("pre-upgrade", map[string]any{"helm.sh/hook": "pre-upgrade"}),
+				resource("test", map[string]any{"helm.sh/hook": "test"}),
+			},
+			Branch: git.Target,
+		},
+		{
+			Id:        "app-2",
+			Name:      "app-2",
+			Manifests: []unstructured.Unstructured{resource("only-hook", map[string]any{"helm.sh/hook": "post-install"})},
+			Branch:    git.Target,
+		},
+	}
+
+	result := RemoveHelmHooks(apps)
+
+	require.Len(t, result, 2)
+	names := make([]string, 0, len(result[0].Manifests))
+	for _, m := range result[0].Manifests {
+		names = append(names, m.GetName())
+	}
+	assert.Equal(t, []string{"plain", "annotated"}, names)
+	assert.Equal(t, "app-2", result[1].Id)
+	assert.Empty(t, result[1].Manifests)
+	assert.Len(t, apps[0].Manifests, 4, "the input applications must not be modified")
+}

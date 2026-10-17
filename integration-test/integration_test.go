@@ -66,6 +66,7 @@ type TestCase struct {
 	ArgocdConfigDirAPIMode     string // Custom argocd-config directory for API render modes; falls back to ArgocdConfigDir when empty
 	ArgocdUIURL                string // Argo CD URL for generating application links in diff output
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
+	IncludeHelmHooks           string // If "true", keeps helm.sh/hook resources in the output (--include-helm-hooks)
 	RepoRegex                  string // If set, use --repo-regex instead of --repo
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
@@ -111,6 +112,15 @@ var testCases = []TestCase{
 		Name:         "branch-2/target",
 		TargetBranch: "integration-test/branch-2/target",
 		BaseBranch:   "integration-test/branch-2/base",
+	},
+	// Same branches with --include-helm-hooks: the chart's helm test hook Pod is
+	// renamed along with the Deployment and now shows up in the diff.
+	{
+		Name:             "branch-2/target-1",
+		TargetBranch:     "integration-test/branch-2/target",
+		BaseBranch:       "integration-test/branch-2/base",
+		Suffix:           "-1",
+		IncludeHelmHooks: "true",
 	},
 	{
 		Name:         "branch-3/target",
@@ -1014,6 +1024,10 @@ func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 		args = append(args, "-e", "TRAVERSE_APP_OF_APPS=true")
 	}
 
+	if tc.IncludeHelmHooks == "true" {
+		args = append(args, "-e", "INCLUDE_HELM_HOOKS=true")
+	}
+
 	// Add image (no additional args needed - all config is via env vars)
 	args = append(args, *dockerImage)
 
@@ -1114,6 +1128,10 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 
 	if tc.TraverseAppOfApps == "true" {
 		args = append(args, "--traverse-app-of-apps")
+	}
+
+	if tc.IncludeHelmHooks == "true" {
+		args = append(args, "--include-helm-hooks")
 	}
 
 	// When the test requires cluster roles to be disabled (API mode or DisableClusterRoles flag),

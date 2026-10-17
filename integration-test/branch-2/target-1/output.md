@@ -1,0 +1,123 @@
+## Argo CD Diff Preview
+
+Summary:
+```yaml
+Modified (1):
+± internal-chart-example (+7|-7)
+```
+
+<details>
+<summary>internal-chart-example (examples/internal-chart/app.yaml)</summary>
+<br>
+
+#### Deployment: default/super-app-name → default/new-app-name
+```diff
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   labels:
+     app.kubernetes.io/instance: internal-chart-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: new-app-name
+   namespace: default
+ spec:
+-  replicas: 1
++  replicas: 5
+   selector:
+     matchLabels:
+       app.kubernetes.io/instance: internal-chart-example
+       app.kubernetes.io/name: myApp
+   template:
+     metadata:
+       labels:
+         app.kubernetes.io/instance: internal-chart-example
+         app.kubernetes.io/managed-by: Helm
+         app.kubernetes.io/name: myApp
+@@ skipped 12 lines (25 -> 36) @@
+         - containerPort: 80
+           name: http
+           protocol: TCP
+         readinessProbe:
+           httpGet:
+             path: /
+             port: http
+         resources: {}
+         securityContext: {}
+       securityContext: {}
+-      serviceAccountName: super-app-name
++      serviceAccountName: new-app-name
+```
+#### Pod: default/super-app-name-test-connection → default/new-app-name-test-connection
+```diff
+ kind: Pod
+ metadata:
+   annotations:
+     helm.sh/hook: test
+   labels:
+     app.kubernetes.io/instance: internal-chart-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name-test-connection
++  name: new-app-name-test-connection
+   namespace: default
+ spec:
+   containers:
+   - args:
+-    - super-app-name:80
++    - new-app-name:80
+     command:
+     - wget
+     image: busybox
+     name: wget
+   restartPolicy: Never
+```
+#### Service: default/super-app-name → default/new-app-name
+```diff
+ apiVersion: v1
+ kind: Service
+ metadata:
+   labels:
+     app.kubernetes.io/instance: internal-chart-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: new-app-name
+   namespace: default
+ spec:
+   ports:
+   - name: http
+     port: 80
+     protocol: TCP
+     targetPort: http
+   selector:
+     app.kubernetes.io/instance: internal-chart-example
+     app.kubernetes.io/name: myApp
+```
+#### ServiceAccount: default/super-app-name → default/new-app-name
+```diff
+ apiVersion: v1
+ automountServiceAccountToken: true
+ kind: ServiceAccount
+ metadata:
+   labels:
+     app.kubernetes.io/instance: internal-chart-example
+     app.kubernetes.io/managed-by: Helm
+     app.kubernetes.io/name: myApp
+     app.kubernetes.io/version: 1.16.0
+     helm.sh/chart: myApp-0.1.0
+-  name: super-app-name
++  name: new-app-name
+   namespace: default
+```
+</details>
+
+_Stats_:
+[Applications: 36], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]

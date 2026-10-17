@@ -391,15 +391,7 @@ func renderApp(
 		return nil, err
 	}
 
-	// Filter out Helm hook resources (reuse the exported helper from extract).
-	filtered := make([]unstructured.Unstructured, 0, len(manifests))
-	for _, m := range manifests {
-		if extract.HelmHookFilter(m) {
-			filtered = append(filtered, m)
-		}
-	}
-
-	return filtered, nil
+	return manifests, nil
 }
 
 // collectRepoURLs extracts all unique repository URLs referenced by the given

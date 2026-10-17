@@ -407,15 +407,6 @@ func getManifestsFromApp(argocd *argocdPkg.ArgoCDInstallation, app argoapplicati
 		}
 	}
 
-	// remove Helm hooks resources
-	newManifestsContent := make([]unstructured.Unstructured, 0, len(manifests))
-	for _, manifest := range manifests {
-		if HelmHookFilter(manifest) {
-			newManifestsContent = append(newManifestsContent, manifest)
-		}
-	}
-	manifests = newManifestsContent
-
 	// Parse the first non-empty manifest from the string
 	return manifests, nil
 }
@@ -513,6 +504,22 @@ func removeArgoCDTrackingID(a []unstructured.Unstructured) error {
 	}
 
 	return nil
+}
+
+// RemoveHelmHooks returns the applications with every Helm hook resource removed.
+func RemoveHelmHooks(apps []ExtractedApp) []ExtractedApp {
+	result := make([]ExtractedApp, 0, len(apps))
+	for _, app := range apps {
+		manifests := make([]unstructured.Unstructured, 0, len(app.Manifests))
+		for _, manifest := range app.Manifests {
+			if HelmHookFilter(manifest) {
+				manifests = append(manifests, manifest)
+			}
+		}
+		app.Manifests = manifests
+		result = append(result, app)
+	}
+	return result
 }
 
 // returns true if the object is NOT a Helm hook
