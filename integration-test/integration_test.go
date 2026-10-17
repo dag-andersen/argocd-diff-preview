@@ -109,18 +109,20 @@ var testCases = []TestCase{
 		ArgocdUIURL:        "https://argocd.example.com",
 	},
 	{
-		Name:         "branch-2/target",
+		Name:         "branch-2/target-1",
 		TargetBranch: "integration-test/branch-2/target",
 		BaseBranch:   "integration-test/branch-2/base",
+		Suffix:       "-1",
 	},
 	// Same branches with --include-helm-hooks: the chart's helm test hook Pod is
 	// renamed along with the Deployment and now shows up in the diff.
 	{
-		Name:             "branch-2/target-1",
+		Name:             "branch-2/target-2",
 		TargetBranch:     "integration-test/branch-2/target",
 		BaseBranch:       "integration-test/branch-2/base",
-		Suffix:           "-1",
+		Suffix:           "-2",
 		IncludeHelmHooks: "true",
+		RenderMethod:     "server-api",
 	},
 	{
 		Name:         "branch-3/target",
@@ -375,9 +377,9 @@ var testCases = []TestCase{
 	// "monitoring.coreos.com/v1/ServiceMonitor", which Argo CD includes next to
 	// the group version. The target enables it, so the diff must show it added.
 	{
-		Name:                       "branch-20/target",
-		TargetBranch:               "integration-test/branch-20/target",
-		BaseBranch:                 "integration-test/branch-20/base",
+		Name:                       "branch-21/target",
+		TargetBranch:               "integration-test/branch-21/target",
+		BaseBranch:                 "integration-test/branch-21/base",
 		RenderMethod:               "repo-server-api",
 		ArgocdConfigDir:            "with-servicemonitor-crd-no-cluster-roles",
 		FileRegex:                  "examples/kind-level-capabilities/.*",

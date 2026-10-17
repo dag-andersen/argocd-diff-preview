@@ -507,6 +507,12 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 		return nil, fmt.Errorf("--traverse-app-of-apps requires --render-method=repo-server-api (current: %s)", cfg.RenderMethod)
 	}
 
+	// Helm hooks are not returned by the Argo CD CLI renderer. They can only be
+	// included when manifests are fetched through one of the API renderers.
+	if cfg.IncludeHelmHooks && cfg.RenderMethod == RenderMethodCLI {
+		return nil, fmt.Errorf("--include-helm-hooks is incompatible with --render-method=cli; use --render-method=server-api or --render-method=repo-server-api")
+	}
+
 	// Check if argocd CLI is installed when not using API mode
 	if cfg.RenderMethod == RenderMethodCLI && !cfg.DryRun {
 		if _, err := exec.LookPath("argocd"); err != nil {
