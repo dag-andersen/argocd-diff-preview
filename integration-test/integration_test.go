@@ -370,6 +370,19 @@ var testCases = []TestCase{
 		FileRegex:                  "examples/(kustomize-build-options|resource-application-boundary|cluster-rbac-repro)/.*",
 		WatchIfNoWatchPatternFound: "false",
 	},
+	// Regression test for kind-level .Capabilities.APIVersions entries in
+	// repo-server-api mode. The chart gates a ServiceMonitor on
+	// "monitoring.coreos.com/v1/ServiceMonitor", which Argo CD includes next to
+	// the group version. The target enables it, so the diff must show it added.
+	{
+		Name:                       "branch-20/target",
+		TargetBranch:               "integration-test/branch-20/target",
+		BaseBranch:                 "integration-test/branch-20/base",
+		RenderMethod:               "repo-server-api",
+		ArgocdConfigDir:            "with-servicemonitor-crd-no-cluster-roles",
+		FileRegex:                  "examples/kind-level-capabilities/.*",
+		WatchIfNoWatchPatternFound: "false",
+	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.

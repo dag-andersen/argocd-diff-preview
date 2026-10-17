@@ -183,11 +183,12 @@ Each `branch-N/target[-suffix]/` directory contains expected output files (`outp
 ### Branch 15: Additional Coverage
 - `target`: Basic diff (no special options)
 
-### Branch 16-19: repo-server-api Render Method
+### Branch 16-20: repo-server-api Render Method
 - `branch-16/target`: Config Management Plugin (kustomize-build-with-helm) via `repo-server-api`
 - `branch-17/target-1` / `target-2`: App-of-apps traversal via `repo-server-api`
 - `branch-18/target`: Single-source local Helm chart whose `helm.valueFiles` reference a file OUTSIDE the chart directory via a repo-root-absolute path (`/examples/out-of-chart-values/env/values.yaml`). Regression test for `repo-server-api`: the tool must stream the whole branch folder so the out-of-chart value file is reachable, otherwise the render fails with `no such file or directory`.
 - `branch-19/target`: Kustomize resource outside the application directory via `repo-server-api`. It requires global `kustomize.buildOptions: --load-restrictor LoadRestrictionsNone` from `argocd-cm`, proving the direct repo-server request forwards that setting.
+- `branch-20/target`: Local Helm chart that gates a ServiceMonitor on the kind-level capability `monitoring.coreos.com/v1/ServiceMonitor`, via `repo-server-api` against a cluster with the ServiceMonitor CRD. The target enables it, so the diff must show the ServiceMonitor added, as a real Argo CD sync would render it.
 
 ## Prerequisites
 
