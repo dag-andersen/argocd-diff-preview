@@ -375,9 +375,9 @@ var testCases = []TestCase{
 	// "monitoring.coreos.com/v1/ServiceMonitor", which Argo CD includes next to
 	// the group version. The target enables it, so the diff must show it added.
 	{
-		Name:                       "branch-20/target",
-		TargetBranch:               "integration-test/branch-20/target",
-		BaseBranch:                 "integration-test/branch-20/base",
+		Name:                       "branch-21/target",
+		TargetBranch:               "integration-test/branch-21/target",
+		BaseBranch:                 "integration-test/branch-21/base",
 		RenderMethod:               "repo-server-api",
 		ArgocdConfigDir:            "with-servicemonitor-crd-no-cluster-roles",
 		FileRegex:                  "examples/kind-level-capabilities/.*",
