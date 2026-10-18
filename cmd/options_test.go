@@ -32,3 +32,32 @@ func TestNewLogger_Human(t *testing.T) {
 
 	assert.Equal(t, "failed to render (app: my-app)", strings.TrimSpace(buf.String()))
 }
+
+func TestRawOptionsToConfig_IncludeHelmHooksRenderMethod(t *testing.T) {
+	baseOptions := func(renderMethod string) RawOptions {
+		return RawOptions{
+			BaseBranch:       "main",
+			TargetBranch:     "feature",
+			Repo:             "example/repo",
+			RenderMethod:     renderMethod,
+			IncludeHelmHooks: true,
+			DryRun:           true,
+		}
+	}
+
+	t.Run("rejects CLI renderer", func(t *testing.T) {
+		options := baseOptions("cli")
+		_, err := options.ToConfig()
+		require.EqualError(t, err, "--include-helm-hooks is incompatible with --render-method=cli; use --render-method=server-api or --render-method=repo-server-api")
+	})
+
+	for _, renderMethod := range []string{"server-api", "repo-server-api"} {
+		t.Run(renderMethod, func(t *testing.T) {
+			options := baseOptions(renderMethod)
+			cfg, err := options.ToConfig()
+			require.NoError(t, err)
+			assert.True(t, cfg.IncludeHelmHooks)
+			assert.Equal(t, RenderMethod(renderMethod), cfg.RenderMethod)
+		})
+	}
+}
