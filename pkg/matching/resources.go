@@ -61,7 +61,7 @@ func (p *Pair) ChangedResources() []ResourcePair {
 // returning only pairs where the resources differ (or are added/deleted).
 //
 // It uses a four-phase matching strategy:
-//  1. Match by kind+name+namespace (exact identity) - strongest signal
+//  1. Match by apiVersion+kind+name+namespace (exact identity) - strongest signal
 //  2. Match remaining by name+namespace across kinds - catches kind changes
 //     (e.g. Deployment → StatefulSet with the same name)
 //  3. Match remaining within the same kind by content similarity - catches name changes
@@ -219,9 +219,14 @@ func unmatchedIndices(n int, matched map[int]bool) []int {
 	return result
 }
 
-// fullResourceKey returns a string key for a resource (kind/namespace/name)
+// fullResourceKey returns a string key for a resource
+// (apiVersion/kind/namespace/name). apiVersion is part of the identity:
+// resources from different CRD groups can share kind+name (e.g. an Istio
+// networking.istio.io/v1alpha3 VirtualService and a Gloo gateway.solo.io/v1
+// VirtualService with the same name) and must be paired with their own
+// counterparts, not with each other by extraction order. See #505.
 func fullResourceKey(r *unstructured.Unstructured) string {
-	return r.GetKind() + "/" + r.GetNamespace() + "/" + r.GetName()
+	return r.GetAPIVersion() + "/" + r.GetKind() + "/" + r.GetNamespace() + "/" + r.GetName()
 }
 
 // sortedMapKeys returns the sorted keys of a map[string][]int
