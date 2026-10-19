@@ -2358,3 +2358,46 @@ func TestPairByContent_DeterministicTieBreaking(t *testing.T) {
 		}
 	}
 }
+
+func TestChangedResources_SameNameDifferentApiVersionSwappedOrder(t *testing.T) {
+	// Two resources with the same kind+name but different apiVersions (e.g. an Istio
+	// networking.istio.io/v1alpha3 and a Gloo gateway.solo.io/v1 VirtualService, both
+	// named after the app) must pair by apiVersion identity, not by the order they
+	// happen to appear in the extracted manifests. Regression test for
+	// https://github.com/dag-andersen/argocd-diff-preview/issues/505: with
+	// kind+name-only keys, byte-identical renders whose extraction order differs
+	// between the base and target sides cross-pair istio<->gloo and report both
+	// resources as changed, producing phantom diffs.
+	istioVS := func() unstructured.Unstructured {
+		return makeResource("networking.istio.io/v1alpha3", "VirtualService", "default", "my-app", map[string]any{
+			"spec": map[string]any{"hosts": []any{"my-app.example.com"}},
+		})
+	}
+	glooVS := func() unstructured.Unstructured {
+		return makeResource("gateway.solo.io/v1", "VirtualService", "default", "my-app", map[string]any{
+			"spec": map[string]any{"virtualHost": map[string]any{"domains": []any{"my-app.example.com"}}},
+		})
+	}
+
+	// Base and target render identical resources, but in swapped order — the order
+	// is not guaranteed: it follows the ArgoCD API extraction order.
+	baseApp := makeApp("app-1", "my-app", []unstructured.Unstructured{istioVS(), glooVS()})
+	targetApp := makeApp("app-1", "my-app", []unstructured.Unstructured{glooVS(), istioVS()})
+
+	pair := Pair{Base: &baseApp, Target: &targetApp}
+	changed := pair.ChangedResources()
+
+	if len(changed) != 0 {
+		t.Errorf("expected 0 changed resources for identical renders in swapped order, got %d", len(changed))
+		for _, c := range changed {
+			baseApi, targetApi := "<nil>", "<nil>"
+			if c.Base != nil {
+				baseApi = c.Base.GetAPIVersion()
+			}
+			if c.Target != nil {
+				targetApi = c.Target.GetAPIVersion()
+			}
+			t.Logf("changed pair: base=%s target=%s", baseApi, targetApi)
+		}
+	}
+}
