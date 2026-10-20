@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -334,5 +335,22 @@ func TestDetectCrashEvents_RestartResetsExistingCrashLoopReporting(t *testing.T)
 	// Should get restart event AND crash-loop event (because restart resets the crash-loop reporting)
 	if len(events) != 2 {
 		t.Fatalf("Expected 2 events, got %d: %+v", len(events), events)
+	}
+}
+
+func TestImagePullHint_Redis(t *testing.T) {
+	hint := ImagePullHint("redis")
+	for _, want := range []string{"redis.image.repository", "custom-argo-cd-installation"} {
+		if !strings.Contains(hint, want) {
+			t.Errorf("Expected Redis hint to mention '%s', got '%s'", want, hint)
+		}
+	}
+}
+
+func TestImagePullHint_OtherContainers(t *testing.T) {
+	for _, name := range []string{"argocd-server", "argocd-repo-server", "argocd-application-controller"} {
+		if hint := ImagePullHint(name); hint != "" {
+			t.Errorf("Expected no hint for container '%s', got '%s'", name, hint)
+		}
 	}
 }
