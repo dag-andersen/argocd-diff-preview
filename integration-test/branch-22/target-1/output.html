@@ -1,0 +1,121 @@
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {
+	font-family: arial;
+}
+.container {
+	margin: auto;
+	width: 910px;
+}
+.diffs {
+	margin: 20px 0 20px 0;
+}
+.diff_container {
+	width: 910px;
+	overflow-x: scroll;
+	border-radius: 8px;
+	background:rgb(239, 239, 239);
+	scrollbar-width: none;
+	margin: 10px 0 10px 0;
+}
+table {
+	font-family: monospace;
+	border-spacing: 0px;
+	width: 100%;
+}
+tr.normal_line {
+	background:rgb(239, 239, 239);
+}
+tr.added_line {
+	background:rgb(169, 216, 184);
+}
+tr.removed_line {
+	background:rgb(247, 149, 173);
+}
+tr.comment_line {
+	background:rgb(197, 194, 194);
+}
+.resource_header {
+	font-family: monospace;
+	font-size: 14px;
+	color: rgb(80, 80, 80);
+	margin: 15px 0 5px 0;
+	padding: 0;
+}
+.resource_header:first-of-type {
+	margin-top: 10px;
+}
+pre {
+	margin: 0;
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Argo CD Diff Preview</h1>
+
+<p>Summary:</p>
+<pre>Modified (1):
+± ignore-array-order (+5|-5)</pre>
+
+<div class="diffs">
+<details>
+<summary>
+ignore-array-order (examples/ignore-array-order/application.yaml)
+</summary>
+
+<h4 class="resource_header">Deployment: default/ignore-array-order</h4>
+<div class="diff_container">
+<table>
+
+	<tr class="normal_line"><td><pre>   selector:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     matchLabels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       app: ignore-array-order</pre></td></tr>
+	<tr class="normal_line"><td><pre>   template:</pre></td></tr>
+	<tr class="normal_line"><td><pre>     metadata:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       labels:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         app: ignore-array-order</pre></td></tr>
+	<tr class="normal_line"><td><pre>     spec:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       containers:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       - args:</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - --first</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - --second</pre></td></tr>
+	<tr class="added_line"><td><pre>+        - --first</pre></td></tr>
+	<tr class="normal_line"><td><pre>         env:</pre></td></tr>
+	<tr class="added_line"><td><pre>+        - name: DB_PORT</pre></td></tr>
+	<tr class="added_line"><td><pre>+          value: &#34;5433&#34;</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - name: LOG_LEVEL</pre></td></tr>
+	<tr class="normal_line"><td><pre>           value: info</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - name: DB_HOST</pre></td></tr>
+	<tr class="normal_line"><td><pre>           value: postgres</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        - name: DB_PORT</pre></td></tr>
+	<tr class="removed_line"><td><pre>-          value: &#34;5432&#34;</pre></td></tr>
+	<tr class="normal_line"><td><pre>         image: nginx:1.27</pre></td></tr>
+	<tr class="normal_line"><td><pre>         name: app</pre></td></tr>
+	<tr class="normal_line"><td><pre>         volumeMounts:</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - mountPath: /etc/config</pre></td></tr>
+	<tr class="normal_line"><td><pre>           name: config</pre></td></tr>
+	<tr class="normal_line"><td><pre>         - mountPath: /var/cache</pre></td></tr>
+	<tr class="normal_line"><td><pre>           name: cache</pre></td></tr>
+	<tr class="normal_line"><td><pre>       volumes:</pre></td></tr>
+	<tr class="normal_line"><td><pre>       - emptyDir: {}</pre></td></tr>
+	<tr class="removed_line"><td><pre>-        name: config</pre></td></tr>
+	<tr class="removed_line"><td><pre>-      - emptyDir: {}</pre></td></tr>
+	<tr class="normal_line"><td><pre>         name: cache</pre></td></tr>
+	<tr class="added_line"><td><pre>+      - emptyDir: {}</pre></td></tr>
+	<tr class="added_line"><td><pre>+        name: config</pre></td></tr>
+</table>
+</div>
+
+</details>
+</div>
+
+<pre>_Stats_:
+[Applications: 2], [Full Run: Xs], [Rendering: Xs], [Cluster: Xs], [Argo CD: Xs]</pre>
+</div>
+</body>
+</html>
