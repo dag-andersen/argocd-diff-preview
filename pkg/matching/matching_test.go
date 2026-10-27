@@ -1470,7 +1470,7 @@ func TestBuildResourceDiffs_SkippedResource(t *testing.T) {
 		{Group: "apps", Kind: "Deployment", Name: "my-deploy"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1517,7 +1517,7 @@ func TestBuildResourceDiffs_MixSkippedAndNormal(t *testing.T) {
 		{Group: "apps", Kind: "Deployment", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1570,7 +1570,7 @@ func TestBuildResourceDiffs_NoIgnoreRules(t *testing.T) {
 
 	resources := []ResourcePair{{Base: &base, Target: &target}}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, nil)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1604,7 +1604,7 @@ func TestBuildResourceDiffs_AllSkipped(t *testing.T) {
 		{Group: "*", Kind: "*", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1636,7 +1636,7 @@ func TestBuildResourceDiffs_SkippedAddedResource(t *testing.T) {
 		{Group: "*", Kind: "Secret", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1666,7 +1666,7 @@ func TestBuildResourceDiffs_SkippedDeletedResource(t *testing.T) {
 		{Group: "*", Kind: "Secret", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1694,7 +1694,7 @@ func TestBuildResourceDiffs_SkippedResourceHeader(t *testing.T) {
 		{Group: "*", Kind: "CustomResourceDefinition", Name: "*"},
 	}
 
-	result, _, _, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, _, _, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1733,7 +1733,7 @@ func TestBuildResourceDiffs_CrossKindPairSkippedByBaseIgnoreRule(t *testing.T) {
 		{Group: "", Kind: "Secret", Name: "*"},
 	}
 
-	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules)
+	result, added, deleted, err := buildResourceDiffs(resources, 3, nil, rules, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

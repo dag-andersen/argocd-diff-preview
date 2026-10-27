@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/arrayorder"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	gitt "github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/matching"
@@ -30,6 +31,7 @@ func GeneratePreview(
 	selectionInfo SelectionInfo,
 	argocdUIURL string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	ignoreArrayOrder []arrayorder.Rule,
 ) (time.Duration, error) {
 	startTime := time.Now()
 	maxDiffMessageCharCount := maxCharCount
@@ -45,8 +47,13 @@ func GeneratePreview(
 		lineCount = 3
 	}
 
+	if len(ignoreArrayOrder) > 0 {
+		baseManifests = sortArraysInApps(baseManifests, ignoreArrayOrder)
+		targetManifests = sortArraysInApps(targetManifests, ignoreArrayOrder)
+	}
+
 	// Generate diffs using the matching package
-	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules)
+	appDiffs, err := matching.GenerateAppDiffs(baseManifests, targetManifests, lineCount, diffIgnoreRegex, ignoreResourceRules, ignoreArrayOrder)
 	if err != nil {
 		return time.Since(startTime), fmt.Errorf("failed to generate matching diffs: %w", err)
 	}

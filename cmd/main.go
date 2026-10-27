@@ -408,6 +408,7 @@ func run(cfg *Config) error {
 		selectionInfo,
 		cfg.ArgocdUIURL,
 		cfg.IgnoreResourceRules,
+		cfg.IgnoreArrayOrder,
 	)
 	if err != nil {
 		log.Error().Msg("❌ Failed to generate diff")
