@@ -61,3 +61,41 @@ func TestRawOptionsToConfig_IncludeHelmHooksRenderMethod(t *testing.T) {
 		})
 	}
 }
+
+func TestRawOptionsToConfig_IgnoreArrayOrder(t *testing.T) {
+	baseOptions := func(ignoreArrayOrder string) RawOptions {
+		return RawOptions{
+			BaseBranch:       "main",
+			TargetBranch:     "feature",
+			Repo:             "example/repo",
+			RenderMethod:     "cli",
+			DryRun:           true,
+			IgnoreArrayOrder: ignoreArrayOrder,
+		}
+	}
+
+	t.Run("empty", func(t *testing.T) {
+		options := baseOptions("")
+		cfg, err := options.ToConfig()
+		require.NoError(t, err)
+		assert.Empty(t, cfg.IgnoreArrayOrder)
+	})
+
+	t.Run("parses list of paths", func(t *testing.T) {
+		options := baseOptions(".spec.template.spec.containers[*].env, ..volumeMounts\n{.spec.template.spec.volumes}")
+		cfg, err := options.ToConfig()
+		require.NoError(t, err)
+		var paths []string
+		for _, rule := range cfg.IgnoreArrayOrder {
+			paths = append(paths, rule.String())
+		}
+		assert.Equal(t, []string{".spec.template.spec.containers[*].env", "..volumeMounts", "{.spec.template.spec.volumes}"}, paths)
+	})
+
+	t.Run("rejects invalid path", func(t *testing.T) {
+		options := baseOptions(".spec.containers[?(@.name=='app')].env")
+		_, err := options.ToConfig()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid ignore-array-order")
+	})
+}

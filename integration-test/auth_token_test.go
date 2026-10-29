@@ -106,10 +106,10 @@ func TestAuthToken(t *testing.T) {
 	_ = os.RemoveAll(targetBranchDir)
 	_ = os.RemoveAll(outputDir)
 
-	if err := cloneBranch("integration-test/branch-1/base", baseBranchDir); err != nil {
+	if err := cloneBranch(gitHubRepo(TestCase{}), "integration-test/branch-1/base", baseBranchDir); err != nil {
 		t.Fatalf("Failed to clone base branch: %v", err)
 	}
-	if err := cloneBranch("integration-test/branch-1/target", targetBranchDir); err != nil {
+	if err := cloneBranch(gitHubRepo(TestCase{}), "integration-test/branch-1/target", targetBranchDir); err != nil {
 		t.Fatalf("Failed to clone target branch: %v", err)
 	}
 

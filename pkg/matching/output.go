@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dag-andersen/argocd-diff-preview/pkg/arrayorder"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/extract"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/resource_filter"
 	"github.com/go-git/go-git/v5/utils/diff"
@@ -168,6 +169,7 @@ func GenerateAppDiffs(
 	contextLines uint,
 	ignorePattern *string,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	ignoreArrayOrder []arrayorder.Rule,
 ) ([]AppDiff, error) {
 	// Compile the ignore pattern regex once up front
 	var compiledIgnorePattern *regexp.Regexp
@@ -186,7 +188,7 @@ func GenerateAppDiffs(
 	var diffs []AppDiff
 
 	for _, pair := range pairs {
-		appDiff, err := generateAppDiff(pair, contextLines, compiledIgnorePattern, ignoreResourceRules)
+		appDiff, err := generateAppDiff(pair, contextLines, compiledIgnorePattern, ignoreResourceRules, ignoreArrayOrder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate diff for app pair: %w", err)
 		}
@@ -215,7 +217,7 @@ func GenerateAppDiffs(
 }
 
 // generateAppDiff generates the diff for a single app pair
-func generateAppDiff(pair Pair, contextLines uint, ignorePattern *regexp.Regexp, ignoreResourceRules []resource_filter.IgnoreResourceRule) (AppDiff, error) {
+func generateAppDiff(pair Pair, contextLines uint, ignorePattern *regexp.Regexp, ignoreResourceRules []resource_filter.IgnoreResourceRule, ignoreArrayOrder []arrayorder.Rule) (AppDiff, error) {
 	diff := AppDiff{}
 
 	// Set names and paths
@@ -259,7 +261,7 @@ func generateAppDiff(pair Pair, contextLines uint, ignorePattern *regexp.Regexp,
 	}
 
 	// Build per-resource diffs
-	resources, added, deleted, err := buildResourceDiffs(changedResources, contextLines, ignorePattern, ignoreResourceRules)
+	resources, added, deleted, err := buildResourceDiffs(changedResources, contextLines, ignorePattern, ignoreResourceRules, ignoreArrayOrder)
 	if err != nil {
 		return diff, err
 	}
@@ -283,6 +285,7 @@ func buildResourceDiffs(
 	contextLines uint,
 	ignorePattern *regexp.Regexp,
 	ignoreResourceRules []resource_filter.IgnoreResourceRule,
+	ignoreArrayOrder []arrayorder.Rule,
 ) ([]ResourceDiff, int, int, error) {
 	var result []ResourceDiff
 	totalAdded := 0
@@ -342,7 +345,7 @@ func buildResourceDiffs(
 		}
 
 		// Generate diff for this resource pair
-		diffResult, err := generateResourceDiff(rp, contextLines, ignorePattern)
+		diffResult, err := generateResourceDiff(rp, contextLines, ignorePattern, ignoreArrayOrder)
 		if err != nil {
 			return nil, 0, 0, err
 		}
@@ -368,7 +371,15 @@ func buildResourceDiffs(
 }
 
 // generateResourceDiff generates diff for a single resource pair with ignore pattern support
-func generateResourceDiff(rp ResourcePair, contextLines uint, ignorePattern *regexp.Regexp) (DiffResult, error) {
+func generateResourceDiff(rp ResourcePair, contextLines uint, ignorePattern *regexp.Regexp, ignoreArrayOrder []arrayorder.Rule) (DiffResult, error) {
+	if rp.Base != nil && rp.Target != nil && len(ignoreArrayOrder) > 0 {
+		base := rp.Base.DeepCopy()
+		target := rp.Target.DeepCopy()
+		arrayorder.Align(base.Object, target.Object, ignoreArrayOrder)
+		rp.Base = base
+		rp.Target = target
+	}
+
 	baseYAML, err := resourceToYAML(rp.Base)
 	if err != nil {
 		return DiffResult{}, fmt.Errorf("failed to marshal base resource: %w", err)

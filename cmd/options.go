@@ -19,6 +19,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/dag-andersen/argocd-diff-preview/pkg/app_selector"
+	"github.com/dag-andersen/argocd-diff-preview/pkg/arrayorder"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/cluster"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/k3d"
@@ -76,6 +77,7 @@ var (
 	DefaultWatchIfNoWatchPatternFound           = true
 	DefaultIgnoreInvalidWatchPattern            = false
 	DefaultHideDeletedAppDiff                   = false
+	DefaultIgnoreArrayOrder                     = ""
 	DefaultIgnoreResourceRules                  = ""
 	DefaultArgocdLoginOptions                   = ""
 	DefaultDisableClientThrottling              = true
@@ -134,6 +136,7 @@ type RawOptions struct {
 	LogFormat                            string `mapstructure:"log-format"`
 	Title                                string `mapstructure:"title"`
 	HideDeletedAppDiff                   bool   `mapstructure:"hide-deleted-app-diff"`
+	IgnoreArrayOrder                     string `mapstructure:"ignore-array-order"`
 	IgnoreResourceRules                  string `mapstructure:"ignore-resources"`
 	DisableClientThrottling              bool   `mapstructure:"disable-client-throttling"`
 	ArgocdUIURL                          string `mapstructure:"argocd-ui-url"`
@@ -199,6 +202,7 @@ type Config struct {
 	FilesChanged        []string
 	RedirectRevisions   []string
 	IgnoreResourceRules []resource_filter.IgnoreResourceRule
+	IgnoreArrayOrder    []arrayorder.Rule
 	ClusterProvider     cluster.Provider
 }
 
@@ -282,6 +286,7 @@ func Parse() *Config {
 	viper.SetDefault("title", DefaultTitle)
 	viper.SetDefault("dry-run", DefaultDryRun)
 	viper.SetDefault("hide-deleted-app-diff", DefaultHideDeletedAppDiff)
+	viper.SetDefault("ignore-array-order", DefaultIgnoreArrayOrder)
 	viper.SetDefault("ignore-resources", DefaultIgnoreResourceRules)
 	viper.SetDefault("disable-client-throttling", DefaultDisableClientThrottling)
 	viper.SetDefault("concurrency", DefaultConcurrency)
@@ -348,6 +353,7 @@ func Parse() *Config {
 	rootCmd.Flags().String("redirect-target-revisions", "", "Comma-separated source targetRevision values to redirect to the target branch. Example: main,HEAD. By default, every targetRevision in matching repositories is redirected")
 	rootCmd.Flags().String("title", DefaultTitle, "Custom title for the markdown output")
 	rootCmd.Flags().Bool("hide-deleted-app-diff", DefaultHideDeletedAppDiff, "Hide diff content for fully deleted applications (only show deletion header)")
+	rootCmd.Flags().String("ignore-array-order", DefaultIgnoreArrayOrder, "Comma-separated JSONPaths of arrays whose element order is ignored in the diff. Example: '.spec.template.spec.containers[*].env'")
 	rootCmd.Flags().String("argocd-ui-url", DefaultArgocdUIURL, "Argo CD URL to generate application links in diff output (e.g., https://argocd.example.com)")
 	rootCmd.Flags().Bool("output-app-manifests", DefaultOutputAppManifests, "Write per-application manifest files to the output folder (output/base/ and output/target/)")
 	rootCmd.Flags().Bool("output-branch-manifests", DefaultOutputBranchManifests, "Write all application manifests per branch to a single file (output/base-branch.yaml and output/target-branch.yaml)")
@@ -489,6 +495,11 @@ func (o *RawOptions) ToConfig() (*Config, error) {
 	cfg.IgnoreResourceRules, err = resource_filter.FromString(o.IgnoreResourceRules)
 	if err != nil {
 		return nil, fmt.Errorf("invalid ignore-resources: %w", err)
+	}
+
+	cfg.IgnoreArrayOrder, err = arrayorder.FromString(o.IgnoreArrayOrder)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ignore-array-order: %w", err)
 	}
 
 	// Parse redirect revisions
@@ -836,6 +847,13 @@ func (o *Config) LogConfig() {
 	}
 	if o.HideDeletedAppDiff {
 		log.Info().Msgf("✨ - hide-deleted-app-diff: %t", o.HideDeletedAppDiff)
+	}
+	if len(o.IgnoreArrayOrder) > 0 {
+		paths := make([]string, len(o.IgnoreArrayOrder))
+		for i, rule := range o.IgnoreArrayOrder {
+			paths[i] = rule.String()
+		}
+		log.Info().Msgf("✨ - ignore-array-order: %s", strings.Join(paths, ", "))
 	}
 	if len(o.IgnoreResourceRules) > 0 {
 		ignoreResourceRuleStrings := make([]string, len(o.IgnoreResourceRules))
