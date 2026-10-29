@@ -105,6 +105,22 @@ func (s *CrashWatcherState) DetectCrashEvents(pods []corev1.Pod) []CrashEvent {
 	return events
 }
 
+// redisImagePullHint explains how to work around a Redis image that cannot be pulled.
+// The chart pulls Redis from ECR Public, which rate limits anonymous pulls from shared runners.
+const redisImagePullHint = "💡 If this problem continues to occur, the registry may be rate limiting anonymous pulls. " +
+	"You can override the Redis image repository (redis.image.repository) in the Argo CD Helm chart values. " +
+	"See the documentation for customizing the Argo CD installation: " +
+	"https://dag-andersen.github.io/argocd-diff-preview/getting-started/custom-argo-cd-installation/"
+
+// ImagePullHint returns a hint to log after an image pull failure of the given container,
+// or an empty string when there is no specific advice for it.
+func ImagePullHint(containerName string) string {
+	if containerName == "redis" {
+		return redisImagePullHint
+	}
+	return ""
+}
+
 // WatchForContainerRestarts starts a background goroutine that monitors pods matching
 // the given label selector for container restarts. It logs a warning whenever a
 // container's restart count increases or when a container enters CrashLoopBackOff.
@@ -151,6 +167,9 @@ func (c *Client) WatchForContainerRestarts(namespace, labelSelector string, poll
 						"🚨🚨🚨🚨🚨 Container '%s' in pod '%s' is waiting with %s. The image cannot be pulled and ArgoCD may not be functioning correctly.",
 						event.ContainerName, event.PodName, event.Reason,
 					)
+					if hint := ImagePullHint(event.ContainerName); hint != "" {
+						log.Info().Msg(hint)
+					}
 				}
 			}
 			return true
