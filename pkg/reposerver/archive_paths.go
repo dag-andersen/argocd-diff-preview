@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// The Argo CD compressor matches inclusions against basenames, so use directory
-// exclusions to retain repository-relative paths and prune unrelated subtrees.
+// archiveExclusions returns literal checkout-relative paths. Directory exclusions
+// retain the repository layout while pruning unrelated subtrees.
 func archiveExclusions(directory string, paths []string) ([]string, error) {
 	excluded := []string{".git"}
 	if len(paths) == 0 {
@@ -49,7 +49,6 @@ func archiveExclusions(directory string, paths []string) ([]string, error) {
 	// A retained symlink can point into an otherwise excluded subtree. Use the
 	// full checkout in that case, preserving the repo server's symlink checks.
 	symlink := errors.New("retained symlink needs the full checkout")
-	escapeGlob := strings.NewReplacer("\\", "\\\\", "*", "\\*", "?", "\\?", "[", "\\[")
 	err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -72,8 +71,7 @@ func archiveExclusions(directory string, paths []string) ([]string, error) {
 				return nil
 			}
 		}
-		// Exclusions are glob patterns, while rel is a literal filename.
-		excluded = append(excluded, escapeGlob.Replace(rel))
+		excluded = append(excluded, rel)
 		if entry.IsDir() {
 			return filepath.SkipDir
 		}

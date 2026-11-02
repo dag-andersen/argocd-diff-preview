@@ -10,7 +10,6 @@ import (
 
 	argocdpath "github.com/argoproj/argo-cd/v3/util/app/path"
 	"github.com/argoproj/argo-cd/v3/util/io/files"
-	"github.com/argoproj/argo-cd/v3/util/tgzstream"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/kustomize/api/krusty"
 	"sigs.k8s.io/kustomize/api/types"
@@ -149,9 +148,9 @@ func TestScopedArchiveFullCheckoutSharesCacheAcrossConcurrentScopes(t *testing.T
 				scopes = append(scopes, paths)
 			}
 			var compressions atomic.Int32
-			cache := newTgzCacheWithCompressor(func(dir string, included, excluded []string) (*os.File, int, string, error) {
+			cache := newTgzCacheWithCompressor(func(dir string, excluded []string) (*os.File, int, string, error) {
 				compressions.Add(1)
-				return tgzstream.CompressFiles(dir, included, excluded)
+				return compressArchive(dir, excluded)
 			})
 			t.Cleanup(cache.Cleanup)
 			type result struct {

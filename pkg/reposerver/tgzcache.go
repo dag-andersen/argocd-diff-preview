@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/argoproj/argo-cd/v3/util/tgzstream"
 	"github.com/rs/zerolog/log"
 )
 
@@ -46,7 +45,8 @@ type tgzArchive struct {
 	cacheWaitDuration   time.Duration
 }
 
-type tgzCompressor func(appDir string, included []string, excluded []string) (*os.File, int, string, error)
+// excluded contains literal paths, not glob patterns.
+type tgzCompressor func(appDir string, excluded []string) (*os.File, int, string, error)
 
 type archiveKey struct {
 	directory string
@@ -79,7 +79,7 @@ type tgzCacheStats struct {
 }
 
 func newTgzCache() *tgzCache {
-	return newTgzCacheWithCompressor(tgzstream.CompressFiles)
+	return newTgzCacheWithCompressor(compressArchive)
 }
 
 func newTgzCacheWithCompressor(compress tgzCompressor) *tgzCache {
@@ -141,7 +141,7 @@ func (c *tgzCache) compressCached(appDir string, paths []string) (*tgzEntry, boo
 	waitStart := time.Now()
 	entry.once.Do(func() {
 		compressStart := time.Now()
-		file, files, checksum, err := c.compress(appDir, []string{"*"}, excluded)
+		file, files, checksum, err := c.compress(appDir, excluded)
 		entry.compressionDuration = time.Since(compressStart)
 		c.compressionNanos.Add(int64(entry.compressionDuration))
 		if err != nil {
