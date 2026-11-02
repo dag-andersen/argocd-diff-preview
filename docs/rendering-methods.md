@@ -38,4 +38,8 @@ components, patches, and value files required by the build.
 For example, a source at `apps/example` can use `.;/base/shared;/config`.
 The archive keeps the repository layout, so relative references still work.
 Applications without this annotation, and sources with retained symlinks, use
-the full checkout. This does not change application selection or remote rendering.
+the full checkout. Full-checkout archives are shared across applications.
+Explicit Helm, plugin, and directory sources are not narrowed. Sources with
+applicable `.argocd-source*.yaml` override files also keep the full checkout,
+because these files can change the renderer.
+This does not change application selection or remote rendering.
