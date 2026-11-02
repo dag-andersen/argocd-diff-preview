@@ -329,7 +329,8 @@ func renderApp(
 		if useRemote {
 			manifestStrings, err = repoClient.GenerateManifestsRemote(ctx, request)
 		} else {
-			manifestStrings, err = repoClient.GenerateManifests(ctx, streamDir, request)
+			paths := localStreamPaths(app, contentSource, branchFolder, streamDir)
+			manifestStrings, err = repoClient.GenerateManifests(ctx, streamDir, request, paths...)
 		}
 		// Clean up the temp dir immediately after the RPC completes - don't defer
 		// inside a loop, which would keep all temp dirs alive until renderApp returns.

@@ -25,3 +25,17 @@ The `repo-server-api` method is an experimental fast-path that bypasses the clus
 - **How it works:** It connects directly to the Argo CD `repo-server` component via gRPC, asking it to generate the manifests synchronously. 
 - **Characteristics:** The fastest method available. No cluster-side Application objects are created, and no polling of the reconciliation loop is needed. 
 - **Lockdown mode:** Compatible with [lockdown mode](reusing-clusters/lockdown-mode.md) (namespace-scoped Argo CD).
+
+### Limit streamed Kustomize files
+
+For local Kustomize sources, `repo-server-api` uses the Application's
+`argocd.argoproj.io/manifest-generate-paths` annotation to limit the streamed
+archive. The source directory is always included. Separate additional paths with
+semicolons; paths starting with `/` are relative to the repository root, and
+other paths are relative to the source directory. Include all external bases,
+components, patches, and value files required by the build.
+
+For example, a source at `apps/example` can use `.;/base/shared;/config`.
+The archive keeps the repository layout, so relative references still work.
+Applications without this annotation, and sources with retained symlinks, use
+the full checkout. This does not change application selection or remote rendering.
