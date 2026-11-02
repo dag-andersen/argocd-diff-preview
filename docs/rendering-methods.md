@@ -28,7 +28,8 @@ The `repo-server-api` method is an experimental fast-path that bypasses the clus
 
 ### Limit streamed Kustomize files
 
-For local Kustomize sources, `repo-server-api` uses the Application's
+For local sources that explicitly select Kustomize (an empty `kustomize: {}`
+configuration is sufficient), `repo-server-api` uses the Application's
 `argocd.argoproj.io/manifest-generate-paths` annotation to limit the streamed
 archive. The source directory is always included. Separate additional paths with
 semicolons; paths starting with `/` are relative to the repository root, and
@@ -39,7 +40,8 @@ For example, a source at `apps/example` can use `.;/base/shared;/config`.
 The archive keeps the repository layout, so relative references still work.
 Applications without this annotation, and sources with retained symlinks, use
 the full checkout. Full-checkout archives are shared across applications.
-Explicit Helm, plugin, and directory sources are not narrowed. Sources with
+Sources without an explicit type keep the full checkout so Argo CD can discover
+plugins. Helm, plugin, and directory sources are not narrowed. Sources with
 applicable `.argocd-source*.yaml` override files also keep the full checkout,
 because these files can change the renderer.
 This does not change application selection or remote rendering.

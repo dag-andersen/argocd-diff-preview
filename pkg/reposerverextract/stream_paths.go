@@ -3,6 +3,7 @@ package reposerverextract
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	argocdpath "github.com/argoproj/argo-cd/v3/util/app/path"
@@ -18,7 +19,9 @@ func localStreamPaths(app argoapplication.ArgoResource, source v1alpha1.Applicat
 		return nil
 	}
 	sourceType, err := source.ExplicitType()
-	if err != nil || (sourceType != nil && *sourceType != v1alpha1.ApplicationSourceTypeKustomize) {
+	// Without an explicit type, repo-server may discover a plugin before
+	// Kustomize. Its discovery inputs must remain in the checkout.
+	if err != nil || sourceType == nil || *sourceType != v1alpha1.ApplicationSourceTypeKustomize {
 		return nil
 	}
 	// Repo-server applies these overrides before selecting the renderer. Keep
@@ -32,8 +35,12 @@ func localStreamPaths(app argoapplication.ArgoResource, source v1alpha1.Applicat
 			return nil
 		}
 	}
+	// Apply the same outer whitespace normalization as application selection.
+	annotation := strings.TrimSpace(app.Yaml.GetAnnotations()[v1alpha1.AnnotationKeyManifestGeneratePaths])
 	paths := argocdpath.GetSourceRefreshPaths(&v1alpha1.Application{
-		ObjectMeta: metav1.ObjectMeta{Annotations: app.Yaml.GetAnnotations()},
+		ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			v1alpha1.AnnotationKeyManifestGeneratePaths: annotation,
+		}},
 	}, source)
 	if len(paths) == 0 {
 		return nil
