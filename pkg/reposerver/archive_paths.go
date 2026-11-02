@@ -26,14 +26,20 @@ func archiveExclusions(directory string, paths []string) ([]string, error) {
 			return excluded, nil
 		}
 		fullPath := filepath.Join(directory, path)
-		if _, err := os.Lstat(fullPath); err == nil {
+		_, statErr := os.Lstat(fullPath)
+		if statErr == nil {
 			roots = append(roots, path)
-			continue
-		} else if !errors.Is(err, fs.ErrNotExist) {
-			return nil, err
+		} else if !errors.Is(statErr, fs.ErrNotExist) {
+			return nil, statErr
 		}
+		// Argo CD matches both literal paths and globs. An existing literal
+		// filename must not hide other files matched by the same pattern.
 		matches, err := fs.Glob(os.DirFS(directory), filepath.ToSlash(path))
 		if err != nil {
+			if statErr == nil {
+				// A literal filename can contain invalid glob syntax.
+				continue
+			}
 			return nil, fmt.Errorf("invalid stream path %q: %w", path, err)
 		}
 		for _, match := range matches {
