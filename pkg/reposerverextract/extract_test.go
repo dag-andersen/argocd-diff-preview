@@ -666,7 +666,7 @@ func TestStageRefSourcesFallsBackForDynamicPaths(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "environments", "my-app.yaml"), []byte("replicas: 2\n"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "unrelated.yaml"), []byte("present: true\n"), 0o644))
 
-	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values"}}, v1alpha1.ApplicationSource{
+	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values", Path: "environments"}}, v1alpha1.ApplicationSource{
 		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values/environments/$ARGOCD_APP_NAME.yaml"}},
 	})
 	require.NoError(t, err)
