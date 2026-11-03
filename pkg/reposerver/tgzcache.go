@@ -3,11 +3,13 @@ package reposerver
 import (
 	"math"
 	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/argoproj/argo-cd/v3/util/tgzstream"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,7 +24,8 @@ import (
 // worst offender is compressed 120 times. A diff run doubles that again, since the
 // base and target branches are rendered separately.
 //
-// So compress once per directory and hand out read-only handles to the result.
+// Compress once per directory and effective exclusions, then hand out read-only
+// handles to the result.
 type tgzEntry struct {
 	once                sync.Once
 	path                string
@@ -42,12 +45,19 @@ type tgzArchive struct {
 	cacheWaitDuration   time.Duration
 }
 
-type tgzCompressor func(appDir string, included []string, excluded []string) (*os.File, int, string, error)
+// excluded contains literal paths, not glob patterns.
+type tgzCompressor func(appDir string, excluded []string) (*os.File, int, string, error)
+
+type archiveKey struct {
+	directory string
+	patterns  string
+}
 
 type tgzCache struct {
-	mu       sync.Mutex
-	entries  map[string]*tgzEntry
-	compress tgzCompressor
+	mu         sync.Mutex
+	entries    map[archiveKey]*tgzEntry
+	selections map[archiveKey]func() ([]string, error)
+	compress   tgzCompressor
 
 	requests         atomic.Int64
 	hits             atomic.Int64
@@ -69,30 +79,59 @@ type tgzCacheStats struct {
 }
 
 func newTgzCache() *tgzCache {
-	return newTgzCacheWithCompressor(tgzstream.CompressFiles)
+	return newTgzCacheWithCompressor(compressArchive)
 }
 
 func newTgzCacheWithCompressor(compress tgzCompressor) *tgzCache {
 	return &tgzCache{
-		entries:  map[string]*tgzEntry{},
-		compress: compress,
+		entries:    map[archiveKey]*tgzEntry{},
+		selections: map[archiveKey]func() ([]string, error){},
+		compress:   compress,
 	}
 }
 
-// compressCached compresses appDir once and returns the cache entry for the
-// archive. Concurrent callers for the same directory block on the first one
+// cachedExclusions walks the checkout once per requested path set. Different
+// selections can produce the same exclusions, especially on symlink fallback.
+func (c *tgzCache) cachedExclusions(appDir string, paths []string) ([]string, error) {
+	paths = slices.Clone(paths)
+	for i := range paths {
+		paths[i] = filepath.Clean(paths[i])
+	}
+	slices.Sort(paths)
+	paths = slices.Compact(paths)
+	key := archiveKey{directory: appDir, patterns: strings.Join(paths, "\x00")}
+
+	c.mu.Lock()
+	resolve, ok := c.selections[key]
+	if !ok {
+		resolve = sync.OnceValues(func() ([]string, error) {
+			return archiveExclusions(appDir, paths)
+		})
+		c.selections[key] = resolve
+	}
+	c.mu.Unlock()
+	return resolve()
+}
+
+// compressCached compresses each effective archive once and returns its entry.
+// Concurrent callers for the same directory and exclusions block on the first one
 // rather than each compressing their own copy.
 //
 // The caller must open its own handle: the archive is read to EOF per request and
 // seeked back on retry, so a shared *os.File would race across goroutines.
-func (c *tgzCache) compressCached(appDir string) (*tgzEntry, bool, error) {
+func (c *tgzCache) compressCached(appDir string, paths []string) (*tgzEntry, bool, error) {
 	c.requests.Add(1)
+	excluded, err := c.cachedExclusions(appDir, paths)
+	if err != nil {
+		return nil, false, err
+	}
+	key := archiveKey{directory: appDir, patterns: strings.Join(excluded, "\x00")}
 
 	c.mu.Lock()
-	entry, hit := c.entries[appDir]
+	entry, hit := c.entries[key]
 	if !hit {
 		entry = &tgzEntry{}
-		c.entries[appDir] = entry
+		c.entries[key] = entry
 		c.misses.Add(1)
 	} else {
 		c.hits.Add(1)
@@ -102,7 +141,7 @@ func (c *tgzCache) compressCached(appDir string) (*tgzEntry, bool, error) {
 	waitStart := time.Now()
 	entry.once.Do(func() {
 		compressStart := time.Now()
-		file, files, checksum, err := c.compress(appDir, []string{"*"}, []string{".git"})
+		file, files, checksum, err := c.compress(appDir, excluded)
 		entry.compressionDuration = time.Since(compressStart)
 		c.compressionNanos.Add(int64(entry.compressionDuration))
 		if err != nil {
@@ -157,11 +196,11 @@ func (c *tgzCache) logStats() {
 		Msg("📦 Cache stats")
 }
 
-// openCachedTgz returns a fresh read handle on the archive for appDir, compressing
-// it first if this is the first caller.
-func (c *tgzCache) openCachedTgz(appDir string) (*tgzArchive, error) {
+// openCachedTgz returns a fresh read handle on the archive for appDir and paths,
+// compressing it first if this is the first caller.
+func (c *tgzCache) openCachedTgz(appDir string, paths ...string) (*tgzArchive, error) {
 	waitStart := time.Now()
-	entry, cacheHit, err := c.compressCached(appDir)
+	entry, cacheHit, err := c.compressCached(appDir, paths)
 	cacheWaitDuration := time.Since(waitStart)
 	if err != nil {
 		return nil, err
@@ -199,8 +238,9 @@ func (c *tgzCache) Cleanup() {
 			continue
 		}
 		if err := os.Remove(entry.path); err != nil && !os.IsNotExist(err) {
-			log.Debug().Err(err).Str("dir", dir).Msg("Failed to remove cached archive")
+			log.Debug().Err(err).Str("dir", dir.directory).Msg("Failed to remove cached archive")
 		}
 	}
-	c.entries = map[string]*tgzEntry{}
+	c.entries = map[archiveKey]*tgzEntry{}
+	c.selections = map[archiveKey]func() ([]string, error){}
 }
