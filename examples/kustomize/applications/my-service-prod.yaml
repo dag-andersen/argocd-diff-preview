@@ -18,4 +18,4 @@ spec:
           patch: |-
             - op: replace
               path: /spec/template/spec/containers/0/ports/0/containerPort
-              value: 443
+              value: 8080
