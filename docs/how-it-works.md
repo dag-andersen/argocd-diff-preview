@@ -58,6 +58,7 @@ For each Application or ApplicationSet found, it applies the following modificat
 | Set `spec.destination.server` to `https://kubernetes.default.svc` | Points to the local cluster (the actual destination doesn't matter since we're only rendering, not syncing) |
 | Set `spec.source.targetRevision` to the branch name | So Argo CD renders manifests from the correct branch |
 | Set `spec.sources[*].targetRevision` to the branch name | Same as above, but for multi-source applications |
+| Set `targetRevision` of sources in `spec.templatePatch` to the branch name | For ApplicationSets that define sources in a [templatePatch](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Template/#template-patch). The patch is a Go template, so it is rewritten line by line: only block-style entries with an explicit `targetRevision` are redirected |
 | Set `spec.generators[*].git.revision` to the branch name | For ApplicationSets using Git generators (including nested Matrix/Merge generators) |
 
 <p align="center">
