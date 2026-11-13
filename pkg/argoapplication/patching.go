@@ -311,6 +311,11 @@ func (a *ArgoResource) RedirectSources(repoSelector *repository.Selector, branch
 		return nil
 	}
 
+	// Sources can also be defined in the ApplicationSet spec.templatePatch
+	if err := a.redirectTemplatePatchSources(repoSelector, branch, redirectRevisions); err != nil {
+		return fmt.Errorf("failed to redirect sources in spec.templatePatch: %w", err)
+	}
+
 	// Get spec
 	specMap, found, _ := unstructured.NestedMap(a.Yaml.Object, specPath...)
 	if !found {
