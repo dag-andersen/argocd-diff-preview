@@ -110,7 +110,8 @@ func PatchApplication(
 // keeps Helm naming stable across branches.
 //
 // This only applies to Application resources and only for Helm chart sources
-// (source.chart or sources[].chart). Existing releaseName values are preserved.
+// (source.chart or sources[].chart) that don't use a plugin. Existing releaseName
+// values are preserved.
 func (a *ArgoResource) SetHelmReleaseNameIfUnset() error {
 	if a.Kind != Application || a.Yaml == nil {
 		return nil
@@ -146,6 +147,13 @@ func (a *ArgoResource) SetHelmReleaseNameIfUnset() error {
 
 func setHelmReleaseNameIfUnsetOnSource(source map[string]any, appName string) {
 	if _, hasChart := source["chart"]; !hasChart {
+		return
+	}
+
+	// A source that sets plugin is rendered by a Config Management Plugin. Argo CD
+	// rejects a source with both helm and plugin ("multiple application sources
+	// defined: Helm,Plugin"), so adding helm.releaseName would break rendering.
+	if _, hasPlugin := source["plugin"]; hasPlugin {
 		return
 	}
 
