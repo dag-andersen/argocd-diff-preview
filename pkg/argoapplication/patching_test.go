@@ -901,6 +901,78 @@ spec:
 `,
 		},
 		{
+			name:    "chart source with plugin is not modified",
+			kind:    Application,
+			appName: "kube-state-metrics",
+			inputYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-state-metrics
+spec:
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-state-metrics
+    targetRevision: 7.2.2
+    plugin:
+      env:
+        - name: HELM_VALUES
+          value: "replicas: 1"
+`,
+			wantYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-state-metrics
+spec:
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-state-metrics
+    targetRevision: 7.2.2
+    plugin:
+      env:
+        - name: HELM_VALUES
+          value: "replicas: 1"
+`,
+		},
+		{
+			name:    "multi-source skips chart sources with an empty plugin",
+			kind:    Application,
+			appName: "my-app",
+			inputYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  sources:
+    - repoURL: https://charts.example.com
+      chart: with-plugin
+      targetRevision: 1.0.0
+      plugin: {}
+    - repoURL: https://charts.example.com
+      chart: without-plugin
+      targetRevision: 1.0.0
+`,
+			wantYML: `
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app
+spec:
+  sources:
+    - repoURL: https://charts.example.com
+      chart: with-plugin
+      targetRevision: 1.0.0
+      plugin: {}
+    - repoURL: https://charts.example.com
+      chart: without-plugin
+      targetRevision: 1.0.0
+      helm:
+        releaseName: my-app
+`,
+		},
+		{
 			name:    "applicationset is not modified",
 			kind:    ApplicationSet,
 			appName: "set-name",
