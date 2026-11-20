@@ -190,6 +190,11 @@ Each `branch-N/target[-suffix]/` directory contains expected output files (`outp
 - `branch-19/target`: Kustomize resource outside the application directory via `repo-server-api`. It requires global `kustomize.buildOptions: --load-restrictor LoadRestrictionsNone` from `argocd-cm`, proving the direct repo-server request forwards that setting.
 - `branch-21/target`: Local Helm chart that gates a ServiceMonitor on the kind-level capability `monitoring.coreos.com/v1/ServiceMonitor`, via `repo-server-api` against a cluster with the ServiceMonitor CRD. The target enables it, so the diff must show the ServiceMonitor added, as a real Argo CD sync would render it.
 
+### Branch 22: Ignore Array Order
+Test data lives in the `quangkhainguyen/extended-argocd-diff-preview` fork (set via the `GitHubRepo` field). The target reorders `env`, `volumes` and `args` of a Deployment and changes one env var value.
+- `target-1`: Without options - all reorderings show up in the diff
+- `target-2`: `--ignore-array-order` on `env` and `volumes` - only the env value change and the `args` reorder remain
+
 ## Prerequisites
 
 - Docker running
@@ -231,6 +236,7 @@ type TestCase struct {
     MaxDiffLength              string // --max-diff-length
     HideDeletedAppDiff         string // --hide-deleted-app-diff
     IgnoreResources            string // --ignore-resources
+    IgnoreArrayOrder           string // --ignore-array-order
     WatchIfNoWatchPatternFound string // --watch-if-no-watch-pattern-found
     AutoDetectFilesChanged     string // --auto-detect-files-changed (uses git diff)
     IgnoreInvalidWatchPattern  string // --ignore-invalid-watch-pattern
@@ -239,6 +245,7 @@ type TestCase struct {
     // Cluster/Auth options
     KindOptions                string // --kind-options
     CreateCluster              string // "true" to force a new cluster for this test
+    GitHubRepo                 string // "owner/repo" to clone test branches from; defaults to dag-andersen/argocd-diff-preview
     ArgocdLoginOptions         string // --argocd-login-options
     ArgocdAuthToken            string // --argocd-auth-token (used instead of username/password login)
     RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global -render-method flag

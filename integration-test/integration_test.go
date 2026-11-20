@@ -58,6 +58,7 @@ type TestCase struct {
 	IgnoreInvalidWatchPattern  string
 	HideDeletedAppDiff         string
 	IgnoreResources            string
+	IgnoreArrayOrder           string // --ignore-array-order (comma-separated JSONPaths)
 	ArgocdLoginOptions         string
 	ArgocdAuthToken            string // Auth token for Argo CD (if set, will be used instead of login)
 	RenderMethod               string // "cli", "server-api", "repo-server-api", or "" to use global flag
@@ -68,6 +69,7 @@ type TestCase struct {
 	TraverseAppOfApps          string // If "true", enables recursive child app discovery (--traverse-app-of-apps)
 	IncludeHelmHooks           string // If "true", keeps helm.sh/hook resources in the output (--include-helm-hooks)
 	RepoRegex                  string // If set, use --repo-regex instead of --repo
+	GitHubRepo                 string // "owner/repo" to clone the test branches from (and pass as --repo); defaults to dag-andersen/argocd-diff-preview
 	ExpectFailure              bool   // If true, the test is expected to fail
 }
 
@@ -385,6 +387,31 @@ var testCases = []TestCase{
 		FileRegex:                  "examples/kind-level-capabilities/.*",
 		WatchIfNoWatchPatternFound: "false",
 	},
+	// Tests --ignore-array-order. The target branch reorders `env`, `volumes` and `args`
+	// of a Deployment and changes the value of one env var.
+	// target-1: without the option, all reorderings show up in the diff.
+	// target-2: with the option, only the env value change and the `args` reorder
+	// (not covered by the JSONPaths) remain.
+	// The test data lives in the quangkhainguyen/extended-argocd-diff-preview fork.
+	{
+		Name:                       "branch-22/target-1",
+		TargetBranch:               "integration-test/branch-22/target",
+		BaseBranch:                 "integration-test/branch-22/base",
+		Suffix:                     "-1",
+		GitHubRepo:                 "quangkhainguyen/extended-argocd-diff-preview",
+		FileRegex:                  "examples/ignore-array-order/.*",
+		WatchIfNoWatchPatternFound: "false",
+	},
+	{
+		Name:                       "branch-22/target-2",
+		TargetBranch:               "integration-test/branch-22/target",
+		BaseBranch:                 "integration-test/branch-22/base",
+		Suffix:                     "-2",
+		GitHubRepo:                 "quangkhainguyen/extended-argocd-diff-preview",
+		FileRegex:                  "examples/ignore-array-order/.*",
+		WatchIfNoWatchPatternFound: "false",
+		IgnoreArrayOrder:           ".spec.template.spec.containers[*].env,.spec.template.spec.volumes",
+	},
 	// This test verifies that disabling cluster roles without using the API fails.
 	// When createClusterRoles: false is set but --render-method=cli is used,
 	// the tool should fail because it can't access cluster resources via CLI.
@@ -414,6 +441,14 @@ var testCases = []TestCase{
 		ExpectFailure:              true,
 		WatchIfNoWatchPatternFound: "false",
 	},
+}
+
+// gitHubRepo returns the "owner/repo" the test branches are cloned from.
+func gitHubRepo(tc TestCase) string {
+	if tc.GitHubRepo != "" {
+		return tc.GitHubRepo
+	}
+	return fmt.Sprintf("%s/%s", defaultGitHubOrg, defaultGitOpsRepo)
 }
 
 // effectiveRenderMethod returns the render mode that should be used for a test case.
@@ -684,10 +719,10 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 	}
 
 	// Clone the repositories to the run directory
-	if err := cloneBranch(tc.BaseBranch, runDirs.BaseBranch); err != nil {
+	if err := cloneBranch(gitHubRepo(tc), tc.BaseBranch, runDirs.BaseBranch); err != nil {
 		t.Fatalf("Failed to clone base branch: %v", err)
 	}
-	if err := cloneBranch(tc.TargetBranch, runDirs.TargetBranch); err != nil {
+	if err := cloneBranch(gitHubRepo(tc), tc.TargetBranch, runDirs.TargetBranch); err != nil {
 		t.Fatalf("Failed to clone target branch: %v", err)
 	}
 
@@ -749,12 +784,12 @@ func cleanup(dirs ...string) {
 }
 
 // cloneBranch clones a specific branch from the repository
-func cloneBranch(branch, targetDir string) error {
+func cloneBranch(repo, branch, targetDir string) error {
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	repoURL := fmt.Sprintf("https://github.com/%s/%s.git", defaultGitHubOrg, defaultGitOpsRepo)
+	repoURL := fmt.Sprintf("https://github.com/%s.git", repo)
 
 	// Clone with depth=1, with retries for transient network errors
 	maxAttempts := 3
@@ -972,7 +1007,7 @@ func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 	if tc.RepoRegex != "" {
 		args = append(args, "-e", fmt.Sprintf("REPO_REGEX=%s", tc.RepoRegex))
 	} else {
-		args = append(args, "-e", fmt.Sprintf("REPO=%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
+		args = append(args, "-e", fmt.Sprintf("REPO=%s", gitHubRepo(tc)))
 	}
 	args = append(args, "-e", fmt.Sprintf("TIMEOUT=%s", defaultTimeout))
 	args = append(args, "-e", fmt.Sprintf("LINE_COUNT=%s", getLineCount(tc)))
@@ -1007,6 +1042,9 @@ func runWithDocker(tc TestCase, createCluster bool, runDirs RunDirs) error {
 	}
 	if tc.IgnoreResources != "" {
 		args = append(args, "-e", fmt.Sprintf("IGNORE_RESOURCES=%s", tc.IgnoreResources))
+	}
+	if tc.IgnoreArrayOrder != "" {
+		args = append(args, "-e", fmt.Sprintf("IGNORE_ARRAY_ORDER=%s", tc.IgnoreArrayOrder))
 	}
 	if tc.KindOptions != "" {
 		args = append(args, "-e", fmt.Sprintf("KIND_OPTIONS=%s", tc.KindOptions))
@@ -1080,7 +1118,7 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 	if tc.RepoRegex != "" {
 		args = append(args, "--repo-regex", tc.RepoRegex)
 	} else {
-		args = append(args, "--repo", fmt.Sprintf("%s/%s", defaultGitHubOrg, defaultGitOpsRepo))
+		args = append(args, "--repo", gitHubRepo(tc))
 	}
 
 	// Don't keep cluster alive for tests that expect failure (cluster may be in broken state)
@@ -1118,6 +1156,9 @@ func buildArgs(tc TestCase, createCluster bool, runDirs RunDirs, repoRoot string
 	}
 	if tc.IgnoreResources != "" {
 		args = append(args, "--ignore-resources", tc.IgnoreResources)
+	}
+	if tc.IgnoreArrayOrder != "" {
+		args = append(args, "--ignore-array-order", tc.IgnoreArrayOrder)
 	}
 	if tc.KindOptions != "" {
 		args = append(args, "--kind-options", tc.KindOptions)
