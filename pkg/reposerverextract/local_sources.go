@@ -23,32 +23,32 @@ func localContentAndRefSourcesAvailable(branchFolder string, primarySource v1alp
 }
 
 func localRefSourcesAvailable(branchFolder string, primarySource v1alpha1.ApplicationSource, refSources []v1alpha1.ApplicationSource) (bool, string) {
-	if primarySource.Helm == nil {
-		for _, ref := range refSources {
-			if ok, reason := localPathExists(localRefSourceRoot(branchFolder, ref), fmt.Sprintf("ref source %q", ref.Ref)); !ok {
-				return false, reason
-			}
+	// All local refs resolve from the repository root. A ref source's Path
+	// selects its own manifests; it does not change the root for Helm refs.
+	if len(refSources) > 0 {
+		if ok, reason := localPathExists(branchFolder, "ref repository"); !ok {
+			return false, reason
 		}
+	}
+	if primarySource.Helm == nil {
 		return true, ""
 	}
 
-	refsByName := make(map[string]v1alpha1.ApplicationSource, len(refSources))
+	refsByName := make(map[string]struct{}, len(refSources))
 	for _, ref := range refSources {
-		refsByName[ref.Ref] = ref
+		refsByName[ref.Ref] = struct{}{}
 	}
 
-	checkedRefs := map[string]bool{}
 	for _, valueFile := range primarySource.Helm.ValueFiles {
 		refName, refPath, ok := splitRefPath(valueFile)
 		if !ok {
 			continue
 		}
-		ref, found := refsByName[refName]
+		_, found := refsByName[refName]
 		if !found {
 			continue
 		}
-		checkedRefs[refName] = true
-		valueFilePath := filepath.Join(localRefSourceRoot(branchFolder, ref), refPath)
+		valueFilePath := filepath.Join(branchFolder, refPath)
 		if _, err := os.Stat(valueFilePath); err != nil {
 			// With ignoreMissingValueFiles a nonexistent file is optional by
 			// declaration, and Argo CD skips it when rendering. The branch folder is
@@ -64,23 +64,7 @@ func localRefSourcesAvailable(branchFolder string, primarySource v1alpha1.Applic
 		}
 	}
 
-	for _, ref := range refSources {
-		if checkedRefs[ref.Ref] {
-			continue
-		}
-		if ok, reason := localPathExists(localRefSourceRoot(branchFolder, ref), fmt.Sprintf("ref source %q", ref.Ref)); !ok {
-			return false, reason
-		}
-	}
-
 	return true, ""
-}
-
-func localRefSourceRoot(branchFolder string, ref v1alpha1.ApplicationSource) string {
-	if ref.Path == "" {
-		return branchFolder
-	}
-	return filepath.Join(branchFolder, ref.Path)
 }
 
 func localPathExists(path, description string) (bool, string) {

@@ -839,14 +839,12 @@ func buildRemoteChartLocalRefsRequest(
 }
 
 // stageRefSources stages only the Helm value files and file parameters that
-// reference another source. A ref source with an empty Path still resolves
-// paths from the repository root, but unrelated repository files are not
-// copied into the streamed archive.
+// reference another source. Ref paths always start at the repository root,
+// regardless of the ref source's Path. Unrelated repository files are not copied
+// into the streamed archive.
 func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.ApplicationSource, primarySource v1alpha1.ApplicationSource) (map[string]string, error) {
 	refDirs := make(map[string]string, len(refSources))
-	refsByName := make(map[string]v1alpha1.ApplicationSource, len(refSources))
 	for _, ref := range refSources {
-		refsByName[ref.Ref] = ref
 		refDirs[ref.Ref] = filepath.Join(tempDir, ".refs", ref.Ref)
 	}
 	if primarySource.Helm == nil {
@@ -875,7 +873,7 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 			}
 			continue
 		}
-		ref, found := refsByName[refName]
+		_, found := refDirs[refName]
 		if !found {
 			return nil, fmt.Errorf("ref path %q references unknown ref %q", refValuePath, refName)
 		}
@@ -883,19 +881,18 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 			continue
 		}
 
-		refRoot := localRefSourceRoot(branchFolder, ref)
 		// Argo CD expands variables in ref paths during rendering. Keep the
 		// existing full-ref behavior for dynamic paths because their final file
 		// name is not known while staging.
 		if strings.Contains(refPath, "$") {
-			if err := copyDir(refRoot, refDirs[refName]); err != nil {
+			if err := copyDir(branchFolder, refDirs[refName]); err != nil {
 				return nil, fmt.Errorf("failed to stage dynamic ref source %q: %w", refName, err)
 			}
 			fullyStagedRefs[refName] = struct{}{}
 			continue
 		}
 
-		srcFile, relPath, err := resolveRefFilePath(refRoot, refPath)
+		srcFile, relPath, err := resolveRefFilePath(branchFolder, refPath)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ref path %q for source %q: %w", refValuePath, refName, err)
 		}
