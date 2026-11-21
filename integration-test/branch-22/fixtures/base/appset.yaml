@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: template-patch
+  annotations:
+    argocd-diff-preview/watch-pattern: '^manifests/production/configmap\.yaml$'
+spec:
+  goTemplate: true
+  goTemplateOptions: [missingkey=error]
+  generators:
+    - list:
+        elements:
+          - env: prod
+            repo: https://github.com/dag-andersen/argocd-diff-preview.git
+          - env: staging
+            repo: https://github.com/dag-andersen/argocd-diff-preview.git
+  template:
+    metadata:
+      name: 'template-patch-{{ .env }}'
+      annotations:
+        argocd-diff-preview/watch-pattern: '^manifests/production/configmap\.yaml$'
+    spec:
+      project: default
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default
+  templatePatch: |
+    spec:
+      sources:
+        - repoURL: {{ .repo | toJson }}
+          targetRevision: HEAD
+          path: manifests/common
+      {{- if eq .env "prod" }}
+        - repoURL: {{ .repo | toJson }}
+          targetRevision: >-
+            HEAD
+          path: manifests/production
+      {{- end }}
