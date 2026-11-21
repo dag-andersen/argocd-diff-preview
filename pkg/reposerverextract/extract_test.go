@@ -625,7 +625,7 @@ spec:
 //
 // ─────────────────────────────────────────────────────────────────────────────
 func TestResolveRefFilePathRejectsTraversal(t *testing.T) {
-	_, _, err := resolveRefFilePath(t.TempDir(), "../outside.yaml")
+	_, err := resolveRefFilePath("../outside.yaml")
 	require.ErrorContains(t, err, "escapes")
 }
 
@@ -634,6 +634,49 @@ func TestStageRefSourcesRejectsMalformedRefPath(t *testing.T) {
 		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values"}},
 	})
 	require.ErrorContains(t, err, "invalid ref path")
+}
+
+func TestStageRefSourcesKeepsStaticReadsInsideCheckout(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "values.yaml"), []byte("replicas: 2\n"), 0o644))
+	require.NoError(t, os.Symlink("values.yaml", filepath.Join(branchFolder, "local.yaml")))
+	outside := filepath.Join(t.TempDir(), "outside.yaml")
+	require.NoError(t, os.WriteFile(outside, []byte("replicas: 3\n"), 0o644))
+	require.NoError(t, os.Symlink(outside, filepath.Join(branchFolder, "external.yaml")))
+	refs := []v1alpha1.ApplicationSource{{Ref: "values"}}
+	primary := v1alpha1.ApplicationSource{Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values/local.yaml"}}}
+	dirs, err := stageRefSources(t.TempDir(), branchFolder, refs, primary)
+	require.NoError(t, err)
+	got, err := os.ReadFile(filepath.Join(dirs["values"], "local.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "replicas: 2\n", string(got))
+
+	primary.Helm.ValueFiles = []string{"$values/external.yaml"}
+	_, err = stageRefSources(t.TempDir(), branchFolder, refs, primary)
+	require.ErrorContains(t, err, "failed to inspect ref path")
+}
+
+func TestStageRefSourcesKeepsDynamicTreeInsideCheckout(t *testing.T) {
+	branchFolder := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(branchFolder, "config"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "config", "my-app.yaml"), []byte("replicas: 2\n"), 0o644))
+	require.NoError(t, os.Symlink("config", filepath.Join(branchFolder, "environments")))
+	require.NoError(t, os.Symlink("missing.yaml", filepath.Join(branchFolder, "dangling.yaml")))
+	require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(branchFolder, "external")))
+
+	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values", Path: "manifests"}}, v1alpha1.ApplicationSource{
+		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values/environments/$ARGOCD_APP_NAME.yaml"}},
+	})
+	require.NoError(t, err)
+	staged := refDirs["values"]
+	link, err := os.Readlink(filepath.Join(staged, "environments"))
+	require.NoError(t, err)
+	assert.Equal(t, "config", link)
+	assert.FileExists(t, filepath.Join(staged, "environments", "my-app.yaml"))
+	for _, skipped := range []string{"dangling.yaml", "external"} {
+		_, err := os.Lstat(filepath.Join(staged, skipped))
+		require.ErrorIs(t, err, os.ErrNotExist)
+	}
 }
 
 func TestStageRefSourcesDeduplicatesStaticPaths(t *testing.T) {
@@ -658,20 +701,6 @@ func TestStageRefSourcesDoesNotIgnoreMissingFileParameter(t *testing.T) {
 		},
 	})
 	require.ErrorContains(t, err, "missing.txt")
-}
-
-func TestStageRefSourcesFallsBackForDynamicPaths(t *testing.T) {
-	branchFolder := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(branchFolder, "environments"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "environments", "my-app.yaml"), []byte("replicas: 2\n"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(branchFolder, "unrelated.yaml"), []byte("present: true\n"), 0o644))
-
-	refDirs, err := stageRefSources(t.TempDir(), branchFolder, []v1alpha1.ApplicationSource{{Ref: "values", Path: "environments"}}, v1alpha1.ApplicationSource{
-		Helm: &v1alpha1.ApplicationSourceHelm{ValueFiles: []string{"$values/environments/$ARGOCD_APP_NAME.yaml"}},
-	})
-	require.NoError(t, err)
-	assert.FileExists(t, filepath.Join(refDirs["values"], "environments", "my-app.yaml"))
-	assert.FileExists(t, filepath.Join(refDirs["values"], "unrelated.yaml"), "dynamic paths must preserve full-ref staging")
 }
 
 func TestBuildManifestRequest_ExternalChart_WithRefAndPath_GH401(t *testing.T) {
