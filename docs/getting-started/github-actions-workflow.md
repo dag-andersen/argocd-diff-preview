@@ -4,6 +4,38 @@
 
 If your repository is public and only uses public Helm charts, you can use the following GitHub Actions workflow to generate a diff between the main branch and the pull request branch. The diff will then be posted as a comment on the pull request.
 
+### Using Native Github Action
+```yaml title=".github/workflows/generate-diff.yml" linenums="1"
+
+name: "ArgoCD Diff Preview Workflow"
+
+on:
+  workflow_call: {}
+  pull_request:
+  branches:
+    main
+
+concurrency:
+  group: pr-action-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  install-argocd-diff-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install argocd diff preview
+        uses: dag-andersen/argocd-diff-preview/action@main
+        with:
+          version: '0.1.23'
+          timeout: '500'
+          dry-run: true
+          create-cluster: true
+          disable-client-throttling: true
+          target-branch: main
+          repo: ${{ github.repository }}
+
+```
+
 ```yaml title=".github/workflows/generate-diff.yml" linenums="1"
 name: Argo CD Diff Preview
 
