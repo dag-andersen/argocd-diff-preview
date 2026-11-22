@@ -204,6 +204,8 @@ func (c *Client) newGRPCConn() (*grpc.ClientConn, error) {
 // appDir is the local directory that contains the rendered/checked-out source
 // files to stream. It must exist and be readable. The directory is compressed
 // into a .tar.gz archive and streamed chunk-by-chunk to the repo server.
+// Optional paths restrict the archive to those checkout-relative files and
+// directories. Without paths, the whole directory is streamed.
 //
 // request is a fully-populated ManifestRequest that describes the application,
 // its source, cluster API versions, Helm settings, etc.
@@ -214,16 +216,16 @@ func (c *Client) newGRPCConn() (*grpc.ClientConn, error) {
 // Transient gRPC Unavailable errors (e.g. EOF on the kubectl port-forward
 // tunnel under high concurrency) are retried with exponential back-off up to
 // maxGenerateRetries times before the error is propagated to the caller.
-func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *repoapiclient.ManifestRequest) ([]string, error) {
+func (c *Client) GenerateManifests(ctx context.Context, appDir string, request *repoapiclient.ManifestRequest, paths ...string) ([]string, error) {
 	log.Debug().
 		Str("app", request.AppName).
 		Str("dir", appDir).
 		Msg("Opening application directory archive for repo server")
 
-	// Cached per directory: Applications routinely share a source path, so
+	// Cached per directory and path set: Applications routinely share sources, so
 	// compressing per Application repeats identical work. Closed, not deleted -
 	// the archive is reused by the other Applications on this path.
-	archive, err := c.tgzCache.openCachedTgz(appDir)
+	archive, err := c.tgzCache.openCachedTgz(appDir, paths...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compress app directory %q: %w", appDir, err)
 	}

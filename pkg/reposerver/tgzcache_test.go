@@ -14,7 +14,7 @@ func TestTgzCacheOpenCachedTgzCompressesOnceForConcurrentCallers(t *testing.T) {
 	archiveDir := t.TempDir()
 
 	var compressions atomic.Int32
-	cache := newTgzCacheWithCompressor(func(string, []string, []string) (*os.File, int, string, error) {
+	cache := newTgzCacheWithCompressor(func(string, []string) (*os.File, int, string, error) {
 		compressions.Add(1)
 		time.Sleep(20 * time.Millisecond)
 		file, err := createTestArchive(archiveDir, "archive")
@@ -86,7 +86,7 @@ func TestTgzCacheOpenCachedTgzReportsArchiveMetrics(t *testing.T) {
 	appDir := t.TempDir()
 	archiveDir := t.TempDir()
 
-	cache := newTgzCacheWithCompressor(func(string, []string, []string) (*os.File, int, string, error) {
+	cache := newTgzCacheWithCompressor(func(string, []string) (*os.File, int, string, error) {
 		file, err := createTestArchive(archiveDir, "archive-content")
 		return file, 3, "checksum", err
 	})
@@ -125,7 +125,7 @@ func TestTgzCacheCleanupRemovesOnlyOwnArchives(t *testing.T) {
 	archiveDir := t.TempDir()
 
 	newCache := func(prefix string) *tgzCache {
-		return newTgzCacheWithCompressor(func(string, []string, []string) (*os.File, int, string, error) {
+		return newTgzCacheWithCompressor(func(string, []string) (*os.File, int, string, error) {
 			file, err := createTestArchive(archiveDir, prefix)
 			return file, 1, prefix, err
 		})
@@ -167,7 +167,7 @@ func TestTgzCacheOpenCachedTgzReturnsErrorForMissingArchive(t *testing.T) {
 	archiveDir := t.TempDir()
 
 	var compressions atomic.Int32
-	cache := newTgzCacheWithCompressor(func(string, []string, []string) (*os.File, int, string, error) {
+	cache := newTgzCacheWithCompressor(func(string, []string) (*os.File, int, string, error) {
 		compression := compressions.Add(1)
 		checksum := fmt.Sprintf("checksum-%d", compression)
 		file, err := createTestArchive(archiveDir, checksum)
