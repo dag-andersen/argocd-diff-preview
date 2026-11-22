@@ -8,6 +8,7 @@ import (
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/dag-andersen/argocd-diff-preview/pkg/git"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
 )
@@ -286,6 +287,37 @@ func TestFilterDuplicates_PreservesExistingSkippedApps(t *testing.T) {
 	assert.Len(t, result.SelectedApps, 1)
 	assert.Equal(t, "app2", result.SelectedApps[0].Name)
 	assert.Len(t, result.SkippedApps, 2) // skippedApp + app1
+}
+
+func TestRemoveIdenticalCopiesBetweenBranches_TemplatePatch(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		kind         string
+		patch        string
+		wantSelected int
+	}{
+		{"ApplicationSet with patch is kept for generation", "ApplicationSet", "spec: {source: {targetRevision: HEAD}}", 1},
+		{"ApplicationSet with blank patch is deduplicated", "ApplicationSet", " \n", 0},
+		{"Applications are still deduplicated", "Application", "spec: {}", 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			base := createTestArgoResource(tc.kind, "test", "app.yaml", git.Base)
+			target := createTestArgoResource(tc.kind, "test", "app.yaml", git.Target)
+			for _, resource := range []argoapplication.ArgoResource{base, target} {
+				require.NoError(t, unstructured.SetNestedField(resource.Yaml.Object, tc.patch, "spec", "templatePatch"))
+			}
+
+			baseResult, targetResult := RemoveIdenticalCopiesBetweenBranches(
+				createArgoSelection([]argoapplication.ArgoResource{base}),
+				createArgoSelection([]argoapplication.ArgoResource{target}),
+			)
+
+			for _, result := range []*argoapplication.ArgoSelection{baseResult, targetResult} {
+				assert.Len(t, result.SelectedApps, tc.wantSelected)
+				assert.Len(t, result.SkippedApps, 1-tc.wantSelected)
+			}
+		})
+	}
 }
 
 func TestRemoveIdenticalCopiesBetweenBranches_ApplicationSetWithRenderAlwaysIsNotRemoved(t *testing.T) {

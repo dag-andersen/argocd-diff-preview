@@ -1,6 +1,8 @@
 package duplicates
 
 import (
+	"strings"
+
 	"github.com/dag-andersen/argocd-diff-preview/pkg/argoapplication"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,6 +20,11 @@ func RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps *argoapplication.
 					log.Debug().
 						Str(baseApp.Kind.ShortName(), baseApp.Name).
 						Msgf("Keeping application because `%s=%s`", argoapplication.AnnotationRender, argoapplication.RenderAlways)
+					break
+				}
+				if hasTemplatePatch(baseApp) {
+					log.Debug().Str(baseApp.Kind.ShortName(), baseApp.Name).
+						Msg("Keeping ApplicationSet until Argo CD renders its templatePatch")
 					break
 				}
 				log.Debug().Str(baseApp.Kind.ShortName(), baseApp.Name).Msg("Skipping application because it has not changed")
@@ -68,6 +75,16 @@ func RemoveIdenticalCopiesBetweenBranches(baseApps, targetApps *argoapplication.
 
 func shouldAlwaysRender(baseApp, targetApp argoapplication.ArgoResource) bool {
 	return baseApp.GetRenderMode() == argoapplication.RenderAlways || targetApp.GetRenderMode() == argoapplication.RenderAlways
+}
+
+// A patch can define sources that are not visible until Argo CD expands the
+// ApplicationSet. The generated Applications are patched and deduplicated later.
+func hasTemplatePatch(app argoapplication.ArgoResource) bool {
+	if app.Kind != argoapplication.ApplicationSet || app.Yaml == nil {
+		return false
+	}
+	patch, _, _ := unstructured.NestedString(app.Yaml.Object, "spec", "templatePatch")
+	return strings.TrimSpace(patch) != ""
 }
 
 func filterDuplicates(apps *argoapplication.ArgoSelection, duplicates []*unstructured.Unstructured) *argoapplication.ArgoSelection {
