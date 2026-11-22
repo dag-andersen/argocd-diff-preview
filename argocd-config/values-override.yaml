@@ -14,6 +14,10 @@ dex:
   enabled: false
 applicationSet:
   replicas: 0
+# ECR Public (the chart default) rate limits anonymous pulls on shared CI runners. Ref: https://github.com/dag-andersen/argocd-diff-preview/issues/494
+redis:
+  image:
+    repository: mirror.gcr.io/library/redis
 # Explicitly disable the source hydrator / commit server
 # We don't want ArgoCD to push hydrated manifests to git
 # Ref: https://argo-cd.readthedocs.io/en/stable/user-guide/source-hydrator/#enabling-the-source-hydrator
