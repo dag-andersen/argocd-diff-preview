@@ -19,7 +19,7 @@ type DiffResult struct {
 // For deleted resources (Target is nil), shows all lines as deletions.
 // For modified resources, shows a unified diff with context.
 func (rp *ResourcePair) Diff(contextLines uint) (DiffResult, error) {
-	return generateResourceDiff(*rp, contextLines, nil)
+	return generateResourceDiff(*rp, contextLines, nil, nil)
 }
 
 // resourceToYAML converts an unstructured resource to YAML string.
