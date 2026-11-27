@@ -43,17 +43,31 @@ func TestLocalRefSourcesAvailableRejectsRequiredMissingValueFile(t *testing.T) {
 	}
 }
 
-func TestLocalRefSourcesAvailableRejectsMissingRefSource(t *testing.T) {
-	branchFolder := t.TempDir()
+func TestLocalRefSourcesAvailableRejectsMissingCheckout(t *testing.T) {
+	branchFolder := filepath.Join(t.TempDir(), "missing-checkout")
 	primary := v1alpha1.ApplicationSource{}
-	refs := []v1alpha1.ApplicationSource{{Ref: "values", Path: "missing-ref"}}
+	refs := []v1alpha1.ApplicationSource{{Ref: "values"}}
 
 	available, reason := localRefSourcesAvailable(branchFolder, primary, refs)
 	if available {
-		t.Fatal("missing ref source should make the local render path unavailable")
+		t.Fatal("missing checkout should make the local render path unavailable")
 	}
-	if !strings.Contains(reason, "missing-ref") || !strings.Contains(reason, "does not exist") {
+	if !strings.Contains(reason, "missing-checkout") || !strings.Contains(reason, "does not exist") {
 		t.Fatalf("unexpected reason: %q", reason)
+	}
+}
+
+func TestLocalRefSourcesAvailableDoesNotRequireRefContentPath(t *testing.T) {
+	branchFolder := t.TempDir()
+	refs := []v1alpha1.ApplicationSource{{Ref: "values", Path: "missing-content"}}
+	available, reason := localRefSourcesAvailable(branchFolder, v1alpha1.ApplicationSource{}, refs)
+	if !available {
+		t.Fatalf("a ref source's content path does not affect its repository root: %s", reason)
+	}
+
+	available, _ = localContentAndRefSourcesAvailable(branchFolder, refs[0], refs)
+	if available {
+		t.Fatal("rendering the ref source's own content must still require its path")
 	}
 }
 

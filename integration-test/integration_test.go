@@ -43,6 +43,7 @@ type TestCase struct {
 	Name                       string
 	TargetBranch               string
 	BaseBranch                 string
+	UseLocalFixtures           bool   // Copy the case's fixtures instead of cloning Git branches
 	Suffix                     string // Used for multiple test variations on same branch
 	LineCount                  string
 	DiffIgnore                 string
@@ -85,6 +86,16 @@ type RunDirs struct {
 
 // testCases defines all integration test cases matching the Makefile
 var testCases = []TestCase{
+	// Repo-server mode streams the fixture files directly, so this case can
+	// reproduce the manifest-only change without publishing data branches.
+	{
+		Name:                       "branch-22/target",
+		BaseBranch:                 "integration-test/branch-22/base",
+		TargetBranch:               "integration-test/branch-22/target",
+		UseLocalFixtures:           true,
+		RenderMethod:               "repo-server-api",
+		WatchIfNoWatchPatternFound: "false",
+	},
 	{
 		Name:          "branch-1/target-1",
 		TargetBranch:  "integration-test/branch-1/target",
@@ -718,12 +729,24 @@ func runTestCase(t *testing.T, tc TestCase, createCluster bool) {
 		t.Fatalf("Failed to copy kind config: %v", err)
 	}
 
-	// Clone the repositories to the run directory
-	if err := cloneBranch(gitHubRepo(tc), tc.BaseBranch, runDirs.BaseBranch); err != nil {
-		t.Fatalf("Failed to clone base branch: %v", err)
-	}
-	if err := cloneBranch(gitHubRepo(tc), tc.TargetBranch, runDirs.TargetBranch); err != nil {
-		t.Fatalf("Failed to clone target branch: %v", err)
+	if !tc.UseLocalFixtures {
+		if err := cloneBranch(gitHubRepo(tc), tc.BaseBranch, runDirs.BaseBranch); err != nil {
+			t.Fatalf("Failed to clone base branch: %v", err)
+		}
+		if err := cloneBranch(gitHubRepo(tc), tc.TargetBranch, runDirs.TargetBranch); err != nil {
+			t.Fatalf("Failed to clone target branch: %v", err)
+		}
+	} else {
+		fixtures := filepath.Join(getBranchDir(tc), "fixtures")
+		base := filepath.Join(fixtures, "base")
+		for _, dst := range []string{runDirs.BaseBranch, runDirs.TargetBranch} {
+			if err := copyDir(base, dst); err != nil {
+				t.Fatalf("Failed to copy base fixture: %v", err)
+			}
+		}
+		if err := copyDir(filepath.Join(fixtures, "target"), runDirs.TargetBranch); err != nil {
+			t.Fatalf("Failed to overlay target fixture: %v", err)
+		}
 	}
 
 	// Run the tool
@@ -1227,18 +1250,14 @@ func getMaxDiffLength(tc TestCase) string {
 	return defaultMaxDiffLen
 }
 
-// getExpectedDir returns the directory containing expected output files
-func getExpectedDir(tc TestCase) string {
+func getBranchDir(tc TestCase) string {
 	// Extract branch name from target branch (e.g., "integration-test/branch-1/target" -> "branch-1")
-	parts := strings.Split(tc.TargetBranch, "/")
-	branchName := parts[1] // "branch-1", "branch-2", etc.
+	return strings.Split(tc.TargetBranch, "/")[1]
+}
 
-	// Build the expected directory path (relative to integration-test/ folder)
-	suffix := tc.Suffix
-	if suffix == "" {
-		suffix = ""
-	}
-	return filepath.Join(branchName, "target"+suffix)
+// getExpectedDir returns the directory containing expected output files.
+func getExpectedDir(tc TestCase) string {
+	return filepath.Join(getBranchDir(tc), "target"+tc.Suffix)
 }
 
 // compareOutput compares actual output with expected output

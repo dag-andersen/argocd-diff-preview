@@ -60,6 +60,8 @@ For each Application or ApplicationSet found, it applies the following modificat
 | Set `spec.sources[*].targetRevision` to the branch name | Same as above, but for multi-source applications |
 | Set `spec.generators[*].git.revision` to the branch name | For ApplicationSets using Git generators (including nested Matrix/Merge generators) |
 
+Selected ApplicationSets with a non-empty `spec.templatePatch` are kept even if they are identical across branches. Argo CD evaluates the patch when generating Applications, then Diff Preview redirects sources on those generated Applications before checking for identical copies again.
+
 <p align="center">
   <img src="../assets/appset-patching.png" width="800">
 </p>

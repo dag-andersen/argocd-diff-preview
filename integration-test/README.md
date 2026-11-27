@@ -224,6 +224,7 @@ type TestCase struct {
     Name                       string // Test name (e.g., "branch-1/target-1")
     TargetBranch               string // Git branch for target state
     BaseBranch                 string // Git branch for base state
+    UseLocalFixtures           bool   // Copy the case's fixtures instead of cloning Git branches
     Suffix                     string // Suffix for multiple tests on same branch
 
     // Tool options
@@ -256,6 +257,20 @@ type TestCase struct {
 ```
 
 `RenderMethod` on a test case overrides the global `-render-method` flag for that specific test, allowing individual tests to pin a render mode regardless of how the suite is invoked.
+
+### Local fixtures
+
+For cases that use `repo-server-api` to render from local files, set `UseLocalFixtures: true` to keep the inputs next to the expected outputs. For example:
+
+```text
+branch-22/
+  fixtures/
+    base/     # Complete base input
+    target/   # New or changed files, relative to base
+  target/     # Expected output.md and output.html
+```
+
+The runner copies `fixtures/base` into both checkouts and overlays `fixtures/target` onto the target checkout. The overlay supports additions and replacements, not deletions. The branch names identify the inputs to the tool and the case directory, but no Git branches are cloned or need to be published. Cases that need Argo CD to fetch their sources from Git should use the branch-backed setup instead.
 
 ## RBAC Configuration Handling
 

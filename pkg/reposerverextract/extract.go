@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -838,15 +839,15 @@ func buildRemoteChartLocalRefsRequest(
 	return newManifestRequest(&rewrittenSource), tempDir, cleanup, nil
 }
 
-// stageRefSources stages only the Helm value files and file parameters that
-// reference another source. A ref source with an empty Path still resolves
-// paths from the repository root, but unrelated repository files are not
-// copied into the streamed archive.
+// stageRefSources stages referenced Helm files from the repository root,
+// regardless of the ref source's Path. Dynamic paths need the checkout tree
+// because their filenames are only known at render time.
 func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.ApplicationSource, primarySource v1alpha1.ApplicationSource) (map[string]string, error) {
 	refDirs := make(map[string]string, len(refSources))
-	refsByName := make(map[string]v1alpha1.ApplicationSource, len(refSources))
 	for _, ref := range refSources {
-		refsByName[ref.Ref] = ref
+		if !filepath.IsLocal(ref.Ref) || ref.Ref == "." || filepath.Base(ref.Ref) != ref.Ref {
+			return nil, fmt.Errorf("invalid ref name %q", ref.Ref)
+		}
 		refDirs[ref.Ref] = filepath.Join(tempDir, ".refs", ref.Ref)
 	}
 	if primarySource.Helm == nil {
@@ -864,8 +865,14 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 	for _, fileParameter := range primarySource.Helm.FileParameters {
 		refPaths = append(refPaths, refPathToStage{path: fileParameter.Path})
 	}
+	dynamicRefs := map[string]struct{}{}
+	for _, ref := range refPaths {
+		if name, path, ok := splitRefPath(ref.path); ok && isDynamicRefPath(path) {
+			dynamicRefs[name] = struct{}{}
+		}
+	}
 	stagedFiles := map[string]struct{}{}
-	fullyStagedRefs := map[string]struct{}{}
+	var checkout *os.Root
 	for _, refPathToStage := range refPaths {
 		refValuePath := refPathToStage.path
 		refName, refPath, ok := splitRefPath(refValuePath)
@@ -875,61 +882,125 @@ func stageRefSources(tempDir, branchFolder string, refSources []v1alpha1.Applica
 			}
 			continue
 		}
-		ref, found := refsByName[refName]
+		_, found := refDirs[refName]
 		if !found {
 			return nil, fmt.Errorf("ref path %q references unknown ref %q", refValuePath, refName)
 		}
-		if _, staged := fullyStagedRefs[refName]; staged {
-			continue
-		}
-
-		refRoot := localRefSourceRoot(branchFolder, ref)
-		// Argo CD expands variables in ref paths during rendering. Keep the
-		// existing full-ref behavior for dynamic paths because their final file
-		// name is not known while staging.
-		if strings.Contains(refPath, "$") {
-			if err := copyDir(refRoot, refDirs[refName]); err != nil {
-				return nil, fmt.Errorf("failed to stage dynamic ref source %q: %w", refName, err)
+		if checkout == nil {
+			var err error
+			checkout, err = os.OpenRoot(branchFolder)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open ref repository: %w", err)
 			}
-			fullyStagedRefs[refName] = struct{}{}
+			defer func() {
+				if err := checkout.Close(); err != nil {
+					log.Warn().Err(err).Msg("Failed to close ref repository")
+				}
+			}()
+		}
+
+		if isDynamicRefPath(refPath) {
 			continue
 		}
 
-		srcFile, relPath, err := resolveRefFilePath(refRoot, refPath)
+		relPath, err := resolveRefFilePath(refPath)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ref path %q for source %q: %w", refValuePath, refName, err)
 		}
-		if _, err := os.Stat(srcFile); err != nil {
+		info, err := checkout.Stat(relPath)
+		if err != nil {
 			if refPathToStage.ignoreIfMissing && errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			return nil, fmt.Errorf("failed to inspect ref path %q from source %q: %w", refValuePath, refName, err)
 		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("ref path %q from source %q is not a regular file", refValuePath, refName)
+		}
+		// A dynamic ref stages the tree once, including its static files.
+		if _, dynamic := dynamicRefs[refName]; dynamic {
+			continue
+		}
 		stagingKey := refName + "\x00" + relPath
 		if _, staged := stagedFiles[stagingKey]; staged {
 			continue
 		}
-		if err := copyFile(srcFile, filepath.Join(refDirs[refName], relPath)); err != nil {
+		if err := copyRefFile(checkout, relPath, filepath.Join(refDirs[refName], relPath)); err != nil {
 			return nil, fmt.Errorf("failed to stage ref path %q from source %q: %w", refValuePath, refName, err)
 		}
 		stagedFiles[stagingKey] = struct{}{}
 	}
+	for refName := range dynamicRefs {
+		if err := copyRefTree(checkout, refDirs[refName]); err != nil {
+			return nil, fmt.Errorf("failed to stage dynamic ref source %q: %w", refName, err)
+		}
+	}
 	return refDirs, nil
 }
 
-func resolveRefFilePath(refRoot, refPath string) (string, string, error) {
-	if filepath.IsAbs(refPath) {
-		return "", "", errors.New("absolute paths are not allowed")
-	}
-	srcFile := filepath.Join(refRoot, refPath)
-	relPath, err := filepath.Rel(refRoot, srcFile)
+func isDynamicRefPath(path string) bool {
+	return strings.Contains(path, "$")
+}
+
+// copyRefTree keeps usable checkout-local links as links instead of following
+// them. Unrelated missing or out-of-checkout targets are not staged.
+func copyRefTree(checkout *os.Root, dst string) error {
+	return fs.WalkDir(checkout.FS(), ".", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.Name() == ".git" {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		rel := filepath.FromSlash(path)
+		target := filepath.Join(dst, rel)
+		switch {
+		case entry.IsDir():
+			return os.MkdirAll(target, 0o755)
+		case entry.Type()&os.ModeSymlink != 0:
+			if _, err := checkout.Stat(rel); err != nil {
+				return nil
+			}
+			link, err := checkout.Readlink(rel)
+			if err != nil {
+				return err
+			}
+			if filepath.IsAbs(link) || !filepath.IsLocal(filepath.Join(filepath.Dir(rel), link)) {
+				return nil
+			}
+			return os.Symlink(link, target)
+		case entry.Type().IsRegular():
+			return copyRefFile(checkout, rel, target)
+		default:
+			return nil
+		}
+	})
+}
+
+func copyRefFile(checkout *os.Root, src, dst string) (err error) {
+	r, err := checkout.Open(src)
 	if err != nil {
-		return "", "", err
+		return err
 	}
-	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(os.PathSeparator)) {
-		return "", "", errors.New("path escapes the ref source root")
+	defer func() {
+		if cerr := r.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+	return writeStagedFile(r, dst)
+}
+
+func resolveRefFilePath(refPath string) (string, error) {
+	if filepath.IsAbs(refPath) {
+		return "", errors.New("absolute paths are not allowed")
 	}
-	return srcFile, relPath, nil
+	if !filepath.IsLocal(refPath) {
+		return "", errors.New("path escapes the ref source root")
+	}
+	return filepath.Clean(refPath), nil
 }
 
 // rewriteRefValueFiles returns a copy of source whose Helm $ref paths are
@@ -1169,9 +1240,6 @@ func copyDir(src, dst string) error {
 
 // copyFile copies a single file from src to dst, creating parent directories.
 func copyFile(src, dst string) (err error) {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
 	r, err := os.Open(src)
 	if err != nil {
 		return err
@@ -1181,6 +1249,13 @@ func copyFile(src, dst string) (err error) {
 			err = cerr
 		}
 	}()
+	return writeStagedFile(r, dst)
+}
+
+func writeStagedFile(r io.Reader, dst string) (err error) {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
 	w, err := os.Create(dst)
 	if err != nil {
 		return err
